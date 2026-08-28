@@ -3594,6 +3594,30 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
    кількості цифр: поле на два символи не має бути таким самим, як на
    чотири, інакше цифри в ньому висять посередині порожнечі. */
 .dob { display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+/* --------------------------------------------------------------------
+   Індикатор надійності пароля. Три рівні; колір — від помилкового до
+   акцентного, бо «слабкий» тут не декор, а причина не пустити далі.
+   -------------------------------------------------------------------- */
+.pwm { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.pwm__bar {
+  flex: 1 1 auto; height: 4px; border-radius: 2px;
+  background: rgba(var(--tint-rgb), 0.10); overflow: hidden;
+}
+.pwm__bar i {
+  display: block; height: 100%; width: 0;
+  background: var(--warn, #d66);
+  transition: width var(--t-fast), background var(--t-fast);
+}
+.pwm__txt { color: var(--muted); flex: 0 1 auto; text-align: right; }
+.pwm[data-score="0"] .pwm__txt { color: var(--warn, #d66); }
+.pwm[data-score="2"] .pwm__bar i,
+.pwm[data-score="3"] .pwm__bar i { background: var(--acc-bar); }
+.pwm[data-score="1"] .pwm__bar i { background: var(--g3); }
+@media (max-width: 420px) {
+  .pwm { flex-direction: column; align-items: stretch; gap: 6px; }
+  .pwm__txt { text-align: left; }
+}
 .dob__part {
   text-align: center;
   font-family: var(--font-mono);

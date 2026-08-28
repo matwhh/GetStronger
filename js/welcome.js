@@ -511,9 +511,36 @@
     const a = state.acc;
     if (a.username.trim().length < 3 || a.username.trim().length > 24) return 'Нік — від 3 до 24 символів.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) return 'Перевір адресу пошти.';
-    if (a.pass.length < 8) return 'Пароль — щонайменше 8 символів.';
+
+    /* Надійність пароля — окреме ядро (js/password-core.js), тут лише
+       його вердикт. Мінімальна довжина продубльована на сервері
+       (Supabase Auth), щоб правило не трималось на самому браузері. */
+    const PC = window.PasswordCore;
+    if (PC) {
+      const v = PC.check(a.pass, { email: a.email, username: a.username });
+      if (!v.ok) return v.problem;
+    } else if (a.pass.length < 8) {
+      return 'Пароль — щонайменше 8 символів.';
+    }
+
     if (a.pass !== a.pass2) return 'Паролі не збігаються.';
     return '';
+  }
+
+  /** Живий індикатор надійності під полем пароля. */
+  function syncPwMeter() {
+    const box = $('#au-pw-meter');
+    const PC = window.PasswordCore;
+    if (!box || !PC) return;
+    const pass = state.acc.pass || '';
+    if (!pass) { box.hidden = true; return; }
+    const v = PC.check(pass, { email: state.acc.email, username: state.acc.username });
+    box.hidden = false;
+    box.dataset.score = String(v.score);
+    const fill = box.querySelector('.pwm__bar i');
+    if (fill) fill.style.width = (v.score / 3 * 100) + '%';
+    const txt = box.querySelector('.pwm__txt');
+    if (txt) txt.textContent = v.ok ? v.label : v.problem;
   }
 
   function readAccFields() {
@@ -704,7 +731,8 @@
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass">Пароль</label>' +
-        '<input class="input" id="au-pass" type="password" autocomplete="current-password" placeholder="мінімум 8 символів">' +
+        '<input class="input" id="au-pass" type="password" autocomplete="current-password" ' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="твій пароль">' +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
@@ -728,11 +756,26 @@
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass">Пароль</label>' +
-        '<input class="input" id="au-pass" type="password" autocomplete="new-password" placeholder="мінімум 8 символів">' +
+        /* lang="en" + autocapitalize/spellcheck — підказки мобільним
+           клавіатурам. Перемкнути РОЗКЛАДКУ з коду неможливо (такого API
+           в браузері немає), тому кирилицю ловить перевірка й одразу
+           каже про це прямо. */
+        '<input class="input" id="au-pass" type="password" autocomplete="new-password" ' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" ' +
+          'placeholder="мінімум ' + (window.PasswordCore ? window.PasswordCore.MIN_LEN : 8) + ' символів">' +
+        /* Індикатор надійності: оцінка приходить із PasswordCore, тут
+           лише показ. Порожній, поки нічого не введено. */
+        '<div id="au-pw-meter" class="pwm" hidden>' +
+          '<span class="pwm__bar"><i></i></span>' +
+          '<span class="pwm__txt small"></span>' +
+        '</div>' +
+        '<span class="field__hint">Тільки англійська розкладка. Потрібні велика й мала літери, ' +
+          'цифра і символ — наприклад <b class="mono">Kyiv#Gym24</b>. Довший пароль — надійніший.</span>' +
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass2">Пароль ще раз</label>' +
-        '<input class="input" id="au-pass2" type="password" autocomplete="new-password" placeholder="той самий пароль">' +
+        '<input class="input" id="au-pass2" type="password" autocomplete="new-password" ' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="той самий пароль">' +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
@@ -863,6 +906,13 @@
 
     host.addEventListener('input', function (e) {
       const t = e.target;
+      /* Пароль: оновлюємо лише індикатор. Повний render() тут знищив би
+         поле під пальцями разом із набраним. */
+      if (t.id === 'au-pass' || t.id === 'au-pass2' || t.id === 'au-email' || t.id === 'au-name') {
+        readAccFields();
+        if (state.step === 'reg') syncPwMeter();
+        return;
+      }
       const key = t.dataset && t.dataset.dob;
       if (key) {
         /* Поле текстове, а не number: type=number пускає 'e', '+' і

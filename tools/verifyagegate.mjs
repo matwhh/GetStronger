@@ -8,6 +8,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import { adultProfile } from './adult.mjs';
+import { fillBirth } from './dob.mjs';
 
 const ROOT = process.cwd();
 const R = [];
@@ -49,15 +50,20 @@ async function fresh(profile) {
   await p.waitForTimeout(900);
   ok('1. заголовок екрана точний',
      (await p.locator('#gate-card h1').innerText()).trim() === 'Вкажіть вашу дату народження');
-  ok('1. поле — саме date picker',
-     (await p.locator('#gate-date').getAttribute('type')) === 'date');
+  /* Календаря бути НЕ повинно: дата народження вводиться цифрами. */
+  ok('1. без рідного календаря', (await p.locator('#gate-card input[type="date"]').count()) === 0);
+  ok('1. три числові поля ДД/ММ/РРРР',
+     (await p.locator('#gate-card [data-dob]').count()) === 3,
+     String(await p.locator('#gate-card [data-dob]').count()));
+  ok('1. клавіатура цифрова',
+     (await p.locator('#dob-d').getAttribute('inputmode')) === 'numeric');
   ok('1. кнопка «Продовжити» вимкнена до вводу', await p.locator('#gate-go').isDisabled());
 
   /* На першому екрані ТІЛЬКИ дата */
   const fields = await p.evaluate(() =>
     [...document.querySelectorAll('#gate-card input, #gate-card select, #gate-card textarea')]
       .map(e => e.id || e.name || e.type));
-  ok('1. на екрані єдине поле — дата', fields.length === 1 && fields[0] === 'gate-date', fields.join(', '));
+  ok('1. на екрані лише поля дати', fields.join(',') === 'dob-d,dob-m,dob-y', fields.join(', '));
 
   const txt = await p.locator('#gate-card').innerText();
   const forbidden = ['Стать', 'Вага', 'Зріст', 'Ціль', 'Програма', 'Активн', 'жиру', 'досвід'];
@@ -73,7 +79,7 @@ async function fresh(profile) {
   await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
   await p.waitForTimeout(900);
 
-  await p.locator('#gate-date').fill('2012-05-05');
+  await fillBirth(p, '2012-05-05');
   await p.waitForTimeout(400);
   ok('2. кнопка лишається вимкненою', await p.locator('#gate-go').isDisabled());
 
@@ -158,7 +164,7 @@ async function fresh(profile) {
   const { ctx, p, errs } = await fresh(null);
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(900);
-  await p.locator('#gate-date').fill('1995-03-10');
+  await fillBirth(p, '1995-03-10');
   await p.waitForTimeout(400);
   ok('5. після дорослої дати кнопка активна', !(await p.locator('#gate-go').isDisabled()));
   await p.locator('#gate-go').click();
@@ -221,7 +227,7 @@ async function fresh(profile) {
   const { ctx, p, errs } = await fresh(null);
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(900);
-  await p.locator('#gate-date').fill('1990-06-15');
+  await fillBirth(p, '1990-06-15');
   await p.waitForTimeout(300);
   await p.locator('#gate-go').click();
   await p.waitForTimeout(1400);
@@ -261,7 +267,7 @@ for (const w of [320, 390, 430]) {
   await p.waitForTimeout(900);
   const m = await p.evaluate(() => ({
     overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
-    date: Math.round(document.getElementById('gate-date').getBoundingClientRect().height),
+    date: Math.round(document.getElementById('dob-d').getBoundingClientRect().height),
     btn: Math.round(document.getElementById('gate-go').getBoundingClientRect().height),
     fits: document.documentElement.scrollHeight <= window.innerHeight + 2
   }));

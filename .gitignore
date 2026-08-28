@@ -4,3 +4,4 @@ package-lock.json
 # Генерується tools/build-meta.js із домену в js/config.js.
 # У репозиторії тримати не варто: він привʼязаний до конкретного домену.
 sitemap.xml
+upd*.zip

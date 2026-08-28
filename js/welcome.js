@@ -29,8 +29,21 @@
     { v: 'elite',  label: 'Понад 5 років' }
   ];
 
+  /*
+   * Дата народження зберігається ТРЬОМА частинами, а не одним рядком.
+   *
+   * Було <input type="date"> — і воно відкривало рідний календар, у якому
+   * доводиться гортати роки назад від сьогоднішнього. Для дати народження
+   * це найгірший можливий спосіб вводу: людина знає свою дату напамʼять і
+   * хоче просто набрати цифри.
+   *
+   * state.birth лишається головним ('YYYY-MM-DD') — його читають перевірки
+   * й запис у профіль. Частини — це лише те, що набрано в полях, і birth
+   * складається з них, коли всі три заповнені.
+   */
   const state = {
     step: 'age',
+    dob: { d: '', m: '', y: '' },
     birth: '',
     body: { sex: null, weight: '', height: '', activity: '', trainingAge: '', hrRest: '', hrMax: '' },
     busy: false
@@ -61,38 +74,82 @@
     return '';
   }
 
+  /** Частини → 'YYYY-MM-DD'. Поки заповнені не всі три — порожньо. */
+  function dobToBirth(dob) {
+    if (dob.y.length !== 4 || !dob.m || !dob.d) return '';
+    return dob.y + '-' + dob.m.padStart(2, '0') + '-' + dob.d.padStart(2, '0');
+  }
+
+  /** 'YYYY-MM-DD' → частини (для профілю, який уже має дату). */
+  function birthToDob(birth) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birth || ''));
+    return m ? { d: m[3], m: m[2], y: m[1] } : { d: '', m: '', y: '' };
+  }
+
+  const DOB_PARTS = [
+    { k: 'd', len: 2, ph: 'ДД',   label: 'День' },
+    { k: 'm', len: 2, ph: 'ММ',   label: 'Місяць' },
+    { k: 'y', len: 4, ph: 'РРРР', label: 'Рік' }
+  ];
+
   function renderAge(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Вкажіть вашу дату народження</h1>' +
+
+      '<div class="field mt-2">' +
+        '<span class="field__label" id="dob-label">Дата народження</span>' +
+        /*
+         * Три числові поля замість календаря. inputmode="numeric" піднімає
+         * на телефоні цифрову клавіатуру, autocomplete розбитий по частинах —
+         * браузер уміє підставити збережену дату народження й сюди.
+         */
+        '<div class="dob" role="group" aria-labelledby="dob-label">' +
+          DOB_PARTS.map(function (p, i) {
+            return (i ? '<span class="dob__sep" aria-hidden="true">.</span>' : '') +
+              '<input class="input dob__part dob__part--' + p.k + '" id="dob-' + p.k + '" ' +
+                'type="text" inputmode="numeric" pattern="[0-9]*" ' +
+                'maxlength="' + p.len + '" placeholder="' + p.ph + '" ' +
+                'autocomplete="bday-' + (p.k === 'y' ? 'year' : p.k === 'm' ? 'month' : 'day') + '" ' +
+                'aria-label="' + p.label + '" data-dob="' + p.k + '" ' +
+                'value="' + esc(state.dob[p.k]) + '">';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+
+      '<div id="gate-msg"></div>' +
+
+      '<button class="btn btn--primary btn--wide mt-2" type="button" id="gate-go">Продовжити</button>' +
+
+      '<p class="small muted gate__note" id="gate-note"></p>';
+
+    refreshAge();
+  }
+
+  /**
+   * Оновити тільки те, що залежить від набраної дати.
+   *
+   * Саме тому це окремо від renderAge: перемальовка всього кроку на кожній
+   * цифрі забирала б фокус із поля, і на телефоні клавіатура закривалась би
+   * після кожного натискання. Поля лишаються на місці — міняються лише
+   * повідомлення, підпис і активність кнопки.
+   */
+  function refreshAge() {
+    state.birth = dobToBirth(state.dob);
     const g = AC.gateState(state.birth);
     const canGo = g.state === 'adult';
 
-    host.innerHTML = '' +
-      '<h1 class="gate__title">Вкажіть вашу дату народження</h1>' +
-      '<p class="small muted gate__lead">Forge доступний користувачам віком від 18 років. ' +
-        'Дата зберігається лише на цьому пристрої.</p>' +
+    const msg = $('#gate-msg');
+    if (msg) msg.innerHTML = messageFor(g);
 
-      '<div class="field mt-2">' +
-        '<label class="field__label" for="gate-date">Дата народження</label>' +
-        '<input class="input" id="gate-date" type="date" ' +
-          'value="' + esc(state.birth) + '" ' +
-          /* max — рівно 18 років тому: рідний вибір дати сам не дасть
-             поставити пізнішу, тож більшість людей до заборони й не
-             дійде. Перевірку це не замінює — лише прибирає зайвий крок. */
-          'max="' + esc(AC.latestAdultBirthDate()) + '" ' +
-          'min="1900-01-01" ' +
-          'autocomplete="bday" ' +
-          'aria-describedby="gate-note">' +
-      '</div>' +
+    const go = $('#gate-go');
+    if (go) go.disabled = !canGo;
 
-      messageFor(g) +
-
-      '<button class="btn btn--primary btn--wide mt-2" type="button" id="gate-go"' +
-        (canGo ? '' : ' disabled') + '>Продовжити</button>' +
-
-      '<p class="small muted gate__note" id="gate-note">' +
-        (g.state === 'adult'
-          ? 'Вік: ' + g.age + ' ' + window.App.plural(g.age, 'рік', 'роки', 'років') + '.'
-          : 'Кнопка стане активною, коли дата підтвердить вік 18+.') +
-      '</p>';
+    const note = $('#gate-note');
+    if (note) {
+      note.textContent = canGo
+        ? 'Вік: ' + g.age + ' ' + window.App.plural(g.age, 'рік', 'роки', 'років') + '.'
+        : '';
+    }
   }
 
   async function proceedAge() {
@@ -120,7 +177,7 @@
     state.busy = false;
     state.step = 'body';
     render();
-    const first = $('#b-weight');
+    const first = $('#b-height');
     if (first) first.focus();
   }
 
@@ -193,8 +250,8 @@
         '</div>' +
       '</div>' +
 
-      numField('b-weight', 'weight', 'Вага тіла, кг', '', { min: 30, max: 300, step: 0.1, ph: '0' }) +
       numField('b-height', 'height', 'Зріст, см', '', { min: 120, max: 250, ph: '0' }) +
+      numField('b-weight', 'weight', 'Вага тіла, кг', '', { min: 30, max: 300, step: 0.1, ph: '0' }) +
 
       '<div class="field mt-2">' +
         '<label class="field__label" for="b-activity">Рівень активності</label>' +
@@ -206,7 +263,6 @@
               esc(NC.ACTIVITY[k].label) + '</option>';
           }).join('') +
         '</select>' +
-        '<p class="small muted" style="margin:6px 0 0">Найбільше джерело похибки. Сумніваєшся — бери нижчий.</p>' +
       '</div>' +
 
       '<div class="field mt-2">' +
@@ -218,18 +274,16 @@
               (state.body.trainingAge === o.v ? ' selected' : '') + '>' + o.label + '</option>';
           }).join('') +
         '</select>' +
-        '<p class="small muted" style="margin:6px 0 0">Від нього залежать діапазони повторень у плані.</p>' +
       '</div>' +
 
-      numField('b-hrrest', 'hrRest', 'Пульс спокою', 'Виміряний одразу після пробудження, лежачи. Без нього зони пульсу рахуються від віку.', { min: 30, max: 120, ph: 'Необовʼязково' }) +
-      numField('b-hrmax', 'hrMax', 'Максимальний пульс', 'Якщо не вказати — рахується за віком (208 − 0,7 × вік).', { min: 120, max: 230, ph: 'Необовʼязково' }) +
+      numField('b-hrrest', 'hrRest', 'Пульс спокою', '', { min: 30, max: 120, ph: 'Необовʼязково' }) +
+      numField('b-hrmax', 'hrMax', 'Максимальний пульс', '', { min: 120, max: 230, ph: 'Необовʼязково' }) +
 
       '<button class="btn btn--primary btn--wide mt-2" type="button" id="body-go"' +
         (canGo ? '' : ' disabled') + '>Далі — обрати програму</button>' +
 
       '<p class="small muted gate__note" id="body-note">' +
-        (canGo ? 'Крок 2 з 3. Далі: програма тренувань і робоча вага.'
-               : 'Обовʼязкові всі поля, крім пульсів.') +
+        (canGo ? 'Крок 2 з 3. Далі: програма тренувань і робоча вага.' : '') +
       '</p>';
   }
 
@@ -243,7 +297,7 @@
     if (note) {
       note.textContent = canGo
         ? 'Крок 2 з 3. Далі: програма тренувань і робоча вага.'
-        : 'Обовʼязкові всі поля, крім пульсів.';
+        : '';
     }
   }
 
@@ -294,7 +348,10 @@
      */
     let p = {};
     try { p = await window.Store.getProfile() || {}; } catch (_) {}
-    if (typeof p.birthDate === 'string') state.birth = p.birthDate;
+    if (typeof p.birthDate === 'string') {
+      state.birth = p.birthDate;
+      state.dob = birthToDob(p.birthDate);
+    }
     ['sex', 'trainingAge'].forEach(function (k) { if (p[k]) state.body[k] = p[k]; });
     ['weight', 'height', 'activity', 'hrRest', 'hrMax'].forEach(function (k) {
       if (p[k] !== null && p[k] !== undefined) state.body[k] = String(p[k]);
@@ -309,26 +366,99 @@
     render();
 
     const host = $('#gate-card');
+
+    /** Наступне/попереднє поле дати — для автопереходу. */
+    function dobNeighbour(key, dir) {
+      const i = DOB_PARTS.findIndex(function (p) { return p.k === key; });
+      const n = DOB_PARTS[i + dir];
+      return n ? $('#dob-' + n.k) : null;
+    }
+
     host.addEventListener('input', function (e) {
       const t = e.target;
-      if (t.closest('#gate-date')) {
-        state.birth = t.value;
-        render();
-        /* Перемальовка забирає фокус із поля — повертаємо, інакше вибір
-           дати на телефоні закривав би клавіатуру після кожної цифри. */
-        const el = $('#gate-date');
-        if (el) el.focus();
+      const key = t.dataset && t.dataset.dob;
+      if (key) {
+        /* Поле текстове, а не number: type=number пускає 'e', '+' і
+           прокручує значення колесом миші — для дати це шкода, а не користь.
+           Тому чистимо самі. */
+        const max = DOB_PARTS.find(function (p) { return p.k === key; }).len;
+        const clean = t.value.replace(/\D+/g, '').slice(0, max);
+        if (clean !== t.value) t.value = clean;
+        state.dob[key] = clean;
+        refreshAge();
+        /* Автоперехід уперед, щойно поле заповнене: 28 → 08 → 2000 без
+           жодного натискання Tab. */
+        if (clean.length === max) {
+          const next = dobNeighbour(key, 1);
+          if (next) { next.focus(); next.select(); }
+        }
         return;
       }
       const b = t.closest('[data-b]');
       if (b) { state.body[b.dataset.b] = b.value; syncBodyControls(); }
     });
+
+    host.addEventListener('keydown', function (e) {
+      const t = e.target;
+      const key = t.dataset && t.dataset.dob;
+      if (!key) return;
+      /* Backspace у порожньому полі повертає в попереднє — інакше з «року»
+         не вийти назад, не тягнучись до миші. */
+      if (e.key === 'Backspace' && t.value === '') {
+        const prev = dobNeighbour(key, -1);
+        if (prev) { e.preventDefault(); prev.focus(); prev.setSelectionRange(prev.value.length, prev.value.length); }
+        return;
+      }
+      if (e.key === 'ArrowLeft' && t.selectionStart === 0) {
+        const prev = dobNeighbour(key, -1);
+        if (prev) { e.preventDefault(); prev.focus(); }
+        return;
+      }
+      if (e.key === 'ArrowRight' && t.selectionStart === t.value.length) {
+        const next = dobNeighbour(key, 1);
+        if (next) { e.preventDefault(); next.focus(); next.setSelectionRange(0, 0); }
+        return;
+      }
+      /* Крапка, кома чи слеш — звичний спосіб відділити частини дати */
+      if (e.key === '.' || e.key === ',' || e.key === '/') {
+        e.preventDefault();
+        const next = dobNeighbour(key, 1);
+        if (next) { next.focus(); next.select(); }
+      }
+    });
+
+    /* Вставка цілої дати: '28.08.2000', '28/08/2000' чи '28082000' —
+       розкладаємо по полях, а не пхаємо все в одне. */
+    host.addEventListener('paste', function (e) {
+      const t = e.target;
+      if (!(t.dataset && t.dataset.dob)) return;
+      const raw = (e.clipboardData || window.clipboardData).getData('text') || '';
+      const digits = raw.replace(/\D+/g, '');
+      if (digits.length < 8) return;
+      e.preventDefault();
+      state.dob = { d: digits.slice(0, 2), m: digits.slice(2, 4), y: digits.slice(4, 8) };
+      DOB_PARTS.forEach(function (p) {
+        const el = $('#dob-' + p.k);
+        if (el) el.value = state.dob[p.k];
+      });
+      refreshAge();
+    });
+
     host.addEventListener('change', function (e) {
       const t = e.target;
-      if (t.closest('#gate-date')) { state.birth = t.value; render(); return; }
+      if (t.dataset && t.dataset.dob) { refreshAge(); return; }
       if (t.name === 'b-sex') { state.body.sex = t.value; syncBodyControls(); return; }
       const b = t.closest('[data-b]');
       if (b) { state.body[b.dataset.b] = b.value; syncBodyControls(); }
+    });
+
+    /* Enter у полях дати = натиснути «Продовжити» */
+    host.addEventListener('keypress', function (e) {
+      if (e.key !== 'Enter') return;
+      if (!(e.target.dataset && e.target.dataset.dob)) return;
+      e.preventDefault();
+      const go = $('#gate-go');
+      if (go && !go.disabled) proceedAge();
     });
     host.addEventListener('click', function (e) {
       if (e.target.closest('#gate-go')) proceedAge();

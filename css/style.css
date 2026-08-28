@@ -2859,8 +2859,23 @@ body {
 .btn--primary:focus-visible {
   box-shadow: var(--acc-raised);
 }
+/*
+ * Вимкнена головна кнопка мусить бути ВИДИМОЮ.
+ *
+ * Загальне .btn:disabled глушить прозорістю 0.45 і замінює фон на поверхню
+ * картки — для акцентної кнопки це означало, що вона зникала: сірий
+ * прямокутник у 45% прозорості на такій самій сірій картці не читався
+ * взагалі, і людина не бачила, що кнопка там узагалі є.
+ *
+ * Тому тут прозорість повертається в 1, а «вимкненість» показується
+ * кольором: приглушена поверхня, приглушений текст і коротша тінь.
+ */
 .btn--primary:disabled {
-  box-shadow: var(--acc-raised-sm);
+  opacity: 1;
+  background: var(--surface-2);
+  color: var(--muted);
+  border-color: transparent;
+  box-shadow: var(--ctl-raised-press);
 }
 /* Без рамки, як і решта сімʼї: форму дає тінь */
 .btn--ghost { background: var(--surface); border-color: transparent; }
@@ -3566,8 +3581,32 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
 .gate__logo .logo__mark { width: 40px; height: auto; }
 
 .gate__title { font-size: 1.5rem; line-height: 1.2; margin: 0; }
-.gate__lead { margin: 8px 0 0; }
+/* Порожній підпис не має лишати відступ під кнопкою: :empty ховає його,
+   поки в ньому нічого немає (а є там лише підтверджений вік). */
 .gate__note { margin: 10px 0 0; }
+.gate__note:empty { display: none; }
+
+/* --------------------------------------------------------------------------
+   ДАТА НАРОДЖЕННЯ: три числові поля замість календаря
+   --------------------------------------------------------------------------
+   <input type="date"> відкривав рідний календар, у якому до року народження
+   треба гортати десятиліття назад. Людина свою дату знає — їй потрібно
+   набрати цифри, а не подорожувати місяцями.
+
+   Тому три поля з автопереходом. Ширини задані в ch і рахуються від
+   кількості цифр: поле на два символи не має бути таким самим, як на
+   чотири, інакше цифри в ньому висять посередині порожнечі. */
+.dob { display: flex; align-items: center; gap: 6px; }
+.dob__part {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  padding-left: 8px; padding-right: 8px;
+}
+.dob__part--d, .dob__part--m { width: 4.6ch; flex: 0 0 auto; }
+.dob__part--y { width: 7ch; flex: 0 0 auto; }
+.dob__sep { color: var(--muted); font-family: var(--font-mono); user-select: none; }
 
 /* Кнопка на всю ширину картки: на цьому екрані дія рівно одна. */
 .btn--wide { width: 100%; justify-content: center; }

@@ -1,5 +1,6 @@
 /** Наскрізний шлях новачка: від чистого браузера до щоденного вжитку. */
 import { chromium } from 'playwright';
+import { fillBirth } from './dob.mjs';
 const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const U=f=>'file:///root/work/forgesite/'+f;
 const b=await chromium.launch({executablePath:CHROME});
@@ -19,7 +20,7 @@ await p.evaluate(()=>localStorage.clear());
 await p.reload(); await p.waitForTimeout(900);
 ok('0. чистий браузер веде на перевірку віку', here()==='welcome.html', here());
 ok('0. кнопка вимкнена, поки дати немає', await p.locator('#gate-go').isDisabled());
-await p.locator('#gate-date').fill('1995-03-10'); await p.waitForTimeout(400);
+await fillBirth(p, '1995-03-10'); await p.waitForTimeout(400);
 ok('0. після дорослої дати можна далі', !(await p.locator('#gate-go').isDisabled()));
 await tap(p.locator('#gate-go')); await p.waitForTimeout(1000);
 

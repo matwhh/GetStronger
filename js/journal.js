@@ -27,6 +27,11 @@
     daysTarget: 0,   // скільки днів на тиждень у обраному плані; 0 — план не обрано
     goal: null,      // ціль харчування — для коридора прогнозу на графіку
     period: 90,      // вибраний період графіка ваги, днів; 0 = весь час
+    volPeriod: 30,   // період графіка тренувального обʼєму, днів
+    view: 'overview',// 'overview' | 'history'
+    hcalY: 0,        // рік/місяць календаря історії
+    hcalM: 0,
+    selDay: '',      // обраний день історії 'YYYY-MM-DD'
     wired: false
   };
 
@@ -149,7 +154,7 @@
     const ticks = [lo, (lo + hi) / 2, hi].map(function (kg) {
       const y = round(py(kg), 1);
       return '<line x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y +
-             '" stroke="rgba(255,255,255,0.08)"/>' +
+             '" stroke="rgba(var(--tint-rgb), 0.08)"/>' +
              '<text x="' + (PAD.l - 6) + '" y="' + (y + 4) + '" text-anchor="end" ' +
              'font-size="11" fill="var(--muted)">' + round(kg, 1) + '</text>';
     }).join('');
@@ -234,6 +239,22 @@
       : f
         ? { val: String(f.avgKcal), lbl: 'ккал у середньому', trend: f.count + ' закритих днів' }
         : { val: '—', lbl: 'харчування', trend: 'ще без закритих днів' });
+
+    // Дві плитки нижче зʼявляються лише З ДАНИМИ: порожня плитка з «—»
+    // тут була б шумом, а не оглядом (плитки вище — базові чотири осі).
+
+    // Середня тривалість тренування — зі знімків часу сесій
+    const ts = PC.timeStats(state.sessionLog, 30);
+    if (ts) tiles.push({
+      val: durTxt(ts.avgMin), lbl: 'середнє тренування',
+      trend: ts.count + ' ' + window.App.plural(ts.count, 'сесія', 'сесії', 'сесій') + ' за 30 днів'
+    });
+
+    // Нові особисті рекорди за 30 днів
+    const prsNew = PC.prList(state.weightLog, 30).filter(function (x) { return x.isNew; }).length;
+    if (prsNew) tiles.push({
+      val: '+' + prsNew, lbl: 'PR за 30 днів', trend: 'нові максимуми робочих ваг'
+    });
 
     return tiles;
   }
@@ -791,6 +812,470 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Форматування чисел і часу для аналітики                             */
+  /* ------------------------------------------------------------------ */
+
+  /** 58420 → '58 420' (тонкий пробіл між тисячами) */
+  function thou(n) {
+    return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
+
+  /** Хвилини → '1 год 14 хв' / '48 хв' */
+  function durTxt(min) {
+    const m = Math.round(Number(min) || 0);
+    if (m < 60) return m + ' хв';
+    const h = Math.floor(m / 60), r = m % 60;
+    return h + ' год' + (r ? ' ' + r + ' хв' : '');
+  }
+
+  /** epoch ms → 'ГГ:ХХ' локального часу */
+  function hhmm(ms) {
+    const d = new Date(Number(ms));
+    if (isNaN(d.getTime())) return '';
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  const MONTHS_NOM = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
+                      'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+  const MONTHS_GEN = ['січня','лютого','березня','квітня','травня','червня',
+                      'липня','серпня','вересня','жовтня','листопада','грудня'];
+  const WEEKDAYS = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
+
+  /* ------------------------------------------------------------------ */
+  /* Тренувальний обʼєм: стовпчики + план проти факту + тренд            */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Джерело — знімки сесій (sessionLog.vol/sets/t0/t1), зняті в момент
+   * тренування. Старі сесії знімків не мають — графік це чесно каже
+   * замість вигаданих стовпчиків. Тоннаж — оцінка за схемою дня, тому
+   * всюди підписаний «≈».
+   */
+
+  const VOL_PERIODS = [
+    { days: 7,   label: '7д' },
+    { days: 30,  label: '30д' },
+    { days: 90,  label: '90д' },
+    { days: 365, label: 'рік' }
+  ];
+
+  function volChartSvg(vb) {
+    const bs = vb.buckets;
+    if (!bs.some(function (b) { return b.hasVol; })) return '';
+
+    const W = 640, H = 190, PAD = { l: 52, r: 8, t: 10, b: 24 };
+    const max = Math.max.apply(null, bs.map(function (b) { return b.vol; }).concat([1]));
+    const bw = (W - PAD.l - PAD.r) / bs.length;
+    const py = function (v) { return PAD.t + (H - PAD.t - PAD.b) * (1 - v / max); };
+
+    // Дві горизонталі шкали: середина і максимум. Нуль — це вісь.
+    const ticks = [max / 2, max].map(function (v) {
+      const y = Math.round(py(v) * 10) / 10;
+      return '<line x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y +
+             '" stroke="rgba(var(--tint-rgb), 0.08)"/>' +
+             '<text x="' + (PAD.l - 6) + '" y="' + (y + 4) + '" text-anchor="end" ' +
+             'font-size="11" fill="var(--muted)">' + thou(v) + '</text>';
+    }).join('');
+
+    // Підписи низу: коли кошиків багато, підписуємо через один — інакше
+    // вони злипаються в нечитабельний рядок.
+    const every = bs.length > 8 ? 2 : 1;
+
+    const bars = bs.map(function (b, i) {
+      const x = PAD.l + i * bw + bw * 0.16;
+      const w = bw * 0.68;
+      const h = b.vol > 0 ? Math.max(2, (H - PAD.t - PAD.b) * b.vol / max) : 0;
+      const y = H - PAD.b - h;
+      const label = (i % every === 0)
+        ? '<text x="' + (PAD.l + i * bw + bw / 2) + '" y="' + (H - 8) + '" text-anchor="middle" ' +
+          'font-size="10" fill="var(--muted)">' + esc(b.label) + '</text>'
+        : '';
+      const bar = b.vol > 0
+        ? '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) +
+          '" height="' + h.toFixed(1) + '" rx="3" fill="var(--acc-bar)">' +
+          '<title>' + esc(b.label) + ': ≈' + thou(b.vol) + ' кг · ' + b.workouts + ' трен.</title></rect>'
+        : '';
+      return bar + label;
+    }).join('');
+
+    const axis = '<line x1="' + PAD.l + '" y1="' + (H - PAD.b) + '" x2="' + (W - PAD.r) +
+                 '" y2="' + (H - PAD.b) + '" stroke="rgba(var(--tint-rgb), 0.14)"/>';
+
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Тренувальний обʼєм, кг за період">' +
+             ticks + axis + bars + '</svg>';
+  }
+
+  function renderVolume() {
+    const host = $('#jr-volume');
+    const PC = window.ProgressCore;
+    if (!host || !PC || !PC.volumeBuckets) return;
+
+    const vb = PC.volumeBuckets(state.sessionLog, state.volPeriod);
+    const svg = volChartSvg(vb);
+    const totalVol = vb.buckets.reduce(function (a, b) { return a + b.vol; }, 0);
+
+    const seg = '<div class="seg mt-2" role="radiogroup" aria-label="Період обʼєму">' +
+      VOL_PERIODS.map(function (pp) {
+        return '<label class="seg__item"><input type="radio" name="vol-period" value="' + pp.days + '"' +
+          (pp.days === state.volPeriod ? ' checked' : '') + '><span>' + pp.label + '</span></label>';
+      }).join('') + '</div>';
+
+    // План проти факту: не голий відсоток, а обидва числа поруч —
+    // «94%» без «із чого» не каже нічого.
+    const tr = PC.trainingStats(state.workLog, state.sessionLog, state.daysTarget);
+    const adh = tr.adherence
+      ? '<p class="small mt-1" style="margin-bottom:0">План проти факту за ' + tr.adherence.weeks +
+        ' тиж: заплановано <b class="mono">' + tr.adherence.planned + '</b>, виконано <b class="mono">' +
+        tr.adherence.done + '</b> — <b class="mono">' + tr.adherence.pct + '%</b>.</p>'
+      : '';
+
+    // Час тренувань — зі знімків t0/t1
+    const ts = PC.timeStats(state.sessionLog, state.volPeriod);
+    const time = ts
+      ? '<p class="small mt-1" style="margin-bottom:0">Середнє тренування: <b class="mono">' + durTxt(ts.avgMin) +
+        '</b> · разом <b class="mono">' + durTxt(ts.totalMin) + '</b> за ' + ts.count + ' ' +
+        window.App.plural(ts.count, 'сесію', 'сесії', 'сесій') + '.</p>'
+      : '';
+
+    // Тренд сили: 30 або 90 днів — залежно від обраного періоду
+    const trendDays = state.volPeriod >= 90 ? 90 : 30;
+    const pt = PC.perfTrend(state.weightLog, trendDays);
+    const TREND = { up: 'Росте', down: 'Знижується', flat: 'Стабільно' };
+    const trend = pt && pt.n >= 2
+      ? '<p class="small mt-1" style="margin-bottom:0">Тренд сили за ' + trendDays + ' днів: <b>' +
+        TREND[pt.verdict] + '</b> (' + pt.up + ' ↑ · ' + pt.down + ' ↓ · ' + pt.flat + ' →).</p>'
+      : '';
+
+    // Стійкий спад: три зниження ваги поспіль в одній вправі.
+    // Один поганий день сюди не потрапляє навмисно — це шум, не регрес.
+    const drops = PC.perfDrops(state.weightLog);
+    const dropCard = drops.length
+      ? '<div class="notice mt-2">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
+          '<div class="small">Стійкий спад: ' +
+            drops.map(function (x) {
+              return '<b>' + esc(x.name) + '</b> (' + fmtNum.kg(x.from) + ' → ' + fmtNum.kg(x.to) + ' кг)';
+            }).join(', ') +
+            ' — три зниження поспіль. Один важкий день — не регрес, але три поспіль — привід глянути на сон, калорії й відновлення.' +
+          '</div>' +
+        '</div>'
+      : '';
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+          '<h2 style="margin:0">Тренувальний обʼєм</h2>' +
+          (totalVol > 0 ? '<span class="chip mono">≈' + thou(totalVol) + ' кг</span>' : '') +
+        '</div>' +
+        seg +
+        (svg
+          ? '<div class="wchart mt-2">' + svg + '</div>' +
+            '<p class="small muted mt-1">Тоннаж — оцінка: підходи × середні повторення × робоча вага дня. ' +
+            'Знімається в момент тренування і заднім числом не переписується.</p>'
+          : '<p class="small muted mt-2">Ще замало даних. Тоннаж знімається з нових тренувань: ' +
+            'познач вправи на сторінці <a href="workout.html">«Тренування»</a> — і стовпчики зʼявляться.</p>') +
+        adh + time + trend + dropCard +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Цей тиждень / цей місяць                                            */
+  /* ------------------------------------------------------------------ */
+
+  function summaryCard(title, sum) {
+    const rows = [];
+    rows.push('<div class="kpi"><div class="kpi__val mono">' + sum.workouts + '</div><p class="kpi__lbl">' +
+      window.App.plural(sum.workouts, 'тренування', 'тренування', 'тренувань') + '</p></div>');
+    if (sum.vol !== null) rows.push('<div class="kpi"><div class="kpi__val mono">≈' + thou(sum.vol) + '</div><p class="kpi__lbl">кг обʼєму</p></div>');
+    if (sum.sets) rows.push('<div class="kpi"><div class="kpi__val mono">' + sum.sets + '</div><p class="kpi__lbl">підходів</p></div>');
+    if (sum.avgMin !== null) rows.push('<div class="kpi"><div class="kpi__val mono">' + durTxt(sum.avgMin) + '</div><p class="kpi__lbl">середнє тренування</p></div>');
+    if (sum.prs) rows.push('<div class="kpi"><div class="kpi__val mono">' + sum.prs + '</div><p class="kpi__lbl">PR</p></div>');
+
+    return '<div class="card">' +
+      '<h3 class="card__title">' + esc(title) + '</h3>' +
+      (sum.workouts || sum.prs
+        ? '<div class="kpis mt-2">' + rows.join('') + '</div>'
+        : '<p class="small muted mt-1 mb-0">Поки порожньо — записи зʼявляться з першим тренуванням.</p>') +
+    '</div>';
+  }
+
+  function renderSummary() {
+    const host = $('#jr-summary');
+    const PC = window.ProgressCore;
+    if (!host || !PC || !PC.rangeSummary) return;
+
+    const now = new Date();
+    const todayK = todayKey();
+
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const week = PC.rangeSummary(state.sessionLog, state.weightLog, state.workLog, keyOf(monday), todayK);
+
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const month = PC.rangeSummary(state.sessionLog, state.weightLog, state.workLog, keyOf(first), todayK);
+
+    host.innerHTML =
+      '<div class="grid grid-2">' +
+        summaryCard('Цей тиждень', week) +
+        summaryCard(MONTHS_NOM[now.getMonth()] + ' ' + now.getFullYear(), month) +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Особисті рекорди                                                    */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Максимум серії кожної вправи з weightLog. Повторень тут немає
+   * навмисно: журнал ваг зберігає лише вагу, і дописувати «× 6» було б
+   * вигадкою. Свіжий рекорд (до 14 днів) — з позначкою і датою.
+   */
+
+  function renderPrs() {
+    const host = $('#jr-prs');
+    const PC = window.ProgressCore;
+    if (!host || !PC || !PC.prList) return;
+
+    const list = PC.prList(state.weightLog, 14);
+    if (!list.length) {
+      host.innerHTML =
+        '<div class="card">' +
+          '<h2 style="margin:0">Особисті рекорди</h2>' +
+          '<p class="small mt-1 mb-0">Рекорд зʼявляється, коли робоча вага вправи перевищує ' +
+          'свій попередній максимум. Поки що перевищувати нічого — все попереду.</p>' +
+        '</div>';
+      return;
+    }
+
+    const rows = list.slice(0, 10).map(function (x) {
+      return '<div class="wlog-row">' +
+        '<span class="small">' + esc(x.name) +
+          (x.isNew ? ' <span class="chip chip--sm chip--acc">Новий PR</span>' : '') + '</span>' +
+        '<span class="muted small">' + esc(dateLabel(dateOf(x.date))) + '</span>' +
+        '<b class="mono">' + fmtNum.kg(x.kg) + ' кг</b>' +
+      '</div>';
+    }).join('');
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px">' +
+          '<h2 style="margin:0">Особисті рекорди</h2>' +
+          '<span class="small muted">' + list.length + ' ' + window.App.plural(list.length, 'вправа', 'вправи', 'вправ') + '</span>' +
+        '</div>' +
+        '<div class="mt-2">' + rows + '</div>' +
+        '<p class="small muted mb-0" style="margin-top:10px">Максимальна робоча вага з журналу. ' +
+        '«Новий PR» — поставлений за останні два тижні.</p>' +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Історія: календар місяця                                            */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Основна навігація по минулих днях: місяць, Пн→Нд, плоскі клітинки з
+   * числом дня, активний день — акцентом теми (токени, не hardcode:
+   * зміна теми перефарбовує і його). Клік — підсумок дня нижче.
+   * Тут НІЧОГО не редагується: позначки ставляться в теплокарті огляду.
+   */
+
+  function renderHcal() {
+    const host = $('#jr-hcal');
+    if (!host) return;
+
+    const y = state.hcalY, m = state.hcalM;
+    const now = new Date();
+    const first = new Date(y, m, 1);
+    const daysIn = new Date(y, m + 1, 0).getDate();
+    const startPad = (first.getDay() + 6) % 7;   // Пн = 0
+    const todayK = todayKey();
+    const isCurrentMonth = y === now.getFullYear() && m === now.getMonth();
+
+    let cells = '';
+    for (let i = 0; i < startPad; i++) cells += '<i class="mcal__cell mcal__cell--pad" aria-hidden="true"></i>';
+    for (let day = 1; day <= daysIn; day++) {
+      const k = keyOf(new Date(y, m, day));
+      if (k > todayK) {
+        cells += '<i class="mcal__cell mcal__cell--future">' + day + '</i>';
+        continue;
+      }
+      const on = trained(k);
+      const sel = k === state.selDay;
+      cells += '<button type="button" class="mcal__cell' + (on ? ' mcal__cell--on' : '') +
+        (sel ? ' mcal__cell--sel' : '') + '" data-hday="' + k + '" ' +
+        'aria-pressed="' + sel + '" aria-label="' + esc(dateLabel(dateOf(k))) +
+        (on ? ': тренування було' : '') + '">' + day + '</button>';
+    }
+
+    const dow = DOW.map(function (n) { return '<span class="mcal__dow">' + n + '</span>'; }).join('');
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
+          '<h2 style="margin:0">Історія</h2>' +
+          '<div class="row" style="gap:8px;align-items:center">' +
+            '<button class="icon-btn" type="button" data-hnav="-1" aria-label="Попередній місяць">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>' +
+            '</button>' +
+            '<b class="mono" style="min-width:140px;text-align:center">' + MONTHS_NOM[m] + ' ' + y + '</b>' +
+            '<button class="icon-btn" type="button" data-hnav="1" aria-label="Наступний місяць"' +
+              (isCurrentMonth ? ' disabled' : '') + '>' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mcal mt-2" role="group" aria-label="Календар ' + MONTHS_NOM[m] + ' ' + y + '">' +
+          dow + cells +
+        '</div>' +
+        '<p class="small muted mt-1 mb-0">Зафарбований день — тренування. Клік по дню — його підсумок нижче.</p>' +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Історія: підсумок дня                                               */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Детальний журнал одного дня — все, що РЕАЛЬНО записано: сесія
+   * тренування (з часом і знімком обʼєму, якщо є), змінені того дня
+   * робочі ваги, вага тіла, закритий день харчування, трекери. Це
+   * незмінний знімок: пізніші правки плану сюди не просочуються.
+   */
+
+  function dayWorkoutHtml(k) {
+    const s = state.sessionLog[k];
+    const manual = Number(state.workLog[k]) > 0;
+
+    if (s && Number(s.done) > 0 && !(Number(state.workLog[k]) === 0 && Object.prototype.hasOwnProperty.call(state.workLog, k))) {
+      const min = window.ProgressCore.sessionMinutes(s);
+      const timeRow = (s.t0 && s.t1)
+        ? '<span class="small">Час: <b class="mono">' + hhmm(s.t0) + ' → ' + hhmm(s.t1) + '</b>' +
+          (min !== null ? ' · <b class="mono">' + durTxt(min) + '</b>' : '') + '</span>'
+        : '';
+      const facts = [];
+      if (Number.isFinite(Number(s.sets)) && s.sets > 0) facts.push('<b class="mono">' + s.sets + '</b> підходів');
+      if (Number.isFinite(Number(s.reps)) && s.reps > 0) facts.push('<b class="mono">' + s.reps + '</b> повторень');
+      if (Number.isFinite(Number(s.vol)) && s.vol > 0) facts.push('≈<b class="mono">' + thou(s.vol) + '</b> кг');
+
+      return '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">' +
+          '<h3 style="margin:0">' + esc(s.title || 'Тренування') + '</h3>' +
+          '<span class="chip chip--acc mono">' + s.done + ' з ' + s.total + ' вправ</span>' +
+        '</div>' +
+        '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
+          timeRow +
+          (facts.length ? '<span class="small">' + facts.join(' · ') + '</span>' : '') +
+        '</div>' +
+        (!timeRow && !facts.length
+          ? '<p class="small muted mt-1 mb-0">Стара сесія — без знімка часу й обʼєму: ці факти пишуться з нових тренувань.</p>'
+          : '');
+    }
+    if (manual) {
+      return '<h3 style="margin:0">Тренування</h3>' +
+        '<p class="small mt-1 mb-0">Позначено вручну в календарі — «був у залі», без деталей сесії.</p>';
+    }
+    return '<h3 style="margin:0">Тренування</h3>' +
+      '<p class="small muted mt-1 mb-0">Цього дня тренування не записано.</p>';
+  }
+
+  function renderDay() {
+    const host = $('#jr-day');
+    if (!host || !state.selDay) return;
+    const k = state.selDay;
+    const d = dateOf(k);
+
+    const parts = [];
+
+    // Тренування
+    parts.push(dayWorkoutHtml(k));
+
+    // Робочі ваги, змінені цього дня
+    const changed = [];
+    Object.keys(state.weightLog || {}).forEach(function (name) {
+      (state.weightLog[name] || []).forEach(function (e) {
+        if (e && e.d === k && Number.isFinite(Number(e.kg))) changed.push({ name: name, kg: Number(e.kg) });
+      });
+    });
+    if (changed.length) {
+      parts.push('<h3 style="margin:0">Робочі ваги</h3>' +
+        '<div class="mt-1">' + changed.map(function (c) {
+          return '<div class="wlog-row"><span class="small">' + esc(c.name) + '</span>' +
+                 '<b class="mono">' + fmtNum.kg(c.kg) + ' кг</b></div>';
+        }).join('') + '</div>');
+    }
+
+    // Вага тіла
+    const bw = Number(state.bodyLog[k]);
+    if (Number.isFinite(bw)) {
+      parts.push('<h3 style="margin:0">Вага тіла</h3>' +
+        '<p class="mt-1 mb-0"><b class="mono">' + fmtNum.kg(bw) + ' кг</b></p>');
+    }
+
+    // Харчування
+    const meal = state.mealLog[k];
+    if (meal && Number.isFinite(Number(meal.kcal))) {
+      const hasT = Number(meal.target) > 0;
+      const diff = hasT ? Math.round(meal.kcal - meal.target) : null;
+      parts.push('<h3 style="margin:0">Харчування</h3>' +
+        '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
+          '<span class="small">Калорії: <b class="mono">' + meal.kcal + '</b>' +
+            (hasT ? ' із цілі <b class="mono">' + meal.target + '</b> (' + (diff > 0 ? '+' : '') + diff + ')' : '') + '</span>' +
+          '<span class="small">Б <b class="mono">' + (meal.p || 0) + '</b> · Ж <b class="mono">' + (meal.f || 0) +
+            '</b> · В <b class="mono">' + (meal.c || 0) + '</b> г</span>' +
+        '</div>');
+    }
+
+    // Трекери дня
+    if (window.TrackerCore) {
+      const TC = window.TrackerCore;
+      const lines = TC.active(state.trackers).map(function (t) {
+        const v = (state.trackerLog[t.id] || {})[k];
+        if (v == null) return null;
+        const def = TC.defFor(t);
+        let txt = '';
+        if (def.kind === 'boolean') txt = v ? '✓' : '—';
+        else if (def.kind === 'pair') {
+          txt = def.fields.map(function (f) {
+            return v[f] != null ? (f === 'before' ? 'до ' : f === 'after' ? 'після ' : f === 'pain' ? 'біль ' : 'втома ') + v[f] : null;
+          }).filter(Boolean).join(' · ');
+        } else if (def.kind === 'duration') txt = TC.formatDuration(Number(v) || 0);
+        else txt = fmtNum.n(Number(v) || 0, 1) + (def.unit ? ' ' + def.unit : '');
+        return txt ? '<div class="wlog-row"><span class="small">' + esc(t.name) + '</span><b class="mono">' + esc(txt) + '</b></div>' : null;
+      }).filter(Boolean);
+      if (lines.length) {
+        parts.push('<h3 style="margin:0">Трекери</h3><div class="mt-1">' + lines.join('') + '</div>');
+      }
+    }
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<h2 style="margin:0">' + WEEKDAYS[d.getDay()] + ', ' + d.getDate() + ' ' +
+          MONTHS_GEN[d.getMonth()] + ' ' + d.getFullYear() + '</h2>' +
+        '<div class="mt-2">' + parts.join('<hr class="divider">') + '</div>' +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Перемикач Огляд / Історія                                           */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Стан живе в location.hash (#history), щоб «Історія» мала пряме
+   * посилання з меню й акаунта. replaceState, а не присвоєння hash:
+   * присвоєння скролить до якоря, якого тут немає.
+   */
+
+  function setView(v, opts) {
+    state.view = v === 'history' ? 'history' : 'overview';
+    const ov = $('#view-overview'), hi = $('#view-history');
+    if (ov) ov.hidden = state.view === 'history';
+    if (hi) hi.hidden = state.view !== 'history';
+    const radio = document.querySelector('input[name="jr-view"][value="' + state.view + '"]');
+    if (radio) radio.checked = true;
+    if (!opts || !opts.silent) {
+      try {
+        history.replaceState(null, '',
+          location.pathname + location.search + (state.view === 'history' ? '#history' : ''));
+      } catch (_) {}
+    }
+    if (state.view === 'history') { renderHcal(); renderDay(); }
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Збереження й обробники                                              */
   /* ------------------------------------------------------------------ */
 
@@ -905,19 +1390,63 @@
       state.trackerLog = (p.trackerLog && typeof p.trackerLog === 'object') ? p.trackerLog : {};
     }
 
+    const now = new Date();
+    state.hcalY = now.getFullYear();
+    state.hcalM = now.getMonth();
+    state.selDay = todayKey();
+
     wire();
     renderOverview();
+    renderVolume();
+    renderSummary();
     keepFocus(renderWeight);
     keepFocus(renderTrain);
     renderLifts();
+    renderPrs();
     renderFood();
     renderTrackers();
+
+    // Вигляд з URL: #history відкриває історію одразу (посилання з меню
+    // й акаунта). silent — hash уже правильний, не чіпаємо його.
+    setView(location.hash === '#history' ? 'history' : 'overview', { silent: true });
+    window.addEventListener('hashchange', function () {
+      setView(location.hash === '#history' ? 'history' : 'overview', { silent: true });
+    });
 
     // Перемикач періоду живе всередині блоку ваги й перемальовується
     // разом із ним — слухаємо на рівні документа
     document.addEventListener('change', function (e) {
       const pp = e.target.closest('input[name="w-period"]');
-      if (pp) { state.period = Number(pp.value); keepFocus(renderWeight); }
+      if (pp) { state.period = Number(pp.value); keepFocus(renderWeight); return; }
+
+      const vp = e.target.closest('input[name="vol-period"]');
+      if (vp) { state.volPeriod = Number(vp.value); renderVolume(); return; }
+
+      const vw = e.target.closest('input[name="jr-view"]');
+      if (vw) setView(vw.value);
+    });
+
+    // Календар історії: навігація місяцями і вибір дня
+    document.addEventListener('click', function (e) {
+      const nav = e.target.closest('[data-hnav]');
+      if (nav && !nav.disabled) {
+        const m = state.hcalM + Number(nav.dataset.hnav);
+        const d = new Date(state.hcalY, m, 1);
+        const now2 = new Date();
+        // у майбутні місяці не ходимо — там нічого немає за побудовою
+        if (d.getFullYear() > now2.getFullYear() ||
+            (d.getFullYear() === now2.getFullYear() && d.getMonth() > now2.getMonth())) return;
+        state.hcalY = d.getFullYear();
+        state.hcalM = d.getMonth();
+        renderHcal();
+        return;
+      }
+      const day = e.target.closest('[data-hday]');
+      if (day) {
+        state.selDay = day.dataset.hday;
+        renderHcal();
+        renderDay();
+      }
     });
 
     document.addEventListener('click', function (e) {
@@ -949,14 +1478,30 @@
       if (profile.activePlan && Number(profile.activePlan.days)) {
         state.daysTarget = Number(profile.activePlan.days);
       }
-      if (profile.workLog && profile.workLog !== state.workLog) { state.workLog = profile.workLog; keepFocus(renderTrain); }
-      if (profile.sessionLog && profile.sessionLog !== state.sessionLog) { state.sessionLog = profile.sessionLog; keepFocus(renderTrain); }
+      if (profile.workLog && profile.workLog !== state.workLog) {
+        state.workLog = profile.workLog;
+        keepFocus(renderTrain); renderVolume(); renderSummary();
+        if (state.view === 'history') { renderHcal(); renderDay(); }
+      }
+      if (profile.sessionLog && profile.sessionLog !== state.sessionLog) {
+        state.sessionLog = profile.sessionLog;
+        keepFocus(renderTrain); renderOverview(); renderVolume(); renderSummary();
+        if (state.view === 'history') { renderHcal(); renderDay(); }
+      }
       if (profile.bodyLog && profile.bodyLog !== state.bodyLog) {
         state.bodyLog = profile.bodyLog;
         if (!typingIn('#jr-weight input')) keepFocus(renderWeight);
       }
-      if (profile.weightLog && profile.weightLog !== state.weightLog) { state.weightLog = profile.weightLog; renderLifts(); }
-      if (profile.mealLog && profile.mealLog !== state.mealLog) { state.mealLog = profile.mealLog; renderFood(); }
+      if (profile.weightLog && profile.weightLog !== state.weightLog) {
+        state.weightLog = profile.weightLog;
+        renderLifts(); renderPrs(); renderVolume(); renderSummary();
+        if (state.view === 'history') renderDay();
+      }
+      if (profile.mealLog && profile.mealLog !== state.mealLog) {
+        state.mealLog = profile.mealLog;
+        renderFood();
+        if (state.view === 'history') renderDay();
+      }
       if (window.TrackerCore && (profile.trackers || profile.trackerLog)) {
         if (profile.trackers) state.trackers = window.TrackerCore.ensureBuiltins(profile.trackers);
         if (profile.trackerLog) state.trackerLog = profile.trackerLog;

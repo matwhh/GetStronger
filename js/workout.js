@@ -127,6 +127,35 @@
    */
   let sessionTimer = null;
 
+  /** Середина діапазону повторень: '6–8' → 7, '10' → 10, сміття → 0. */
+  function repMid(reps) {
+    const m = String(reps || '').match(/(\d+)\s*[–—-]\s*(\d+)/);
+    if (m) return (Number(m[1]) + Number(m[2])) / 2;
+    const one = String(reps || '').match(/\d+/);
+    return one ? Number(one[0]) : 0;
+  }
+
+  /**
+   * Факти сесії для знімка в історію: підходи, повторення й оцінка
+   * тоннажу ЗАКРИТИХ вправ. Вага — з книги ваг на момент тренування;
+   * вправи без ваги (планка, прес) чесно дають 0 кг у тоннаж, але
+   * рахуються в підходи. Це оцінка за схемою дня, не ваги кожного
+   * підходу — тому сторінка прогресу підписує її «≈».
+   */
+  function sessionFacts(day, done, weights) {
+    let sets = 0, reps = 0, vol = 0;
+    day.exercises.forEach(function (ex, i) {
+      if (!done[i]) return;
+      const s = Number(ex.sets) || 0;
+      const r = repMid(ex.reps);
+      const w = Number(weights && weights[ex.name]);
+      sets += s;
+      reps += s * r;
+      if (Number.isFinite(w) && w > 0) vol += s * r * w;
+    });
+    return { sets: sets, reps: Math.round(reps), vol: Math.round(vol) };
+  }
+
   function scheduleSessionLog() {
     if (!state.plan || !window.HistoryCore) return;
     const done = WC.doneCount(state.done);
@@ -136,6 +165,8 @@
     sessionTimer = setTimeout(function () {
       const day = state.plan[state.dayIdx];
       const a = state.profile.activePlan || {};
+      const facts = sessionFacts(day, state.done, state.profile.weights);
+      const now = Date.now();
       const log = window.HistoryCore.upsertSession(
         state.profile.sessionLog, state.todayKey, {
           programId: a.programId,
@@ -143,7 +174,12 @@
           dayIdx: state.dayIdx,
           title: day.title || ('День ' + (state.dayIdx + 1)),
           done: done,
-          total: day.exercises.length
+          total: day.exercises.length,
+          t0: now,   // upsertSession лишає найперший t0 — початок сесії
+          t1: now,
+          sets: facts.sets,
+          reps: facts.reps,
+          vol: facts.vol
         });
       state.profile.sessionLog = log;
       saveOwn({ sessionLog: log }).catch(function (e) {

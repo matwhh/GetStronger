@@ -286,8 +286,9 @@
     ] },
 
     { href: 'journal.html', label: 'Прогрес', core: true, icon: 'progress', children: [
-      { href: 'journal.html',  label: 'Огляд прогресу' },
-      { href: 'rating.html',   label: 'Сезон' }
+      { href: 'journal.html',          label: 'Огляд прогресу' },
+      { href: 'rating.html',           label: 'Рейтинг' },
+      { href: 'journal.html#history',  label: 'Історія' }
     ] },
 
     /* «Акаунта» тут немає: він має власний пункт біля правого краю
@@ -316,7 +317,7 @@
     { href: 'nutrition.html',  label: 'План харчування' },
     { href: 'trackers.html',   label: 'Трекери' },
     { href: 'journal.html',    label: 'Прогрес' },
-    { href: 'rating.html',     label: 'Сезон' },
+    { href: 'rating.html',     label: 'Рейтинг' },
     { href: 'boxing.html',     label: 'Бокс' },
     { href: 'cardio.html',     label: 'Кардіо' },
     { href: 'calculator.html', label: 'Калькулятор 1ПМ' },
@@ -543,7 +544,7 @@
       el.textContent = String(lvl.level);
       el.classList.toggle('is-elite', lvl.elite);
       el.setAttribute('aria-label',
-        'Сезон: ' + st.elo + ' ELO, ' + lvl.name +
+        'Рейтинг: ' + st.elo + ' ELO, ' + lvl.name +
         (st.today ? ', сьогодні ' + (st.today > 0 ? '+' : '') + st.today : '') + ' — детальніше');
       el.title = st.elo + ' ELO' + (st.today ? ' · ' + (st.today > 0 ? '+' : '') + st.today + ' сьогодні' : '');
     }

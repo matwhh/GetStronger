@@ -324,6 +324,232 @@
     };
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Аналітика сесій: обʼєм, час, підсумки періодів                      */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Джерело — знімки sessionLog (history-core.upsertSession): sets/reps/
+   * vol/t0/t1 зняті в момент тренування. Старі записи цих полів не мають;
+   * функції нижче це чесно повертають у полях hasVol/withTime, а сторінка
+   * показує «замало даних» замість вигаданих чисел.
+   */
+
+  /** Валідні сесії періоду: [{d, done, total, sets, reps, vol, t0, t1}] */
+  function sessionEntries(sessionLog, fromKey, toKey) {
+    if (!sessionLog || typeof sessionLog !== 'object') return [];
+    return Object.keys(sessionLog)
+      .filter(function (k) {
+        const s = sessionLog[k];
+        return DATE_KEY.test(k) && s && Number(s.done) > 0 &&
+               (!fromKey || k >= fromKey) && (!toKey || k <= toKey);
+      })
+      .sort()
+      .map(function (k) { return Object.assign({ d: k }, sessionLog[k]); });
+  }
+
+  /** Понеділок тижня дати — ключем */
+  function mondayKey(key) {
+    const d = dateOf(key);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return keyOf(d);
+  }
+
+  /**
+   * Обʼєм по кошиках для стовпчикового графіка.
+   * period: 7 → дні, 30/90 → тижні, 365 → місяці. Кошики йдуть підряд,
+   * навіть порожні: дірка у тренуваннях — це видимий нуль, а не зникла
+   * колонка.
+   */
+  function volumeBuckets(sessionLog, periodDays, now) {
+    const base = now instanceof Date ? now : new Date();
+    const from = cutKey(periodDays, base);
+    const list = sessionEntries(sessionLog, from);
+
+    const mode = periodDays <= 7 ? 'day' : periodDays <= 120 ? 'week' : 'month';
+    const buckets = [];
+    const idx = {};
+
+    const push = function (key, label) {
+      idx[key] = buckets.length;
+      buckets.push({ key: key, label: label, vol: 0, sets: 0, workouts: 0, hasVol: false });
+    };
+
+    if (mode === 'day') {
+      for (let i = periodDays - 1; i >= 0; i--) {
+        const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - i);
+        push(keyOf(d), ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'][d.getDay()]);
+      }
+    } else if (mode === 'week') {
+      const weeks = Math.ceil(periodDays / 7);
+      const m0 = dateOf(mondayKey(keyOf(base)));
+      for (let i = weeks - 1; i >= 0; i--) {
+        const d = new Date(m0); d.setDate(m0.getDate() - i * 7);
+        push(keyOf(d), String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0'));
+      }
+    } else {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+        push(keyOf(d), ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'][d.getMonth()]);
+      }
+    }
+
+    list.forEach(function (s) {
+      const key = mode === 'day' ? s.d
+        : mode === 'week' ? mondayKey(s.d)
+        : s.d.slice(0, 7) + '-01';
+      const b = buckets[idx[key]];
+      if (!b) return;
+      b.workouts += 1;
+      if (Number.isFinite(Number(s.sets))) b.sets += Number(s.sets);
+      if (Number.isFinite(Number(s.vol))) { b.vol += Number(s.vol); b.hasVol = true; }
+    });
+
+    return {
+      mode: mode,
+      buckets: buckets,
+      withVol: list.filter(function (s) { return Number.isFinite(Number(s.vol)); }).length,
+      total: list.length
+    };
+  }
+
+  /** Тривалість сесії, хв; null якщо знімка часу немає або він сміттєвий */
+  function sessionMinutes(s) {
+    const t0 = Number(s && s.t0), t1 = Number(s && s.t1);
+    if (!(t0 > 0) || !(t1 > t0)) return null;
+    const min = (t1 - t0) / 60000;
+    // Понад 6 годин — забута вкладка, а не тренування; таке не рахуємо.
+    return (min >= 1 && min <= 360) ? min : null;
+  }
+
+  /** Час тренувань за період: середня і сумарна тривалість */
+  function timeStats(sessionLog, periodDays, now) {
+    const list = sessionEntries(sessionLog, periodDays ? cutKey(periodDays, now) : null);
+    const mins = list.map(sessionMinutes).filter(function (m) { return m !== null; });
+    if (!mins.length) return null;
+    const total = mins.reduce(function (a, b) { return a + b; }, 0);
+    return {
+      count: mins.length,
+      avgMin: Math.round(total / mins.length),
+      totalMin: Math.round(total)
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Рекорди і тренд сили                                                */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Особисті рекорди: максимум серії кожної вправи.
+   * isNew — рекорд поставлено за останні recentDays (за замовчуванням 14).
+   * Перший запис вправи рекордом не вважається — це точка відліку.
+   */
+  function prList(weightLog, recentDays, now) {
+    const H = window.HistoryCore;
+    if (!H || !weightLog) return [];
+    const from = cutKey(recentDays || 14, now);
+    return H.weightNames(weightLog).map(function (name) {
+      const s = H.weightSeries(weightLog, name);
+      if (s.length < 2) return null;
+      let max = s[0];
+      s.forEach(function (e) { if (Number(e.kg) >= Number(max.kg)) max = e; });
+      if (Number(max.kg) <= Number(s[0].kg)) return null;  // росту не було
+      return { name: name, kg: Number(max.kg), date: max.d, isNew: max.d >= from };
+    }).filter(Boolean).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+  }
+
+  /**
+   * Тренд продуктивності за період: по кожній вправі з 2+ записами у
+   * вікні дивимось знак зміни; вердикт — за перевагою. Одна вправа чи
+   * один запис вердикту не дають — це шум, а не тренд.
+   */
+  function perfTrend(weightLog, periodDays, now) {
+    const H = window.HistoryCore;
+    if (!H || !weightLog) return null;
+    const from = cutKey(periodDays, now);
+    let up = 0, down = 0, flat = 0;
+
+    H.weightNames(weightLog).forEach(function (name) {
+      const s = H.weightSeries(weightLog, name);
+      let base = null, last = null;
+      s.forEach(function (e) {
+        if (e.d < from) base = e; else last = e;
+      });
+      if (!last) return;
+      if (!base) base = s.filter(function (e) { return e.d >= from; })[0];
+      if (base === last) return;
+      const d = Number(last.kg) - Number(base.kg);
+      if (d > 0) up++; else if (d < 0) down++; else flat++;
+    });
+
+    const n = up + down + flat;
+    if (!n) return null;
+    return {
+      up: up, down: down, flat: flat, n: n,
+      verdict: up > down ? 'up' : down > up ? 'down' : 'flat'
+    };
+  }
+
+  /**
+   * Стійкий спад: вправи, чиї ОСТАННІ 3 записи йдуть строго вниз.
+   * Один провал (деолоад, поганий день) сюди не потрапляє навмисно.
+   */
+  function perfDrops(weightLog) {
+    const H = window.HistoryCore;
+    if (!H || !weightLog) return [];
+    return H.weightNames(weightLog).filter(function (name) {
+      const s = H.weightSeries(weightLog, name);
+      if (s.length < 3) return false;
+      const t = s.slice(-3).map(function (e) { return Number(e.kg); });
+      return t[0] > t[1] && t[1] > t[2];
+    }).map(function (name) {
+      const s = window.HistoryCore.weightSeries(weightLog, name);
+      const t = s.slice(-3);
+      return { name: name, from: Number(t[0].kg), to: Number(t[2].kg) };
+    });
+  }
+
+  /**
+   * Підсумок довільного діапазону дат [fromKey..toKey] — «цей тиждень» і
+   * «цей місяць» на сторінці прогресу.
+   */
+  function rangeSummary(sessionLog, weightLog, workLog, fromKey, toKey) {
+    const H = window.HistoryCore;
+    const sess = sessionEntries(sessionLog, fromKey, toKey);
+    const trained = trainedDates(workLog, sessionLog).filter(function (d) {
+      return d >= fromKey && d <= toKey;
+    });
+
+    let vol = 0, sets = 0, hasVol = false;
+    sess.forEach(function (s) {
+      if (Number.isFinite(Number(s.vol))) { vol += Number(s.vol); hasVol = true; }
+      if (Number.isFinite(Number(s.sets))) sets += Number(s.sets);
+    });
+
+    const mins = sess.map(sessionMinutes).filter(function (m) { return m !== null; });
+    const avgMin = mins.length
+      ? Math.round(mins.reduce(function (a, b) { return a + b; }, 0) / mins.length)
+      : null;
+
+    let prs = 0;
+    if (H && weightLog) {
+      H.weightNames(weightLog).forEach(function (name) {
+        const s = H.weightSeries(weightLog, name);
+        if (s.length < 2) return;
+        let max = s[0];
+        s.forEach(function (e) { if (Number(e.kg) >= Number(max.kg)) max = e; });
+        if (Number(max.kg) > Number(s[0].kg) && max.d >= fromKey && max.d <= toKey) prs++;
+      });
+    }
+
+    return {
+      workouts: trained.length,
+      vol: hasVol ? Math.round(vol) : null,
+      sets: sets || null,
+      avgMin: avgMin,
+      prs: prs
+    };
+  }
+
   window.ProgressCore = {
     bodyStats: bodyStats,
     forecast: forecast,
@@ -332,6 +558,15 @@
     bestLift: bestLift,
     trainedDates: trainedDates,
     trainingStats: trainingStats,
-    foodStats: foodStats
+    foodStats: foodStats,
+    sessionEntries: sessionEntries,
+    mondayKey: mondayKey,
+    volumeBuckets: volumeBuckets,
+    sessionMinutes: sessionMinutes,
+    timeStats: timeStats,
+    prList: prList,
+    perfTrend: perfTrend,
+    perfDrops: perfDrops,
+    rangeSummary: rangeSummary
   };
 })();

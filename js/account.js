@@ -1009,6 +1009,18 @@
                 done: Math.round(done),
                 total: Math.round(total)
               };
+              // Знімок фактів сесії (етап аналітики): час, підходи,
+              // повторення, тоннаж. Необовʼязкові — старі записи їх не мають.
+              const t0 = finite(s.t0, 0, 4102444800000);
+              const t1 = finite(s.t1, 0, 4102444800000);
+              if (t0) out[d].t0 = Math.round(t0);
+              if (t1) out[d].t1 = Math.round(t1);
+              const sets = finite(s.sets, 0, 200);
+              const reps = finite(s.reps, 0, 5000);
+              const vol = finite(s.vol, 0, 200000);
+              if (sets !== null) out[d].sets = Math.round(sets);
+              if (reps !== null) out[d].reps = Math.round(reps);
+              if (vol !== null) out[d].vol = Math.round(vol);
             }
             return accept(k, out);
           }
@@ -1484,7 +1496,14 @@
           '</div>' +
         '</div>' +
 
-        '<div class="row mt-2"><a class="small" href="rating.html">Сезон, лідери й історія →</a></div>' +
+        /* Прогрес як єдина структура: огляд (аналітика), рейтинг
+           (гейміфікація) та історія (факти) — три різні питання,
+           тому три посилання поруч, а не один змішаний розділ. */
+        '<div class="row mt-2" style="gap:14px;flex-wrap:wrap">' +
+          '<a class="small" href="journal.html">Огляд прогресу →</a>' +
+          '<a class="small" href="rating.html">Рейтинг →</a>' +
+          '<a class="small" href="journal.html#history">Історія →</a>' +
+        '</div>' +
       '</div>';
 
     const nick = $('#p-nick');

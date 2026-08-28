@@ -148,6 +148,7 @@
     if (!session || typeof session !== 'object') return src;
 
     const out = Object.assign({}, src);
+    const prev = (src[d] && typeof src[d] === 'object') ? src[d] : {};
     out[d] = {
       programId: String(session.programId || ''),
       days: Number(session.days) || 0,
@@ -156,6 +157,30 @@
       done: Math.max(0, Math.round(Number(session.done) || 0)),
       total: Math.max(0, Math.round(Number(session.total) || 0))
     };
+
+    /*
+     * Факти сесії, зняті В МОМЕНТ тренування — історія як незмінний
+     * знімок: пізніші правки плану чи ваг цих чисел не переписують.
+     *
+     *   t0/t1 — час першої та останньої дії (epoch ms): з них сторінка
+     *           прогресу рахує тривалість тренування;
+     *   sets/reps — підходи й повторення закритих вправ за схемою дня;
+     *   vol  — оцінка тоннажу: підходи × середина діапазону повторень ×
+     *          робоча вага, що діяла в день сесії.
+     *
+     * t0 пише перший запис і далі НЕ перетирається: початок тренування
+     * один. Решта оновлюється з кожною галочкою. Старі записи цих полів
+     * не мають — аналітика чесно каже «замало даних», а не вигадує.
+     */
+    const t0 = Number(session.t0) || Number(prev.t0) || 0;
+    const t1 = Number(session.t1) || 0;
+    if (t0 > 0) out[d].t0 = t0;
+    if (t1 > 0) out[d].t1 = Math.max(t1, t0);
+    ['sets', 'reps', 'vol'].forEach(function (k) {
+      const v = Number(session[k]);
+      if (Number.isFinite(v) && v >= 0) out[d][k] = Math.round(v);
+      else if (Number.isFinite(Number(prev[k]))) out[d][k] = Number(prev[k]);
+    });
     return out;
   }
 

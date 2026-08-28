@@ -826,9 +826,6 @@
               '<img class="logo__mark" src="logo-mark.svg" alt="" width="57" height="41">' +
               '<span>' + esc(CFG.siteName || 'FORGE') + '</span>' +
             '</a>' +
-            '<p class="small muted" style="margin:12px 0 0;max-width:34ch">' +
-              'Особистий інструмент. Нічого не продає, реклами й підписок немає.' +
-            '</p>' +
           '</div>' +
           '<div class="footer__links">' +
             NAV_ITEMS.map(function (i) {

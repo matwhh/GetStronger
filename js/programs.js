@@ -966,90 +966,8 @@
   const fmt = window.App.fmt;
 
   /* ------------------------------------------------------------------ */
-  /* Тир-лист                                                            */
-  /* ------------------------------------------------------------------ */
-  /*
-   * Рейтинг схем. Дані — у programs-data.js (TIERS + PROGRAM_TIER),
-   * тут тільки показ.
-   *
-   * Кольору тут немає навмисно, хоча в тир-листах він звичний: правило
-   * палітри сайту — один хроматичний колір і нейтральні, а статуси
-   * розрізняються яскравістю. Тому вищий тир = світліша плашка.
-   * Це той самий принцип, що й у смугах тижневого обʼєму.
-   */
-
-  /* Плашки тирів від найсвітлішої до найтемнішої. Якщо тирів стане
-     більше за відтінки, зайві беруть останній — рейтинг не зламається,
-     просто нижні рядки будуть однакові. */
-  const TIER_SHADE = [
-    { bg: 'var(--g1)', ink: 'var(--bg)' },
-    { bg: 'var(--g2)', ink: 'var(--bg)' },
-    { bg: 'var(--g3)', ink: 'var(--text)' }
-  ];
-
-  function tierBlock() {
-    const TIERS = window.TIERS || [];
-    const MAP = window.PROGRAM_TIER || {};
-    if (!TIERS.length) return '';
-
-    const rows = TIERS.map(function (tier, i) {
-      const shade = TIER_SHADE[Math.min(i, TIER_SHADE.length - 1)];
-
-      const items = PROGRAMS.filter(function (p) {
-        return MAP[p.id] === tier.id;
-      }).map(function (p) {
-        const days = (p.daysSupported || []).slice().sort(function (a, b) { return a - b; });
-        // Кнопка, а не плашка: клік ставить кількість днів, за якої схема
-        // існує, і прокручує до неї. Рейтинг, на який не можна натиснути,
-        // лишався б просто картинкою.
-        return '<button class="tier__item" type="button" data-tier-pick="' + esc(p.id) + '">' +
-                 '<b>' + esc(p.name) + '</b>' +
-                 '<span class="tier__days">' + days.join('/') + ' дн.</span>' +
-               '</button>';
-      }).join('');
-
-      return '<div class="tier__row">' +
-               '<div class="tier__label" style="background:' + shade.bg + ';color:' + shade.ink + '">' +
-                 esc(tier.id) +
-               '</div>' +
-               '<div class="tier__items">' + items + '</div>' +
-             '</div>';
-    }).join('');
-
-    // Без класу reveal, хоч сусідні статичні картки його мають.
-    // initReveal() із app.js відпрацьовує один раз при завантаженні
-    // сторінки — тобто ДО того, як цей блок сюди вставлять. Елемент із
-    // reveal лишився б із opacity: 0 назавжди, мовчки й без помилки.
-    // Саме тому жоден із рендерерів сайту цим класом не користується.
-    return '' +
-      '<div class="card">' +
-        '<h2 style="margin:0">Тир-лист</h2>' +
-
-        '<div class="tier mt-2">' + rows + '</div>' +
-
-        '<div class="notice mt-2">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
-          '<div class="small">' +
-            'Дослідження цей рейтинг не підтверджують і підтвердити не можуть. ' +
-            'Мета-аналіз 25 робіт: при однаковому тижневому обʼємі частота тренування ' +
-            'групи мʼязів <b>не дає значущої різниці</b> в гіпертрофії, і вибирати її ' +
-            'радять за зручністю. Тобто різниця між цими планами — питання розкладу ' +
-            'й уподобань, а не результату. ' +
-            '<a href="https://pubmed.ncbi.nlm.nih.gov/30558493/" target="_blank" rel="noopener">PMID 30558493</a>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-  }
-
-  /* ------------------------------------------------------------------ */
   /* Рендер: список схем                                                 */
   /* ------------------------------------------------------------------ */
-
-  function renderTiers() {
-    const host = $('#tier-list');
-    if (!host) return;
-    host.innerHTML = tierBlock();
-  }
 
   function renderList() {
     const host = $('#program-list');
@@ -2049,10 +1967,6 @@
     }
     if (profile.programId) state.programId = profile.programId;
 
-    // Тир-лист не залежить ні від кількості днів, ні від обраної схеми,
-    // тому рендериться один раз і далі не чіпається.
-    renderTiers();
-
     const readDays = function () {
       const el = $$('input[name="days"]').find(function (r) { return r.checked; });
       return el ? Number(el.value) : 3;
@@ -2068,38 +1982,6 @@
       });
     });
 
-    const tierHost = $('#tier-list');
-    if (tierHost) {
-      tierHost.addEventListener('click', function (e) {
-        const btn = e.target.closest('[data-tier-pick]');
-        if (!btn) return;
-
-        const program = PROGRAMS.find(function (p) { return p.id === btn.dataset.tierPick; });
-        if (!program) return;
-
-        // Схема існує не за будь-якої кількості днів. Якщо поточна їй не
-        // підходить — переставляємо на найменшу, за якої вона є, інакше
-        // клік привів би до картки «недоступно за 3 днів».
-        const days = (program.daysSupported || []).slice().sort(function (a, b) { return a - b; });
-        if (days.length && days.indexOf(state.days) === -1) {
-          state.days = days[0];
-          $$('input[name="days"]').forEach(function (el) {
-            el.checked = Number(el.value) === state.days;
-          });
-          saveOwn({ daysPerWeek: state.days }).catch(function (e) { if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err'); });
-          renderList();
-        }
-
-        state.programId = program.id;
-        state.plan = loadPlan(state.programId, state.days);
-        state.editing = false;
-        renderList();
-        renderPlan();
-
-        const plan = $('#plan');
-        if (plan && plan.scrollIntoView) plan.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    }
 
     $('#program-list').addEventListener('click', function (e) {
       const btn = e.target.closest('[data-pick]');

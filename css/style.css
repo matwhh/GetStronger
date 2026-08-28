@@ -1859,81 +1859,6 @@ main:focus:not(:focus-visible) { outline: none; }
 }
 
 /* ==========================================================================
-   ТИР-ЛИСТ СХЕМ
-   ==========================================================================
-   Класичний тир-лист кодує ранг кольором: червоний, помаранчевий, жовтий.
-   Тут цього немає навмисно — правило палітри сайту дозволяє один
-   хроматичний колір, а статуси розрізняються яскравістю. Вищий тир =
-   світліша плашка. Той самий принцип, що й у смугах тижневого обʼєму.
-
-   Сам відтінок задає JS інлайном (TIER_SHADE), бо кількість тирів може
-   змінитись, а прив'язка стилю до порядкового номера в CSS ламалась би
-   при першому ж додаванні рядка.
-   ========================================================================== */
-
-.tier {
-  display: grid;
-  gap: 10px;
-}
-
-.tier__row {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 12px;
-  align-items: stretch;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: rgba(var(--tint-rgb), 0.02);
-}
-
-/* Плашка рангу. Квадратна й важка — це якір рядка. */
-.tier__label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 52px;
-  border-radius: var(--r-sm);
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  line-height: 1;
-}
-
-.tier__items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-content: center;
-}
-
-/* Схема в рядку. Кнопка, а не плашка: клік веде до самої схеми. */
-.tier__item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 14px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--t-fast), background var(--t-fast);
-}
-.tier__item:hover {
-  border-color: var(--acc-line);
-  background: var(--surface-2);
-}
-.tier__item b { font-size: 0.95rem; font-weight: 700; }
-.tier__days { font-size: 0.75rem; color: var(--muted); font-family: var(--font-mono); }
-
-@media (max-width: 560px) {
-  .tier__row { grid-template-columns: 44px 1fr; gap: 10px; }
-  .tier__label { min-height: 44px; font-size: 1.1rem; }
-  .tier__item { padding: 7px 11px; }
-}
-
-/* ==========================================================================
    РЕЦЕПТ У КАРТЦІ
    ==========================================================================
    Інгредієнти по стравах. Живуть усередині акордеона .acc — того самого,
@@ -2938,7 +2863,6 @@ body {
 .week,
 .acc,
 .table-wrap,
-.tier,
 .modal__box,
 .rest-timer,
 .wchart,
@@ -3096,7 +3020,6 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
    перемальовки. Тут — рівно те, чого бракувало, тим самим кольором, що
    вже вживає :hover. */
 .acc__head:active { background: rgba(var(--acc-rgb), 0.14); }
-.tier__item:active { border-color: var(--acc-line); background: rgba(var(--acc-rgb), 0.18); }
 .quick-list__item:active { background: rgba(var(--acc-rgb), 0.18); }
 .dash-main:active, .tile:active { border-color: var(--acc-line); }
 
@@ -3137,7 +3060,6 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
     transform: none;
   }
   table.tbl tbody tr:hover { background: transparent; }
-  .tier__item:hover { border-color: var(--line); background: transparent; }
   .acc__head:hover { background: transparent; }
   .quick-list__item:hover { background: transparent; }
   .tile:hover { border-color: var(--line); }

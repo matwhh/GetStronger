@@ -67,6 +67,8 @@
   --ink-grad-a:  #ffffff;         /* градієнт великих чисел */
   --ink-grad-b:  #b9babd;
   --thumb:       var(--on-acc);   /* повзунок перемикача: завжди контрастний до заливки */
+  --footer-bg:   rgba(18, 22, 28, 0.72);   /* підвал */
+  --backdrop:    rgba(9, 12, 16, 0.68);    /* затемнення під модалкою */
 
   /* Текст — чисті сірі, це і є «чорно-біле» */
   --text:        #f2f2f3;
@@ -1621,7 +1623,7 @@ body.has-rest-timer { --rest-h: 86px; }
 .modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(11, 14, 20, 0.78);
+  background: var(--backdrop);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -2543,6 +2545,13 @@ html[data-scheme="light"] {
   --ink-grad-a: #14171c;
   --ink-grad-b: #565c67;
 
+  /* Підвал на папері — трохи глибший за сторінку, а не чорний. Затемнення
+     під модалкою лишається темним у ОБОХ схемах: його робота — прибрати
+     сторінку з уваги, і світла плівка поверх світлої сторінки цього не
+     дає. Міняється лише щільність. */
+  --footer-bg: rgba(214, 218, 225, 0.82);
+  --backdrop:  rgba(24, 30, 40, 0.45);
+
   --shadow:    0 18px 44px -20px rgba(16, 22, 34, 0.30);
   --shadow-lg: 0 40px 84px -34px rgba(16, 22, 34, 0.34);
 
@@ -3013,7 +3022,7 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
 
 .notice { border-left: 0; border-radius: 18px; }
 .notice--acc { border-color: rgba(var(--acc-ink-rgb), 0.22); background: rgba(var(--acc-rgb), 0.10); }
-.modal__backdrop { background: rgba(9, 12, 16, 0.68); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
+.modal__backdrop { background: var(--backdrop); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
 .modal__box { border-radius: 28px; }
 .rest-timer { border-radius: 20px; }
 .toast { border-radius: 17px; }
@@ -3038,7 +3047,10 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
 .footer {
   margin-top: 80px;
   border-top-color: var(--line);
-  background: rgba(18, 22, 28, 0.72);
+  /* Було rgba(18,22,28,0.72) — захардкоджений темний. У світлій схемі
+     підвал лишався майже чорним, а текст у ньому — темним: низ сайту
+     ставав нечитабельним. Тепер це токен, і кожна схема дає своє. */
+  background: var(--footer-bg);
 }
 .heatmap__cell { border-radius: 8px; box-shadow: var(--neo-inset-sm); }
 /*

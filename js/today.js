@@ -459,18 +459,6 @@
       '</a>';
   }
 
-  function foodTile() {
-    const NC = window.NutritionCalc;
-    const t = NC ? NC.targetFor(state.profile) : null;
-    if (!t) return tile('nutrition.html', 'Харчування', '—', 'порахувати норму', ' tile--empty');
-    const got = window.DayCore ? window.DayCore.dayTotals(state.profile.day, state.profile.recipes) : { kcal: 0 };
-    const left = t.kcal - got.kcal;
-    return tile('meals.html', 'Харчування',
-      '<span class="mono">' + fmtNum.kcal(got.kcal) + '</span><span class="tile__of"> / ' + fmtNum.kcal(t.kcal) + '</span>',
-      left >= 0 ? 'лишилось ' + fmtNum.kcal(left, { unit: true })
-                : 'понад ціль на ' + fmtNum.kcal(-left, { unit: true }));
-  }
-
   function weightTile() {
     const log = (state.profile.bodyLog && typeof state.profile.bodyLog === 'object') ? state.profile.bodyLog : {};
     const keys = Object.keys(log).sort();
@@ -517,8 +505,21 @@
    * за частоту у вікні, тож сигнал може лишатись низьким при виконаному
    * дні — і причина тоді зовсім інша.
    */
+  /*
+   * Смужка плиток: вага і трекери.
+   *
+   * Плитки харчування тут більше немає — просто над нею стоїть повна
+   * картка «Харчування» з тими самими числами. Два однакові показники
+   * поруч не додають інформації, а змушують звіряти, чи вони збігаються.
+   *
+   * Через це плиток лишилось дві, і сітка для них своя (.tiles--wide):
+   * у ряду на три вони були вузькими колонками, де довгий підпис на
+   * кшталт «−0,4 кг до попереднього» ламався на два рядки.
+   */
   function tilesStrip() {
-    return '<div class="tiles">' + foodTile() + weightTile() + trackerTile() + '</div>';
+    const inner = weightTile() + trackerTile();
+    if (!inner) return '';
+    return '<div class="tiles tiles--wide">' + inner + '</div>';
   }
 
 

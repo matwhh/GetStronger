@@ -216,13 +216,13 @@
       : { val: '—', lbl: 'вага', trend: 'ще без записів' });
 
     // Сила: найбільший приріст вправи за 8 тижнів
-    const lift = PC.bestLift(state.weightLog, 56);
+    const lift = PC.bestLift(sn.weightLog, 56);
     tiles.push(lift
       ? { val: sign(lift.delta) + ' кг', lbl: 'сила · ' + lift.name, trend: lift.from + ' → ' + lift.to + ' за 8 тиж' }
       : { val: '—', lbl: 'сила', trend: 'без змін ваг' });
 
     // Тренування: цього тижня X з Y (або всього)
-    const tr = PC.trainingStats(state.workLog, state.sessionLog, state.daysTarget);
+    const tr = PC.trainingStats(sn.workLog, sn.sessionLog, state.daysTarget);
     tiles.push({
       val: state.daysTarget ? tr.thisWeek + ' з ' + state.daysTarget : String(tr.thisWeek),
       lbl: 'тренувань цього тижня',
@@ -232,7 +232,7 @@
     });
 
     // Харчування: середнє проти цілі за 30 днів
-    const f = PC.foodStats(state.mealLog, 30);
+    const f = PC.foodStats(sn.mealLog, 30);
     tiles.push(f && f.avgTarget
       ? { val: f.avgKcal + ' / ' + f.avgTarget, lbl: 'ккал: середнє / ціль',
           trend: f.inTarget + ' із ' + f.withTarget + ' днів у межах ±5%' }
@@ -244,14 +244,14 @@
     // тут була б шумом, а не оглядом (плитки вище — базові чотири осі).
 
     // Середня тривалість тренування — зі знімків часу сесій
-    const ts = PC.timeStats(state.sessionLog, 30);
+    const ts = PC.timeStats(sn.sessionLog, 30);
     if (ts) tiles.push({
       val: durTxt(ts.avgMin), lbl: 'середнє тренування',
       trend: ts.count + ' ' + window.App.plural(ts.count, 'сесія', 'сесії', 'сесій') + ' за 30 днів'
     });
 
     // Нові особисті рекорди за 30 днів
-    const prsNew = PC.prList(state.weightLog, 30).filter(function (x) { return x.isNew; }).length;
+    const prsNew = PC.prList(sn.weightLog, 30).filter(function (x) { return x.isNew; }).length;
     if (prsNew) tiles.push({
       val: '+' + prsNew, lbl: 'PR за 30 днів', trend: 'нові максимуми робочих ваг'
     });
@@ -264,9 +264,16 @@
     if (!host || !window.ProgressCore) return;
 
     const tiles = overviewTiles();
+    const SC = window.SeasonCore;
     host.innerHTML =
       '<div class="card">' +
-        '<div class="kpis">' +
+        (SC
+          ? '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">' +
+              '<h2 style="margin:0">Огляд</h2>' +
+              '<span class="small muted">' + esc(SC.label()) + '</span>' +
+            '</div>'
+          : '') +
+        '<div class="kpis' + (SC ? ' mt-2' : '') + '">' +
           tiles.map(function (t) {
             return '<div class="kpi">' +
               '<div class="kpi__val mono">' + t.val + '</div>' +
@@ -812,6 +819,36 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Сезонне вікно аналітики                                             */
+  /* ------------------------------------------------------------------ */
+  /*
+   * «Огляд прогресу» рахує статистику ЗА СЕЗОН (js/season-core.js), а не
+   * за весь час: інакше метрики першого тижня Сезону 1 були б розмиті
+   * роками попередніх даних. Історія при цьому НЕ чіпається — календар,
+   * підсумок дня і графік ваги тіла й далі бачать усе.
+   *
+   * Зрізи рахуються один раз на завантаження журналів (seasonize), а не
+   * в кожному рендері: clip проходить по всіх ключах, і викликати його
+   * з чотирьох блоків на кожну перемальовку — марна робота.
+   */
+  const sn = {
+    sessionLog: {}, workLog: {}, weightLog: {}, mealLog: {}
+  };
+
+  function seasonize() {
+    const SC = window.SeasonCore;
+    if (!SC) {
+      sn.sessionLog = state.sessionLog; sn.workLog = state.workLog;
+      sn.weightLog = state.weightLog;   sn.mealLog = state.mealLog;
+      return;
+    }
+    sn.sessionLog = SC.clip(state.sessionLog);
+    sn.workLog = SC.clip(state.workLog);
+    sn.weightLog = SC.clipSeries(state.weightLog);
+    sn.mealLog = SC.clip(state.mealLog);
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Форматування чисел і часу для аналітики                             */
   /* ------------------------------------------------------------------ */
 
@@ -909,7 +946,7 @@
     const PC = window.ProgressCore;
     if (!host || !PC || !PC.volumeBuckets) return;
 
-    const vb = PC.volumeBuckets(state.sessionLog, state.volPeriod);
+    const vb = PC.volumeBuckets(sn.sessionLog, state.volPeriod);
     const svg = volChartSvg(vb);
     const totalVol = vb.buckets.reduce(function (a, b) { return a + b.vol; }, 0);
 
@@ -921,7 +958,7 @@
 
     // План проти факту: не голий відсоток, а обидва числа поруч —
     // «94%» без «із чого» не каже нічого.
-    const tr = PC.trainingStats(state.workLog, state.sessionLog, state.daysTarget);
+    const tr = PC.trainingStats(sn.workLog, sn.sessionLog, state.daysTarget);
     const adh = tr.adherence
       ? '<p class="small mt-1" style="margin-bottom:0">План проти факту за ' + tr.adherence.weeks +
         ' тиж: заплановано <b class="mono">' + tr.adherence.planned + '</b>, виконано <b class="mono">' +
@@ -929,7 +966,7 @@
       : '';
 
     // Час тренувань — зі знімків t0/t1
-    const ts = PC.timeStats(state.sessionLog, state.volPeriod);
+    const ts = PC.timeStats(sn.sessionLog, state.volPeriod);
     const time = ts
       ? '<p class="small mt-1" style="margin-bottom:0">Середнє тренування: <b class="mono">' + durTxt(ts.avgMin) +
         '</b> · разом <b class="mono">' + durTxt(ts.totalMin) + '</b> за ' + ts.count + ' ' +
@@ -938,7 +975,7 @@
 
     // Тренд сили: 30 або 90 днів — залежно від обраного періоду
     const trendDays = state.volPeriod >= 90 ? 90 : 30;
-    const pt = PC.perfTrend(state.weightLog, trendDays);
+    const pt = PC.perfTrend(sn.weightLog, trendDays);
     const TREND = { up: 'Росте', down: 'Знижується', flat: 'Стабільно' };
     const trend = pt && pt.n >= 2
       ? '<p class="small mt-1" style="margin-bottom:0">Тренд сили за ' + trendDays + ' днів: <b>' +
@@ -947,7 +984,7 @@
 
     // Стійкий спад: три зниження ваги поспіль в одній вправі.
     // Один поганий день сюди не потрапляє навмисно — це шум, не регрес.
-    const drops = PC.perfDrops(state.weightLog);
+    const drops = PC.perfDrops(sn.weightLog);
     const dropCard = drops.length
       ? '<div class="notice mt-2">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
@@ -1008,10 +1045,10 @@
 
     const monday = new Date(now);
     monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-    const week = PC.rangeSummary(state.sessionLog, state.weightLog, state.workLog, keyOf(monday), todayK);
+    const week = PC.rangeSummary(sn.sessionLog, sn.weightLog, sn.workLog, keyOf(monday), todayK);
 
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    const month = PC.rangeSummary(state.sessionLog, state.weightLog, state.workLog, keyOf(first), todayK);
+    const month = PC.rangeSummary(sn.sessionLog, sn.weightLog, sn.workLog, keyOf(first), todayK);
 
     host.innerHTML =
       '<div class="grid grid-2">' +
@@ -1034,7 +1071,7 @@
     const PC = window.ProgressCore;
     if (!host || !PC || !PC.prList) return;
 
-    const list = PC.prList(state.weightLog, 14);
+    const list = PC.prList(sn.weightLog, 14);
     if (!list.length) {
       host.innerHTML =
         '<div class="card">' +
@@ -1395,6 +1432,7 @@
     state.hcalM = now.getMonth();
     state.selDay = todayKey();
 
+    seasonize();
     wire();
     renderOverview();
     renderVolume();
@@ -1480,11 +1518,13 @@
       }
       if (profile.workLog && profile.workLog !== state.workLog) {
         state.workLog = profile.workLog;
+        seasonize();
         keepFocus(renderTrain); renderVolume(); renderSummary();
         if (state.view === 'history') { renderHcal(); renderDay(); }
       }
       if (profile.sessionLog && profile.sessionLog !== state.sessionLog) {
         state.sessionLog = profile.sessionLog;
+        seasonize();
         keepFocus(renderTrain); renderOverview(); renderVolume(); renderSummary();
         if (state.view === 'history') { renderHcal(); renderDay(); }
       }
@@ -1494,11 +1534,13 @@
       }
       if (profile.weightLog && profile.weightLog !== state.weightLog) {
         state.weightLog = profile.weightLog;
+        seasonize();
         renderLifts(); renderPrs(); renderVolume(); renderSummary();
         if (state.view === 'history') renderDay();
       }
       if (profile.mealLog && profile.mealLog !== state.mealLog) {
         state.mealLog = profile.mealLog;
+        seasonize();
         renderFood();
         if (state.view === 'history') renderDay();
       }

@@ -129,7 +129,11 @@
       render(); return;
     }
     try {
-      const rows = await Store.rpc('admin_requests');
+      /* Ліміт передаємо явно: RPC має значення за замовчуванням, але
+         покладатись на них означає, що одного дня сторінка спробує
+         витягти всіх користувачів одним запитом. Фільтр статусу
+         лишається клієнтським — сторінка тримає одну сторінку заявок. */
+      const rows = await Store.rpc('admin_requests', { p_limit: 200, p_offset: 0 });
       state.rows = Array.isArray(rows) ? rows : [];
       state.denied = '';
     } catch (e) {

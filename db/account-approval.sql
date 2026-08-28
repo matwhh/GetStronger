@@ -73,3 +73,35 @@ on conflict (user_id) do nothing;
 -- account_state(), admin_requests(), admin_decide(uuid, text) —
 -- повні тіла див. у міграції; всі security definer, execute лише
 -- для authenticated.
+
+-- ============================================================
+-- ДОДАТОК: security hardening + performance (аудит 28.08.2026)
+-- Міграції: security_lockdown_rpc_and_view,
+--           perf_rls_initplan_indexes_pagination
+--
+-- CRITICAL (виправлено): elo_try_clean_day — SECURITY DEFINER,
+--   доступна anon, приймала uid І cfg параметрами без перевірки
+--   авторизації → будь-хто міг накрутити ELO будь-кому. EXECUTE
+--   відкликано в anon і authenticated (це внутрішній помічник
+--   elo_submit; SECURITY DEFINER-функції викликають його від owner).
+--
+-- HIGH (виправлено): view public.leaderboard був SECURITY DEFINER із
+--   SELECT для anon → дамп ніків і ELO всіх користувачів без входу.
+--   Тепер security_invoker = true, anon доступу не має.
+--
+-- WARN (виправлено): решту elo_* відкликано в anon; season_of,
+--   elo_ladder, elo_band, elo_action_delta, touch_updated_at
+--   отримали SET search_path.
+--
+-- PERFORMANCE: усі RLS-політики переписані на (select auth.uid()) —
+--   auth-функція стає InitPlan і рахується раз на запит, а не на
+--   кожен рядок (важливо для elo_events, що росте необмежено).
+--   Індекси: season_state(season, elo desc) під elo_leaderboard,
+--   account_status(status, requested_at desc) під адмінку.
+--   admin_requests() отримав (p_status, p_limit, p_offset) —
+--   раніше тягнув УСІ заявки з усім скринінгом одним запитом.
+--
+-- ЗАЛИШИЛОСЬ ВРУЧНУ: у Supabase Dashboard увімкнути
+--   Authentication → Password protection (перевірка пароля за
+--   HaveIBeenPwned). Через API це не вмикається.
+-- ============================================================

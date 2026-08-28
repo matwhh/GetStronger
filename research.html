@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дослідження з PubMed про тренування — FORGE</title>
+<meta name="description" content="Джерела всіх рекомендацій сайту: обʼєм, частота, відмова, відпочинок, білок, дефіцит калорій, пульс, VO2max. З PMID.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Дослідження з PubMed про тренування — FORGE">
+<meta property="og:description" content="Джерела всіх рекомендацій сайту: обʼєм, частота, відмова, відпочинок, білок, дефіцит калорій, пульс, VO2max. З PMID.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Дослідження</h1>
+      <p class="lead reveal" data-d="1">
+        Чотирнадцять публікацій, на яких побудовані розрахунки й логіка підбору.
+        Усі джерела — з PubMed, кожне з PMID. Для кожного вказано, що воно показало
+        і чого не показало.
+      </p>
+
+      <div class="notice notice--acc mt-3 reveal" data-d="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5m0-3h.01"/></svg>
+        <div>
+          Мета-аналіз усереднює результати багатьох досліджень і показує середню тенденцію
+          по групі людей. Розкид індивідуальних відповідей на однакову програму
+          буває більший за сам ефект програми.
+        </div>
+      </div>
+
+      <!-- ================= ТРЕНУВАННЯ ================= -->
+      <h2 class="mt-3 reveal">Тренування</h2>
+
+      <article class="card reveal mt-2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Кут нахилу</span>
+            <h3 class="card__title mt-1">Нахил дає більше <i>верху</i> грудей — але не грудей загалом</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/32922646/" target="_blank" rel="noopener">PMID 32922646 ↗</a>
+        </div>
+        <p class="small">
+          Chaves SFN, Rocha-Júnior VA, Encarnação IGA та ін. <i>Effects of Horizontal and Incline
+          Bench Press on Neuromuscular Adaptations in Untrained Young Men.</i>
+          Int J Exerc Sci. 2020;13(6):859–872.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> 47 нетренованих чоловіків рандомізували на три групи — горизонтальний
+          жим, жим під нахилом, і обидва разом. Товщину великого грудного мʼяза міряли УЗД
+          у <b>трьох точках</b>. Різниця вийшла лише в одній: у <b>другому міжреберʼї</b>
+          (верх грудей) група нахилу випередила горизонтальну на <b>0,62 см</b> (p = 0,003).
+          У решті двох точок різниці між групами не було. Приріст ізометричної сили теж
+          не відрізнявся: ≈ +10 кг у горизонтальному жимі (p = 0,776) і ≈ +11 кг у жимі
+          під нахилом (p = 0,333) — однаково в усіх групах.
+        </p>
+        <p class="small mb-0">
+          <b>Чого НЕ показало:</b> що жим під нахилом «краще нарощує груди». Він виграв
+          у <b>однієї з трьох</b> ділянок — верхньої. На середній і нижній частині мʼяза переваги
+          немає, у силі немає теж. Обмеження серйозні: нетреновані чоловіки, ~15 осіб на групу,
+          8 тижнів і <b>лише одне тренування на тиждень</b>. Група, яка робила обидві вправи,
+          верх грудей теж не наростила краще — імовірно тому, що обʼєм на кожен кут ділився навпіл.
+          Практичний висновок вужчий за гучний: якщо відстає саме верх грудей — став нахил
+          першою вправою, а не тому, що «нахил кращий».
+        </p>
+      </article>
+
+      <article class="card reveal mt-2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Обʼєм</span>
+            <h3 class="card__title mt-1">Кількість підходів визначає приріст маси</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/27433992/" target="_blank" rel="noopener">PMID 27433992 ↗</a>
+        </div>
+        <p class="small">
+          Schoenfeld BJ, Ogborn D, Krieger JW. <i>Dose-response relationship between weekly resistance
+          training volume and increases in muscle mass: A systematic review and meta-analysis.</i>
+          J Sports Sci. 2017;35(11):1073–1082.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> мета-регресія 34 груп із 15 досліджень знайшла значущий вплив
+          тижневого обʼєму на зміну розміру мʼязів (p = 0,002). Кожен додатковий тижневий підхід
+          відповідав приросту величини ефекту на 0,023 — приблизно +0,37% до відсоткового приросту.
+        </p>
+        <p class="small mb-0">
+          <b>Чого НЕ показало:</b> що «більше — завжди краще» без обмежень. Залежність оцінена
+          в діапазоні обʼємів, представлених у включених дослідженнях; екстраполяція на 40+ підходів
+          на групу за тиждень цим аналізом не підкріплена. Не враховано індивідуальну здатність відновлюватися.
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="1">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Частота</span>
+            <h3 class="card__title mt-1">Двічі на тиждень краще, ніж раз</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/30558493/" target="_blank" rel="noopener">PMID 30558493 ↗</a>
+        </div>
+        <p class="small">
+          Grgic J, Schoenfeld BJ, Davies TB, Lazinica B, Krieger JW, Pedisic Z.
+          <i>How many times per week should a muscle be trained to maximize muscle hypertrophy?
+          A systematic review and meta-analysis of studies examining the effects of resistance
+          training frequency.</i> J Sports Sci. 2019;37(11):1286–1295.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> при однаковому тижневому обʼємі частота сама по собі впливає слабко.
+          Але коли обʼєм не вирівняний, вища частота дає більший приріст — бо дозволяє
+          розподілити більше підходів по тижню без надмірно довгих сесій.
+        </p>
+        <p class="small mb-0">
+          <b>Практичний висновок для сайту:</b> саме тому жодна програма тут не має варіанта,
+          де група мʼязів тренується лише 1 раз на тиждень. PPL існує тільки на шести днях —
+          на трьох він давав би частоту 1×, і замість нього стоїть Full Body із частотою 3×.
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Відмова</span>
+            <h3 class="card__title mt-1">До відмови працювати не обовʼязково</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/36334240/" target="_blank" rel="noopener">PMID 36334240 ↗</a>
+        </div>
+        <p class="small">
+          Refalo MC, Helms ER, Trexler ET, Hamilton DL, Fyfe JJ.
+          <i>Influence of Resistance Training Proximity-to-Failure on Skeletal Muscle Hypertrophy:
+          A Systematic Review with Meta-analysis.</i> Sports Med. 2023;53(3):649–665.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> 15 досліджень. Перевага роботи до відмови над роботою «не до відмови»
+          для гіпертрофії виявилась тривіальною: ES = 0,19 (95% ДІ 0,00–0,37; p = 0,045).
+          Нижня межа довірчого інтервалу впирається в нуль.
+        </p>
+        <p class="small mb-0">
+          <b>Чого НЕ показало:</b> що відмова шкідлива. І що можна зупинятись за 5 повторень до відмови —
+          у включених дослідженнях «не до відмови» зазвичай означало 1–3 повторення в запасі.
+          Саме тому в програмах стоїть RIR 1–3, а не «як піде».
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Близькість до відмови</span>
+            <h3 class="card__title mt-1">Чим ближче до відмови, тим більша гіпертрофія — але не сила</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/38970765/" target="_blank" rel="noopener">PMID 38970765 ↗</a>
+        </div>
+        <p class="small">
+          Robinson ZP, Pelland JC, Remmert JF, Refalo MC, Jukic I, Steele J, Zourdos MC.
+          <i>Exploring the Dose–Response Relationship Between Estimated Resistance Training
+          Proximity to Failure, Strength Gain, and Muscle Hypertrophy: A Series of Meta-Regressions.</i>
+          Sports Med. 2024;54(9):2209–2231.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> попередні роботи порівнювали відмову й не-відмову як дві категорії.
+          Тут близькість до відмови взяли як <b>неперервну</b> величину — у повтореннях у запасі (RIR) —
+          і прогнали серію мета-регресій із поправкою на вагу обтяження, спосіб зрівняння обʼєму,
+          тривалість втручання й тренованість.
+        </p>
+        <p class="small">
+          Для <b>гіпертрофії</b> нахил лінії за RIR був відʼємним у всіх найкращих моделях,
+          і довірчий інтервал не перетинав нуль: <b>що ближче підхід завершено до відмови,
+          то більший приріст розміру мʼяза</b>. Для <b>сили</b> — навпаки: довірчі інтервали
+          містили нуль, тобто сила росла однаково в широкому діапазоні RIR.
+        </p>
+        <p class="small mb-0">
+          <b>Чого НЕ показало:</b> що треба завжди йти в нуль. RIR не вимірювали — його
+          <b>оцінювали заднім числом</b> з описів тренувань у кожному дослідженні, якість підгонки
+          моделей автори назвали помірною, а сам аналіз — пошуковим, і прямо просять інтерпретувати
+          обережно. Точки, після якої віддача зникає, робота не називає, і вартість втоми не рахує.
+        </p>
+      </article>
+
+      <div class="notice reveal mt-2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5m0-3h.01"/></svg>
+        <div class="small">
+          <b>Ці дві роботи не суперечать одна одній, хоч і виглядають так.</b>
+          Refalo порівнює <i>відмову</i> з <i>майже відмовою</i> (у включених роботах це 1–3 RIR) —
+          і між ними різниця тривіальна. Robinson дивиться на <i>весь</i> діапазон: від RIR 5 до RIR 1
+          різниця вже суттєва. Разом вони дають одне правило: <b>підходити близько треба, доходити
+          до нуля — не обовʼязково.</b> RIR 1–3 у програмах стоїть саме тому — це та зона,
+          де стимул уже майже максимальний, а втома й ризик ще керовані.
+        </div>
+      </div>
+
+      <article class="card reveal mt-2" data-d="3">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Відпочинок</span>
+            <h3 class="card__title mt-1">Три хвилини між підходами краще за одну</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/26605807/" target="_blank" rel="noopener">PMID 26605807 ↗</a>
+        </div>
+        <p class="small">
+          Schoenfeld BJ, Pope ZK, Benik FM та ін. <i>Longer Interset Rest Periods Enhance Muscle
+          Strength and Hypertrophy in Resistance-Trained Men.</i> J Strength Cond Res. 2016;30(7):1805–1812.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> 21 тренований чоловік, 8 тижнів, 3 тренування на все тіло на тиждень,
+          3 підходи по 8–12 ПМ у 7 вправах. Група з 3-хвилинним відпочинком показала більший приріст
+          сили й товщини мʼязів, ніж група з 1-хвилинним. Усі інші змінні були однакові.
+        </p>
+        <p class="small mb-0">
+          <b>Обмеження:</b> мала вибірка (n = 21), лише чоловіки, лише 8 тижнів.
+          Це одне дослідження, а не мета-аналіз — приймати як сильний орієнтир, а не як закон.
+        </p>
+      </article>
+
+      <!-- ================= ХАРЧУВАННЯ ================= -->
+      <h2 class="mt-3 reveal">Харчування</h2>
+
+      <article class="card reveal mt-2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Білок</span>
+            <h3 class="card__title mt-1">Понад ~1,6 г/кг приросту вже немає</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/28698222/" target="_blank" rel="noopener">PMID 28698222 ↗</a>
+        </div>
+        <p class="small">
+          Morton RW, Murphy KT, McKellar SR та ін. <i>A systematic review, meta-analysis and
+          meta-regression of the effect of protein supplementation on resistance training-induced
+          gains in muscle mass and strength in healthy adults.</i> Br J Sports Med. 2018;52(6):376–384.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> 49 досліджень, 1863 учасники. Додатковий білок значуще покращує приріст
+          сили й мʼязової маси при силових тренуваннях. Точка виходу на плато — близько
+          <b>1,6 г на кг маси тіла на добу</b>, верхня межа довірчого інтервалу — до 2,2 г/кг.
+        </p>
+        <p class="small mb-0">
+          <b>Чого НЕ показало:</b> що більший білок шкідливий — просто без додаткової користі
+          для набору маси в цій вибірці. Дані стосуються здорових дорослих при достатній калорійності.
+          На дефіциті калорій потреба вища.
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="1">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Дефіцит</span>
+            <h3 class="card__title mt-1">0,5–1% маси тіла на тиждень</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/24864135/" target="_blank" rel="noopener">PMID 24864135 ↗</a>
+        </div>
+        <p class="small">
+          Helms ER, Aragon AA, Fitschen PJ. <i>Evidence-based recommendations for natural
+          bodybuilding contest preparation: nutrition and supplementation.</i>
+          J Int Soc Sports Nutr. 2014;11:20.
+        </p>
+        <p class="small">
+          <b>Що показало (огляд літератури, не експеримент):</b> калорійність варто задавати так,
+          щоб втрата ваги становила <b>0,5–1% на тиждень</b> — це максимізує збереження мʼязів.
+          Білок для більшості — <b>2,3–3,1 г на кг сухої маси</b>, жири — 15–30% калорійності,
+          решта — вуглеводи.
+        </p>
+        <p class="small mb-0">
+          <b>Обмеження:</b> це рекомендації для натуральних бодібілдерів на підготовці до змагань,
+          тобто для людей із високим стажем і низьким відсотком жиру. Для новачка з високим
+          відсотком жиру верхня межа швидкості втрати може бути вищою без шкоди для мʼязів.
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--warn">Профіцит</span>
+            <h3 class="card__title mt-1">Більше калорій — більше жиру, не більше мʼязів</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/23679146/" target="_blank" rel="noopener">PMID 23679146 ↗</a>
+        </div>
+        <p class="small">
+          Garthe I, Raastad T, Refsnes PE, Sundgot-Borgen J. <i>Effect of nutritional intervention
+          on body composition and performance in elite athletes.</i> Eur J Sport Sci. 2013;13(3):295–303.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> 39 елітних спортсменів рандомізували на дві групи, обидві додали
+          4 силові тренування на тиждень. Група з розписаним планом харчування їла 3585 ккал,
+          група «за апетитом» — 2964 ккал. Перша набрала <b>3,9% маси тіла проти 1,5%</b>,
+          але жирова маса зросла на <b>15% проти 3%</b>, а <b>приріст сухої маси між групами
+          статистично не відрізнявся</b>. Висновок авторів: надлишок енергії при наборі варто
+          дозувати обережно через небажаний приріст жиру.
+        </p>
+        <p class="small mb-0">
+          <b>Чого НЕ показало:</b> що профіцит узагалі не потрібен — обидві групи були в профіциті
+          й обидві набрали суху масу. Також вибірка — елітні спортсмени з високим стажем;
+          у новачка запас для росту більший, і поведінка на високому профіциті може відрізнятися.
+          Дослідження не порівнювало проміжні рівні профіциту, тому оптимальної точки воно не називає.
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Витрати</span>
+            <h3 class="card__title mt-1">Формула базового обміну</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/2305711/" target="_blank" rel="noopener">PMID 2305711 ↗</a>
+        </div>
+        <p class="small">
+          Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO.
+          <i>A new predictive equation for resting energy expenditure in healthy individuals.</i>
+          Am J Clin Nutr. 1990;51(2):241–247.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> рівняння виведене на 498 здорових людях (247 жінок, 251 чоловік,
+          19–78 років), із нормальною вагою та ожирінням, витрати вимірювались непрямою калориметрією.
+          Спрощення формули й розділення за статтю не погіршили прогностичну здатність.
+        </p>
+        <p class="small mb-0">
+          <b>Головне обмеження:</b> це <b>популяційна регресія</b>. Вона добре описує середнє по групі
+          і погано — конкретну людину. Помилка для окремої особи легко сягає ±10–15%.
+          Тому калькулятор дає стартову точку, а не норму.
+        </p>
+      </article>
+
+      <!-- ================= КАРДІО ================= -->
+      <h2 class="mt-3 reveal">Кардіо</h2>
+
+      <article class="card reveal mt-2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Пульс</span>
+            <h3 class="card__title mt-1">«220 − вік» помиляється на краях діапазону</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/11153730/" target="_blank" rel="noopener">PMID 11153730 ↗</a>
+        </div>
+        <p class="small">
+          Tanaka H, Monahan KD, Seals DR. <i>Age-predicted maximal heart rate revisited.</i>
+          J Am Coll Cardiol. 2001;37(1):153–156.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> мета-аналіз 351 дослідження. Максимальний пульс пов'язаний з віком
+          із кореляцією −0,90 і описується рівнянням <b>208 − 0,7 × вік</b>. Стать і рівень
+          звичної фізичної активності на нього суттєво не впливають.
+        </p>
+        <p class="small mb-0">
+          <b>Обмеження:</b> це регресія по популяції. Індивідуальний розкид навколо неї —
+          близько ±10 ударів, тому виміряний у полі максимум завжди точніший за будь-яку формулу.
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="1">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Жир</span>
+            <h3 class="card__title mt-1">Пік окислення жиру — близько 63% VO2max</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/14598198/" target="_blank" rel="noopener">PMID 14598198 ↗</a>
+        </div>
+        <p class="small">
+          Achten J, Jeukendrup AE. <i>Maximal fat oxidation during exercise in trained men.</i>
+          Int J Sports Med. 2003;24(8):603–608.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> швидкість окислення жиру росте від спокою приблизно до 60–65%
+          VO2max, а далі падає. Максимум у тренованих чоловіків — близько 63% VO2max.
+        </p>
+        <p class="small mb-0">
+          <b>Чого НЕ показало:</b> що ця зона краща для схуднення. Йдеться про швидкість
+          окислення жиру <i>під час самого бігу</i>, а не про втрату жиру за тиждень —
+          її визначає дефіцит калорій. На вищій інтенсивності частка жиру в паливі падає,
+          зате загальна витрата калорій росте.
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="2">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">VO2max</span>
+            <h3 class="card__title mt-1">Інтервали 4 × 4 хв дають більше за рівний біг</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/17414804/" target="_blank" rel="noopener">PMID 17414804 ↗</a>
+        </div>
+        <p class="small">
+          Helgerud J, Høydal K, Wang E та ін. <i>Aerobic high-intensity intervals improve
+          VO2max more than moderate training.</i> Med Sci Sports Exerc. 2007;39(4):665–671.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> 40 помірно тренованих чоловіків, 8 тижнів, 3 сесії на тиждень,
+          чотири режими за <b>однакової загальної роботи</b>. Варіант 4 × 4 хв на 90–95% HRmax
+          дав +7,2% VO2max (55,5 → 60,4 мл/кг/хв) і приріст ударного обʼєму серця близько 10% —
+          значуще більше, ніж рівний біг на 70% HRmax.
+        </p>
+        <p class="small mb-0">
+          <b>Обмеження:</b> лише чоловіки, лише 8 тижнів, вибірка 40 осіб. Висновок стосується
+          приросту VO2max, а не витривалості на дистанції взагалі.
+        </p>
+      </article>
+
+      <article class="card reveal mt-2" data-d="3">
+        <div class="row row--split">
+          <div>
+            <span class="chip chip--acc">Сумісність</span>
+            <h3 class="card__title mt-1">Біг заважає силовим, велосипед — ні</h3>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="https://pubmed.ncbi.nlm.nih.gov/22002517/" target="_blank" rel="noopener">PMID 22002517 ↗</a>
+        </div>
+        <p class="small">
+          Wilson JM, Marin PJ, Rhea MR та ін. <i>Concurrent training: a meta-analysis examining
+          interference of aerobic and resistance exercises.</i> J Strength Cond Res. 2012;26(8):2293–2307.
+        </p>
+        <p class="small">
+          <b>Що показало:</b> 21 дослідження, 422 величини ефекту. Для гіпертрофії самі силові
+          дали ES 1,23, силові разом із кардіо — 0,85. Ключова деталь: значуще падіння
+          гіпертрофії й сили було при поєднанні з <b>бігом</b>, але <b>не з велосипедом</b>.
+          Частота й тривалість кардіо корелюють із втратами негативно (−0,26…−0,75).
+        </p>
+        <p class="small mb-0">
+          <b>Чого НЕ показало:</b> що кардіо треба прибрати. Ефект залежить від модальності,
+          частоти й тривалості — помірний обсяг на велосипеді практично не заважає.
+        </p>
+      </article>
+
+      <!-- ================= ЯК ЧИТАТИ ================= -->
+      <h2 class="mt-3 reveal">Як читати ці дані</h2>
+
+      <div class="grid grid-3 mt-2">
+        <div class="card reveal" data-d="1">
+          <h3 class="card__title">Величина ефекту, не «значущість»</h3>
+          <p class="small mb-0">
+            p &lt; 0,05 означає лише низьку ймовірність випадковості й нічого не каже про розмір ефекту.
+            ES = 0,19 статистично значущий, але практично тривіальний.
+          </p>
+        </div>
+        <div class="card reveal" data-d="2">
+          <h3 class="card__title">Вибірка</h3>
+          <p class="small mb-0">
+            Результат на 21 тренованому чоловікові за 8 тижнів не переноситься автоматично
+            на жінок, новачків, людей за 50 чи на дворічний період.
+          </p>
+        </div>
+        <div class="card reveal" data-d="3">
+          <h3 class="card__title">Довірчий інтервал</h3>
+          <p class="small mb-0">
+            Якщо 95% ДІ доходить до нуля (0,00–0,37 у дослідженні про відмову),
+            дані сумісні з відсутністю ефекту. Точкова оцінка — найімовірніше значення, не єдине можливе.
+          </p>
+        </div>
+      </div>
+
+      <div class="notice mt-3 reveal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+        <div>
+          Це чотирнадцять джерел, а не вичерпний огляд літератури. Частина висновків із часом уточниться —
+          сторінку варто оновлювати, коли зʼявляться свіжіші мета-аналізи.
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+</body>
+</html>

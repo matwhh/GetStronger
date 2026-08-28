@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мій план тренувань і прогноз ваг — FORGE</title>
+<meta name="description" content="Обрана програма тренувань: робочі ваги, заміна вправ, тижневий обʼєм і модель приросту ваг на 6–24 місяці.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Мій план тренувань і прогноз ваг — FORGE">
+<meta property="og:description" content="Обрана програма тренувань: робочі ваги, заміна вправ, тижневий обʼєм і модель приросту ваг на 6–24 місяці.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Мій план</h1>
+      <p class="lead reveal" data-d="1">
+        Обрана програма тренувань з твоїми робочими вагами. Тут можна змінювати
+        і редагувати твій план тренувань. Нижче можна подивитися на прогнозований
+        прогрес у робочих вагах.
+      </p>
+
+      <!-- Порожній стан: план ще не обрано.
+           Ховається через [data-state="ready"] на #my-plan. -->
+      <div id="my-plan" data-state="loading">
+
+        <div class="card mt-3 pl-empty">
+          <h2 style="margin-top:0">План ще не обрано</h2>
+          <p class="small">
+            Зайди в «Плани тренувань», постав кількість днів у залі, подивись плани
+            та їх фактичні характеристики — частоту на групу мʼязів, тижневий обʼєм,
+            тривалість сесії — і натисни <b>«Обрати цей план»</b>.
+          </p>
+          <p class="small muted">
+            Після цього план приїде сюди. Робочі ваги в ньому порожні —
+            їх заповнюєш сам, під свої цифри.
+          </p>
+          <a class="btn btn--primary mt-1" href="programs.html">Обрати програму</a>
+        </div>
+
+        <div class="pl-ready">
+          <!-- Сюди programs.js рендерить обраний план з редактором -->
+          <div id="plan" class="mt-3"></div>
+
+          <!-- Запасний варіант, якщо браузер не дав доступу до буфера обміну:
+               сюди лягає текст плану, щоб виділити його вручну. -->
+          <div class="card mt-3" id="copy-fallback" hidden>
+            <h3 class="card__title">Текст плану</h3>
+            <p class="small muted">Браузер не дав доступ до буфера. Виділи й скопіюй вручну.</p>
+            <textarea class="input" rows="14" readonly aria-label="Текст плану для копіювання вручну" style="width:100%;text-align:left;font-family:var(--font-mono);font-size:0.82rem"></textarea>
+          </div>
+
+          <!-- Сюди projection.js рендерить модель приросту -->
+          <div id="projection" class="mt-3"></div>
+
+          <div class="card mt-3">
+            <h3 class="card__title">Змінити план тренувань</h3>
+            <p class="small muted">
+              Правки вправ і ваг зберігаються окремо для кожної пари «план + кількість днів»,
+              тож повернення до попереднього варіанта нічого не зітре.
+            </p>
+            <div class="row">
+              <a class="btn btn--ghost btn--sm" href="programs.html">До планів тренувань</a>
+              <button class="btn btn--ghost btn--sm" type="button" id="drop-plan">Зняти вибір</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<!-- Історія робочих ваг: append-only журнал (етап памʼяті) -->
+<script defer src="js/history-core.js"></script>
+<script defer src="js/exercises.js"></script>
+<script defer src="js/reps-core.js"></script>
+<script defer src="js/programs-data.js"></script>
+<!-- Скидання ваг використовує округлення до млинців і applyDeload,
+     тому ядра підключаються перед programs.js -->
+<script defer src="js/onerm-core.js"></script>
+<script defer src="js/periodization-core.js"></script>
+<!-- Позначає нові факти побаченими для Forge Rating (App.stampRating) -->
+<script defer src="js/programs.js"></script>
+<script defer src="js/projection.js"></script>
+<script>
+/* Перемикання порожнього / заповненого стану і зняття вибору.
+   Логіка крихітна й потрібна лише цій сторінці — тримати заради неї
+   окремий файл сенсу немає. */
+(function () {
+  'use strict';
+  var root = document.getElementById('my-plan');
+
+  // Запобіжник: якщо скрипти плану чомусь не відпрацювали, сторінка не має
+  // лишитись порожньою назавжди — через 3 с показуємо порожній стан.
+  setTimeout(function () {
+    if (root.dataset.state === 'loading') root.dataset.state = 'empty';
+  }, 3000);
+
+  document.addEventListener('plan:change', function () {
+    var cur = window.PlanEngine && window.PlanEngine.current();
+    root.dataset.state = (cur && cur.plan) ? 'ready' : 'empty';
+  });
+
+  var drop = document.getElementById('drop-plan');
+  if (drop) {
+    drop.addEventListener('click', function () {
+      if (!confirm('Зняти вибір плану? Самі правки вправ і ваг залишаться збереженими.')) return;
+      window.Store.saveProfile({ activePlan: null }).then(function () {
+        location.reload();
+      }, function (e) {
+        /* Обробника відмови не було зовсім, і офлайн (чи прострочена сесія)
+           давали найгірше поєднання: у localStorage план уже знято, сторінка
+           показує старий, кнопка на вигляд не спрацювала, а в консолі —
+           необроблена відмова. .queued означає «лежить у черзі», тобто
+           локально все записано і перезавантаження чесне. */
+        if (e && e.queued) { location.reload(); return; }
+        window.App.toast('Не збереглося: ' + (e && e.message), 'err');
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кардіо: пульсові зони й LISS проти HIIT — FORGE</title>
+<meta name="description" content="Пульсові зони за резервом пульсу, режими для окислення жиру й приросту VO2max, план бігу поруч із силовими.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Кардіо: пульсові зони й LISS проти HIIT — FORGE">
+<meta property="og:description" content="Пульсові зони за резервом пульсу, режими для окислення жиру й приросту VO2max, план бігу поруч із силовими.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Кардіо</h1>
+      <p class="lead reveal" data-d="1">
+        Розрахунок пульсу під конкретну мету: максимальна швидкість окислення жиру
+        або приріст VO2max. Плюс план, як вписати біг поруч із силовими.
+      </p>
+
+      <!-- ---------- Форма ---------- -->
+      <div class="card reveal mt-3" data-d="2" id="cardio-form">
+        <div class="grid" style="gap:26px">
+
+          <div class="field">
+            <label class="field__label">Мета</label>
+            <div class="seg">
+              <label class="seg__item"><input type="radio" name="cardio-goal" value="fat" checked><span>Окислення жиру</span></label>
+              <label class="seg__item"><input type="radio" name="cardio-goal" value="vo2"><span>Приріст VO2max</span></label>
+            </div>
+          </div>
+
+          <div class="grid grid-3">
+            <div class="field">
+              <label class="field__label" for="c-age">Вік, років</label>
+              <input class="input" id="c-age" type="number" inputmode="numeric" min="10" max="100" step="1" placeholder="25">
+            </div>
+            <div class="field">
+              <label class="field__label" for="c-rest">Пульс спокою <span class="muted">(бажано)</span></label>
+              <input class="input" id="c-rest" type="number" inputmode="numeric" min="30" max="110" step="1" placeholder="60">
+              <span class="field__hint">Уранці, не встаючи з ліжка. Три дні поспіль, узяти середнє.</span>
+            </div>
+            <div class="field">
+              <label class="field__label" for="c-max">Максимум <span class="muted">(якщо міряв)</span></label>
+              <input class="input" id="c-max" type="number" inputmode="numeric" min="120" max="230" step="1" placeholder="—">
+              <span class="field__hint">Реально виміряний завжди точніший за формулу.</span>
+            </div>
+          </div>
+
+          <div>
+            <button class="btn btn--ghost btn--sm" type="button" id="c-save">Зберегти мої дані</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ---------- Результат ---------- -->
+      <div id="cardio-out" class="mt-3"></div>
+
+      <!-- ---------- План ---------- -->
+      <div class="mt-3">
+        <h2 class="reveal">Скільки й коли бігати</h2>
+
+        <div class="notice mt-2 reveal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          <div>
+            <b>Біг заважає росту мʼязів більше, ніж велотренажер.</b> У мета-аналізі 21 дослідження
+            силові разом із <i>бігом</i> дали значуще падіння і гіпертрофії, і сили, а разом
+            із <i>велосипедом</i> — ні. Чим вища частота й довша тривалість кардіо, тим сильніший
+            ефект. Якщо мʼязи в пріоритеті — обирай велотренажер або греблю замість бігу.
+          </div>
+        </div>
+
+        <div class="grid grid-2 mt-2">
+          <div class="card reveal">
+            <h3 class="card__title">Правила сумісності</h3>
+            <ul class="small list-note" style="margin-bottom:0">
+              <li><b>Різні дні.</b> Найпростіший спосіб не заважати силовим — ставити кардіо у вільні дні.</li>
+              <li><b>Якщо в один день</b> — силові першими, кардіо після, або розрив ≥ 6 годин.</li>
+              <li><b>Ніколи перед ногами.</b> Біг напередодні дня ніг зіпсує і присідання, і саму сесію.</li>
+              <li><b>Тримай обсяг помірним.</b> Дві-три сесії на тиждень по 30–45 хв — межа, після якої втручання в силові стає помітним.</li>
+            </ul>
+            <p class="small muted mt-2 mb-0">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/22002517/" target="_blank" rel="noopener">PMID 22002517</a>
+            </p>
+          </div>
+
+          <div class="card reveal" data-d="1">
+            <h3 class="card__title">Тижневий обсяг</h3>
+            <div class="table-wrap mt-1">
+              <table class="tbl">
+                <thead><tr><th>Днів у залі</th><th>Кардіо</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">3</td><td class="small">2 сесії у вільні дні: одна 4×4, одна рівна 40–50 хв</td></tr>
+                  <tr><td class="mono">4</td><td class="small">2 сесії: одна у вільний день, одна після верхнього дня</td></tr>
+                  <tr><td class="mono">5</td><td class="small">1–2 сесії, обидві після силових або у вільний день</td></tr>
+                  <tr><td class="mono">6</td><td class="small">1 сесія у день відпочинку, легка або 4×4 — не обидва</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small muted mt-2 mb-0">
+              Це орієнтири під правило «частота й тривалість кардіо погіршують силові»,
+              а не окремий протокол із дослідження.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Пояснення ---------- -->
+      <div class="mt-3">
+        <h2 class="reveal">Що стоїть за цифрами</h2>
+
+        <div class="acc reveal mt-2">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--warn">Головне</span>
+            <span><h3>«Зона жироспалювання» не робить того, що обіцяє назва</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <p class="small">
+              Пік окислення жиру справді існує — приблизно на <b>63% VO2max</b>. Але це пік
+              <b>швидкості</b> окислення жиру за хвилину, а не найкращий режим для схуднення.
+            </p>
+            <p class="small">
+              На вищій інтенсивності частка жиру в паливі падає, зате <b>загальна витрата
+              калорій росте</b> — і за той самий час ти витратиш більше. А втрата жиру за тиждень
+              визначається дефіцитом калорій, а не тим, яке паливо горіло під час самого бігу.
+            </p>
+            <p class="small">
+              Практичний висновок: ця зона корисна як комфортний режим для великого обсягу,
+              який не вбиває відновлення перед силовими. Але вибирати її «щоб горів жир»
+              замість дефіциту в харчуванні — помилка.
+            </p>
+            <p class="small muted mb-0">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/14598198/" target="_blank" rel="noopener">PMID 14598198</a>
+            </p>
+          </div></div></div>
+        </div>
+
+        <div class="acc reveal">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--acc">VO2max</span>
+            <span><h3>Чому саме 4 × 4 хвилини</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <p class="small">
+              40 чоловіків, 8 тижнів, 3 сесії на тиждень. Порівнювали чотири режими
+              за <b>однакової загальної роботи</b>: рівний біг на 70% HRmax, робота на порозі
+              (85% HRmax), інтервали 15/15 і інтервали 4 × 4 хв на 90–95% HRmax.
+            </p>
+            <p class="small">
+              Інтервальні режими дали значуще більший приріст VO2max. Варіант 4 × 4 хв —
+              <b>+7,2%</b> (з 55,5 до 60,4 мл/кг/хв), ударний обʼєм серця виріс приблизно на 10%.
+            </p>
+            <p class="small mb-0">
+              Ключове тут — «за однакової загальної роботи». Річ не в тому, що інтервали
+              дозволяють зробити більше, а в тому, що <b>та сама робота на високій
+              інтенсивності дає більший приріст</b>, ніж розтягнута на рівний біг.
+            </p>
+            <p class="small muted mt-2 mb-0">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/17414804/" target="_blank" rel="noopener">PMID 17414804</a>
+            </p>
+          </div></div></div>
+        </div>
+
+        <div class="acc reveal">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--acc">Формули</span>
+            <span><h3>Максимум пульсу й резерв</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <p class="small">
+              <b>«220 − вік» брехливе.</b> Мета-аналіз 351 дослідження показав, що максимальний
+              пульс залежить від віку з кореляцією −0,90 і описується рівнянням
+              <b>208 − 0,7 × вік</b>. Стать і рівень тренованості на нього майже не впливають.
+            </p>
+            <div class="table-wrap mt-1">
+              <table class="tbl">
+                <thead><tr><th>Вік</th><th>220 − вік</th><th>208 − 0,7 × вік</th><th>Різниця</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">20</td><td class="num mono">200</td><td class="num mono">194</td><td class="num mono">−6</td></tr>
+                  <tr><td class="mono">30</td><td class="num mono">190</td><td class="num mono">187</td><td class="num mono">−3</td></tr>
+                  <tr><td class="mono">40</td><td class="num mono">180</td><td class="num mono">180</td><td class="num mono">0</td></tr>
+                  <tr><td class="mono">50</td><td class="num mono">170</td><td class="num mono">173</td><td class="num mono">+3</td></tr>
+                  <tr><td class="mono">60</td><td class="num mono">160</td><td class="num mono">166</td><td class="num mono">+6</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small mt-2">
+              <b>Резерв пульсу (метод Karvonen)</b> — це різниця між максимумом і пульсом спокою.
+              Зона рахується як <code>спокій + відсоток × резерв</code>. Так розрахунок враховує
+              тренованість серця: у людини з пульсом спокою 50 і в людини з 75 однакові
+              «70% від максимуму» означають зовсім різне навантаження.
+            </p>
+            <p class="small muted mb-0">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/11153730/" target="_blank" rel="noopener">PMID 11153730</a>
+            </p>
+          </div></div></div>
+        </div>
+
+        <div class="acc reveal">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--warn">Межі</span>
+            <span><h3>Чого цей калькулятор не враховує</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <ul class="small list-note">
+              <li><b>Індивідуальний розкид максимуму — ±10–12 ударів.</b> Формула описує середнє по популяції: у конкретної людини реальний максимум може бути на 10 ударів вищим або нижчим.</li>
+              <li><b>Пік окислення жиру теж індивідуальний.</b> Точно його визначає лише тест із газоаналізом; 63% VO2max — середнє по групі.</li>
+              <li>Ліки (передусім бета-блокатори), кофеїн, спека, зневоднення й недосип зсувають пульс на десятки ударів.</li>
+              <li>Пульс на зап'ясті відстає від реального на інтервалах: нагрудний датчик точніший.</li>
+            </ul>
+            <p class="small mb-0">
+              Якщо є проблеми із серцем або тиском — режим 90–95% максимуму варто узгодити з лікарем,
+              а не запускати з калькулятора.
+            </p>
+          </div></div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<script defer src="js/cardio.js"></script>
+</body>
+</html>

@@ -1,0 +1,337 @@
+/**
+ * Аналітика прогресу — чисті функції над журналами профілю.
+ *
+ * Джерела правди ті самі, що їх ведуть сторінки (етап памʼяті):
+ *   bodyLog    — вага тіла по днях (journal)
+ *   weightLog  — серії робочих ваг по вправах (history-core)
+ *   workLog    — позначки «був у залі» (таймер/рука)
+ *   sessionLog — виконання плану по днях («Сьогодні»)
+ *   mealLog    — закриті дні харчування з ціллю свого дня
+ *
+ * Цей модуль їх ЛИШЕ ЧИТАЄ і зводить у висновки. Жодного власного
+ * сховища: один факт → одне джерело правди → багато способів показати.
+ *
+ * Усі висновки детерміновані. Жодних порад («їж більше») — тільки
+ * факти («середнє 2840 із цілі 2900»): порада вимагає моделі людини,
+ * якої в цих даних немає.
+ */
+(function () {
+  'use strict';
+
+  const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+  const DAY_MS = 86400000;
+
+  function dateOf(key) {
+    const p = String(key).split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2]);
+  }
+
+  function keyOf(d) {
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+
+  /**
+   * Ключ ПЕРШОГО дня вікна завдовжки `days`, рахуючи сьогодні включно.
+   *
+   * Було `- days * DAY_MS`, а фільтри всюди інклюзивні з обох боків — тож
+   * «за 30 днів» насправді захоплювало 31 календарний день, і середні
+   * рахувались по неправильному знаменнику. rating-core рахує вікно
+   * інакше (рівно N днів), і два модулі розходились у тому, що таке 30 днів.
+   *
+   * setDate замість мілісекунд: у ніч переходу на зимовий час доба триває
+   * 25 годин, і віднімання DAY_MS зсувало межу вікна на день.
+   */
+  function cutKey(days, now) {
+    const base = now instanceof Date ? now : new Date();
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+    d.setDate(d.getDate() - (Math.max(1, Number(days) || 1) - 1));
+    return keyOf(d);
+  }
+
+  const r1 = function (n) { return Math.round(n * 10) / 10; };
+
+  /* ------------------------------------------------------------------ */
+  /* Вага тіла                                                           */
+  /* ------------------------------------------------------------------ */
+
+  /** Відсортовані валідні записи ваги: [{d, kg}] старі → нові */
+  function bodyEntries(bodyLog, fromKey) {
+    if (!bodyLog || typeof bodyLog !== 'object') return [];
+    return Object.keys(bodyLog)
+      .filter(function (k) {
+        const v = Number(bodyLog[k]);
+        return DATE_KEY.test(k) && Number.isFinite(v) && v >= 30 && v <= 300 &&
+               (!fromKey || k >= fromKey);
+      })
+      .sort()
+      .map(function (k) { return { d: k, kg: Number(bodyLog[k]) }; });
+  }
+
+  /**
+   * Статистика ваги за період.
+   * delta — між першим і останнім записом ПЕРІОДУ; perWeek — той самий
+   * приріст, приведений до тижня за фактичним інтервалом дат (не за
+   * кількістю записів: пропуски не мають розтягувати час).
+   */
+  function bodyStats(bodyLog, periodDays, now) {
+    const from = periodDays ? cutKey(periodDays, now) : null;
+    const s = bodyEntries(bodyLog, from);
+    if (!s.length) return null;
+
+    const first = s[0], last = s[s.length - 1];
+    const spanDays = Math.max(1,
+      (dateOf(last.d).getTime() - dateOf(first.d).getTime()) / DAY_MS);
+    const avg = s.reduce(function (sum, e) { return sum + e.kg; }, 0) / s.length;
+    const delta = last.kg - first.kg;
+
+    return {
+      current: last.kg,
+      currentDate: last.d,
+      first: first.kg,
+      firstDate: first.d,
+      delta: r1(delta),
+      perWeek: s.length > 1 ? r1(delta / spanDays * 7) : null,
+      avg: r1(avg),
+      count: s.length,
+      spanDays: Math.round(spanDays)
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Прогноз проти факту (вага тіла)                                     */
+  /* ------------------------------------------------------------------ */
+
+  /*
+   * Очікувана ШВИДКІСТЬ зміни ваги за ціллю — %, маси тіла на тиждень.
+   * Числа — ті самі діапазони, що написані людям у GOALS.rate
+   * (js/nutrition-core.js): тут вони потрібні числами, щоб намалювати
+   * коридор. maintain і recomp — абсолютний коридор ±0,5 кг: «вага
+   * стабільна» означає межу в кілограмах, а не у відсотках.
+   */
+  const GOAL_RATES = {
+    bulk:     { lo: 0.25,  hi: 0.5 },
+    bulkfast: { lo: 0.5,   hi: 0.8 },
+    cut:      { lo: -1.0,  hi: -0.5 },
+    cutfast:  { lo: -0.9,  hi: -0.7 },
+    recomp:   { abs: 0.5 },
+    maintain: { abs: 0.5 }
+  };
+
+  /**
+   * Коридор прогнозу від якірної точки.
+   *
+   * Якір — ПЕРШИЙ запис ваги у вибраному періоді: модель веде відлік
+   * звідти, куди дивиться людина. Повертає функції lo(t)/hi(t) від
+   * кількості днів після якоря і зведення проти фактичної кінцевої ваги.
+   *
+   * null, якщо порівнювати нема чого: без цілі, без записів або період
+   * закороткий (менш як 2 тижні шуму ±300 г води — ще не сигнал).
+   */
+  function forecast(bodyLog, goalKey, periodDays, now) {
+    const rate = GOAL_RATES[goalKey];
+    if (!rate) return null;
+
+    const s = bodyEntries(bodyLog, periodDays ? cutKey(periodDays, now) : null);
+    if (s.length < 3) return null;
+
+    const anchor = s[0], last = s[s.length - 1];
+    const days = (dateOf(last.d).getTime() - dateOf(anchor.d).getTime()) / DAY_MS;
+    if (days < 14) return null;
+
+    const weeks = days / 7;
+    const kgAt = function (pctPerWeek, t) {
+      // Складний відсоток чесніший за лінійний: −1%/тиж від нової ваги щотижня
+      return anchor.kg * Math.pow(1 + pctPerWeek / 100, t / 7);
+    };
+
+    const lo = function (t) {
+      return rate.abs != null ? anchor.kg - rate.abs : kgAt(Math.min(rate.lo, rate.hi), t);
+    };
+    const hi = function (t) {
+      return rate.abs != null ? anchor.kg + rate.abs : kgAt(Math.max(rate.lo, rate.hi), t);
+    };
+
+    const expectLo = r1(lo(days) - anchor.kg);
+    const expectHi = r1(hi(days) - anchor.kg);
+    const actual = r1(last.kg - anchor.kg);
+
+    return {
+      anchor: anchor, last: last, days: Math.round(days), weeks: r1(weeks),
+      lo: lo, hi: hi,
+      expectLo: expectLo, expectHi: expectHi, actual: actual,
+      verdict: actual < Math.min(expectLo, expectHi) ? 'below'
+             : actual > Math.max(expectLo, expectHi) ? 'above' : 'within'
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Сила                                                                */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Повна статистика однієї вправи з weightLog.
+   * Рекорд — найбільша вага серії; isRecord — поточна вага і є рекордом
+   * (і це не єдиний запис: перший запис — точка відліку, а не досягнення).
+   */
+  function liftStats(weightLog, name) {
+    const H = window.HistoryCore;
+    const s = H ? H.weightSeries(weightLog, name) : [];
+    if (!s.length) return null;
+
+    const first = s[0], last = s[s.length - 1];
+    let max = s[0];
+    s.forEach(function (e) { if (Number(e.kg) >= Number(max.kg)) max = e; });
+
+    const delta = r1(Number(last.kg) - Number(first.kg));
+    return {
+      name: name,
+      series: s,
+      first: Number(first.kg), firstDate: first.d,
+      last: Number(last.kg), lastDate: last.d,
+      delta: delta,
+      pct: Number(first.kg) > 0 ? Math.round(delta / Number(first.kg) * 1000) / 10 : null,
+      max: Number(max.kg), maxDate: max.d,
+      isRecord: s.length > 1 && Number(last.kg) === Number(max.kg) && delta > 0,
+      count: s.length
+    };
+  }
+
+  /**
+   * Найбільший приріст серед вправ за останні N днів — для рядка
+   * «Жим: +12,5 кг за 8 тижнів» в огляді. null, якщо росту не було.
+   */
+  function bestLift(weightLog, periodDays, now) {
+    const H = window.HistoryCore;
+    if (!H || !weightLog) return null;
+    const from = cutKey(periodDays, now);
+    let best = null;
+
+    H.weightNames(weightLog).forEach(function (name) {
+      const s = H.weightSeries(weightLog, name);
+      // Точка відліку — останній запис ДО періоду (вага, з якою в період
+      // увійшли); якщо такого немає — перший запис усередині періоду.
+      let base = null, last = null;
+      s.forEach(function (e) {
+        if (e.d < from) base = e;
+        else last = e;
+      });
+      if (!last) return;
+      if (!base) base = s.filter(function (e) { return e.d >= from; })[0];
+      const delta = r1(Number(last.kg) - Number(base.kg));
+      if (delta > 0 && (!best || delta > best.delta)) {
+        best = { name: name, delta: delta, from: Number(base.kg), to: Number(last.kg) };
+      }
+    });
+    return best;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Тренування                                                          */
+  /* ------------------------------------------------------------------ */
+
+  /** День тренувальний, якщо є позначка АБО сесія з прогресом */
+  function trainedDates(workLog, sessionLog) {
+    const set = {};
+    const wl = workLog || {};
+    Object.keys(wl).forEach(function (k) {
+      if (DATE_KEY.test(k) && Number(wl[k]) > 0) set[k] = true;
+    });
+    Object.keys(sessionLog || {}).forEach(function (k) {
+      const s = sessionLog[k];
+      if (!DATE_KEY.test(k) || !s || !(Number(s.done) > 0)) return;
+      /*
+       * Явний 0 у workLog — це «знято руками в теплокарті» і має
+       * перекривати сесію. Інакше день, знятий у «Прогресі», однаково
+       * лишався б тренувальним для статистики й для Rating, і зняти його
+       * було б неможливо взагалі.
+       */
+      if (Number(wl[k]) === 0 && Object.prototype.hasOwnProperty.call(wl, k)) return;
+      set[k] = true;
+    });
+    return Object.keys(set).sort();
+  }
+
+  /**
+   * Регулярність. adherence — виконання плану за останні N ПОВНИХ тижнів:
+   * фактичні тренування проти daysTarget*тижні, обрізане до 100%.
+   * Без обраного плану adherence відсутній — вигадувати ціль нема з чого.
+   */
+  function trainingStats(workLog, sessionLog, daysTarget, now) {
+    const dates = trainedDates(workLog, sessionLog);
+    const base = now instanceof Date ? now : new Date();
+
+    const monday = new Date(base);
+    const dow = (base.getDay() + 6) % 7;   // Пн=0
+    monday.setDate(base.getDate() - dow);
+    const weekKey = keyOf(monday);
+
+    const monthKey = cutKey(30, base);
+    const thisWeek = dates.filter(function (d) { return d >= weekKey; }).length;
+    const thisMonth = dates.filter(function (d) { return d >= monthKey; }).length;
+
+    let adherence = null;
+    const WEEKS = 6;
+    if (daysTarget > 0) {
+      const from = keyOf(new Date(monday.getTime() - WEEKS * 7 * DAY_MS));
+      const done = dates.filter(function (d) { return d >= from && d < weekKey; }).length;
+      const planned = daysTarget * WEEKS;
+      adherence = {
+        done: done, planned: planned, weeks: WEEKS,
+        pct: Math.min(100, Math.round(done / planned * 100))
+      };
+    }
+
+    return { total: dates.length, thisWeek: thisWeek, thisMonth: thisMonth, adherence: adherence };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Харчування                                                          */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Статистика закритих днів за період. inTarget — день у межах ±5% від
+   * ЦІЛІ СВОГО дня; дні без цілі в цю частку не входять.
+   */
+  function foodStats(mealLog, periodDays, now) {
+    if (!mealLog || typeof mealLog !== 'object') return null;
+    const from = periodDays ? cutKey(periodDays, now) : null;
+    const days = Object.keys(mealLog)
+      .filter(function (k) { return DATE_KEY.test(k) && (!from || k >= from); })
+      .sort()
+      .map(function (k) { return Object.assign({ d: k }, mealLog[k]); });
+    if (!days.length) return null;
+
+    const sum = function (f) {
+      return days.reduce(function (s, e) { return s + (Number(e[f]) || 0); }, 0);
+    };
+    const withTarget = days.filter(function (e) { return Number(e.target) > 0; });
+    const inTarget = withTarget.filter(function (e) {
+      return e.kcal >= e.target * 0.95 && e.kcal <= e.target * 1.05;
+    }).length;
+
+    return {
+      count: days.length,
+      days: days,
+      avgKcal: Math.round(sum('kcal') / days.length),
+      avgP: Math.round(sum('p') / days.length),
+      avgTarget: withTarget.length
+        ? Math.round(withTarget.reduce(function (s, e) { return s + e.target; }, 0) / withTarget.length)
+        : null,
+      withTarget: withTarget.length,
+      inTarget: inTarget
+    };
+  }
+
+  window.ProgressCore = {
+    bodyStats: bodyStats,
+    forecast: forecast,
+    GOAL_RATES: GOAL_RATES,
+    liftStats: liftStats,
+    bestLift: bestLift,
+    trainedDates: trainedDates,
+    trainingStats: trainingStats,
+    foodStats: foodStats
+  };
+})();

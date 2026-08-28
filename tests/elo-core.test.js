@@ -1,0 +1,134 @@
+/**
+ * Сезонний ELO (js/elo-core.js): сезони, рівні, дії, бонуси, стелі.
+ * Баланс (цілі по профілях користувачів) перевіряє tools/simelo.mjs.
+ */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { loadModules } from './helpers.js';
+
+const E = loadModules(['js/elo-core.js']).EloCore;
+const CFG = JSON.parse(readFileSync(new URL('../db/elo-config.json', import.meta.url), 'utf8'));
+
+describe('ELO: сезони', () => {
+  it('чотири сезони за місяцями', () => {
+    assert.equal(E.seasonOf(new Date(2026, 2, 1)), 'SPRING-2026');
+    assert.equal(E.seasonOf(new Date(2026, 4, 31)), 'SPRING-2026');
+    assert.equal(E.seasonOf(new Date(2026, 5, 1)), 'SUMMER-2026');
+    assert.equal(E.seasonOf(new Date(2026, 8, 15)), 'AUTUMN-2026');
+    assert.equal(E.seasonOf(new Date(2026, 11, 1)), 'WINTER-2026');
+  });
+
+  it('зима належить року свого грудня', () => {
+    assert.equal(E.seasonOf(new Date(2027, 0, 20)), 'WINTER-2026');
+    assert.equal(E.seasonOf(new Date(2027, 1, 28)), 'WINTER-2026');
+  });
+
+  it('межі сезону обіймають рівно свої місяці', () => {
+    const [a, b] = E.seasonRange('WINTER-2026');
+    assert.equal(a.getMonth(), 11); assert.equal(a.getFullYear(), 2026);
+    assert.equal(b.getMonth(), 1); assert.equal(b.getFullYear(), 2027);
+  });
+});
+
+describe('ELO: рівні 0–2500', () => {
+  it('рівні рівномірні по 200', () => {
+    assert.equal(E.levelFor(0, CFG).level, 1);
+    assert.equal(E.levelFor(199, CFG).level, 1);
+    assert.equal(E.levelFor(200, CFG).level, 2);
+    assert.equal(E.levelFor(999, CFG).level, 5);
+    assert.equal(E.levelFor(1799, CFG).level, 9);
+    assert.equal(E.levelFor(1800, CFG).level, 10);
+  });
+
+  it('2000+ — Level 10 ELITE, а не Level 11', () => {
+    const a = E.levelFor(1942, CFG), b = E.levelFor(2247, CFG);
+    assert.equal(a.level, 10); assert.equal(a.elite, false); assert.equal(a.name, 'Level 10');
+    assert.equal(b.level, 10); assert.equal(b.elite, true); assert.equal(b.name, 'Level 10 — ELITE');
+  });
+
+  it('стеля 2500', () => {
+    assert.equal(E.clampElo(2600, CFG), 2500);
+    assert.equal(E.clampElo(-50, CFG), 0);
+    assert.equal(E.levelFor(2500, CFG).pct, 100);
+  });
+});
+
+describe('ELO: власний план — однакова ціна за однакове виконання', () => {
+  it('4/тиж і 6/тиж на 100% дають однаковий тижневий ELO', () => {
+    const w4 = E.actionDelta('workout', { done: 14, total: 14 }, CFG, { plannedDays: 4 }).delta * 4;
+    const w6 = E.actionDelta('workout', { done: 14, total: 14 }, CFG, { plannedDays: 6 }).delta * 6;
+    assert.ok(Math.abs(w4 - w6) <= 4, w4 + ' vs ' + w6); // похибка округлення
+  });
+});
+
+describe('ELO: tolerance-зони', () => {
+  it('тренування: повне > часткового > провального', () => {
+    const ctx = { plannedDays: 4 };
+    const full = E.actionDelta('workout', { done: 14, total: 14 }, CFG, ctx).delta;
+    const most = E.actionDelta('workout', { done: 13, total: 14 }, CFG, ctx).delta;
+    const half = E.actionDelta('workout', { done: 7, total: 14 }, CFG, ctx).delta;
+    const none = E.actionDelta('workout', { done: 1, total: 14 }, CFG, ctx).delta;
+    assert.ok(full > most && most > half && half > none && none >= 0,
+      [full, most, half, none].join(' > '));
+  });
+
+  it('білок за прикладом ТЗ: 180→повна, 171→трохи менше, 150→часткова, 100→мала', () => {
+    const meal = (p) => E.actionDelta('meal', { kcal: 2600, target: 2600, protein: p, proteinTarget: 180 }, CFG).delta;
+    const a = meal(180), b = meal(171), c = meal(150), d = meal(100);
+    assert.ok(a >= b && b > c && c > d && d >= 0, [a, b, c, d].join(' ≥ '));
+  });
+
+  it('калорії: невеликий перебір і недобір караються однаково мʼяко', () => {
+    const meal = (k) => E.actionDelta('meal', { kcal: k, target: 2600, protein: 170, proteinTarget: 170 }, CFG).delta;
+    assert.equal(meal(2600 * 1.04), meal(2600 * 0.96));
+    assert.ok(meal(2600) > meal(2600 * 1.3));
+  });
+
+  it('сон проти власної цілі', () => {
+    const s = (m) => E.actionDelta('sleep', { minutes: m, goal: 480 }, CFG).delta;
+    assert.ok(s(480) > s(430) && s(430) > s(360) && s(360) >= s(200));
+  });
+
+  it('recovery: чесне «мені погано» все одно щось дає', () => {
+    const bad = E.actionDelta('recovery', { value: 3 }, CFG).delta;
+    const good = E.actionDelta('recovery', { value: 9 }, CFG).delta;
+    const none = E.actionDelta('recovery', { value: null }, CFG).delta;
+    assert.ok(good > bad && bad > 0 && none === 0);
+  });
+});
+
+describe('ELO: grace week', () => {
+  it('тренування без grace дає ELO, з grace — нуль (і нуль штрафів)', () => {
+    const on = E.actionDelta('workout', { done: 14, total: 14 }, CFG, { plannedDays: 4, grace: true });
+    assert.equal(on.delta, 0);
+    assert.equal(E.weekPenalty(0, 4, 7, CFG), 0);
+  });
+
+  it('півтижня grace — штраф лише за неgrace-половину плану', () => {
+    assert.equal(E.weekPenalty(0, 4, 4, CFG), Math.round(4 * (1 - 4 / 7)) * CFG.missedWorkoutPenalty);
+  });
+
+  it('без grace недобір карається за кожен пропуск', () => {
+    assert.equal(E.weekPenalty(2, 4, 0, CFG), 2 * CFG.missedWorkoutPenalty);
+    assert.ok(E.weekPenalty(2, 4, 0, CFG) < 0);
+  });
+});
+
+describe('ELO: бонуси і стелі дня', () => {
+  it('чистий день вимагає УСІ категорії вище порога', () => {
+    const good = { training: 1, nutrition: 0.95, sleep: 1, recovery: 1, activity: 0.92 };
+    assert.equal(E.cleanDay(good, true, CFG), true);
+    assert.equal(E.cleanDay({ ...good, nutrition: 0.5 }, true, CFG), false);
+  });
+
+  it('день відпочинку не вимагає тренування', () => {
+    assert.equal(E.cleanDay({ nutrition: 1, sleep: 1, recovery: 1, activity: 1 }, false, CFG), true);
+  });
+
+  it('втрати дня впираються в підлогу, здобутки — у стелю', () => {
+    assert.equal(E.applyDayCaps([-10, -10, -10], CFG), CFG.dayLossFloor);
+    assert.equal(E.applyDayCaps([30, 30, 30], CFG), CFG.dayGainCap);
+    assert.equal(E.applyDayCaps([5, -3], CFG), 2);
+  });
+});

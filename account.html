@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Акаунт — FORGE</title>
+<meta name="description" content="Усі дані профілю в одному місці: антропометрія, мета, активність, стаж, пульс і рекорди 1ПМ. Зміни підхоплює решта сайту.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Акаунт — FORGE">
+<meta property="og:description" content="Усі дані профілю в одному місці: антропометрія, мета, активність, стаж, пульс і рекорди 1ПМ. Зміни підхоплює решта сайту.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Акаунт</h1>
+      <p class="lead reveal" data-d="1">
+        Усі твої дані в одному місці й редагуються просто тут. Зміни зберігаються
+        одразу і підхоплюються рештою сайту — калькулятором харчування, раціоном,
+        кардіо й прогнозом ваг.
+      </p>
+
+      <!-- Competitive identity: сезон, ELO, нагороди, маскот (js/account.js) -->
+      <div id="identity" class="mt-3 reveal" data-d="1"></div>
+
+      <div id="mode" class="mt-3 reveal" data-d="2"></div>
+
+      <div class="grid grid-2 mt-3">
+        <div id="auth" class="reveal"></div>
+        <div id="profile" class="reveal" data-d="1"></div>
+      </div>
+
+      <!-- Сюди account.js рендерить вибір теми -->
+      <div id="theme" class="mt-3 reveal"></div>
+
+      <div class="mt-3">
+        <h2 class="reveal">Приватність</h2>
+        <div class="grid grid-2 mt-2">
+          <div class="card reveal" data-d="1">
+            <h3 class="card__title">Що зберігається</h3>
+            <p class="small">
+              Стать, вік, зріст, вага, відсоток жиру, рівень активності, обрана програма,
+              кількість днів у залі, мета й рекорди 1ПМ. Крім них — усе, що ти сам
+              вносиш на сторінках: <strong>журнал ваги тіла й дати тренувань</strong>
+              (це історія, вона накопичується), <strong>робочі ваги</strong>,
+              <strong>відредаговані плани</strong>, <strong>власні рецепти</strong> та
+              <strong>поточний раціон дня</strong>, стан циклу періодизації й обрана тема.
+            </p>
+            <p class="small mb-0">
+              Ні аналітики, ні трекерів, ні сторонніх скриптів, окрім шрифтів Google Fonts.
+              Точний перелік завжди можна побачити кнопкою «Експортувати JSON» —
+              у файлі рівно те, що зберігається, і нічого понад те.
+            </p>
+          </div>
+          <div class="card reveal" data-d="2">
+            <h3 class="card__title">Хто це бачить</h3>
+            <p class="small mb-0">
+              У локальному режимі — тільки цей браузер. У хмарному — тільки ти:
+              рядок у базі привʼязаний до твого користувача, а політики RLS у Postgres
+              не дають прочитати чужий рядок навіть маючи публічний ключ.
+              Друзі зі спільним доступом мають власні акаунти і своїх даних одне одного не бачать.
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<!-- Перевірка віку при імпорті профілю: файл із дитячою датою
+     не має ставати обходом гейта (див. js/account.js, case birthDate). -->
+<!-- Ядро харчування потрібне сторінці, щоб показати добову норму
+     з тих самих даних і взяти список цілей замість власної копії. -->
+<script defer src="js/nutrition-core.js"></script>
+<script defer src="js/account.js"></script>
+</body>
+</html>

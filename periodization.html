@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Періодизація: цикл на 8–16 тижнів — FORGE</title>
+<meta name="description" content="Лінійний цикл від легкого до важкого: старт від відсотка разового максимуму, щотижневий крок, окрема стеля інтенсивності для ізоляції.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Періодизація: цикл на 8–16 тижнів — FORGE">
+<meta property="og:description" content="Лінійний цикл від легкого до важкого: старт від відсотка разового максимуму, щотижневий крок, окрема стеля інтенсивності для ізоляції.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Періодизація</h1>
+      <p class="lead reveal" data-d="1">
+        Цикл від легкого до важкого: заходиш нижче за свій максимум і за 8–16 тижнів
+        підходиш до нього назад. Ваги рахуються від разового максимуму кожної вправи,
+        а повторення — від відсотка, на якому ти цього тижня працюєш.
+      </p>
+
+      <!-- Порожній стан: план ще не обрано. Без плану немає ні списку вправ,
+           ні робочих ваг, з яких оцінювати максимум. -->
+      <div id="pd" data-state="loading">
+
+        <div class="card mt-3 pd-empty">
+          <h2 style="margin-top:0">Спочатку потрібен план</h2>
+          <p class="small">
+            Цикл будується на вправах твого плану й на робочих вагах із книги ваг.
+            Обери план у «Планах тренувань» і заповни ваги в «Моєму плані» — після цього
+            повернись сюди.
+          </p>
+          <div class="row mt-1">
+            <a class="btn btn--primary" href="programs.html">Обрати програму</a>
+            <a class="btn btn--ghost" href="plan.html">До мого плану</a>
+          </div>
+        </div>
+
+        <div class="pd-ready">
+          <!-- Налаштування циклу -->
+          <div id="pd-setup" class="mt-3"></div>
+
+          <!-- Таблиця тижнів -->
+          <div id="pd-table" class="mt-3"></div>
+
+          <!-- Що це за модель і де вона закінчується -->
+          <div class="mt-3" data-longform="Формула циклу й межі інтенсивності">
+            <h2 class="reveal">Як це рахується</h2>
+            <div class="grid grid-2 mt-2">
+
+              <div class="card reveal" data-d="1">
+                <h3 class="card__title">Звідки береться разовий максимум</h3>
+                <p class="small">
+                  Для присідань, жиму лежачи й армійського жиму — з поля рекордів
+                  в «Акаунті», якщо воно заповнене. Виміряне завжди краще за оцінене.
+                </p>
+                <p class="small">
+                  Для решти вправ 1ПМ оцінюється з робочої ваги: береться середина
+                  діапазону повторень плану, до неї додається RIR (бо підхід свідомо
+                  не доводиться до відмови), і отримане число проганяється через сім
+                  формул. Результат — медіана.
+                </p>
+                <p class="small mb-0">
+                  Це <b>оцінка</b>, і на високих повтореннях вона груба. Формули
+                  побудовані на підходах у 2–10 повторень; на 15 і вище вони починають
+                  вимірювати радше витривалість, ніж силу.
+                </p>
+              </div>
+
+              <div class="card reveal" data-d="2">
+                <h3 class="card__title">Чому повторення падають</h3>
+                <p class="small">
+                  Відсоток від максимуму й кількість повторень — це одне й те саме,
+                  сказане двома способами. Не можна одночасно поставити 90% і «6–8 разів»:
+                  такої ваги на вісім разів не існує.
+                </p>
+                <p class="small">
+                  Тому на тижнях циклу головним стає відсоток, а повторення виводяться
+                  з нього: 70% — це 12 разів, 80% — 8, 85% — 6, 90% — 4, 95% — 2.
+                  Діапазон плану на цих тижнях не діє.
+                </p>
+                <p class="small">
+                  <b>Повторення обрізані на 12.</b> Формула на 50% дає близько 22 —
+                  математично правильно, як припис безглуздо: підхід на двадцять разів
+                  тренує витривалість, а не силу. Тому на легких тижнях стоїть 12, а
+                  різниця показана як <b>запас</b>: зроби дванадцять і зупинись, маючи
+                  ще десяток у баку. Це і є сенс перших тижнів — рух і техніка, а не втома.
+                </p>
+                <p class="small mb-0">
+                  Нижче 50% старт поставити не можна: це вже розминка, а не робочий підхід.
+                  Підходи лишаються ті самі, що в плані — зменшувати їх разом із
+                  повтореннями цикл не намагається, це вже інше рішення, і приймати
+                  його за тебе він не повинен.
+                </p>
+              </div>
+
+              <div class="card reveal" data-d="3">
+                <h3 class="card__title">Окрема стеля для ізоляції</h3>
+                <p class="small">
+                  90% від максимуму в махах з гантелями — це не важкий підхід, це плече.
+                  Односуглобові вправи з довгим важелем не тестуються на максимум і не
+                  тренуються біля нього: 1ПМ там ні виміряти, ні надійно оцінити, а
+                  навантаження на суглоб росте швидше за корисний стимул.
+                </p>
+                <p class="small mb-0">
+                  Тому базові вправи цикл веде до 95%, ізоляцію — до 75% (це приблизно
+                  10 повторень). Клітинки, які вперлись у стелю, позначені в таблиці.
+                  Вони не помилка: вправа просто далі йде рівно.
+                </p>
+              </div>
+
+              <div class="card reveal" data-d="4">
+                <h3 class="card__title">Де ця модель закінчується</h3>
+                <p class="small">
+                  Що періодизація загалом працює — підтверджено: мета-аналіз 18 робіт
+                  показав більший приріст 1ПМ проти непериодизованого тренування
+                  (ES 0,43). Але конкретних відсотків по тижнях жодне дослідження
+                  не називає — числа нижче це конвенція силових програм, не дані.
+                </p>
+                <p class="small">
+                  Більше того, дані працюють <b>проти</b> саме лінійної схеми, яку
+                  рахує ця сторінка. У мета-аналізі з вирівняним обʼємом хвилеподібна
+                  періодизація (інтенсивність гуляє в межах тижня) дала більший приріст
+                  1ПМ, ніж лінійна — але тільки в тренованих; у новачків різниці немає.
+                  На гіпертрофію лінійна й хвилеподібна вплинули однаково.
+                </p>
+                <p class="small muted">
+                  <a href="https://pubmed.ncbi.nlm.nih.gov/28497285/" target="_blank" rel="noopener">PMID 28497285</a>
+                  &nbsp;·&nbsp;
+                  <a href="https://pubmed.ncbi.nlm.nih.gov/35044672/" target="_blank" rel="noopener">PMID 35044672</a>
+                </p>
+                <p class="small mb-0">
+                  Тобто лінійний цикл тут доречний як <b>повернення в роботу</b> після
+                  перерви — задача, для якої він і задуманий. Як постійна схема для
+                  тренованого це не найкращий вибір. І модель не знає про твій сон,
+                  стрес, харчування й травми: якщо вага тижня не йде — вона не йде,
+                  і таблиця тут не аргумент. Пропущений тиждень не наздоганяють:
+                  повтори його й рухайся далі.
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<script defer src="js/exercises.js"></script>
+<script defer src="js/reps-core.js"></script>
+<script defer src="js/programs-data.js"></script>
+<script defer src="js/onerm-core.js"></script>
+<script defer src="js/periodization-core.js"></script>
+<script defer src="js/periodization.js"></script>
+</body>
+</html>

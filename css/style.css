@@ -1,0 +1,3609 @@
+/* ==========================================================================
+   FORGE — дизайн-система
+
+   ПРАВИЛО ПАЛІТРИ: на сторінці рівно ОДИН хроматичний колір — #15243B.
+   Увесь інтерфейс — чорний, білий і сірі відтінки; кольором позначені лише
+   кнопки, посилання, активні стани, смуги даних і фокус. Жодного зеленого,
+   жовтого чи помаранчевого: статуси розрізняються яскравістю та іконкою.
+
+   Сам #15243B темний (яскравість 23%), тому як колір ТЕКСТУ на чорному він
+   дає 1.26:1 і нечитабельний. Він працює як поверхня картки, а для посилань
+   і кнопок беруться світліші відтінки того самого тону (H = 216°).
+
+   Ключова змінна — --acc-ink: колір, яким акцент можна писати ТЕКСТ.
+
+   Кожна пара перевірена за WCAG: текст ≥ 4.5:1, елементи інтерфейсу ≥ 3:1.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   ПАЛІТРА, ТИПОГРАФІКА, МЕТРИКИ
+   -------------------------------------------------------------------------- */
+:root {
+  /* Поверхні НЕЙТРАЛЬНІ — чистий графіт без домішки тону. Глибина будується
+     не кольором, а сходинками яскравості й тінями:
+
+       #131416  поле вводу (найглибше)
+       #17181a  тло сторінки
+       #1e2022  картка
+       #26282b  вкладена поверхня
+
+     Кроки навмисно дрібні (2–4% яскравості): саме така відстань читається
+     як обʼєм поруч із неоморфною тінню. Більший контраст дав би «плоскі
+     прямокутники різних кольорів» замість однієї матової поверхні. */
+  --bg:          #17181a;
+  --bg-1:        #1e2022;
+  --card-1:      #1e2022;
+  --card-2:      #26282b;
+
+  /* Акцент за замовчуванням — Navy Blue (H = 216°). Заливка СВІТЛА, а текст
+     на ній темний (--on-acc): темний бік navy на графіті зникає (заливка
+     1,2:1 до картки), а світлий не тримає білий текст. Розбір усіх чотирьох
+     кроків палітри — у блоці graphite-navy в секції ТЕМИ. */
+  --acc:         #6685b6;   /* заливка кнопок */
+  --acc-hi:      #9eb9e1;   /* кнопка під курсором: тут СВІТЛІШАЄ */
+  --acc-bar:     #6685b6;   /* смуги даних */
+  --acc-ink:     #9eb9e1;   /* акцент, безпечний як КОЛІР ТЕКСТУ на темному */
+  --acc-line:    #64809f;   /* межа акцентних елементів */
+  --link:        #9eb9e1;
+  --link-hover:  #c8daf2;
+
+  --acc-rgb:      102, 133, 182;
+  --acc-ink-rgb:  158, 185, 225;
+
+  /* Колір тексту НА акцентній заливці. */
+  --on-acc:      #0b0e14;
+
+  /* Тінт напівпрозорих підкладок і декору. У темній схемі це СВІТЛО;
+     світла схема перевертає його на чорний одним рядком. Без цього токена
+     кожна з 40 підкладок була б захардкодженим білим і в світлій схемі
+     розчинилась би. */
+  color-scheme: dark;
+
+  --tint-rgb:    255, 255, 255;
+  --fx-rgb:      255, 255, 255;   /* радіальні плями тла й відблиск картки */
+  --fx-a1:       0.030;
+  --fx-a2:       0.016;
+  --fx-card:     0.05;
+  --ink-grad-a:  #ffffff;         /* градієнт великих чисел */
+  --ink-grad-b:  #b9babd;
+  --thumb:       var(--on-acc);   /* повзунок перемикача: завжди контрастний до заливки */
+
+  /* Текст — чисті сірі, це і є «чорно-біле» */
+  --text:        #f2f2f3;
+  --text-2:      #c2c2c6;
+  --muted:       #a3a3ab;   /* світліше за типове: має проходити 4.5:1 і на найсвітлішій поверхні */
+  --placeholder: #8e8e97;   /* було #7a7a82 — 4,02:1 у полі; текст має 4,5:1 */
+
+  /* Нейтральні для графіків: смуга макросів, дані */
+  --g1:          #d8d8dc;
+  --g2:          #9a9aa1;
+  --g3:          #7e7e87;   /* було #5f5f66 — 2,49:1 до фону; для межі елемента норма 3:1 */
+
+  --line:        rgba(var(--tint-rgb), 0.15);
+  --line-2:      rgba(var(--tint-rgb), 0.26);
+
+  --shadow:    0 20px 54px -18px rgba(0, 0, 0, 0.92);
+  --shadow-lg: 0 44px 96px -30px rgba(0, 0, 0, 0.96);
+
+  /* Похідні поверхні */
+  --bg-2:        var(--card-2);
+  --surface:     var(--bg-1);
+  --surface-2:   var(--card-2);
+  --field:       var(--bg);
+  --field-focus: var(--bg-1);
+
+  /* Напівпрозорі поверхні. Шапка навмисно прозоріша за решту:
+     контент має просвічувати крізь неї при скролі, як у панелях iOS. */
+  /* Плоскі rgba, а не color-mix: ці три значення однаково перекриває
+     безумовний :root нижче, але тримати тут функцію, якої немає в
+     Safari < 16.2, — заряджена рушниця для наступної правки. */
+  --glass:       rgba(23, 24, 26, 0.88);
+  --glass-2:     rgba(23, 24, 26, 0.97);
+  --overlay:     rgba(19, 20, 22, 0.97);
+
+  --grad-a:      #1a1b1e;
+  --grad-b:      #17181a;
+  --grad-c:      #141517;
+
+  /* Аліаси під наявну розмітку */
+  --acc-3:       var(--acc-ink);
+  --acc-2-rgb:   var(--acc-ink-rgb);
+  --acc-3-rgb:   var(--acc-ink-rgb);
+  --acc-text-rgb: var(--acc-ink-rgb);
+
+  /* Статуси — без кольору. Розрізняються яскравістю рамки та іконкою. */
+  --ok:    var(--acc-ink);
+  --warn:  var(--g1);
+
+  /* Шрифти. Archivo Black — важкий гротеск із квадратними формами
+     та єдиною вагою (400 = максимальна). Тільки для словесного знака
+     й головного заголовка: у довгих рядках він занадто щільний. */
+  --font-display: "Archivo Black", "Arial Black", "Helvetica Neue", Impact, sans-serif;
+  --font-body:    "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --r-sm:  8px;
+  --r:     14px;
+  --r-lg:  22px;
+  --maxw:  1180px;
+  /* Висота шапки. Піднята з 60 разом зі збільшенням лого: слово при
+     2.25rem займає 36px, і в смузі 60px йому лишалось по 12px зверху
+     й знизу — воно впиралось у краї. 80px повертають те саме повітря,
+     що було в пропорції 24px у 60px.
+     Цю змінну читають ще scroll-padding-top і верхня межа мобільного
+     меню, тому міняти достатньо тут. */
+  --nav-h: 80px;
+
+  --e-out:  cubic-bezier(0.16, 1, 0.3, 1);
+  --e-io:   cubic-bezier(0.65, 0, 0.35, 1);
+  --t-fast: 0.18s var(--e-out);
+  --t:      0.34s var(--e-out);
+}
+
+/* ---------- Reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-h) + 20px);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 16px/1.65 var(--font-body);
+  font-feature-settings: "cv02", "cv03", "cv04", "tnum" 0;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+img, svg { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--link); text-decoration: none; transition: color var(--t-fast); }
+a:hover { color: var(--link-hover); }
+
+h1, h2, h3, h4 {
+  margin: 0 0 0.5em;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
+  font-weight: 700;
+}
+h1 { font-size: clamp(2.1rem, 5.2vw, 3.9rem); letter-spacing: -0.035em; }
+h2 { font-size: clamp(1.6rem, 3.4vw, 2.5rem); letter-spacing: -0.028em; }
+h3 { font-size: clamp(1.15rem, 2vw, 1.4rem); }
+p  { margin: 0 0 1em; color: var(--text-2); }
+
+::selection { background: var(--acc); color: var(--on-acc, #fff); }
+
+/* ---------- Фонова графіка ---------- */
+.bg-fx {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(165deg, var(--grad-a) 0%, var(--grad-b) 48%, var(--grad-c) 100%);
+  transition: background 0.45s var(--e-out);
+}
+
+/* ---------- Layout ---------- */
+.wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+/* Вузька колонка для «Сьогодні»: це екран однієї справи, і розтягувати
+   список вправ на 1240px означало б рядки-ниточки на десктопі. */
+.wrap--narrow { max-width: 760px; }
+.section { padding: clamp(56px, 9vw, 108px) 0; }
+
+.row     { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.grid    { display: grid; gap: 20px; }
+/* min() у minmax обовʼязковий: усередині картки корисна ширина на 320px
+   екрані ~232px, і голий minmax(280px,...) робив трек ширшим за батька —
+   вміст вилазив, а body{overflow-x:hidden} його мовчки зрізав. */
+.grid-2  { grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
+.grid-3  { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+.grid-4  { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+
+.center  { text-align: center; }
+.mb-0 { margin-bottom: 0; }
+.mt-1 { margin-top: 10px; } .mt-2 { margin-top: 22px; } .mt-3 { margin-top: 38px; }
+
+/* ---------- Навігація ---------- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  min-height: var(--nav-h);
+  display: flex;
+  align-items: center;
+
+  /* Матове скло: сильне розмиття + підняття насиченості того, що під ним.
+     Саме друге дає ефект «живої» панелі — без saturate фон під нею
+     виглядає просто сірим, а не приглушеним кольором сторінки. */
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--line);
+  transition: background var(--t-fast);
+}
+/* При скролі трохи щільніша, щоб текст під нею не заважав читати меню */
+.nav.is-stuck { background: var(--overlay); }
+
+.nav__inner {
+  position: relative;
+  width: 100%; max-width: var(--maxw);
+  margin: 0 auto; padding: 0 22px;
+  display: flex; align-items: center; gap: 22px;
+}
+
+/* Логотип — суто словесний знак, без іконки.
+   Наведення нічого не змінює: це головний елемент шапки, і будь-який
+   рух чи підсвітка на ньому смикають око при кожному проході курсором. */
+.logo {
+  display: inline-flex;
+  /* По базовій лінії, а не по центру: у flex-контейнері базовою лінією
+     картинки вважається її нижній край, тому ковадло стає рівно на ту саму
+     лінію, з якої починаються літери. Вирівнювання по центру ставило його
+     на око — верх і низ не збігалися з межами літер. */
+  align-items: baseline;
+  gap: 0.34em;
+  font-family: var(--font-display);
+  font-weight: 400;              /* Archivo Black має лише одну, максимальну вагу */
+  /* Ковадло задане в одиницях cap, тому від зміни кегля росте разом зі
+     словом — окремо його чіпати не треба. 2.25rem при line-height 1 дає
+     36px, тобто 12px запасу зверху й знизу в шапці висотою 60px. */
+  font-size: 2.25rem;
+  letter-spacing: 0.10em;
+  line-height: 1;
+  color: var(--text);
+  text-transform: uppercase;
+}
+.logo:hover { color: var(--text); }
+
+/* Знак ліворуч від слова.
+   Розмір заданий в em, тому він масштабується разом із кеглем логотипа
+   й лишається на місці і в шапці, і у футері, і на мобільному.
+
+   Висота — рівно висота великої літери, щоб верх і низ ковадла збігалися
+   з верхом і низом слова FORGE.
+
+   Одиниця cap і означає саме це: 1cap = висота великої літери поточного
+   шрифту. Вона точна за визначенням, тоді як em довелося б підбирати під
+   Archivo Black і переставляти при кожній зміні шрифту.
+
+   Перший рядок height — запасний варіант для браузерів без підтримки cap
+   (десь до 2022 року). 0.72em — приблизна висота великої літери Archivo
+   Black; браузер, що розуміє cap, просто перезапише її точним значенням.
+
+   У logo-mark.svg viewBox обрізаний по самому малюнку, тому задана висота
+   означає висоту ковадла, а не коробки з полями — без цього жодна з цифр
+   не збігалася б.
+
+   width: auto — пропорції тримає сам SVG (57:41). Задавати ширину числом
+   означало б стежити за нею вручну щоразу, коли зміниться форма.
+
+   flex-shrink: 0 — інакше на вузькому екрані flex стисне картинку
+   й ковадло розтягнеться. */
+.logo__mark {
+  width: auto;
+  height: 0.72em;
+  height: 1cap;
+  flex-shrink: 0;
+}
+
+/* flex:1 — смуга займає всю ширину між лого й правим краєм: без цього
+   margin-left:auto на «Акаунті» не мав би вільного місця, куди штовхати */
+.nav__links { display: flex; gap: 2px; align-items: center; flex: 1; }
+
+/* Акаунт притиснутий до правого краю окремо від груп */
+.nav__link--edge { margin-left: auto; }
+.nav__link {
+  position: relative;
+  padding: 8px 13px;
+  border-radius: 10px;
+  font-size: 0.92rem; font-weight: 500;
+  color: var(--text-2);
+  transition: color var(--t-fast), background var(--t-fast);
+  /* Без цього flex тиснув пункти по ширині, і «Мій план» на вузькому
+     екрані ламався на два рядки — шапка ставала різновисокою. Краще
+     чесно не вміститись і піти в бургер, ніж рвати назви. */
+  white-space: nowrap;
+}
+.nav__link:hover { color: var(--text); background: rgba(var(--tint-rgb), 0.05); }
+.nav__link::after {
+  content: "";
+  position: absolute; left: 13px; right: 13px; bottom: 3px; height: 2px;
+  border-radius: 2px;
+  background: var(--acc);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform var(--t);
+}
+.nav__link.is-active { color: var(--text); }
+.nav__link.is-active::after { transform: scaleX(1); }
+
+/* ---------- Групи з випадними меню ---------- */
+/* Батько + стрілка + випадний список. Наведення обробляє CSS
+   (:hover і :focus-within — друге дає клавіатурі той самий доступ),
+   клік по стрілці — тач-екранам, де наведення не існує. */
+.nav__item { position: relative; display: flex; align-items: center; }
+
+.nav__caret {
+  display: flex;
+  padding: 6px 3px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.nav__caret:hover { color: var(--text); }
+.nav__caret svg { transition: transform var(--t-fast); }
+.nav__item:hover .nav__caret svg,
+.nav__item.is-open .nav__caret svg { transform: rotate(180deg); }
+
+.nav__link--parent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.nav__link--parent svg { transition: transform var(--t-fast); }
+.nav__item:hover .nav__link--parent svg,
+.nav__item.is-open .nav__link--parent svg { transform: rotate(180deg); }
+
+/* Випадний список. padding-top — місток між пунктом і меню: без нього
+   курсор на шляху вниз пролітає щілину, :hover рветься й меню зникає. */
+.nav__drop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 120;
+  min-width: 200px;
+  padding-top: 10px;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity var(--t-fast), transform var(--t-fast);
+}
+.nav__item:hover .nav__drop,
+.nav__item:focus-within .nav__drop,
+.nav__item.is-open .nav__drop {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.nav__drop-in {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--overlay);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: var(--shadow);
+}
+.nav__drop-in .nav__link { padding: 10px 14px; font-size: 0.9rem; }
+
+.nav__burger {
+  display: none;
+  width: 42px; height: 42px;
+  border: 1px solid var(--line); border-radius: 11px;
+  background: rgba(var(--tint-rgb), 0.04);
+  cursor: pointer;
+  position: relative;
+}
+.nav__burger span {
+  position: absolute; left: 11px; right: 11px; height: 2px;
+  background: var(--text); border-radius: 2px;
+  transition: transform var(--t), opacity var(--t-fast);
+}
+.nav__burger span:nth-child(1) { top: 14px; }
+.nav__burger span:nth-child(2) { top: 20px; }
+.nav__burger span:nth-child(3) { top: 26px; }
+.nav__burger.is-open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+/* .is-open змінює тільки смужки всередині, сама кнопка лишається translateY(-50%) */
+.nav__burger.is-open span:nth-child(2) { opacity: 0; }
+.nav__burger.is-open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/* Бургер і бейдж Forge Rating — одна група праворуч (див. коментар у
+   js/app.js/buildNav): на мобільному nav__links випадає з потоку, і без
+   спільного контейнера space-between рознесла б їх по різних кінцях шапки. */
+.nav__actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+/* Коло рівня Forge Rating. Той самий приглушений тон, що в .nav__burger, —
+   це навігаційний елемент, а не значок досягнення: жодного яскравого
+   акценту чи анімації, лише число, яке видно з першого погляду. */
+/* Позначка «не синхронізовано». Схована, поки черга порожня; текст
+   ховається на телефоні, лишається крапка — сама наявність позначки і є
+   повідомленням, а місця в шапці там немає. */
+.nav__sync {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 12px;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: rgba(var(--tint-rgb), 0.04);
+  color: var(--text-2); text-decoration: none;
+  font-size: 0.8rem; white-space: nowrap;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.nav__sync[hidden] { display: none; }
+.nav__sync:hover, .nav__sync:focus-visible { border-color: var(--acc-line); color: var(--text); }
+.nav__sync-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--warn);
+  flex: none;
+}
+.nav__sync.is-offline .nav__sync-dot { background: var(--muted); }
+
+@media (max-width: 560px) {
+  .nav__sync { padding: 0; width: 34px; justify-content: center; }
+  .nav__sync-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+
+/* Перемикач світлої/темної схеми в шапці.
+   Геометрія однакова з .nav__rating — вони стоять поруч, і будь-яка різниця
+   в розмірі чи радіусі читалась би як недбалість, а не як задум. */
+.nav__scheme {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(var(--tint-rgb), 0.04);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+}
+.nav__scheme:hover { color: var(--text); border-color: var(--acc-line); background: rgba(var(--tint-rgb), 0.08); }
+.nav__scheme:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
+.nav__scheme svg { display: block; }
+
+.nav__rating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(var(--tint-rgb), 0.04);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
+}
+.nav__rating[hidden] { display: none; }   /* display:flex вище перебиває hidden */
+.nav__rating:hover { color: var(--text); background: rgba(var(--tint-rgb), 0.08); }
+.nav__rating.is-active { color: var(--text); border-color: rgba(var(--acc-rgb), 0.55); }
+
+/* Те саме коло, що в шапці, але для карток (Сьогодні → «Forge Rating»,
+   rating.html → заголовок): раніше тут був суцільний акцентний чип
+   «РІВЕНЬ N» (.chip--acc) — надто яскраво й «гейміфіковано» для звичайного
+   відображення поточного рівня. Замінено на те саме приглушене коло з
+   числом, трохи більше за навігаційне — тут воно самостійний
+   елемент картки, а не дрібна іконка в шапці. Коло лишається строго
+   круглим (фіксовані width/height) — підпис «Level» стоїть окремим
+   текстом ліворуч від нього (.lvl-label), а не всередині. */
+.lvl-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(var(--tint-rgb), 0.04);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Підпис «Level» ліворуч від круглого бейджа — окремий текст, не всередині
+   кола (щоб коло лишалось колом, а не капсулою). */
+.lvl-label {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-right: 8px;
+}
+
+@media (max-width: 1060px) {
+  /* Вкладки ховаються в бургер: лишається назва зліва й кнопка справа.
+
+     Поріг повернувся з 720 до 1060: пункти більше не згруповані у випадні
+     меню, у рядку їх девʼять замість чотирьох (~900px проти ~330), і разом
+     із лок-апом 193px та полями це вимагає ~1050. Історія порога:
+     900 → 960 (більше лого) → 1000 (11 пунктів) → 720 (групи) → 1060
+     (плоский список). */
+  .nav__inner { justify-content: space-between; }
+  .logo { font-size: 1.95rem; }
+  .nav__burger { display: block; }
+
+  .nav__links {
+    position: fixed; inset: var(--nav-h) 0 auto 0;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    padding: 14px 22px 22px;
+    /* Меню — 17 рядків; на екрані 390×844 вони не вміщались, а fixed-блок,
+       що вилазить за нижню межу вікна, НЕ скролиться сам. Через це «Акаунт»
+       і «Дослідження» на телефоні були недосяжні взагалі. dvh, а не vh:
+       з висувною адресною смугою vh бреше саме в той бік, що ховає низ. */
+    /* vh першим, dvh другим. dvh — Safari 15.4+; на старіших iOS уся
+       calc() відкидається ще при розборі, max-height зникає — і меню знову
+       вилазить за нижню межу вікна, тобто повертається саме той баг, який
+       описано вище. Рядок із vh переживає це й дає робочий, хоч і трохи
+       менш точний, ліміт. */
+    max-height: calc(100vh - var(--nav-h));
+    max-height: calc(100dvh - var(--nav-h));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    background: var(--overlay);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);   /* Safari до 18 знає лише префіксовану */
+    border-bottom: 1px solid var(--line);
+    /*
+     * ЗАКРИТЕ меню має бути повністю невидимим для дотику й для клавіатури.
+     *
+     * Раніше воно ховалось лише прозорістю: opacity:0 + pointer-events:none.
+     * Обидва не прибирають елемент із дерева, а pointer-events до того ж
+     * перевизначався нижче (.nav__drop: auto) — і невидима накладка на
+     * 770 із 844 пікселів висоти ловила дотики по сторінці. Реальний тап
+     * по кнопці в нижній частині «Раціону» відкривав калькулятор 1ПМ.
+     * Клавіатура так само проходила крізь сімнадцять невидимих посилань.
+     *
+     * visibility: hidden прибирає й те, й те. Перехід прописаний окремо
+     * (0s із затримкою на закриття), щоб згасання лишалось плавним.
+     */
+    transform: translateY(-8px); opacity: 0;
+    visibility: hidden; pointer-events: none;
+    transition: opacity var(--t), transform var(--t), visibility 0s linear 0.34s;
+  }
+  .nav__links.is-open {
+    opacity: 1; transform: none;
+    visibility: visible; pointer-events: auto;
+    transition: opacity var(--t), transform var(--t), visibility 0s;
+  }
+  .nav__link { padding: 13px 14px; font-size: 1rem; }
+  .nav__link::after { display: none; }
+
+  /* Акаунт у колонці стає звичайним пунктом: авто-відступ, що на
+     десктопі тисне його праворуч, тут зсував би його вбік списку */
+  .nav__link--edge { margin-left: 0; }
+
+  /* У бургері випадні меню стають простим списком: батько, під ним
+     дочірні з відступом. Стрілки ховаються — розкривати нічого. */
+  .nav__item { flex-direction: column; align-items: stretch; }
+  .nav__caret { display: none; }
+  .nav__drop {
+    position: static;
+    padding: 0;
+    opacity: 1;
+    transform: none;
+    min-width: 0;
+  }
+  /*
+   * Групи в мобільному меню розгорнуті завжди — але тільки коли РОЗГОРНУТЕ
+   * САМЕ МЕНЮ.
+   *
+   * Базове правило вище (.nav__drop) вимикає дотики, бо на десктопі група
+   * прихована до наведення. Тут його треба ввімкнути назад, інакше клік по
+   * «Боксу» падає на батьківський .nav__item. Але ставити auto беззастережно
+   * не можна: саме так і виникала невидима накладка, що ловила дотики по
+   * сторінці при ЗАКРИТОМУ меню. Тому — лише всередині .is-open.
+   */
+  .nav__links.is-open .nav__drop { pointer-events: auto; }
+  .nav__drop-in {
+    padding: 0 0 4px 18px;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .nav__drop-in .nav__link { padding: 10px 14px; color: var(--muted); }
+  .nav__drop-in .nav__link.is-active { color: var(--text); }
+  /* «Інше» без сторінки: у розгорнутому списку це просто заголовок */
+  .nav__link--parent { pointer-events: none; }
+  .nav__link--parent svg { display: none; }
+}
+
+/* ---------- Кнопки ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 12px 22px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 0.94rem; font-weight: 600; letter-spacing: 0.005em;
+  cursor: pointer;
+  background: rgba(var(--tint-rgb), 0.05);
+  color: var(--text);
+  transition: transform var(--t-fast), background var(--t-fast), box-shadow var(--t), border-color var(--t-fast), color var(--t-fast);
+  white-space: nowrap;
+}
+.btn:hover { transform: translateY(-2px); color: var(--text); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.btn--primary {
+  background: var(--acc);
+  border-color: var(--acc-line);
+  /* --on-acc — колір тексту НА акцентній заливці. Фолбек #fff, тому для
+     всіх наявних тем це рівно те, що було. Перевизначає його лише
+     графіт-navy: його акцент — світло-синій, і білий на ньому не читається. */
+  color: var(--on-acc, #fff);
+  box-shadow: 0 10px 30px -14px rgba(var(--acc-rgb), 0.9);
+}
+.btn--primary:hover { background: var(--acc); border-color: var(--text); color: var(--on-acc, #fff); box-shadow: 0 16px 40px -14px rgba(var(--acc-rgb), 0.95); }
+
+.btn--ghost { border-color: var(--line-2); background: rgba(var(--tint-rgb), 0.03); }
+.btn--ghost:hover { border-color: rgba(var(--acc-2-rgb), 0.55); background: rgba(var(--acc-rgb), 0.12); }
+
+.btn--sm { padding: 8px 15px; font-size: 0.86rem; border-radius: 10px; }
+
+/* ---------- Картки ---------- */
+.card {
+  position: relative;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card-1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  transition: transform var(--t), border-color var(--t), box-shadow var(--t);
+  overflow: hidden;
+}
+.card::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(420px 220px at var(--mx, 50%) var(--my, 0%),
+    rgba(var(--acc-2-rgb), 0.16), transparent 70%);
+  opacity: 0; transition: opacity var(--t);
+  pointer-events: none;
+}
+.card--hover:hover {
+  transform: translateY(-5px);
+  border-color: rgba(var(--acc-2-rgb), 0.4);
+  box-shadow: var(--shadow-lg);
+}
+
+/*
+ * Картка-посилання на розділ (сітка «Розділи» на головній).
+ *
+ * Сітка й так тягне всі картки в ряду до однакової висоти, але кнопка
+ * «Відкрити» стояла одразу під текстом — а тексти різної довжини. Через це
+ * в сусідніх картках вона опинялась на різній висоті: 300px від верху проти
+ * 345px, відступ знизу 78 проти 33. Вісім карток — вісім різних рівнів.
+ *
+ * Колонковий flex + margin-top: auto притискає кнопку до низу, і всі вони
+ * шикуються по одній лінії. align-self потрібен, бо інакше flex розтягнув
+ * би кнопку на всю ширину картки: .btn — inline-flex, і сам по собі він
+ * обіймає текст, але як flex-елемент підкоряється align-items: stretch.
+ */
+a.card {
+  display: flex;
+  flex-direction: column;
+}
+a.card > .btn {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+/* Недоступна схема: приглушена, без наведення й анімації появи.
+   Раніше ці картки мали клас .reveal, тому при кожній зміні кількості
+   днів увесь список наново «випливав» із затримками до 0,32 с. */
+.card--off {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+/* Необовʼязковий блок: раунди 7–8 на мішку. Це не «вимкнено» й не
+   «недоступно» — роботу робити треба, якщо лишились сили, тому картка
+   повноцінна, а пунктир лише каже «без цього сесія теж закінчена».
+   Модифікатор стану наявної картки, а не новий компонент. */
+.card--optional { border-style: dashed; }
+
+/* ---------- «Сьогодні»: список вправ ----------
+   Не таблиця навмисно: у залі це читають із телефона однією рукою.
+   Кожен рядок — одна велика зона дотику (весь рядок = чекбокс),
+   таймер — окрема кнопка праворуч, щоб не спрацьовував від галочки. */
+.tdy-list { list-style: none; margin: 0; padding: 0; }
+.tdy-ex {
+  display: flex; flex-direction: column;
+  border-bottom: 1px solid var(--line);
+}
+/* Верхній рядок вправи: галочка + назва зі схемою + таймер */
+.tdy-ex__top { display: flex; align-items: center; gap: 10px; }
+.tdy-ex:last-child { border-bottom: 0; }
+.tdy-ex__main {
+  flex: 1;
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Рідний чекбокс схований, але лишається у фокус-ланцюжку — стилізований
+   квадрат поруч малюється від його стану, і клавіатура працює як звикла */
+.tdy-ex__main input {
+  position: absolute; opacity: 0; width: 1px; height: 1px;
+}
+.tdy-ex__check {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  margin-top: 1px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--field, var(--surface-2));
+  box-shadow: var(--neo-inset, none);
+  position: relative;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.tdy-ex__check::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: center / 14px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  opacity: 0; transition: opacity var(--t-fast);
+}
+.tdy-ex__main input:checked + .tdy-ex__check {
+  background: var(--acc);
+  border-color: transparent;
+  box-shadow: var(--acc-raised-xs, none);
+}
+.tdy-ex__main input:checked + .tdy-ex__check::after { opacity: 1; }
+.tdy-ex__main input:focus-visible + .tdy-ex__check {
+  outline: 2px solid var(--acc-ink);
+  outline-offset: 2px;
+}
+.tdy-ex__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tdy-ex__name { font-weight: 600; line-height: 1.3; }
+.tdy-ex__scheme { font-size: 0.88rem; color: var(--text-2); }
+.tdy-ex__note { font-size: 0.8rem; color: var(--muted); }
+.tdy-ex.is-done .tdy-ex__name { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.tdy-ex__rest { flex: 0 0 auto; }
+
+/* Робоча вага прямо в рядку.
+   Окремим рядком під назвою, а не в тому ж флексі: назва вправи буває
+   на три слова, і поле поруч із нею на телефоні стискалось до нечитабельного.
+   Відступ зліва вирівнює поле під текст назви, а не під галочку. */
+.tdy-ex__wt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 0 12px 34px;
+}
+.tdy-ex__wt-lbl { font-size: 0.8rem; color: var(--muted); }
+.tdy-ex__wt-unit { font-size: 0.85rem; color: var(--muted); }
+.tdy-ex__wt .input { width: 92px; }
+.tdy-ex.is-done .tdy-ex__wt { opacity: 0.55; }
+
+.card.is-selected { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc), var(--shadow-lg); }
+.card--hover:hover::before { opacity: 1; }
+
+.card__title { margin: 0 0 6px; font-size: 1.22rem; }
+.card__meta  { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+/* ---------- Дрібні елементи ---------- */
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--acc);
+  border-radius: 999px;
+  background: rgba(var(--acc-rgb), 0.1);
+  font-size: 0.76rem; font-weight: 600;
+  letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--text);
+}
+.eyebrow__dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--acc-3);
+  box-shadow: 0 0 0 0 rgba(var(--acc-3-rgb), 0.7);
+  animation: pulse 2.4s infinite;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--acc-3-rgb), 0.6); }
+  70%  { box-shadow: 0 0 0 9px rgba(var(--acc-3-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--acc-3-rgb), 0); }
+}
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: rgba(var(--tint-rgb), 0.04);
+  font-size: 0.78rem; font-weight: 500; color: var(--text-2);
+}
+.chip--acc { border-color: var(--acc); background: rgba(var(--acc-rgb), 0.18); color: var(--text); }
+.chip--ok   { border-color: var(--acc); background: rgba(var(--acc-rgb), 0.18); color: var(--acc-ink); }
+.chip--warn { border-color: rgba(var(--tint-rgb), 0.34); background: rgba(var(--tint-rgb), 0.07); color: var(--g1); }
+
+.lead { font-size: clamp(1.02rem, 1.7vw, 1.16rem); color: var(--text-2); max-width: 62ch; }
+.muted { color: var(--muted); }
+.small { font-size: 0.86rem; }
+.mono  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.gradient-text {
+  background: linear-gradient(100deg, #fff 10%, var(--acc-ink) 95%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+
+.divider { height: 1px; border: 0; margin: 34px 0; background: linear-gradient(90deg, transparent, var(--line-2), transparent); }
+
+/* ---------- Форми ---------- */
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field__label { font-size: 0.83rem; font-weight: 600; color: var(--text-2); letter-spacing: 0.01em; }
+.field__hint  { font-size: 0.78rem; color: var(--muted); }
+
+.input, .select, .textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--field);
+  color: var(--text);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
+  appearance: none;
+}
+/*
+ * Фокус у полях вводу.
+ *
+ * Було outline:none плюс box-shadow rgba(--acc, .22). Специфічність .input:focus
+ * (0,2,0) бʼє глобальне :focus-visible (0,1,0), тож кільце лишалось єдиною
+ * ознакою фокуса — а його контраст до поверхні становив 1,03:1 при нормі 3:1.
+ * Людина, яка працює з клавіатури, просто не бачила, де вона у формі.
+ *
+ * --acc-ink, а не --acc: --acc це темна заливка кнопок, її контраст до
+ * поверхні в базовій темі 1,17:1. --acc-ink підбирався саме як світлий,
+ * видимий на темному.
+ */
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--acc-ink);
+  background: var(--field-focus);
+}
+.input:focus-visible, .select:focus-visible, .textarea:focus-visible {
+  outline: 2px solid var(--acc-ink);
+  outline-offset: 2px;
+}
+/* Миша: рамки й тіні досить, кільце не малюємо */
+.input:focus:not(:focus-visible),
+.select:focus:not(:focus-visible),
+.textarea:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--acc-ink-rgb), 0.20);
+}
+.input::placeholder { color: var(--placeholder); }
+.select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%238ba3c7' stroke-width='1.6'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px;
+  padding-right: 38px;
+  cursor: pointer;
+}
+.select option { background: var(--bg-2); color: var(--text); }
+
+/* Сегментований перемикач */
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg__item { position: relative; }
+.seg__item input { position: absolute; opacity: 0; width: 0; height: 0; }
+.seg__item span {
+  display: block;
+  padding: 9px 16px;
+  border: 1px solid var(--line-2); border-radius: 11px;
+  background: rgba(var(--tint-rgb), 0.03);
+  font-size: 0.88rem; font-weight: 500; color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--t-fast);
+  user-select: none;
+}
+.seg__item span:hover { border-color: rgba(var(--acc-2-rgb), 0.45); color: var(--text); }
+.seg__item input:checked + span {
+  border-color: transparent;
+  background: var(--acc);
+  color: var(--on-acc, #fff);
+  box-shadow: 0 8px 24px -12px rgba(var(--acc-rgb), 0.9);
+}
+/* Було rgba(--acc, .35) — 1,05:1 до картки. Кільце мало бути видимим. */
+.seg__item input:focus-visible + span {
+  outline: 2px solid var(--acc-ink);
+  outline-offset: 2px;
+}
+
+/* ---------- Таблиці ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+/* min() замість жорстких 460px: широкі таблиці й далі скроляться, а
+   три-чотириколонкові (1ПМ, макроси) на телефоні складаються нормально
+   й більше не тягнуть горизонтальний скрол без потреби. */
+table.tbl { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: min(460px, 100%); }
+table.tbl th, table.tbl td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--line); }
+table.tbl th {
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface-2);
+  position: sticky; top: 0;
+}
+table.tbl tbody tr { transition: background var(--t-fast); }
+table.tbl tbody tr:hover { background: rgba(var(--acc-rgb), 0.08); }
+
+/* Цільовий рядок у таблиці зон */
+table.tbl tbody tr.is-target {
+  background: rgba(var(--acc-rgb), 0.2);
+  box-shadow: inset 3px 0 0 var(--acc-ink);
+}
+table.tbl tbody tr.is-target td { color: var(--text); }
+table.tbl tbody tr:last-child td { border-bottom: 0; }
+table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---------- Карусель постерів ---------- */
+
+/* Вікно каруселі ріже все, що виходить за межі — це потрібно, щоб бічні
+   постери обрізались на краях під час прокрутки.
+   Але при наведенні картка піднімається на 8px і трохи росте, і верх
+   зрізався тим самим overflow: hidden — виглядало так, ніби зображення
+   заповзає під фон.
+   Вертикальні поля дають запас усередині зони обрізки: по горизонталі
+   ріже як і раніше, по вертикалі є місце під підйом, збільшення й тінь.
+   Відʼємний margin компенсує ці поля, щоб розкладка сторінки не зсунулась. */
+
+/* ---------- Панель дня (головна) ----------
+   Головна — не афіша, а відповідь на «що зараз». Тому замість героя
+   на пів-екрана тут щільний блок: дата, велика дія дня, плитки стану.
+   Верхній відступ навмисно менший за .section: на телефоні перший
+   екран має бути станом, а не порожнечею. */
+.section--dash { padding: clamp(24px, 5vw, 48px) 0 clamp(40px, 7vw, 72px); }
+
+.dash__eyebrow {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 0.85rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--muted);
+}
+.dash__h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 5.5vw, 2.6rem);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+/* Головна дія дня. Одна картка-посилання, візуально найважча на сторінці:
+   на телефоні саме вона має ловити великий палець першою. */
+.dash-main {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 20px;
+  border: 1px solid var(--line-2); border-radius: var(--r-lg);
+  background: var(--card-1);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
+}
+.dash-main:hover, .dash-main:focus-visible { border-color: var(--acc-line); color: var(--text); }
+.dash-main:active { transform: translateY(1px); }
+.dash-main__eyebrow {
+  font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--acc-ink);
+}
+.dash-main__title {
+  font-size: clamp(1.4rem, 4.6vw, 2rem); font-weight: 700; line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.dash-main__sub { font-size: 0.95rem; color: var(--text-2); }
+.dash-main__go { margin-top: 6px; font-size: 0.95rem; font-weight: 600; color: var(--acc-ink); }
+.dash-main.is-done .dash-main__eyebrow { color: var(--ok); }
+
+/* Смужка виконання всередині головної картки — той самий візуальний
+   словник, що .qi-bar у трекерах, лише без числа поруч. */
+.dash-main__bar {
+  display: block; height: 6px; margin-top: 8px;
+  border-radius: 999px; background: var(--line); overflow: hidden;
+}
+.dash-main__bar i {
+  display: block; height: 100%; border-radius: inherit;
+  background: var(--acc-bar);
+  transition: width var(--t);
+}
+
+/* Плитки стану. min() у minmax — щоб на вузькому екрані трек не був
+   ширший за сам контейнер (та сама пастка, що в .grid-*). */
+.tiles {
+  display: grid;
+  /* 14px, а не 10: плитки стоять поруч із картками, у яких внутрішній
+     відступ 26px, і вдвічі щільніший проміжок читався як склеєний блок. */
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+}
+.tile {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.tile:hover, .tile:focus-visible { border-color: var(--line-2); color: var(--text); }
+.tile:active { background: var(--surface-2); }
+.tile__label {
+  font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted);
+}
+.tile__val { font-size: 1.5rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+.tile__of { font-size: 0.95rem; font-weight: 500; color: var(--muted); }
+.tile__sub { font-size: 0.82rem; color: var(--text-2); }
+.tile--empty .tile__val { color: var(--muted); }
+
+/* Решта розділів — компактний перелік посилань, а не сітка карток.
+   Повна навігація вже є в шапці й футері; тут лише швидкий доступ. */
+.dash__more { display: flex; flex-wrap: wrap; gap: 8px; }
+.dash__more a {
+  padding: 8px 12px;
+  min-height: 40px; display: inline-flex; align-items: center;
+  border: 1px solid var(--line); border-radius: 999px;
+  font-size: 0.88rem; color: var(--text-2); text-decoration: none;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.dash__more a:hover, .dash__more a:focus-visible { border-color: var(--line-2); color: var(--text); }
+.dash__more a:active { background: var(--surface); }
+
+.dash__note { max-width: 68ch; }
+
+/* Орієнтир першого відкриття. Видно лише доти, доки в профілі порожньо. */
+
+/* Підказки швидкого додавання в день (раціон). Не випадайка поверх
+   контенту, а простий список під полем: на телефоні поверхневі меню
+   конфліктують із клавіатурою, а тут список і так одразу під пальцем. */
+.quick-list {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r, 12px);
+  background: var(--surface);
+  overflow: hidden;
+}
+.quick-list__item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0; border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px; /* зона дотику */
+}
+.quick-list__item:last-child { border-bottom: 0; }
+.quick-list__item:hover,
+.quick-list__item:focus-visible { background: rgba(var(--acc-rgb), 0.10); }
+
+/* ---------- Прогрес: рядок вправи з історією ваги ----------
+   Назва + дельта зліва, спарклайн по центру, поточна вага справа.
+   На вузькому екрані спарклайн ховається: дельта каже те саме словами. */
+.lift-list { list-style: none; margin: 0; padding: 0; }
+.lift { border-bottom: 1px solid var(--line); }
+.lift:last-child { border-bottom: 0; }
+/* Весь рядок — кнопка розгортання: великий тач-таргет, працює з клавіатури */
+.lift__head {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%;
+  padding: 11px 0;
+  border: 0; background: none;
+  color: inherit; font: inherit; text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.lift__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lift__name { font-weight: 600; line-height: 1.3; }
+.lift__spark { flex: 0 0 120px; height: 30px; }
+.lift__now { flex: 0 0 auto; font-size: 1.02rem; }
+.lift__detail { padding: 2px 0 14px; }
+.lift__chart { width: 100%; height: auto; }
+@media (max-width: 560px) {
+  .lift__spark { display: none; }
+}
+
+/* Третій рядок у KPI-плитці огляду — короткий тренд під підписом */
+.kpi__trend { margin: 3px 0 0; }
+
+/* ---------- Трекери (етап 4) ---------- */
+
+/* Перемикач увімк/вимк. Прихований чекбокс лишається у фокус-ланцюжку —
+   той самий підхід, що .tdy-ex__check: видимий стан малює сусідній span. */
+.switch { position: relative; flex: 0 0 auto; display: inline-flex; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch__track {
+  display: block;
+  width: 42px; height: 25px;
+  border-radius: 999px;
+  background: var(--field, var(--surface-2));
+  box-shadow: var(--neo-inset, none);
+  border: 1px solid var(--line-2);
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.switch__thumb {
+  display: block;
+  width: 19px; height: 19px;
+  margin: 2px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform var(--t-fast), background var(--t-fast);
+}
+.switch input:checked + .switch__track { background: var(--acc); border-color: transparent; box-shadow: var(--acc-raised-xs, none); }
+.switch input:checked + .switch__track .switch__thumb { transform: translateX(17px); background: var(--thumb); }
+.switch input:focus-visible + .switch__track { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
+
+/* Список убудованих трекерів: перемикач + рядок-кнопка розгортання,
+   той самий принцип, що .lift-list у Прогресі. */
+.tr-list { list-style: none; margin: 0; padding: 0; }
+.tr-row { border-bottom: 1px solid var(--line); }
+.tr-row:last-child { border-bottom: 0; }
+.tr-row__top { display: flex; align-items: center; gap: 14px; padding: 11px 0; }
+.tr-row__btn {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  border: 0; background: none; text-align: left;
+  color: inherit; font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tr-row__name { font-weight: 600; line-height: 1.3; }
+.tr-row--off .tr-row__name { color: var(--muted); }
+.tr-row__detail { padding: 2px 0 16px 56px; }
+@media (max-width: 560px) { .tr-row__detail { padding-left: 0; } }
+
+/* Швидкий ввід усередині розгорнутого рядка */
+.qi-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.qi-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.qi-bar__track { flex: 1; position: relative; height: 10px; border-radius: 999px; background: rgba(var(--tint-rgb), 0.08); }
+.qi-bar__track i { display: block; height: 100%; border-radius: 999px; background: var(--acc-bar); transition: width 0.5s var(--e-out); }
+.qi-bar__num { flex: 0 0 auto; white-space: nowrap; }
+
+/* Оцінка 1..10 — рядок кнопок замість слайдера: більший тач-таргет,
+   миттєвий стан без перетягування. */
+/* Сітка, а не flex-wrap: десять кнопок по 34px + проміжки просили 394px,
+   а всередині картки на 390px екрані є ~302 — ряд рвався на 7+3. П'ять
+   колонок дають рівні 5×2 на телефоні й один рядок на ширшому екрані. */
+.qi-scale { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; }
+.qi-scale__btn {
+  width: 100%; height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--field, var(--surface-2));
+  box-shadow: var(--neo-inset-sm, none);
+  color: inherit; font: inherit; font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.qi-scale__btn:hover { border-color: rgba(var(--acc-2-rgb), 0.45); }
+@media (max-width: 640px) {
+  .qi-scale { grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .qi-scale__btn { height: 44px; }
+}
+.qi-scale__btn.is-on { background: var(--acc); color: var(--on-acc, #fff); border-color: transparent; box-shadow: var(--acc-raised-xs, none); }
+
+/* Добавки / звички: чек-лист власних позицій */
+.tr-custom-list { list-style: none; margin: 0; padding: 0; }
+.tr-custom-row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+.tr-custom-row:last-child { border-bottom: 0; }
+.tr-custom-row__name { font-weight: 600; }
+
+/* «Сьогодні»: один компактний рядок на активний трекер */
+.tdy-trk__row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.tdy-trk__row:last-of-type { border-bottom: 0; }
+.tdy-trk__name { font-weight: 600; }
+
+/* ---------- Результати / KPI ---------- */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+.kpi {
+  padding: 18px;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--card-1);
+  text-align: center;
+}
+.kpi__val { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
+.kpi__lbl { margin: 6px 0 0; font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+
+/* Смуга макросів */
+.macrobar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+/* Розділювач кольором тла між сегментами.
+   Причина не косметична: сусідні заливки дають 2,8:1 (білок ↔ жири) при
+   нормі 3:1, і межа між ними ледь читається. Розсунути три сірих далі по
+   яскравості на темному тлі неможливо — найтемніший тоді зіллється вже з
+   карткою. Явна лінія знімає питання незалежно від контрасту заливок. */
+.macrobar > span { transition: width 0.6s var(--e-out); box-shadow: 1px 0 0 var(--bg-1); }
+.macrobar > span:last-child { box-shadow: none; }
+.macrobar__p { background: var(--acc-bar); }
+.macrobar__f { background: var(--g1); }
+.macrobar__c { background: var(--g3); }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 0.83rem; color: var(--text-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+
+/* ---------- Обʼєм по групах мʼязів ---------- */
+.vol-list { display: flex; flex-direction: column; gap: 9px; }
+.vol {
+  display: grid;
+  /* Четвертий трек — під залишок («ще 240» / «понад 90») у раціоні.
+     Без нього цей елемент лягав у колонку числа й вилазив із неї, а
+     body{overflow-x:hidden} зрізав його без жодного скролу. Обʼєм по
+     групах мʼязів має лише три елементи — зайвий трек там просто порожній. */
+  grid-template-columns: minmax(140px, 200px) 1fr 74px auto;
+  align-items: center;
+  gap: 14px;
+}
+.vol__name { font-size: 0.89rem; color: var(--text-2); }
+.vol__bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(var(--tint-rgb), 0.08);
+}
+.vol__bar i {
+  display: block; height: 100%;
+  border-radius: 999px;
+  background: var(--acc-bar);
+  transition: width 0.5s var(--e-out);
+}
+.vol__num { text-align: right; font-weight: 700; font-size: 0.95rem; }
+.vol__target { color: var(--muted); font-weight: 400; }
+
+/* Стани.
+   Раніше на смузі стояла ще й риска «оптимуму», а неповна смуга гасилась
+   як «недобір». Обидва прибрані: єдиний орієнтир — стеля, тож повна смуга
+   означає межу, а не мету. Недобір — нормальний стан, а не помилка.
+
+   Група рівно на межі підсвічується світлішим кінцем смуги — щоб було
+   видно, що запасу більше немає, ще до спроби додати підхід. */
+/* Заповнення й перевищення межі малюються в секції ТЕМИ (там же, де решта
+   декору): рівна акцентна заливка й діагональна штриховка. Тут лишається
+   тільки те, що від теми не залежить. */
+.vol--over .vol__num { color: var(--text); }
+
+@media (max-width: 640px) {
+  .vol { grid-template-columns: 1fr auto; gap: 4px 10px; }
+  .vol__bar { grid-column: 1 / -1; order: 3; }
+}
+
+/* ---------- Рядок тижня ---------- */
+.week {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  font-size: 0.86rem;
+}
+.week__day  { color: var(--text); font-weight: 600; }
+/* flex-wrap обовʼязковий: до двох кнопок додалась третя («Скасувати
+   правку»), і на телефоні рядок вилазив за екран цілою сторінкою, а не
+   лише собою. margin-left:auto тисне блок праворуч, поки він вміщається. */
+.week__actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+.week__rest { color: var(--muted); }
+.week__sep  { color: var(--muted); opacity: 0.5; }
+
+/* ---------- День відпочинку між блоками ---------- */
+.rest-day {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r);
+  color: var(--muted);
+  font-size: 0.86rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.rest-day svg { width: 16px; height: 16px; flex: 0 0 16px; }
+
+/* ---------- Смуга кругової частини в таблиці ---------- */
+tr.tbl__band td {
+  padding: 10px 16px;
+  background: rgba(var(--acc-rgb), 0.14);
+  border-top: 1px solid var(--acc);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.84rem;
+  color: var(--text-2);
+}
+tr.tbl__band:hover td { background: rgba(var(--acc-rgb), 0.14); }
+
+/* ---------- Розминка / заминка ---------- */
+.ritual {
+  list-style: none;
+  counter-reset: ritual;
+  margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.ritual li {
+  counter-increment: ritual;
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 10px 0 10px 34px;
+  position: relative;
+  border-bottom: 1px solid var(--line);
+}
+.ritual li:last-child { border-bottom: 0; }
+.ritual li::before {
+  content: counter(ritual);
+  position: absolute; left: 0; top: 10px;
+  width: 22px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: right;
+}
+/* Список без нумерації: замість цифри — нейтральна крапка.
+   Базовий .ritual лишається нумерованим — його використовує план бігу
+   в кардіо, де кроки йдуть саме по порядку. */
+.ritual--plain li::before {
+  content: "";
+  top: 18px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--g3);
+}
+
+.ritual__name { font-size: 0.94rem; color: var(--text); }
+.ritual__detail { font-size: 0.86rem; color: var(--muted); }
+
+/* ---------- Редактор плану ---------- */
+.select--sm, .input--sm {
+  padding: 6px 10px;
+  font-size: 0.86rem;
+  border-radius: 10px;
+}
+.select--sm { padding-right: 30px; background-position: right 10px center; }
+.input--sm { width: 70px; text-align: right; }
+
+/* Поле робочої ваги: доступне і в режимі перегляду, тому виглядає
+   спокійніше за інші поля — рамка проявляється тільки при взаємодії. */
+.input--weight {
+  width: 76px;
+  border-color: transparent;
+  background: rgba(var(--tint-rgb), 0.04);
+}
+.input--weight:hover { border-color: var(--line-2); }
+.input--weight::placeholder { color: var(--muted); }
+
+.row-actions { display: flex; gap: 8px; }
+/* Візуально лишається 30px, але зона дотику розширена псевдоелементом до
+   44px: три такі кнопки стоять поруч у редакторі плану, і одна з них —
+   видалення вправи без скасування. */
+.icon-btn {
+  position: relative;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-2); border-radius: 8px;
+  background: rgba(var(--tint-rgb), 0.04);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.icon-btn svg { width: 15px; height: 15px; }
+.icon-btn::after { content: ''; position: absolute; inset: -7px; }
+.icon-btn:hover:not(:disabled) { color: var(--text); border-color: transparent; background: rgba(var(--acc-rgb), 0.18); }
+.icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.icon-btn--danger:hover:not(:disabled) { border-color: var(--text); background: rgba(var(--tint-rgb), 0.12); }
+
+/* ---------- Акордеон ---------- */
+.acc { border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
+.acc + .acc { margin-top: 12px; }
+.acc__head {
+  width: 100%;
+  display: flex; align-items: center; gap: 14px;
+  padding: 17px 22px;
+  border: 0; background: none;
+  text-align: left; cursor: pointer;
+  transition: background var(--t-fast);
+}
+.acc__head:hover { background: rgba(var(--acc-rgb), 0.08); }
+.acc__head h3 { margin: 0; font-size: 1.05rem; }
+.acc__ico {
+  margin-left: auto; flex: 0 0 auto;
+  width: 22px; height: 22px;
+  color: var(--muted);
+  transition: transform var(--t), color var(--t);
+}
+.acc.is-open .acc__ico { transform: rotate(180deg); color: var(--acc-ink); }
+.acc__body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--t); }
+.acc.is-open .acc__body { grid-template-rows: 1fr; }
+.acc__inner { overflow: hidden; }
+
+/*
+ * Закритий акордеон стиснуто до нульової висоти, але це НЕ прибирає його
+ * вміст ні з таб-порядку, ні з дерева доступності: табуляція заходила в
+ * невидимі посилання й кнопки, а читалка озвучувала згорнутий текст.
+ *
+ * visibility: hidden прибирає і те, і те, а затримка дорівнює тривалості
+ * анімації — інакше вміст зникав би миттєво й згортання виглядало б різким.
+ * Атрибут inert проставляє initAccordions у js/app.js: там, де він
+ * підтримується, спрацьовує саме він, а це — надійний запасний шлях.
+ */
+.acc:not(.is-open) .acc__inner {
+  visibility: hidden;
+  transition: visibility 0s linear var(--t);
+}
+.acc.is-open .acc__inner { visibility: visible; transition: visibility 0s; }
+.acc__pad { padding: 0 22px 22px; }
+
+/* ---------- Розкриття при скролі ---------- */
+/* Поява при скролі.
+   Ховаємо блок ТІЛЬКИ якщо JS живий: клас .js ставить вбудований скрипт
+   у <head>. Раніше opacity: 0 стояв беззастережно, і будь-яка помилка
+   в скриптах лишала сторінку візуально порожньою — контент був у DOM,
+   але прозорий. Тепер без JS усе просто видно одразу. */
+.js .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.75s var(--e-out), transform 0.75s var(--e-out); }
+.js .reveal.is-in { opacity: 1; transform: none; }
+
+/* Той, хто вимкнув анімації в системі, не має чекати на появу блоків */
+@media (prefers-reduced-motion: reduce) {
+  .js .reveal { opacity: 1; transform: none; transition: none; }
+}
+.reveal[data-d="1"] { transition-delay: 0.08s; }
+.reveal[data-d="2"] { transition-delay: 0.16s; }
+.reveal[data-d="3"] { transition-delay: 0.24s; }
+.reveal[data-d="4"] { transition-delay: 0.32s; }
+
+/* ---------- Тости ---------- */
+/* Тости стоять ВИЩЕ за таймер відпочинку: обидва були прибиті до
+   right:18px/bottom:18px з однаковим z-index, і на телефоні будь-яке
+   «Збережено» під час тренування накривало живий відлік. */
+.toasts { position: fixed; right: 18px; bottom: calc(18px + var(--rest-h, 0px)); z-index: 320; display: flex; flex-direction: column; gap: 10px; }
+body.has-rest-timer { --rest-h: 86px; }
+.toast {
+  min-width: 240px; max-width: 360px;
+  padding: 13px 17px;
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  background: var(--overlay);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.9rem;
+  animation: toast-in 0.4s var(--e-out);
+}
+.toast--ok  { border-color: var(--acc); box-shadow: inset 3px 0 0 var(--acc), var(--shadow-lg); }
+.toast--err { border-color: rgba(var(--tint-rgb), 0.45); box-shadow: inset 3px 0 0 var(--g1), var(--shadow-lg); }
+.toast.is-out { animation: toast-out 0.3s var(--e-io) forwards; }
+@keyframes toast-in  { from { opacity: 0; transform: translateX(24px) scale(0.96); } }
+@keyframes toast-out { to   { opacity: 0; transform: translateX(24px) scale(0.96); } }
+
+/* ---------- Футер ---------- */
+.footer { margin-top: 40px; padding: 44px 0 34px; border-top: 1px solid var(--line); background: var(--glass-2); }
+.footer__grid { display: flex; gap: 26px; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; }
+.footer__links { display: flex; gap: 22px; flex-wrap: wrap; }
+.footer__links a { color: var(--text-2); font-size: 0.9rem; }
+.footer__links a:hover { color: var(--link-hover); }
+.footer__note { margin: 22px 0 0; font-size: 0.8rem; color: var(--muted); max-width: 70ch; }
+
+/* ---------- Дисклеймер ---------- */
+.notice {
+  display: flex; gap: 13px; align-items: flex-start;
+  padding: 15px 18px;
+  /* Попередження без кольору: виділяється світлою рамкою та смугою зліва */
+  border: 1px solid rgba(var(--tint-rgb), 0.22); border-radius: var(--r);
+  border-left: 3px solid var(--g1);
+  background: rgba(var(--tint-rgb), 0.045);
+  font-size: 0.88rem; color: var(--text-2);
+}
+.notice svg { flex: 0 0 19px; width: 19px; height: 19px; margin-top: 2px; color: var(--warn); }
+.notice--acc {
+  border-color: rgba(var(--acc-text-rgb), 0.30);
+  border-left-color: var(--acc);
+  background: rgba(var(--acc-rgb), 0.10);
+  color: var(--text-2);
+}
+.notice--acc svg { color: var(--acc-ink); }
+
+/* ---------- Доступність ---------- */
+/* Глобальне кільце фокуса визначене ОДИН раз — нижче, у блоці кольорів
+   (--acc-ink підбирався саме як контрастний на темному). Тут його раніше
+   стояла друга копія з іншим кольором і відступом; дві глобальні
+   декларації за 1300 рядків одна від одної — пастка для наступної правки. */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}
+
+/* Друк живе окремим блоком у кінці файла — див. «ДРУК» */
+
+/* ==========================================================================
+   МІЙ ПЛАН І ПРОГНОЗ
+   ==========================================================================
+   Правило палітри діє й тут: жодного нового кольору. Три сценарії прогнозу
+   розрізняються НЕ кольором, а яскравістю й пунктиром — так само, як статуси
+   в решті інтерфейсу.
+   ========================================================================== */
+
+/* Порожній / заповнений стан сторінки «Мій план».
+   Стан 'loading' ховає обидва блоки: інакше на частку секунди блимав би
+   напис «План ще не обрано» навіть у того, хто план обрав. */
+#my-plan[data-state="loading"] .pl-empty,
+#my-plan[data-state="loading"] .pl-ready,
+#my-plan[data-state="empty"]   .pl-ready,
+#my-plan[data-state="ready"]   .pl-empty { display: none; }
+
+.pj-chart {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 6px 4px;
+  background: rgba(var(--tint-rgb), 0.02);
+}
+.pj-chart svg { display: block; width: 100%; height: auto; }
+
+.pj-grid { stroke: var(--line); stroke-width: 1; }
+.pj-mark { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 5; }
+.pj-tick { fill: var(--g2); font-size: 11px; font-family: var(--font-mono); }
+
+.pj-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pj-line--high { stroke: var(--acc-ink); opacity: 0.42; stroke-dasharray: 5 4; }
+.pj-line--mid  { stroke: var(--acc-ink); opacity: 1;    stroke-width: 2.6; }
+.pj-line--low  { stroke: var(--g2);      opacity: 0.62; stroke-dasharray: 2 4; }
+
+.pj-legend {
+  display: flex; flex-wrap: wrap; gap: 8px 18px;
+  padding: 10px 8px 6px; font-size: 0.82rem; color: var(--text-2);
+}
+.pj-key { display: inline-flex; align-items: center; gap: 7px; }
+.pj-key::before {
+  content: ''; width: 16px; height: 0; flex: 0 0 16px;
+  border-top-width: 2px; border-top-style: solid;
+}
+.pj-key--high::before { border-color: var(--acc-ink); opacity: 0.42; border-top-style: dashed; }
+.pj-key--mid::before  { border-color: var(--acc-ink); border-top-width: 3px; }
+.pj-key--low::before  { border-color: var(--g2);      border-top-style: dotted; }
+
+@media (max-width: 640px) {
+  .pj-legend { font-size: 0.78rem; gap: 6px 12px; }
+}
+
+/* Дрібний чип — позначка стану продукту поруч із назвою */
+.chip--sm {
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+/* Поля в таблицях раціону ширші за стандартні 70px — там грами до 4 знаків */
+.tbl .input--sm[type="number"] { min-width: 70px; }
+.tbl .input--sm[type="text"] { width: auto; text-align: left; }
+
+/* Постерів менше, ніж слотів: стрічка не їде, тому центруємо її,
+   інакше єдиний постер притискався б до лівого краю. */
+
+/* ==========================================================================
+   МОДАЛЬНЕ ВІКНО
+   ==========================================================================
+   Використовується для додавання продукту чи контейнера в день: три рішення
+   (стан, маса, прийом їжі) ухвалюються в одному місці, з попереднім
+   підрахунком КБЖВ.
+   ========================================================================== */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 400;              /* вище за шапку (100) і тости (300) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+/* display:flex сильніший за атрибут hidden — гасимо явно */
+.modal[hidden] { display: none; }
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 14, 20, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.modal__box {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: min(88vh, 720px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-lg);
+  animation: modal-in 0.24s var(--e-out);
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Поля у вікні на всю ширину: тут немає таблиці, тісні поля тільки заважають */
+.modal__box .input { width: 100%; text-align: left; }
+.modal__box .kpis { gap: 10px; }
+.modal__box .kpi__val { font-size: 1.35rem; }
+
+/* Кнопки вікна липнуть до його низу.
+   На телефоні вікно притиснуте до нижнього краю, а поле грамів отримує
+   фокус одразу при відкритті — екранна клавіатура виїжджає й накриває
+   саме той рядок, де стоїть «Додати». Липкий блок лишає кнопку в межах
+   видимої частини вікна, тому найчастішу дію раціону можна завершити,
+   не ховаючи клавіатуру. */
+.modal__actions {
+  position: sticky; bottom: -24px;
+  display: flex; gap: 14px; flex-wrap: wrap;
+  margin: 0 -24px -24px;
+  padding: 16px 24px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) { .modal__box { animation: none; } }
+
+@media (max-width: 640px) {
+  .modal { padding: 12px; align-items: flex-end; }
+  /* dvh, а не vh: на телефоні vh рахується від висоти БЕЗ адресної смуги,
+     тож вікно виявлялось вищим за реально видиму область. */
+  .modal__box { max-height: 92vh; max-height: 92dvh; padding: 20px 18px; }
+  .modal__actions { bottom: -20px; margin: 0 -18px -20px; padding: 14px 18px; }
+}
+
+/* ==========================================================================
+   РІВЕНЬ ДОКАЗОВОСТІ
+   ==========================================================================
+   Три поділки на шкалі, з них заповнені 3 або 2. Розрізняються яскравістю,
+   а не кольором — правило палітри діє й тут: зеленого «добре» / червоного
+   «погано» на сайті немає, бо це не оцінка користі, а міра надійності даних.
+   Третій рівень (одна поділка) прибраний разом із добавками, що в ньому були.
+   ========================================================================== */
+
+.ev {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 5px 11px 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.76rem;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.ev i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--g3);
+}
+.ev--strong i               { background: var(--acc-ink); }
+.ev--moderate i:nth-child(1),
+.ev--moderate i:nth-child(2) { background: var(--acc-ink); }
+
+/* Джерело: PMID окремою колонкою, щоб посилання не тонуло в тексті */
+.src {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.src:first-child { border-top: 0; padding-top: 0; }
+.src__id { font-size: 0.82rem; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .src { grid-template-columns: 1fr; gap: 4px; }
+}
+
+/* Смуга складу приросту: скільки з набраної ваги мʼязи, скільки жир.
+   Розрізняються яскравістю, не кольором — правило палітри. */
+.split {
+  display: flex;
+  width: 100%;
+  min-width: 90px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(var(--tint-rgb), 0.08);
+}
+.split i { display: block; height: 100%; }
+.split__lean { background: var(--acc-ink); box-shadow: 1px 0 0 var(--bg-1); }
+.split__fat  { background: var(--g3); }
+
+/* Перехід одразу до вмісту. Видно лише при навігації з клавіатури:
+   мишею його ніхто не побачить, а Tab на першому кроці покаже. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 500;
+  padding: 12px 18px;
+  border-radius: 0 0 var(--r) 0;
+  background: var(--acc);
+  color: var(--on-acc, #fff);
+  font-weight: 600;
+}
+.skip-link:focus {
+  left: 0;
+  color: var(--on-acc, #fff);
+}
+/* main отримує tabindex=-1 заради переходу; власна рамка фокуса тут зайва */
+/* :not(:focus-visible), а не голе outline:none.
+   main має tabindex="-1" і є ціллю посилання «До вмісту». Голе зняття
+   контуру означало, що після переходу з клавіатури людина не бачила
+   жодної ознаки, куди подівся фокус. Кліком миші кільце й далі не
+   зʼявляється — саме це правило й малось на увазі. */
+main:focus:not(:focus-visible) { outline: none; }
+
+/* ==========================================================================
+   ПЕРІОДИЗАЦІЯ
+   ==========================================================================
+   Таблиця циклу — найширше, що є на сайті: 16 тижнів × вправи. Вона живе
+   в .table-wrap і скролиться горизонтально, а перша колонка з назвою
+   вправи прилипає до лівого краю, інакше на 12-му тижні вже не видно,
+   чия це вага.
+   ========================================================================== */
+
+/* Порожній / заповнений стан, за тим самим правилом, що й «Мій план» */
+#pd[data-state="loading"] .pd-empty,
+#pd[data-state="loading"] .pd-ready,
+#pd[data-state="empty"]   .pd-ready,
+#pd[data-state="ready"]   .pd-empty { display: none; }
+
+/* Похідне число під перемикачем режиму: те, що порахувалось саме */
+.pd-derived {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(var(--tint-rgb), 0.02);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.tbl--pd th,
+.tbl--pd td { white-space: nowrap; }
+
+/* Назва вправи лишається на місці при горизонтальному скролі */
+.tbl--pd tbody td:first-child,
+.tbl--pd thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+/* Клітинка тижня: вага великим, відсоток і повторення дрібним під нею */
+.pd-cell { line-height: 1.25; }
+.pd-cell__sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* Поточний тиждень. Позначений рамкою й фоном, а не кольором:
+   палітра сайту — один акцент плюс нейтральні, і статуси кольором
+   тут не кодуються ніде. */
+.tbl--pd th.is-now,
+.pd-cell.is-now {
+  background: rgba(var(--acc-rgb), 0.14);
+  box-shadow: inset 0 0 0 1px rgba(var(--acc-rgb), 0.45);
+}
+
+/* Клітинка вперлась у стелю інтенсивності — далі йде рівно.
+   Приглушена, щоб було видно, що це не приріст, а полиця. */
+.pd-cell.is-capped { opacity: 0.55; }
+
+@media (max-width: 640px) {
+  .pd-derived { font-size: 0.95rem; }
+  .tbl--pd tbody td:first-child { max-width: 150px; white-space: normal; }
+}
+
+/* Довгий довідник продуктів: скрол усередині таблиці замість того, щоб
+   розсувати сторінку на кілька екранів. Шапка лишається на місці —
+   без неї на 60-му рядку вже не зрозуміло, де білки, а де жири. */
+.table-wrap--tall {
+  max-height: 460px;
+  overflow-y: auto;
+}
+.table-wrap--tall thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+}
+@media (max-width: 640px) {
+  .table-wrap--tall { max-height: 60vh; }
+}
+
+/* «Запас N» у клітинці циклу: третій рядок, ще дрібніший за відсоток.
+   Це не попередження, а вказівка зупинитись раніше за відмову, тому
+   ніякого виділення — просто тихий підпис. */
+.pd-res {
+  display: block;
+  font-style: normal;
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+
+/* ==========================================================================
+   ТИР-ЛИСТ СХЕМ
+   ==========================================================================
+   Класичний тир-лист кодує ранг кольором: червоний, помаранчевий, жовтий.
+   Тут цього немає навмисно — правило палітри сайту дозволяє один
+   хроматичний колір, а статуси розрізняються яскравістю. Вищий тир =
+   світліша плашка. Той самий принцип, що й у смугах тижневого обʼєму.
+
+   Сам відтінок задає JS інлайном (TIER_SHADE), бо кількість тирів може
+   змінитись, а прив'язка стилю до порядкового номера в CSS ламалась би
+   при першому ж додаванні рядка.
+   ========================================================================== */
+
+.tier {
+  display: grid;
+  gap: 10px;
+}
+
+.tier__row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
+  align-items: stretch;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: rgba(var(--tint-rgb), 0.02);
+}
+
+/* Плашка рангу. Квадратна й важка — це якір рядка. */
+.tier__label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border-radius: var(--r-sm);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.tier__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: center;
+}
+
+/* Схема в рядку. Кнопка, а не плашка: клік веде до самої схеми. */
+.tier__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.tier__item:hover {
+  border-color: var(--acc-line);
+  background: var(--surface-2);
+}
+.tier__item b { font-size: 0.95rem; font-weight: 700; }
+.tier__days { font-size: 0.75rem; color: var(--muted); font-family: var(--font-mono); }
+
+@media (max-width: 560px) {
+  .tier__row { grid-template-columns: 44px 1fr; gap: 10px; }
+  .tier__label { min-height: 44px; font-size: 1.1rem; }
+  .tier__item { padding: 7px 11px; }
+}
+
+/* ==========================================================================
+   РЕЦЕПТ У КАРТЦІ
+   ==========================================================================
+   Інгредієнти по стравах. Живуть усередині акордеона .acc — того самого,
+   що блок «Виробництво» на сторінці добавок, тому власних рамок і фону
+   тут немає: їх дає .acc__pad.
+
+   Кроків приготування тут немає: метод лишився у відео за посиланням,
+   і стилі для нумерованого списку прибрані разом із ним.
+   ========================================================================== */
+
+/* Страви поруч, поки є місце: рецепт із трьох частин інакше витягується
+   в довгу колонку, і крізь неї не видно структури. */
+.rc-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+}
+.rc-part b { display: block; margin-bottom: 6px; }
+
+.rc-list {
+  margin: 0;
+  padding-left: 17px;
+  color: var(--text-2);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 560px) {
+  .rc-parts { grid-template-columns: 1fr; gap: 14px; }
+}
+
+/* ==========================================================================
+   ГАЛОЧКА
+   ==========================================================================
+   Стоїть у рядку з кнопками, тому вирівняна по їх висоті й має ту саму
+   рамку: інакше вона читається як підпис, а не як орган керування.
+   ========================================================================== */
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: 0.87rem;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.check:hover { border-color: var(--line-2); color: var(--text); }
+
+/* Рідний чекбокс, перефарбований у колір акценту. accent-color робить
+   рівно це й не вимагає підміняти елемент своїм: власний квадратик
+   довелося б окремо вчити фокусу, клавіатурі та станам. */
+.check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--acc-bar);
+  cursor: pointer;
+}
+
+/* Коли увімкнено — підпис яскравіший, щоб стан читався й без кольору */
+.check:has(input:checked) { border-color: var(--acc-line); color: var(--text); }
+
+/* Підзаголовок групи полів усередині картки.
+   Рівень h3 заради послідовності заголовків (h1 → h2 → h3 без пропусків),
+   а кегль пінимо явно: типовий h3 у 1.4rem зробив би з підпису групи
+   другий заголовок картки й перебив би її власну назву. */
+.group-title { font-size: 1rem; }
+
+/* ==========================================================================
+   ТЕМИ
+   ==========================================================================
+   Тем як «сімей» більше немає — є ОДНА графітова основа й дві осі поверх неї:
+
+     СХЕМА   світло / темрява   html[data-scheme="light"], типово темна
+     АКЦЕНТ  один хроматичний   html[data-theme="graphite-*"], типово Navy Blue
+
+   Поверхні НЕЙТРАЛЬНІ в обох схемах: колір лишається рівно там, де він щось
+   означає — кнопки, активні стани, дані, фокус. Кольорові сімʼї (де тон
+   заходив і в поверхні: рожевий фон, деревʼяний, фіолетовий) прибрані.
+
+   Вибір живе у localStorage('forge.theme' / 'forge.scheme') і в профілі.
+   Інлайн-скрипт у head ставить обидва атрибути ДО завантаження стилів —
+   інакше на кожному переході блимала б типова тема перед обраною.
+
+   Пороги контрасту ті самі в обох схемах і перевіряються машиною
+   (tools/verifythemes.mjs): текст ≥ 4,5:1, елементи інтерфейсу ≥ 3:1.
+   ========================================================================== */
+
+
+/* Перемикач тем в акаунті: плашка з двома кружками кольорів теми */
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.theme-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text);
+  cursor: pointer; text-align: left;
+  transition: border-color var(--t-fast);
+}
+.theme-btn:hover { border-color: var(--acc-line); }
+.theme-btn.is-active { border-color: var(--acc-ink); box-shadow: inset 0 0 0 1px var(--acc-ink); }
+.theme-btn i {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1px solid rgba(var(--tint-rgb), 0.25);
+  flex-shrink: 0;
+}
+.theme-btn i + i { margin-left: -14px; }
+
+/* ==========================================================================
+   ТАЙМЕР ВІДПОЧИНКУ
+   ==========================================================================
+   Клітинка «Відпоч.» у плані — кнопка, що запускає відлік. Сам відлік живе
+   в плаваючому віджеті внизу праворуч: під час відпочинку сторінку зазвичай
+   гортають, і таймер має лишатись на оці.
+   ========================================================================== */
+
+.rest-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--line-2); border-radius: 8px;
+  background: rgba(var(--tint-rgb), 0.03);
+  color: var(--text-2);
+  font-family: var(--font-mono); font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.rest-btn:hover { border-color: var(--acc-line); color: var(--text); }
+
+.rest-timer {
+  position: fixed; right: 18px; bottom: 18px; z-index: 300;
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--acc-line); border-radius: var(--r);
+  background: var(--overlay);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+}
+.rest-timer[hidden] { display: none; }
+.rest-timer__time { font-family: var(--font-mono); font-size: 1.7rem; font-weight: 600; min-width: 88px; }
+.rest-timer__name { max-width: 180px; font-size: 0.8rem; color: var(--muted); }
+.rest-timer.is-done .rest-timer__time { color: var(--acc-ink); }
+
+/* ==========================================================================
+   ЖУРНАЛ: ГРАФІК ВАГИ Й ТЕПЛОКАРТА ТРЕНУВАНЬ
+   ========================================================================== */
+
+.wchart {
+  border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 8px 6px;
+  background: rgba(var(--tint-rgb), 0.02);
+}
+.wchart svg { display: block; width: 100%; height: auto; }
+
+/* Останні записи ваги: рядок «дата — число — видалити» */
+.wlog-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.wlog-row:last-child { border-bottom: none; }
+.wlog-row .mono { margin-left: auto; }
+
+/* Теплокарта як на трекерах активності, але в кольорах теми, не зелена.
+   Рівні — насиченістю акценту: 0 тренувань → ледь видима клітинка,
+   3+ → найсвітліший акцент. Це те саме правило «статус яскравістю». */
+/* 12 тижнів × Пн…Нд. Клітинки — кнопки-перемикачі з числом місяця,
+   як у календарі; 24px — щоб число читалось і день ловився пальцем */
+.heatmap { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 6px; }
+.heatmap__col { display: flex; flex-direction: column; gap: 3px; }
+.heatmap__days {
+  display: flex; flex-direction: column; gap: 3px;
+  margin-right: 6px;
+}
+.heatmap__days span {
+  height: 24px; line-height: 24px;
+  font-size: 0.68rem; color: var(--muted);
+}
+.heatmap__cell {
+  width: 24px; height: 24px; border-radius: 5px;
+  border: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(var(--tint-rgb), 0.06);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--t-fast), transform var(--t-fast), color var(--t-fast);
+}
+button.heatmap__cell:hover { background: rgba(var(--tint-rgb), 0.14); color: var(--text); transform: scale(1.1); }
+button.heatmap__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 1px; }
+/* Позначений день: число має читатись на акцентній заливці */
+.heatmap__cell--on { background: var(--acc-bar); color: #0b0e14; font-weight: 700; }
+button.heatmap__cell--on:hover { background: var(--acc-ink); color: #0b0e14; }
+.heatmap__cell--future {
+  background: transparent;
+  border: 1px dashed rgba(var(--tint-rgb), 0.07);
+  color: rgba(var(--tint-rgb), 0.22);
+  cursor: default;
+}
+
+/* ==========================================================================
+   НЕОМОРФНИЙ РЕДИЗАЙН
+
+   Новий шар не копіює жоден сторонній макет: він будує власну систему з
+   великих мʼяких поверхонь, глибоких inset-полів і чіткого акцентного стану.
+   Відтінок теми змінює тільки змінні вище, а логотип і типографіка лишаються
+   незмінними на всьому сайті.
+   ========================================================================== */
+:root {
+  --surface:      #1e2022;
+  --surface-2:    #26282b;
+  --field:        #131416;
+  --field-focus:  #191b1d;
+
+  /* Межі тонші за типові: на графіті світла лінія помітніша, ніж на синьому,
+     і при звичайній щільності вона починає різати обʼєм навпіл. */
+  --line:   rgba(var(--tint-rgb), 0.055);
+  --line-2: rgba(var(--tint-rgb), 0.10);
+
+  --glass:   rgba(23, 24, 26, 0.88);
+  --glass-2: rgba(23, 24, 26, 0.97);
+  --overlay: rgba(19, 20, 22, 0.97);
+
+  /* --grad-* навмисно майже впритул одне до одного: технічно це той самий
+     linear-gradient, що й був, але візуально градієнта немає — перепад по
+     всій висоті екрана менший за 3% яскравості й читається як рівне
+     матове тло. */
+  --grad-a: #1a1b1e;
+  --grad-b: #17181a;
+  --grad-c: #141517;
+
+  /* Неоморфна пара тіней: чорна знизу-праворуч, ледь світла зверху-ліворуч.
+     Світла грань слабка — на майже чорному тлі сильніша виглядала б
+     білою подряпиною. */
+  --neo-raised:    18px 18px 36px rgba(0, 0, 0, 0.68), -12px -12px 30px rgba(255, 255, 255, 0.022);
+  --neo-raised-sm: 8px 8px 18px rgba(0, 0, 0, 0.60),   -6px -6px 15px rgba(255, 255, 255, 0.020);
+  --neo-inset:     inset 8px 8px 16px rgba(0, 0, 0, 0.66), inset -6px -6px 14px rgba(255, 255, 255, 0.022);
+  --neo-inset-sm:  inset 4px 4px 9px rgba(0, 0, 0, 0.60), inset -3px -3px 6px rgba(255, 255, 255, 0.020);
+
+  /*
+   * ПІДНЯТІ АКЦЕНТНІ ЕЛЕМЕНТИ.
+   *
+   * Правило: усе, що залито акцентом, ПІДНЯТЕ над поверхнею, ніколи не
+   * втоплене й ніколи не має внутрішнього підмішування кольору. Раніше було
+   * навпаки — активний сегмент, чипи й «eyebrow» несли inset-тінь, а фон їм
+   * рахував color-mix(--acc 22%, --field), тобто акцент був не суцільний,
+   * а розведений полем. Разом це давало вигляд ямки, залитої напівпрозорим
+   * кольором, замість кнопки.
+   *
+   * Тут ТІЛЬКИ темна тінь — без світлої зустрічної грані, яку решта
+   * неоморфних поверхонь має. На матовій сірій поверхні та грань читається
+   * як об'єм, а на суцільному кольорі — як відблиск, тобто як градієнт.
+   *
+   * Напрямок (вниз-праворуч) той самий, що в усього сайту.
+   */
+  --acc-raised:     7px 7px 16px rgba(0, 0, 0, 0.46);
+  --acc-raised-sm:  4px 4px 10px rgba(0, 0, 0, 0.40);
+  --acc-raised-hi: 10px 10px 24px rgba(0, 0, 0, 0.52);
+  --acc-raised-xs:  2px 2px 6px  rgba(0, 0, 0, 0.36);
+
+  /*
+   * СІМʼЯ ПІДНЯТИХ КОНТРОЛІВ: кнопки, сегменти, чипи, теги.
+   *
+   * На відміну від акцентних заливок, тут пара тіней — темна знизу-праворуч
+   * і світла зверху-ліворуч, обидві ЗОВНІШНІ. Саме ця пара й робить
+   * неоморфну випуклість: поверхня однакова з тлом, а форму дає світло.
+   *
+   * Світла тінь тут доречна (на відміну від суцільного кольору, де вона
+   * читалась би як відблиск), бо фон контрола дорівнює фону картки —
+   * елемент саме «виростає» з поверхні, а не лежить на ній плямою.
+   */
+  --ctl-raised:       6px 6px 15px rgba(0, 0, 0, 0.44), -5px -5px 13px rgba(255, 255, 255, 0.032);
+  --ctl-raised-hover: 9px 9px 22px rgba(0, 0, 0, 0.50), -7px -7px 18px rgba(255, 255, 255, 0.040);
+  --ctl-raised-press: 3px 3px  8px rgba(0, 0, 0, 0.40), -2px -2px  6px rgba(255, 255, 255, 0.024);
+  --ctl-raised-sm:    4px 4px 10px rgba(0, 0, 0, 0.40), -3px -3px  9px rgba(255, 255, 255, 0.028);
+
+  /* Єдина геометрія сімʼї: висота, радіус, бічні відступи */
+  --ctl-h:      44px;
+  --ctl-h-sm:   40px;
+  --ctl-h-tag:  32px;
+  --ctl-r:      13px;
+  --ctl-r-sm:   11px;
+}
+
+/* (кольорові сімʼї прибрані: лишилась одна графітова основа) */
+
+
+/* --------------------------------------------------------------------------
+   ДЕКОРАТИВНІ ГРАДІЄНТИ: світло замість кольору
+   --------------------------------------------------------------------------
+   Тема будується на нейтральних поверхнях, тому декор теж нейтральний:
+   тло, великі числа й відблиск картки малюються СВІТЛОМ (--fx-tint), а не
+   акцентом. Один хроматичний колір лишається рівно там, де він щось
+   означає: кнопки, активні стани, дані, фокус.
+
+   --fx-tint / --ink-grad задані у схемі (темній і світлій), тому ці три
+   правила однакові для обох — міняються лише токени.
+   -------------------------------------------------------------------------- */
+
+/* Тло сторінки: безбарвні радіальні плями, ледве видимі. Це не колір, а
+   світло — воно й дає обʼєм тлу. */
+.bg-fx {
+  background:
+    radial-gradient(1000px 680px at 8% -12%, rgba(var(--fx-rgb), var(--fx-a1)), transparent 62%),
+    radial-gradient(820px 600px at 96% 26%, rgba(var(--fx-rgb), var(--fx-a2)), transparent 66%),
+    linear-gradient(160deg, var(--grad-a), var(--grad-b) 50%, var(--grad-c));
+}
+
+/* Великі числа й заголовки: перепад лишається (текст не «падає» в суцільну
+   пляму), але хроматики в ньому немає. */
+.gradient-text {
+  background: linear-gradient(100deg, var(--ink-grad-a) 10%, var(--ink-grad-b) 95%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+
+/* Смуга обʼєму на межі: рівна акцентна заливка замість переходу в сірий.
+   Стан «група заповнена» читається за кольором смуги, а не за градієнтом. */
+.vol--full .vol__bar i { background: var(--acc-bar); }
+
+/* Перевищення межі: діагональна штриховка лишається — вона несе СТАН, а не
+   оформлення, і без неї «на межі» й «за межею» стали б однаковими смугами. */
+.vol--over .vol__bar i {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--acc-bar) 0 6px,
+    var(--surface-2) 6px 12px
+  );
+}
+
+/* Світлова пляма під курсором картки: світло, а не колір. */
+.card::before {
+  background: radial-gradient(420px 220px at var(--mx, 50%) var(--my, 0%),
+    rgba(var(--fx-rgb), var(--fx-card)), transparent 70%);
+}
+
+/* ==========================================================================
+   АКЦЕНТИ
+   ==========================================================================
+   Усе вище — :root — це СПІЛЬНА основа: поверхні, лінії, тіні, декор.
+   Вона одна на весь сайт і написана рівно один раз. Нижче кожен варіант
+   задає ТІЛЬКИ акцент; жодного рядка про поверхні тут немає й бути не повинно.
+
+   Дизайну девʼять разів не існує — він один. Різниця між акцентами дорівнює
+   десятку рядків кольору.
+
+   Критерій добору той самий для всіх: текст на заливці ≥ 4,5:1 і сама
+   заливка ≥ 3:1 до картки. Картка графітова, тому «рідний» найтемніший крок
+   палітри не всюди проходить — береться сусідній.
+
+   --on-acc задає, ЯКИМ кольором пишеться текст на заливці. У :root стоїть
+   темний (Navy має світлу заливку), тому кожен акцент із темною заливкою
+   мусить повернути білий явно — інакше успадкує чорний текст на чорному.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Дерево — історичний id 'graphite'
+   --------------------------------------------------------------------------
+   Id лишився коротким, бо цей акцент зʼявився першим, до появи решти;
+   перейменування зламало б збережені профілі.
+
+     --acc     #93663e  білий текст 4,99:1, заливка 3,28:1 до картки
+     --acc-hi  #7a5230  наведення ТЕМНІШАЄ: наступний світліший крок
+                        (#ad7a4f) тримає білий лише 3,70:1
+   -------------------------------------------------------------------------- */
+html[data-theme="graphite"] {
+  --acc:      #93663e;
+  --acc-hi:   #7a5230;
+  --acc-bar:  #bd9168;
+  --acc-ink:  #e4c3a1;
+  --acc-line: #ad7a4f;
+  --link:       #e4c3a1;
+  --link-hover: #f5dfc6;
+  --acc-rgb:     147, 102, 62;
+  --acc-ink-rgb: 228, 195, 161;
+  --on-acc: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   Графіт + Navy Blue
+   --------------------------------------------------------------------------
+   Єдиний варіант, де акцент СВІТЛИЙ. Причина в самій палітрі: navy темна,
+   і на графіті жоден її токен не тримає білий текст одночасно з видимістю
+   заливки. Перевірено всі чотири:
+
+     --acc      #202f46   білий 13,49 — але заливка 1,21 до картки: кнопки не видно
+     --acc-hi   #2c4160   білий 10,33 — заливка 1,58: те саме
+     --acc-line #64809f   заливка 3,99 — але білий лише 4,09 при нормі 4,5
+     --acc-bar  #6685b6   заливка 4,35 — білий 3,75
+
+   Тобто темний бік палітри зникає на графіті, а світлий не тримає білий
+   текст. Тому тут світла заливка з ТЕМНИМ текстом (#0b0e14 на #6685b6 =
+   5,15:1) — для цього й існує --on-acc. У кольоровій темі navy ця проблема
+   не виникала, бо там картка сама була синьою.
+
+   Наведення відповідно СВІТЛІШАЄ, а не темнішає: рух завжди геть від
+   поверхні, просто тут поверхня знизу, а не зверху.
+   -------------------------------------------------------------------------- */
+html[data-theme="graphite-navy"] {
+  --acc:      #6685b6;
+  --acc-hi:   #9eb9e1;
+  --acc-bar:  #6685b6;
+  --acc-ink:  #9eb9e1;
+  --acc-line: #64809f;
+  --link:       #9eb9e1;
+  --link-hover: #c8daf2;
+  --acc-rgb:     102, 133, 182;
+  --acc-ink-rgb: 158, 185, 225;
+
+  /* Текст на акцентній заливці — темний, а не білий */
+  --on-acc: #0b0e14;
+}
+
+/* --------------------------------------------------------------------------
+   Графіт + Рожевий
+   --------------------------------------------------------------------------
+   Рожева палітра найяскравіша з чотирьох, тому її «рідний» --acc проходить
+   як є: білий 4,91:1, заливка 3,33:1.
+
+   На наведення потрібен темніший крок, а нижче --acc у рожевій темі лежить
+   тільки --card-2 (#a93060) — його й беремо: білий на ньому 6,40:1.
+   Наступний СВІТЛІШИЙ крок (--acc-hi #d95789) не годиться — білий там
+   падає до 3,70:1.
+   -------------------------------------------------------------------------- */
+html[data-theme="graphite-pink"] {
+  --acc:      #c43e72;
+  --acc-hi:   #a93060;
+  --acc-bar:  #e878a4;
+  --acc-ink:  #f0a3c0;
+  --acc-line: #df6694;
+  --link:       #f0a3c0;
+  --link-hover: #ffd0df;
+  --acc-rgb:     196, 62, 114;
+  --acc-ink-rgb: 240, 163, 192;
+  --on-acc: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   Графіт + Фіолетовий
+   --------------------------------------------------------------------------
+   Поводиться рівно як дерево: «рідний» --acc (#6b4ab8) дає заливку лише
+   2,57:1 до графітової картки, тому на заливку йде наступний світліший крок
+   --acc-hi (#8063c7 — білий 4,64:1, заливка 3,52:1), а наведення повертається
+   до --acc (білий 6,37:1), тобто темнішає.
+   -------------------------------------------------------------------------- */
+html[data-theme="graphite-violet"] {
+  --acc:      #8063c7;
+  --acc-hi:   #6b4ab8;
+  --acc-bar:  #a28be0;
+  --acc-ink:  #d0c2f3;
+  --acc-line: #947ad4;
+  --link:       #d0c2f3;
+  --link-hover: #ece6ff;
+  --acc-rgb:     128, 99, 199;
+  --acc-ink-rgb: 208, 194, 243;
+  --on-acc: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   Графіт + п'ять доданих відтінків
+   --------------------------------------------------------------------------
+   Той самий принцип, що вище: поверхні спільні, тут ТІЛЬКИ акцент. На
+   заливку йде крок палітри, який одночасно тримає білий текст ≥ 4,5:1 і сам
+   видно на графітовій картці (≥ 3:1) — у всіх п'яти це --acc-hi кольорової
+   теми, а на наведення повертається темніший --acc. Заливка ≥ 3,4:1 до
+   #1e2022, білий на ній 4,70:1.
+   -------------------------------------------------------------------------- */
+
+html[data-theme="graphite-crimson"] {
+  --acc:      #db302a;
+  --acc-hi:   #c7231d;
+  --acc-bar:  #d97c79;
+  --acc-ink:  #efaba8;
+  --acc-line: #dd423d;
+  --link:       #efaba8;
+  --link-hover: #efd4d4;
+  --acc-rgb:     199, 35, 29;
+  --acc-ink-rgb: 239, 171, 168;
+  --on-acc: #ffffff;
+}
+
+html[data-theme="graphite-amber"] {
+  --acc:      #9b6a17;
+  --acc-hi:   #8c5d0d;
+  --acc-bar:  #ce8e20;
+  --acc-ink:  #f5af35;
+  --acc-line: #a47628;
+  --link:       #f5af35;
+  --link-hover: #efdec2;
+  --acc-rgb:     140, 93, 13;
+  --acc-ink-rgb: 245, 175, 53;
+  --on-acc: #ffffff;
+}
+
+html[data-theme="graphite-moss"] {
+  --acc:      #50802e;
+  --acc-hi:   #3a7410;
+  --acc-bar:  #71ad47;
+  --acc-ink:  #86cf51;
+  --acc-line: #5c8e38;
+  --link:       #86cf51;
+  --link-hover: #d1ecbe;
+  --acc-rgb:     58, 116, 16;
+  --acc-ink-rgb: 134, 207, 81;
+  --on-acc: #ffffff;
+}
+
+html[data-theme="graphite-emerald"] {
+  --acc:      #1f835e;
+  --acc-hi:   #1e7455;
+  --acc-bar:  #3bb085;
+  --acc-ink:  #66cfa8;
+  --acc-line: #33906e;
+  --link:       #66cfa8;
+  --link-hover: #bfeddc;
+  --acc-rgb:     30, 116, 85;
+  --acc-ink-rgb: 102, 207, 168;
+  --on-acc: #ffffff;
+}
+
+html[data-theme="graphite-ocean"] {
+  --acc:      #0d7e9a;
+  --acc-hi:   #296f81;
+  --acc-bar:  #31a8c5;
+  --acc-ink:  #5ecae5;
+  --acc-line: #34899e;
+  --link:       #5ecae5;
+  --link-hover: #cbe5eb;
+  --acc-rgb:     41, 111, 129;
+  --acc-ink-rgb: 94, 202, 229;
+  --on-acc: #ffffff;
+}
+
+
+/* ==========================================================================
+   СВІТЛА СХЕМА
+   ==========================================================================
+   Друга вісь поверх тієї самої основи. Це НЕ окрема тема: акцент лишається
+   тим, який обрала людина, змінюються тільки поверхні, текст і тіні.
+
+   Три речі, які не можна просто «інвертувати»:
+
+   1. ТІНТ. Сорок напівпрозорих підкладок у компонентах намальовані
+      rgba(var(--tint-rgb), α). У темряві тінт — світло, тут — чорний;
+      підкладки лишаються тими самими правилами, міняється один токен.
+
+   2. НЕОМОРФІЗМ. У темряві обʼєм дає чорна тінь плюс ледь світла грань.
+      У світлі навпаки: сіра тінь знизу-праворуч і ЩІЛЬНО БІЛА грань
+      зверху-ліворуч — саме вона й читається як опукла поверхня на сірому
+      папері. Тому нео-токени задані тут явно, а не через тінт.
+
+   3. АКЦЕНТ. У темряві заливка кнопки світла (навпроти графіту), у світлі —
+      темна (навпроти паперу). Тому кожен акцент має тут власний блок: беруться
+      темні кроки тієї самої палітри, --on-acc повертається на білий.
+
+   Усі пари перевірені машиною (tools/verifythemes.mjs) на тих самих порогах:
+   текст ≥ 4,5:1, елементи інтерфейсу ≥ 3:1.
+   -------------------------------------------------------------------------- */
+html[data-scheme="light"] {
+  color-scheme: light;
+
+  /* Поверхні. Порядок сходинок ТОЙ САМИЙ, що в темряві (поле — найглибше,
+     картка — найвище), просто шкала перевернута: папір, а не графіт. */
+  --bg:          #e6e8ec;
+  --bg-1:        #eef0f3;
+  --card-1:      #f4f5f7;
+  --card-2:      #e8eaee;
+  --surface:     #f4f5f7;
+  --surface-2:   #e8eaee;
+  --field:       #e2e5ea;
+  --field-focus: #edeff2;
+
+  /* Текст. Порог той самий 4,5:1, міряний на НАЙСВІТЛІШІЙ поверхні
+     (#f4f5f7) і в полі (#e2e5ea) — обидва проходять. */
+  --text:        #16181c;   /* 16,3:1 */
+  --text-2:      #3f434b;   /*  9,1:1 */
+  --muted:       #5c616b;   /*  5,7:1 на картці, 4,9:1 у полі */
+  --placeholder: #656a74;   /*  5,0:1 / 4,3:1 */
+
+  --g1:          #2a2d33;
+  --g2:          #5c616b;
+  --g3:          #767c86;   /* межа елемента: 3,85:1 */
+
+  /* Тінт перевертається на чорний — і всі 40 підкладок разом із ним */
+  --tint-rgb: 0, 0, 0;
+  --line:   rgba(var(--tint-rgb), 0.10);
+  --line-2: rgba(var(--tint-rgb), 0.17);
+
+  --glass:   rgba(238, 240, 243, 0.86);
+  --glass-2: rgba(238, 240, 243, 0.97);
+  --overlay: rgba(230, 232, 236, 0.97);
+
+  --grad-a: #eef0f3;
+  --grad-b: #e6e8ec;
+  --grad-c: #dcdfe5;
+
+  /* Декор: на папері «світлові плями» мусять бути щільнішими, інакше їх
+     просто не видно — 3% білого на сірому не існує. */
+  --fx-rgb:  255, 255, 255;
+  --fx-a1:   0.70;
+  --fx-a2:   0.42;
+  --fx-card: 0.55;
+  --ink-grad-a: #14171c;
+  --ink-grad-b: #565c67;
+
+  --shadow:    0 18px 44px -20px rgba(16, 22, 34, 0.30);
+  --shadow-lg: 0 40px 84px -34px rgba(16, 22, 34, 0.34);
+
+  /* Нео-пара: сіра тінь + біла грань (див. п.2 у заголовку) */
+  --neo-raised:    18px 18px 34px rgba(158, 166, 180, 0.50), -12px -12px 28px rgba(255, 255, 255, 0.95);
+  --neo-raised-sm:  8px  8px 17px rgba(158, 166, 180, 0.44),  -6px  -6px 14px rgba(255, 255, 255, 0.92);
+  --neo-inset:     inset 8px 8px 16px rgba(158, 166, 180, 0.46), inset -6px -6px 14px rgba(255, 255, 255, 0.94);
+  --neo-inset-sm:  inset 4px 4px  9px rgba(158, 166, 180, 0.42), inset -3px -3px  6px rgba(255, 255, 255, 0.92);
+
+  --acc-raised:     7px 7px 16px rgba(16, 22, 34, 0.20);
+  --acc-raised-sm:  4px 4px 10px rgba(16, 22, 34, 0.17);
+  --acc-raised-hi: 10px 10px 24px rgba(16, 22, 34, 0.24);
+  --acc-raised-xs:  2px 2px  6px rgba(16, 22, 34, 0.15);
+
+  --ctl-raised:       6px 6px 15px rgba(158, 166, 180, 0.42), -5px -5px 13px rgba(255, 255, 255, 0.92);
+  --ctl-raised-hover: 9px 9px 22px rgba(158, 166, 180, 0.48), -7px -7px 18px rgba(255, 255, 255, 0.95);
+  --ctl-raised-press: 3px 3px  8px rgba(158, 166, 180, 0.38), -2px -2px  6px rgba(255, 255, 255, 0.88);
+  --ctl-raised-sm:    4px 4px 10px rgba(158, 166, 180, 0.38), -3px -3px  9px rgba(255, 255, 255, 0.90);
+
+  /* Акцент за замовчуванням — Navy. Тут заливка ТЕМНА, текст на ній білий:
+     на папері працює рівно дзеркальна логіка до графіту. */
+  --acc:      #2c4160;   /* білий на заливці 10,3:1, заливка 9,5:1 до картки */
+  --acc-hi:   #202f46;   /* наведення ТЕМНІШАЄ: рух геть від поверхні */
+  --acc-bar:  #64809f;   /* смуга даних 3,8:1 до картки */
+  --acc-ink:  #202f46;   /* як текст: 12,4:1 на картці, 10,7:1 у полі */
+  --acc-line: #64809f;
+  --link:       #202f46;
+  --link-hover: #2c4160;
+  --acc-rgb:     44, 65, 96;
+  --acc-ink-rgb: 32, 47, 70;
+  --on-acc: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   Світла схема: решта акцентів
+   --------------------------------------------------------------------------
+   Той самий принцип для всіх: на заливку йде крок, де білий текст ≥ 4,5:1,
+   а сама заливка ≥ 3:1 до картки; на наведення — наступний ТЕМНІШИЙ;
+   як текст (--acc-ink, --link) — найтемніший крок палітри; на смуги й межі —
+   середній. Жодного нового відтінку не заведено: це ті самі девʼять палітр.
+   -------------------------------------------------------------------------- */
+html[data-scheme="light"][data-theme="graphite"] {            /* Дерево */
+  --acc: #7a5230; --acc-hi: #684226; --acc-bar: #93663e;
+  --acc-ink: #684226; --acc-line: #ad7a4f;
+  --link: #684226; --link-hover: #7a5230;
+  --acc-rgb: 122, 82, 48; --acc-ink-rgb: 104, 66, 38;
+}
+html[data-scheme="light"][data-theme="graphite-navy"] {
+  --acc: #2c4160; --acc-hi: #202f46; --acc-bar: #64809f;
+  --acc-ink: #202f46; --acc-line: #64809f;
+  --link: #202f46; --link-hover: #2c4160;
+  --acc-rgb: 44, 65, 96; --acc-ink-rgb: 32, 47, 70;
+}
+html[data-scheme="light"][data-theme="graphite-pink"] {
+  --acc: #c43e72; --acc-hi: #a93060; --acc-bar: #d95789;
+  --acc-ink: #a93060; --acc-line: #d95789;
+  --link: #a93060; --link-hover: #c43e72;
+  --acc-rgb: 196, 62, 114; --acc-ink-rgb: 169, 48, 96;
+}
+html[data-scheme="light"][data-theme="graphite-violet"] {
+  --acc: #6b4ab8; --acc-hi: #593d9b; --acc-bar: #8063c7;
+  --acc-ink: #593d9b; --acc-line: #947ad4;
+  --link: #593d9b; --link-hover: #6b4ab8;
+  --acc-rgb: 107, 74, 184; --acc-ink-rgb: 89, 61, 155;
+}
+html[data-scheme="light"][data-theme="graphite-crimson"] {
+  --acc: #c7231d; --acc-hi: #ad1813; --acc-bar: #db302a;
+  --acc-ink: #ad1813; --acc-line: #dd423d;
+  --link: #ad1813; --link-hover: #c7231d;
+  --acc-rgb: 199, 35, 29; --acc-ink-rgb: 173, 24, 19;
+}
+html[data-scheme="light"][data-theme="graphite-amber"] {
+  --acc: #8c5d0d; --acc-hi: #784f08; --acc-bar: #9b6a17;
+  --acc-ink: #784f08; --acc-line: #a47628;
+  --link: #784f08; --link-hover: #8c5d0d;
+  --acc-rgb: 140, 93, 13; --acc-ink-rgb: 120, 79, 8;
+}
+html[data-scheme="light"][data-theme="graphite-moss"] {
+  --acc: #3a7410; --acc-hi: #3b6120; --acc-bar: #50802e;
+  --acc-ink: #3b6120; --acc-line: #5c8e38;
+  --link: #3b6120; --link-hover: #3a7410;
+  --acc-rgb: 58, 116, 16; --acc-ink-rgb: 59, 97, 32;
+}
+html[data-scheme="light"][data-theme="graphite-emerald"] {
+  --acc: #1e7455; --acc-hi: #22624b; --acc-bar: #1f835e;
+  --acc-ink: #22624b; --acc-line: #33906e;
+  --link: #22624b; --link-hover: #1e7455;
+  --acc-rgb: 30, 116, 85; --acc-ink-rgb: 34, 98, 75;
+}
+html[data-scheme="light"][data-theme="graphite-ocean"] {
+  --acc: #296f81; --acc-hi: #1b5f70; --acc-bar: #0d7e9a;
+  --acc-ink: #1b5f70; --acc-line: #34899e;
+  --link: #1b5f70; --link-hover: #296f81;
+  --acc-rgb: 41, 111, 129; --acc-ink-rgb: 27, 95, 112;
+}
+
+body {
+  background: var(--bg);
+  letter-spacing: 0.003em;
+}
+.bg-fx {
+  background:
+    radial-gradient(900px 620px at 5% -10%, rgba(var(--acc-rgb), 0.2), transparent 61%),
+    radial-gradient(760px 580px at 96% 30%, rgba(var(--acc-rgb), 0.11), transparent 65%),
+    linear-gradient(145deg, var(--grad-a), var(--grad-b) 48%, var(--grad-c));
+}
+.wrap { max-width: 1240px; }
+.section { padding: clamp(58px, 8vw, 104px) 0; }
+
+/* Шапка — піднята над фоном, без скляного ефекту. */
+.nav {
+  min-height: 86px;
+  background: var(--glass-2);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(3, 5, 9, 0.24);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+.nav.is-stuck { background: var(--overlay); }
+.nav__inner { gap: 28px; }
+.nav__link {
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.nav__link:hover {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: var(--neo-raised-sm);
+}
+.nav__link::after { display: none; }
+/* Активний розділ — та сама піднята акцентна плашка, без білої грані */
+.nav__link.is-active {
+  color: var(--on-acc, #fff);
+  background: var(--acc);
+  border-color: transparent;
+  box-shadow: var(--acc-raised-sm);
+}
+.nav__link.is-active:hover { background: var(--acc); box-shadow: var(--acc-raised); }
+.nav__caret { color: var(--text-2); }
+.nav__drop { padding-top: 14px; }
+.nav__drop-in {
+  padding: 8px;
+  border-color: var(--line);
+  border-radius: 17px;
+  background: var(--surface);
+  box-shadow: var(--neo-raised);
+}
+.nav__drop-in .nav__link { box-shadow: none; }
+
+/*
+ * АДАПТИВ ШАПКИ ЖИВЕ ТУТ, А НЕ ВГОРІ ФАЙЛА.
+ *
+ * Neo-шар вище перевизначає .nav__link і .nav__drop-in беззастережно, тому
+ * медіазапити з базової секції він перебивав: відступи лишались десктопними
+ * на вузькому екрані, а список у бургері малювався плаваючою карткою з
+ * фоном і тінню — просто поверх сусідніх пунктів. Ці два блоки стоять
+ * ПІСЛЯ neo-шару навмисно.
+ */
+
+/* 1061–1200px: девʼять пунктів у рядок ще вміщаються, але впритул.
+   Тиснемо відступи й кегль, а не ховаємо пункти. */
+@media (max-width: 1200px) {
+  .nav__links { gap: 0; }
+  .nav__link { padding: 8px 9px; font-size: 0.86rem; }
+}
+
+/* До 1060px меню — колонка в бургері. Випадний список стає простим
+   списком з відступом: картка всередині картки тут ні до чого. */
+@media (max-width: 1060px) {
+  .nav__link { padding: 13px 14px; font-size: 1rem; }
+  .nav__drop-in {
+    padding: 0 0 4px 18px;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .nav__drop-in .nav__link { padding: 10px 14px; font-size: 0.95rem; }
+}
+
+/* ==========================================================================
+   ПІДНЯТІ КОНТРОЛИ: кнопки, сегменти, чипи, теги
+   ==========================================================================
+   Три речі, які тут виправлено проти попереднього стану:
+
+   1. ПРИБРАНО ВИДИМУ РАМКУ. Стояло border-color: var(--line), тобто біла
+      лінія 1px по краю. На піднятому неоморфному елементі така лінія читається
+      як внутрішня обводка навколо тексту — рівно той «bevel», якого тут бути
+      не повинно. Форму задає тінь, а не контур.
+
+   2. ЧИПИ БІЛЬШЕ НЕ ВТОПЛЕНІ. Вони мали background: var(--field) плюс
+      --neo-inset-sm, тобто були ямкою в поверхні. Тепер це така сама
+      піднята плашка, як кнопка, лише дрібніша.
+
+   3. НАТИСКАННЯ НЕ ВИВЕРТАЄ ТІНЬ. Було --neo-inset-sm, тобто кнопка
+      провалювалась усередину. Тепер це коротший хід тіні: елемент лишається
+      піднятим у кожному стані.
+   ========================================================================== */
+.btn,
+.icon-btn,
+.rest-btn,
+.theme-btn,
+.seg__item span,
+.chip {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--ctl-raised);
+}
+.btn,
+.rest-btn,
+.theme-btn { font-weight: 700; }
+
+/* Дрібні елементи сімʼї — та сама тінь, менший радіус розсіювання */
+.icon-btn,
+.seg__item span,
+.chip { box-shadow: var(--ctl-raised-sm); }
+
+/*
+ * ГЕОМЕТРІЯ Й ЦЕНТРУВАННЯ.
+ *
+ * Було: .seg__item span — display: block, тобто текст усередині взагалі не
+ * центрувався флексом; .chip і .eyebrow — justify-content: normal, тобто
+ * притиснуті вліво. Плюс успадкований line-height (1,65) різний у кожного
+ * через різний кегль: 20,06 / 20,59 / 22,70 / 23,23 px. Через це написи
+ * стояли на різній висоті й зі зміщенням.
+ *
+ * Тепер: flex по обох осях, line-height: 1 і фіксована min-height. Вертикаль
+ * задає ВИСОТА, а не вертикальні відступи, тому текст стоїть рівно
+ * посередині незалежно від метрик шрифту й кегля.
+ */
+.btn,
+.seg__item span,
+.chip,
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  text-align: center;
+}
+.btn        { min-height: var(--ctl-h);     padding: 0 22px; border-radius: var(--ctl-r); }
+.btn--sm    { min-height: var(--ctl-h-sm);  padding: 0 15px; border-radius: var(--ctl-r-sm); }
+.seg__item span { min-height: var(--ctl-h-sm); padding: 0 16px; border-radius: var(--ctl-r-sm); }
+.chip,
+.eyebrow    { min-height: var(--ctl-h-tag); padding: 0 13px; border-radius: 999px; }
+
+/* Дрібний чип (позначка «сире / готове» біля назви продукту) лишається
+   компактним: спільне правило сімʼї вище перебило б його власні відступи. */
+.chip--sm { min-height: 22px; padding: 0 8px; }
+
+/*
+ * Чип-мітка НАД заголовком картки («Обʼєм», «Частота», «Відмова»).
+ *
+ * Проблема: чип — inline-flex заввишки 32px, а line-box абзацу — 26,4px.
+ * Нижній край чипа вилазив за line-box і зʼїдав усі 10px від .mt-1
+ * заголовка: фактична відстань між обводкою чипа й текстом = 0px.
+ *
+ * Рішення: у цьому контексті чип стає блоковим боксом власної ширини
+ * (width: fit-content). Розмір, padding, радіус і тінь незмінні — просто
+ * його висота тепер враховується у потоці, тому відступ заголовка працює.
+ * У браузерах без :has() правило не спрацює й лишиться попередня поведінка.
+ */
+.chip:has(+ .card__title) {
+  display: flex;
+  width: fit-content;
+}
+.chip + .card__title { margin-top: 14px; }
+
+/* Наведення — легке підняття, без появи кольорового контуру */
+.btn:hover,
+.icon-btn:hover:not(:disabled),
+.rest-btn:hover,
+.theme-btn:hover,
+.seg__item span:hover {
+  transform: translateY(-1px);
+  border-color: transparent;
+  background: var(--surface-2);
+  box-shadow: var(--ctl-raised-hover);
+}
+.icon-btn:hover:not(:disabled),
+.seg__item span:hover { box-shadow: var(--ctl-raised); }
+
+/* Натискання — коротша тінь, а не вивернута */
+.btn:active,
+.icon-btn:active:not(:disabled),
+.rest-btn:active,
+.theme-btn:active,
+.seg__item span:active {
+  transform: translateY(1px);
+  box-shadow: var(--ctl-raised-press);
+}
+
+/* Вимкнено — приглушено, але все ще підняте */
+.btn:disabled,
+.icon-btn:disabled,
+.rest-btn:disabled {
+  transform: none;
+  background: var(--surface);
+  box-shadow: var(--ctl-raised-press);
+}
+
+/*
+ * Акцентна кнопка НЕ втоплюється при натисканні.
+ *
+ * Правило .btn:active вище дає inset усім кнопкам — для сірих поверхонь це
+ * правильно (натиснута поверхня вминається), але акцентний елемент має
+ * лишатися піднятим у КОЖНОМУ стані. Тому натискання тут — це коротший
+ * хід тіні, а не її вивертання.
+ *
+ * Друга тінь (-4px -4px біла) прибрана: на суцільному кольорі вона читалась
+ * як відблиск угорі зліва, тобто саме як внутрішній градієнт.
+ */
+.btn--primary {
+  background: var(--acc);
+  border-color: transparent;
+  box-shadow: var(--acc-raised);
+}
+.btn--primary:hover {
+  background: var(--acc-hi);
+  border-color: transparent;
+  box-shadow: var(--acc-raised-hi);
+}
+.btn--primary:active {
+  box-shadow: var(--acc-raised-sm);
+}
+.btn--primary:focus-visible {
+  box-shadow: var(--acc-raised);
+}
+.btn--primary:disabled {
+  box-shadow: var(--acc-raised-sm);
+}
+/* Без рамки, як і решта сімʼї: форму дає тінь */
+.btn--ghost { background: var(--surface); border-color: transparent; }
+.icon-btn,
+.rest-btn { background: var(--surface); }
+
+.input, .select, .textarea,
+.input--weight {
+  border-color: transparent;
+  background-color: var(--field);
+  box-shadow: var(--neo-inset-sm);
+}
+.input:hover, .select:hover, .textarea:hover { border-color: rgba(var(--tint-rgb), 0.055); }
+.input:focus, .select:focus, .textarea:focus {
+  border-color: rgba(var(--acc-ink-rgb), 0.48);
+  background-color: var(--field-focus);
+  box-shadow: var(--neo-inset-sm), 0 0 0 3px rgba(var(--acc-rgb), 0.18);
+}
+.seg { gap: 10px; }
+.seg__item span {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--neo-raised-sm);
+}
+/*
+ * Обраний сегмент — піднятий, як кнопка. Було: inset-тінь плюс білий
+ * контур, тобто вибір показувався ямкою. Тепер вибір показується тим, що
+ * елемент виступає над рештою ряду.
+ */
+.seg__item input:checked + span {
+  background: var(--acc);
+  border-color: transparent;
+  box-shadow: var(--acc-raised-sm);
+}
+.seg__item input:checked + span:hover { box-shadow: var(--acc-raised); }
+.seg__item input:checked:active + span { box-shadow: var(--acc-raised-xs); }
+
+/* Основні контейнери однаково "виростають" із фону. */
+.card,
+.kpi,
+.week,
+.acc,
+.table-wrap,
+.tier,
+.modal__box,
+.rest-timer,
+.wchart,
+.notice,
+.toast {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: var(--neo-raised);
+}
+.card {
+  padding: clamp(22px, 3vw, 32px);
+  border-radius: 24px;
+  overflow: visible;
+}
+.card::before { display: none; }
+.card--hover:hover {
+  transform: translateY(-5px);
+  border-color: rgba(var(--acc-ink-rgb), 0.34);
+  box-shadow: 20px 20px 38px rgba(3,5,9,.53), -13px -13px 28px rgba(var(--tint-rgb), .04);
+}
+.card.is-selected {
+  border-color: rgba(var(--acc-ink-rgb), 0.52);
+  box-shadow: var(--neo-raised), 0 0 0 2px rgba(var(--acc-rgb), 0.25);
+}
+.kpis { gap: 20px; }
+.kpi { border-radius: 20px; padding: 22px 16px; }
+.kpi__val { color: var(--text); }
+/* .eyebrow без акценту сюди не потрапляє — нижче він завжди акцентний.
+   Чипи піднімає спільне правило сімʼї вище, тому тут лишається лише фон. */
+.eyebrow {
+  border-color: transparent;
+  background: var(--surface);
+}
+/*
+ * Чипи й «eyebrow» — СУЦІЛЬНИЙ акцент, підняті.
+ *
+ * Було color-mix(--acc 22%, --field): акцент, розведений кольором поля на
+ * 78%. Це і є той «внутрішній градієнт» — колір елемента залежав від того,
+ * що під ним, і суцільним не був ніколи. Плюс inset-тінь у eyebrow.
+ *
+ * Колір тексту — var(--on-acc): на суцільній заливці --text уже не
+ * гарантує контрасту, а --on-acc для того й існує. Перевірено для всіх
+ * восьми тем, мінімум 4,64:1 при нормі 4,5.
+ */
+.chip--acc,
+.chip--ok,
+.eyebrow {
+  background: var(--acc);
+  border-color: transparent;
+  color: var(--on-acc, #fff);
+  box-shadow: var(--acc-raised-sm);
+}
+/* Крапка в eyebrow теж на акценті, тому колір їй потрібен той самий */
+.eyebrow__dot { background: var(--on-acc, #fff); box-shadow: none; animation: none; }
+.divider { opacity: 0.55; }
+
+.table-wrap { border-radius: 22px; }
+/* Липкий заголовок таблиці МУСИТЬ мати непрозорий фон: під ним
+   прокручуються рядки. Через color-mix (Safari < 16.2) він ставав
+   прозорим, і текст заголовка змішувався з даними. */
+table.tbl th { background: var(--surface-2); }
+table.tbl th, table.tbl td { border-bottom-color: var(--line); }
+table.tbl tbody tr:hover { background: rgba(var(--acc-rgb), 0.14); }
+tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
+.macrobar,
+.vol__bar,
+.split {
+  border-color: transparent;
+  background: var(--field);
+  box-shadow: var(--neo-inset-sm);
+}
+.macrobar > span { box-shadow: 1px 0 0 rgba(0,0,0,.28); }
+.vol__bar i { box-shadow: 0 2px 7px rgba(var(--acc-rgb), .4); }
+
+.acc { border-radius: 20px; }
+.acc__head { padding: 20px 24px; }
+.acc__head:hover { background: rgba(var(--acc-rgb), 0.1); }
+.acc__pad { padding: 0 24px 24px; }
+.week { border-radius: 17px; }
+.rest-day { border-color: var(--line-2); background: var(--field); box-shadow: var(--neo-inset-sm); }
+
+.notice { border-left: 0; border-radius: 18px; }
+.notice--acc { border-color: rgba(var(--acc-ink-rgb), 0.22); background: rgba(var(--acc-rgb), 0.10); }
+.modal__backdrop { background: rgba(9, 12, 16, 0.68); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
+.modal__box { border-radius: 28px; }
+.rest-timer { border-radius: 20px; }
+.toast { border-radius: 17px; }
+
+.theme-btn { border-radius: 16px; }
+/*
+ * Обрана тема. Заливку тут навмисно НЕ роблю суцільно акцентною: усередині
+ * кнопки лежать два кружки-свотчі, і суцільний акцент під ними перебивав би
+ * саме те, що вони показують. Але вгнутість прибрана — вибір показується
+ * піднятістю й акцентним контуром.
+ */
+.theme-btn.is-active {
+  border-color: var(--acc);
+  background: var(--surface-2);
+  box-shadow: var(--acc-raised-sm), 0 0 0 1px var(--acc);
+}
+
+/* Посилання «до вмісту» — теж акцентна плашка, хай і видима лише з клавіатури */
+.skip-link { box-shadow: var(--acc-raised); }
+.theme-btn i { border-color: rgba(var(--tint-rgb), .2); box-shadow: 2px 2px 4px rgba(0, 0, 0, .28); }
+
+.footer {
+  margin-top: 80px;
+  border-top-color: var(--line);
+  background: rgba(18, 22, 28, 0.72);
+}
+.heatmap__cell { border-radius: 8px; box-shadow: var(--neo-inset-sm); }
+/*
+ * color лишається ТЕМНИМ.
+ *
+ * Цей нео-шар перебивав color:#0b0e14 з базової частини на #fff, і контраст
+ * позначеного дня падав до 3,75:1 у базовій темі й 2,74:1 у рожевій —
+ * при нормі 4,5:1. Смуга --acc-bar світла в усіх темах, тому читається на
+ * ній саме темний текст (5,15–9,9:1), а не білий.
+ */
+.heatmap__cell--on { background: var(--acc-bar); color: #0b0e14; font-weight: 700; box-shadow: var(--acc-raised-xs); }
+
+:focus-visible {
+  outline: 2px solid var(--acc-ink);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Стан кнопки після дії та під час дії.
+   Обидва — пояснення, а не прикраса: перший каже «сталось», другий —
+   «триває, другий клік не потрібен». */
+.btn.is-done, .icon-btn.is-done {
+  border-color: var(--acc-line);
+  color: var(--acc-ink);
+}
+.btn.is-busy { opacity: 0.7; cursor: progress; }
+
+/* Повторювані розкладки, які досі жили в inline-стилях.
+   .row зі space-between траплявся понад пʼятдесят разів, і в трьох
+   варіантах вирівнювання — тобто однакові на вигляд рядки мали різну
+   поведінку залежно від того, який варіант скопіювали. */
+.row--split { justify-content: space-between; align-items: flex-start; }
+
+/* Список-примітка під карткою: був сімома копіями одного inline-стилю
+   з трьома різними нижніми відступами. */
+.list-note { margin: 0 0 12px; padding-left: 18px; color: var(--text-2); }
+.list-note li + li { margin-top: 4px; }
+
+/* Відгук на дотик.
+   Наведення на тач-екрані не існує, а :active мали лише кнопки-.btn. Через
+   це тир-лист, заголовок акордеона й підказка швидкого додавання на
+   телефоні виглядали як мертві елементи: тап нічого не міняв до моменту
+   перемальовки. Тут — рівно те, чого бракувало, тим самим кольором, що
+   вже вживає :hover. */
+.acc__head:active { background: rgba(var(--acc-rgb), 0.14); }
+.tier__item:active { border-color: var(--acc-line); background: rgba(var(--acc-rgb), 0.18); }
+.quick-list__item:active { background: rgba(var(--acc-rgb), 0.18); }
+.dash-main:active, .tile:active { border-color: var(--acc-line); }
+
+@media (max-width: 720px) {
+  /* Шапка нижча — отже й змінна нижча. Раніше min-height правився тут, а
+     --nav-h лишалась 80px, і мобільне меню (inset: var(--nav-h)) починалось
+     на 6px нижче за реальний край шапки: між ними просвічувала сторінка.
+     Ту саму змінну читає scroll-padding-top, тож правити достатньо її. */
+  :root { --nav-h: 74px; }
+  .nav { min-height: var(--nav-h); }
+  .nav__links { background: var(--surface); box-shadow: 0 16px 35px rgba(3,5,9,.5); }
+  .nav__link.is-active { box-shadow: none; }
+}
+
+/* ====================================================================== */
+/* Тач-екран: наведення там не існує                                      */
+/* ====================================================================== */
+/*
+ * На тач-екрані iOS і Android лишають :hover застосованим ПІСЛЯ дотику —
+ * доки людина не торкнеться чогось іншого. Через це кнопка залишалась
+ * піднятою, рядок таблиці — підсвіченим, а картка — зміщеною на пʼять
+ * пікселів угору. Виглядало так, ніби елемент застряг у натиснутому стані.
+ *
+ * Не переписуємо 51 правило з :hover, а гасимо саме те, що ЗАЛИПАЄ:
+ * зсув і підсвітку. Відгук на дотик уже дають окремі :active-правила
+ * нижче — вони короткі й самі знімаються.
+ *
+ * @media (hover: none) — це не «мобільна ширина», а «пристрій без
+ * наведення»: сенсорний ноутбук із мишею сюди не потрапить.
+ */
+@media (hover: none) {
+  .btn:hover,
+  .icon-btn:hover:not(:disabled),
+  .rest-btn:hover,
+  .theme-btn:hover,
+  .seg__item span:hover,
+  .card--hover:hover {
+    transform: none;
+  }
+  table.tbl tbody tr:hover { background: transparent; }
+  .tier__item:hover { border-color: var(--line); background: transparent; }
+  .acc__head:hover { background: transparent; }
+  .quick-list__item:hover { background: transparent; }
+  .tile:hover { border-color: var(--line); }
+  .dash__more a:hover { border-color: var(--line); color: var(--text-2); }
+}
+
+/* ==================================================================== */
+/* Телефон: доведення розмірів під палець і під вузький екран           */
+/* ==================================================================== */
+/*
+ * Один блок замість розсипу по файлу. Тут лише те, що міняє РОЗМІР під
+ * дотик або рятує від обрізання — не переоформлення: візуальна мова
+ * (кольори, рамки, радіуси) на телефоні та десктопі однакова навмисно.
+ */
+@media (max-width: 640px) {
+  /* Дрібні кнопки (пресети трекерів, «✕» у модалці, вкладки днів) стояли
+     на 40px — постійний недоліт до мінімальних 44. Одна змінна вирівнює
+     їх усі одразу. */
+  :root { --ctl-h-sm: 44px; }
+
+  /* Клітинка теплокарти — кнопка, що ставить/знімає позначку тренування
+     в журналі. 24px із числом 9,9px читались і ловились однаково погано;
+     сітка й далі скролиться горизонтально, і це нормально. */
+  .heatmap { gap: 4px; }
+  .heatmap__col { gap: 4px; }
+  .heatmap__days { gap: 4px; }
+  .heatmap__days span { height: 32px; line-height: 32px; font-size: 0.75rem; }
+  .heatmap__cell { width: 32px; height: 32px; font-size: 0.74rem; }
+
+  /* Текст, який НЕ дрібний шрифт, а самі дані: відсоток 1ПМ і повтори в
+     клітинці періодизації, запас RIR, стан «сире/готове» біля продукту. */
+  .pd-cell__sub { font-size: 0.8rem; }
+  .pd-res { font-size: 0.8rem; opacity: 0.9; }
+  .chip--sm { font-size: 0.78rem; }
+
+  /* Липка колонка з назвою вправи їла 190px із ~346 — від тижнів лишалась
+     смужка. Ширину задає заголовок; max-width на td не діє взагалі. */
+  .tbl--pd thead th:first-child,
+  .tbl--pd tbody td:first-child { min-width: 116px; max-width: none; }
+
+  /* Довідник продуктів був вкладеним скролером на пів-екрана: свайп у
+     ньому ніколи не гортав сторінку, і людина застрягала посеред неї.
+     Пошук над таблицею й так тримає список коротким. */
+  .table-wrap--tall { max-height: none; overflow-y: visible; }
+
+  /* Самотні текстові посилання-дії («Редагувати план», «Налаштувати»,
+     посилання на PMID) мали 16–23px висоти. Формально це виняток WCAG
+     для тексту в реченні, але тут вони стоять окремо й працюють як
+     кнопки — тож на дотик їм потрібна нормальна зона.
+     inline-flex + min-height, а не padding: інакше поїхали б відступи
+     всередині абзацу. */
+  .row > a.small,
+  p.small.muted > a[href^="https://pubmed"],
+  p.small > a[href^="https://pubmed"] {
+    display: inline-flex; align-items: center;
+    min-height: 32px;
+  }
+
+  /* ---- План: таблиця складається у стовпчик карток ----
+     Сім колонок (# · вправа · підходи · повтори · вага · RIR · дії)
+     просили близько 600px усередині картки шириною ~302. Правка власного
+     плану — часта дія, і робити її горизонтальним скролом по 30-піксельних
+     кнопках не можна. Розмітка лишається таблицею: міняється тільки показ,
+     тому десктоп, друк і читалки бачать ту саму структуру.
+
+     Селектори навмисно з table.tbl--plan, а не просто .tbl--plan: базові
+     правила записані як `table.tbl td`, і коротший селектор програвав би
+     їм за специфічністю — рамки комірок протікали б крізь ці правила. */
+  table.tbl--plan,
+  table.tbl--plan tbody,
+  table.tbl--plan tr,
+  table.tbl--plan td { display: block; width: auto; }
+  table.tbl--plan thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  table.tbl--plan tr {
+    position: relative;
+    padding: 12px 2px 12px 34px;
+    border-bottom: 1px solid var(--line);
+  }
+  table.tbl--plan tr:last-child { border-bottom: 0; }
+  table.tbl--plan td { padding: 0; border: 0; }
+
+  /* Номер вправи — у поле зліва, а не окремим рядком */
+  table.tbl--plan .tbl__idx {
+    position: absolute; left: 0; top: 13px;
+    font-size: 0.85rem;
+  }
+  table.tbl--plan .tbl__main { margin-bottom: 6px; }
+
+  /* Схема підходів читається одним рядком, що переноситься, а не шістьма
+     рядками «підпис: значення»: інакше чотирнадцять вправ дня розтягували
+     сторінку на кілька екранів і гортати доводилось більше, ніж до того
+     скролити вбік. */
+  table.tbl--plan td[data-l] {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin: 3px 16px 3px 0;
+    text-align: left;
+    vertical-align: middle;
+  }
+  table.tbl--plan td[data-l]::before {
+    content: attr(data-l);
+    font-family: var(--font-body); font-weight: 500;
+    font-size: 0.8rem; color: var(--muted);
+    white-space: nowrap;
+  }
+  table.tbl--plan td[data-l] .input { width: 84px; }
+
+  /* Кнопки порядку й видалення — власним рядком, притиснуті праворуч */
+  table.tbl--plan .tbl__acts { margin-top: 8px; }
+  table.tbl--plan .row-actions { justify-content: flex-end; gap: 16px; }
+
+  /* Смуга «кругова частина» лишається суцільним рядком */
+  table.tbl--plan .tbl__band { padding-left: 14px; }
+  table.tbl--plan .tbl__band td { display: block; padding: 6px 0; }
+}
+
+/* ==========================================================================
+   ДРУК
+   ==========================================================================
+   Що з цього виходить на папері: план тренування, сьогоднішній список
+   вправ, боксерська сесія. Тобто аркуш, який беруть у зал, а не знімок
+   екрана. Тому тут не «трохи інші кольори», а знята вся браузерна частина
+   інтерфейсу.
+
+   Блок стоїть НАПРИКІНЦІ файла навмисно: тематичний шар нижче перевизначає
+   кольори через ті самі змінні, і якби друк ішов до нього, тема забирала б
+   свої темні значення назад.
+   ========================================================================== */
+@media print {
+  /* Світла палітра — через ті самі змінні, а не патчі окремих селекторів.
+     Майже кожен елемент ставить собі колір із --text/--muted/--line, тому
+     перефарбувати самий body (як було) не давало нічого: текст лишався
+     майже білим на білому. */
+  :root,
+  [data-theme] {
+    --bg: #fff; --bg-1: #fff; --bg-2: #fff;
+    --surface: #fff; --surface-2: #fff; --card-1: #fff; --card-2: #fff;
+    --field: #fff; --field-focus: #fff; --overlay: #fff;
+    --text: #000; --text-2: #1a1a1a; --muted: #4a4a4a;
+    --line: #c8c8c8; --line-2: #9a9a9a;
+    --acc: #000; --acc-ink: #000; --acc-line: #888; --acc-bar: #666;
+    --shadow: none; --shadow-lg: none;
+  }
+
+  @page { margin: 14mm; }
+
+  html, body { background: #fff !important; color: #000 !important; }
+  body { font-size: 11pt; }
+
+  /* Тіні, розмиття й декоративні підкладки не існують у друку — вони або
+     не друкуються взагалі, або зʼїдають тонер сірим прямокутником. */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Усе, що потрібно лише в браузері */
+  #site-nav, .nav,
+  #site-footer, .footer,
+  .bg-fx, .skip-link, .toasts, .rest-timer, .modal,
+  .btn, .icon-btn, .acc__ico, .row-actions, .seg,
+  .tbl__acts, .switch, #copy-fallback,
+  .dash__more, .qi-scale, .qi-row {
+    display: none !important;
+  }
+
+  /* Поява при скролі: усе, повз що не гортали, лишалось opacity:0 і
+     друкувалось порожнечею. На research.html це була майже вся сторінка. */
+  .js .reveal, .reveal { opacity: 1 !important; transform: none !important; }
+
+  /* Згорнутий акордеон друкувався порожнім заголовком — а це рівно те, що
+     треба надрукувати: дні плану, розминка, склад рецептів. inert на показ
+     не впливає, тому JS чіпати не потрібно. */
+  .acc__body { grid-template-rows: 1fr !important; }
+  .acc__inner { visibility: visible !important; overflow: visible !important; }
+  .acc, .acc__head { border-color: #c8c8c8 !important; }
+
+  /* Таблиці: без горизонтального скролу папір нічого не покаже — те, що
+     не влізло, просто зникало з аркуша. */
+  .table-wrap, .table-wrap--tall {
+    overflow: visible !important;
+    max-height: none !important;
+    border: 0 !important;
+  }
+  table.tbl { min-width: 0 !important; font-size: 10pt; }
+  table.tbl thead { display: table-header-group; }
+  table.tbl th, table.tbl td { padding: 5px 8px; border-bottom: 1px solid #c8c8c8; }
+
+  /* Робоча вага, підходи, грами живуть у полях вводу. Значення друкується
+     (це атрибут value), але рамка поля з темною заливкою робила його
+     білим на білому. Лишаємо тільки підкреслення — як у бланку. */
+  .input, .select, .textarea {
+    border: 0 !important;
+    border-bottom: 1px solid #000 !important;
+    border-radius: 0 !important;
+    background: none !important;
+    background-image: none !important;
+    color: #000 !important;
+    padding: 0 2px !important;
+    appearance: none; -webkit-appearance: none;
+  }
+
+  /* Галочку виконання малює фон + SVG-картинка, а фони в друку вимкнені:
+     квадрат виходив однаковий і для зробленого, і для ні. Друкуємо порожню
+     рамку — її ставлять олівцем у залі, що для аркуша й правильніше. */
+  .tdy-ex__check {
+    background: none !important;
+    border: 1.4px solid #000 !important;
+  }
+  .tdy-ex__check::after { display: none !important; }
+  .tdy-ex.is-done .tdy-ex__name { text-decoration: none; color: #000; }
+
+  /* Компонування аркуша */
+  .section, .section--dash { padding: 0 !important; }
+  .wrap { max-width: none; padding: 0; }
+  .card, .acc, .tdy-ex, .tbl--plan tr, li { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+  h1 { font-size: 18pt; }
+  h2 { font-size: 14pt; }
+  h3 { font-size: 12pt; }
+  .card { border: 1px solid #c8c8c8; border-radius: 0; margin-bottom: 10px; }
+  .card + .card, .acc + .acc { margin-top: 8px; }
+
+  /* Посилання без адреси на папері марні; але друкувати адресу біля
+     кожного пункту меню теж не можна — меню вже приховане, лишаються
+     тільки змістовні посилання в тексті. */
+  .card a[href^="http"]::after,
+  p a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 8pt; word-break: break-all; }
+}
+
+/* ==========================================================================
+   СЬОГОДНІ: стан дня
+   ==========================================================================
+   Три нові дрібниці для головної. Жодного нового кольору й жодного нового
+   радіуса: усе з наявних токенів — картка, сітка, .vol, шрифт чисел.
+   ========================================================================== */
+
+/* Rating як головна метрика: число завбільшки з заголовок, поруч рівень.
+   Це той самий .card, лише з підсиленим першим рядком. */
+/*
+ * Ритм екрана дня задає КОНТЕЙНЕР, а не кожна картка окремо.
+ *
+ * Раніше кожна картка носила власний .mt-2, і та, що опинялась першою,
+ * його не мала. Після перебудови головної першою стала смуга стану — а
+ * «Тренування» лишилось без відступу й лягло на плитки впритул, без
+ * жодного проміжку взагалі.
+ *
+ * Тепер проміжок один і належить сусідству, тож картка, додана сюди
+ * завтра, не може його забути. 26px замість базових 22: на екрані дня
+ * блоків більше, ніж на решті сторінок, і рівно на цю різницю їм
+ * потрібно більше повітря, щоб читатись окремими.
+ */
+#today > * + * { margin-top: 26px; }
+
+.rating-hero {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
+.rating-hero__val {
+  font-size: 2.6rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1;
+}
+.rating-hero__meta { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Розклад по сигналах: назва — смуга — «скільки з максимуму».
+   Сітка, а не таблиця: три елементи в рядок, середній тягнеться. */
+.sig-list { display: flex; flex-direction: column; gap: 8px; }
+.sig {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) 1fr minmax(56px, auto);
+  align-items: center; gap: 10px;
+}
+.sig__name { font-size: 0.85rem; color: var(--text-2); }
+.sig__val  { font-size: 0.85rem; text-align: right; white-space: nowrap; }
+/* .vol — сітка з чотирьох треків (назва, смуга, число, залишок), і сама
+   смуга там стоїть у другій колонці. Тут потрібна ЛИШЕ смуга: назву й
+   число малює .sig своєю сіткою. Тому переводимо в одну колонку — інакше
+   смуга лягала б у перший трек шириною 140–200px і не тягнулась. */
+.sig .vol { margin: 0; grid-template-columns: 1fr; gap: 0; }
+
+/* Підсумок тижня: три числа в ряд. На вузькому — так само в ряд,
+   бо чисел рівно три й вони короткі. */
+.wk { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.wk__cell {
+  padding: 12px 10px;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface); text-align: center;
+}
+.wk__val { display: block; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.03em; }
+.wk__lbl { display: block; margin-top: 4px; font-size: 0.72rem; color: var(--muted); line-height: 1.25; }
+
+@media (max-width: 380px) {
+  .rating-hero__val { font-size: 2.1rem; }
+  .sig { grid-template-columns: minmax(70px, auto) 1fr minmax(48px, auto); gap: 8px; }
+  .sig__name, .sig__val { font-size: 0.79rem; }
+}
+
+/* ==========================================================================
+   МОБІЛЬНА ПАНЕЛЬ РОЗДІЛІВ
+   ==========================================================================
+   Пʼять розділів щоденного циклу внизу екрана — у зоні великого пальця.
+   Тільки для сенсорних ширин: на десктопі ті самі розділи стоять у шапці,
+   і другий ряд посилань унизу вікна був би дублем.
+
+   Побудована з наявних токенів: та сама скляна поверхня, що в шапки
+   (--glass-2), ті самі --line, --acc, --muted, --t-fast. Нових кольорів
+   і радіусів немає — це навігація, а не новий візуальний шар.
+   ========================================================================== */
+
+.tabbar { display: none; }
+
+@media (max-width: 900px) {
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 240;
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    border-top: 1px solid var(--line);
+    background: var(--glass-2);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    /* Безпечна зона iPhone: без неї нижній ряд ховається під смугою
+       жестів, і по крайніх пунктах не влучити. */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .tabbar__item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px;
+    /* 56px + безпечна зона — стандартна висота панелі розділів і водночас
+       ціль дотику з великим запасом понад 44px. */
+    min-height: 56px;
+    padding: 7px 4px 8px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.66rem; font-weight: 600; letter-spacing: 0.01em;
+    line-height: 1.1; text-align: center;
+    transition: color var(--t-fast);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tabbar__ico { width: 22px; height: 22px; flex: none; }
+  .tabbar__lbl { display: block; }
+
+  .tabbar__item.is-active { color: var(--acc-ink); }
+  .tabbar__item:active { color: var(--text); }
+  .tabbar__item:focus-visible {
+    outline: 2px solid var(--acc-ink); outline-offset: -3px; border-radius: var(--r-sm);
+  }
+
+  /* Вміст сторінки не має ховатись під панеллю. Змінна, а не число:
+     той самий відступ потрібен тостам і таймеру відпочинку нижче. */
+  body.has-tabbar { --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  body.has-tabbar #site-footer { padding-bottom: var(--tabbar-h); }
+
+  /* Таймер відпочинку й тости піднімаються над панеллю, а не лягають під неї */
+  body.has-tabbar .rest-timer { bottom: calc(18px + var(--tabbar-h)); }
+  body.has-tabbar .toasts { bottom: calc(18px + var(--rest-h, 0px) + var(--tabbar-h)); }
+
+  /* Меню-накладка бургера відкривається над панеллю: інакше її нижні
+     пункти лягали б рівно під неї й не натискались. */
+  .nav__links.is-open { padding-bottom: calc(24px + var(--tabbar-h, 56px)); }
+}
+
+/* Друк: панель — інтерфейс, на аркуші її немає */
+@media print {
+  .tabbar { display: none !important; }
+}
+
+/* Довге пояснення у згорнутому вигляді. Той самий .acc, лише голова
+   спокійніша: це не орган керування даними, а «прочитати за бажанням». */
+.acc--longform { border-color: var(--line); }
+.acc--longform > .acc__head h3 { font-size: 1.05rem; }
+.acc--longform > .acc__head { color: var(--text-2); }
+.acc--longform > .acc__head:hover { color: var(--text); }
+
+/* ==========================================================================
+   КАРТКА-ВХІД У ТРЕНУВАННЯ + ПОВЕРНЕННЯ НАЗАД
+   ==========================================================================
+   Нових кольорів, радіусів і тіней тут немає: .tdy-entry — це та сама
+   .card, лише як посилання, а всередині — наявні .vol і типографіка.
+   ========================================================================== */
+
+/* Уся картка клікабельна: у залі ціль дотику має бути картка, а не
+   кнопка в її кутку. */
+.tdy-entry {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--t-fast), transform var(--t-fast);
+}
+.tdy-entry:hover, .tdy-entry:focus-visible { border-color: var(--acc-line); color: var(--text); }
+.tdy-entry:active { transform: translateY(1px); }
+
+.tdy-entry__head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+.tdy-entry__title {
+  display: block;
+  font-family: var(--font-display); font-size: 1.6rem; line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.tdy-entry__meta { display: block; margin-top: 4px; font-size: 0.87rem; color: var(--muted); }
+.tdy-entry__focus { display: block; margin-top: 10px; font-size: 0.87rem; color: var(--text-2); }
+.tdy-entry__status { display: block; margin-top: 12px; font-size: 0.95rem; font-weight: 600; }
+.tdy-entry__cta { display: block; margin-top: 12px; font-weight: 700; color: var(--acc-ink); }
+
+/* Стрілка — не кнопка, а вказівник напрямку: колір як у підпису, щоб не
+   змагатися за увагу з самою назвою тренування. */
+.tdy-entry__go { flex: none; color: var(--muted); }
+.tdy-entry__go svg { width: 22px; height: 22px; display: block; }
+.tdy-entry:hover .tdy-entry__go { color: var(--acc-ink); }
+
+/* Виконане тренування читається рамкою, а не окремим кольором тексту:
+   правило «один відтінок плюс нейтральні» діє й тут. */
+.tdy-entry.is-done { border-color: var(--acc-line); }
+
+/* Повернення на «Сьогодні» — окремим рядком над заголовком сторінки.
+   Висота 44px: це головний шлях назад, і на телефоні в нього мають
+   влучати не цілячись. */
+.backlink {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; margin-left: -4px; padding: 0 4px;
+  font-size: 0.92rem; font-weight: 600;
+  color: var(--text-2); text-decoration: none;
+  transition: color var(--t-fast);
+}
+.backlink:hover, .backlink:focus-visible { color: var(--acc-ink); }
+.backlink svg { width: 18px; height: 18px; flex: none; }
+
+/* Ритм сторінки тренування — той самий, що на екрані дня. */
+#workout > * + * { margin-top: 26px; }
+
+@media print {
+  .backlink { display: none !important; }
+}
+
+/* ==========================================================================
+   ПЕРШИЙ ЕКРАН: ПЕРЕВІРКА ВІКУ
+   ==========================================================================
+   Нової дизайн-системи тут немає й бути не повинно: картка — та сама
+   .card із неоморфною тінню, поле — .input, кнопка — .btn.btn--primary,
+   відступи й типографіка — наявні токени. Власне лише те, чого в системі
+   не було: центрування на весь екран і два стани повідомлення.
+   ========================================================================== */
+
+.gate-body { min-height: 100vh; min-height: 100dvh; }
+
+.gate {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh;
+  /* dvh другим: Safari 15.4+ розуміє його, старіші лишаються на vh */
+  min-height: 100dvh;
+  padding: 24px 18px;
+}
+.gate__box { width: 100%; max-width: 440px; }
+
+/* Знак замість шапки: до перевірки віку застосунку немає, і меню, з якого
+   нікуди не можна піти, теж бути не повинно. */
+.gate__logo {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-bottom: 22px;
+  font-family: var(--font-display); font-size: 1.5rem; letter-spacing: 0.02em;
+  color: var(--text);
+}
+.gate__logo .logo__mark { width: 40px; height: auto; }
+
+.gate__title { font-size: 1.5rem; line-height: 1.2; margin: 0; }
+.gate__lead { margin: 8px 0 0; }
+.gate__note { margin: 10px 0 0; }
+
+/* Кнопка на всю ширину картки: на цьому екрані дія рівно одна. */
+.btn--wide { width: 100%; justify-content: center; }
+
+.gate__msg { margin: 14px 0 0; }
+
+/* Помилка формату — рядком, без окремої поверхні: це підказка, а не подія. */
+.gate__msg--err { color: var(--acc-ink); font-size: 0.88rem; }
+
+/* Заборона — власна поверхня, бо це вже не підказка, а відповідь.
+   Кольору тривоги в палітрі Forge немає навмисно (правило «один відтінок
+   плюс нейтральні»), тому стан читається рамкою й фоном вкладеної
+   поверхні — тим самим прийомом, що .notice на інших сторінках. */
+.gate__msg--block {
+  padding: 14px 16px;
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--neo-inset-sm, none);
+}
+.gate__msg-title { margin: 0 0 6px; font-weight: 700; font-size: 0.95rem; }
+
+/* Рідний вибір дати: у темній темі Chrome малює іконку календаря чорною
+   на темному тлі й вона зникає. Інвертуємо — це та сама іконка браузера,
+   свого віджета календаря Forge не заводить. */
+.gate input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1); opacity: 0.65; cursor: pointer;
+}
+.gate input[type="date"] { min-height: var(--ctl-h, 44px); }
+
+/* Placeholder — підказка ДО взаємодії: на фокусі зникає одразу, щоб поле
+   було чистим для вводу (стандартно браузер тримає його до першого
+   символа). Стосується всіх полів вводу — поведінка одна на весь Forge. */
+.input:focus::placeholder { color: transparent; }
+
+
+@media (max-width: 380px) {
+  .gate { padding: 18px 14px; }
+  .gate__title { font-size: 1.3rem; }
+}

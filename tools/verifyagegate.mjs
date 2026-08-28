@@ -1,0 +1,279 @@
+/**
+ * Віковий гейт: 18+ як умова доступу, а не як екран.
+ *
+ * Найважливіше тут — не те, що екран малюється, а те, що його не можна
+ * обійти: прямим URL, історією, перезавантаженням, підробленим
+ * localStorage чи імпортом профілю з дитячою датою.
+ */
+import { chromium } from 'playwright';
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { adultProfile } from './adult.mjs';
+
+const ROOT = process.cwd();
+const R = [];
+const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
+const page = (u) => String(u).split('/').pop().split('#')[0];
+
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+
+const PAGES = ['index.html', 'workout.html', 'plan.html', 'programs.html', 'nutrition.html',
+               'meals.html', 'journal.html', 'trackers.html', 'rating.html', 'periodization.html',
+               'boxing.html', 'cardio.html', 'calculator.html', 'supplements.html',
+               'research.html', 'account.html', 'today.html'];
+
+async function fresh(profile) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', e => errs.push(e.message));
+  p.on('dialog', d => d.accept());
+  if (profile) {
+    await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
+    await p.evaluate(pr => localStorage.setItem('ib.profile', JSON.stringify(pr)), profile);
+  }
+  return { ctx, p, errs };
+}
+
+/* ---- 1. Чистий браузер: будь-яка сторінка веде на гейт ---- */
+{
+  const { ctx, p, errs } = await fresh(null);
+  let bad = [];
+  for (const f of PAGES) {
+    await p.goto('file://' + ROOT + '/' + f, { waitUntil: 'load' });
+    await p.waitForTimeout(160);
+    if (page(p.url()) !== 'welcome.html') bad.push(f + '→' + page(p.url()));
+  }
+  ok('1. усі ' + PAGES.length + ' сторінок ведуть на гейт (прямий URL)', bad.length === 0, bad.join(', '));
+
+  await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
+  await p.waitForTimeout(900);
+  ok('1. заголовок екрана точний',
+     (await p.locator('#gate-card h1').innerText()).trim() === 'Вкажіть вашу дату народження');
+  ok('1. поле — саме date picker',
+     (await p.locator('#gate-date').getAttribute('type')) === 'date');
+  ok('1. кнопка «Продовжити» вимкнена до вводу', await p.locator('#gate-go').isDisabled());
+
+  /* На першому екрані ТІЛЬКИ дата */
+  const fields = await p.evaluate(() =>
+    [...document.querySelectorAll('#gate-card input, #gate-card select, #gate-card textarea')]
+      .map(e => e.id || e.name || e.type));
+  ok('1. на екрані єдине поле — дата', fields.length === 1 && fields[0] === 'gate-date', fields.join(', '));
+
+  const txt = await p.locator('#gate-card').innerText();
+  const forbidden = ['Стать', 'Вага', 'Зріст', 'Ціль', 'Програма', 'Активн', 'жиру', 'досвід'];
+  ok('1. нічого зайвого не питає', !forbidden.some(w => txt.includes(w)),
+     forbidden.filter(w => txt.includes(w)).join(', '));
+  ok('1. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 2. Неповнолітній ---- */
+{
+  const { ctx, p, errs } = await fresh(null);
+  await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
+  await p.waitForTimeout(900);
+
+  await p.locator('#gate-date').fill('2012-05-05');
+  await p.waitForTimeout(400);
+  ok('2. кнопка лишається вимкненою', await p.locator('#gate-go').isDisabled());
+
+  const msg = await p.locator('#gate-card').innerText();
+  ok('2. повідомлення точне за текстом',
+     msg.includes('Forge доступний лише користувачам віком від 18 років.'));
+  ok('2. пояснення на місці',
+     msg.includes('Платформа та її тренувальні програми розроблені для повнолітніх користувачів віком 18 років і старше.'));
+
+  /* Профіль не створюється */
+  const stored = await p.evaluate(() => localStorage.getItem('ib.profile'));
+  ok('2. профіль не створено', !stored || !JSON.parse(stored).birthDate, String(stored).slice(0, 60));
+
+  /* Кнопку не обійти зняттям disabled */
+  await p.evaluate(() => { const el = document.getElementById('gate-go'); el.disabled = false; el.click(); });
+  await p.waitForTimeout(900);
+  ok('2. зняття disabled нічого не дає', page(p.url()) === 'welcome.html', page(p.url()));
+  const after = await p.evaluate(() => localStorage.getItem('ib.profile'));
+  ok('2. і профіль так і не створено', !after || !JSON.parse(after).birthDate);
+  ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 3. Дитяча дата вже в профілі ---- */
+{
+  const { ctx, p, errs } = await fresh({ version: 6, birthDate: '2011-01-01', age: 15, weight: 60 });
+  let bad = [];
+  for (const f of ['index.html', 'workout.html', 'programs.html', 'account.html']) {
+    await p.goto('file://' + ROOT + '/' + f, { waitUntil: 'load' });
+    await p.waitForTimeout(160);
+    if (page(p.url()) !== 'welcome.html') bad.push(f);
+  }
+  ok('3. профіль із дитячою датою не пускає в застосунок', bad.length === 0, bad.join(', '));
+
+  await p.waitForTimeout(800);
+  ok('3. гейт одразу показує заборону',
+     (await p.locator('#gate-card').innerText()).includes('лише користувачам віком від 18'));
+  ok('3. кнопка вимкнена', await p.locator('#gate-go').isDisabled());
+  ok('3. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 4. Підробка localStorage ---- */
+{
+  const attempts = [
+    ['вигаданий прапорець «пройдено»', { version: 6, ageGatePassed: true, adult: true, age: 30 }],
+    ['лише числовий вік без дати', { version: 6, age: 30 }],
+    ['дата у майбутньому', { version: 6, birthDate: '2030-01-01' }],
+    ['неіснуючий день', { version: 6, birthDate: '2001-02-31' }],
+    ['сміття замість дати', { version: 6, birthDate: 'дорослий' }],
+    ['дата не рядком', { version: 6, birthDate: 19950310 }],
+    ['неправдоподібно давня', { version: 6, birthDate: '1850-01-01' }],
+    ['за день до 18-річчя', { version: 6, birthDate: (() => {
+      const d = new Date(); d.setFullYear(d.getFullYear() - 18); d.setDate(d.getDate() + 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    })() }]
+  ];
+  for (const [name, prof] of attempts) {
+    const { ctx, p } = await fresh(prof);
+    await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+    await p.waitForTimeout(200);
+    ok('4. ' + name + ' — не пускає', page(p.url()) === 'welcome.html', page(p.url()));
+    await ctx.close();
+  }
+
+  /* Рівно 18 сьогодні — пускає */
+  const today18 = (() => {
+    const d = new Date(); d.setFullYear(d.getFullYear() - 18);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  })();
+  const { ctx, p } = await fresh({ version: 6, birthDate: today18 });
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(900);
+  /* Вік пройдено — далі онбординг веде на крок «тіло», не назад до дати. */
+  ok('4. рівно 18 років сьогодні — вік пройдено', page(p.url()) === 'welcome.html' &&
+     await p.locator('#b-weight').count() === 1, page(p.url()));
+  await ctx.close();
+}
+
+/* ---- 5. Дорослий: дата зберігається, повний профіль дає доступ ---- */
+{
+  const { ctx, p, errs } = await fresh(null);
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(900);
+  await p.locator('#gate-date').fill('1995-03-10');
+  await p.waitForTimeout(400);
+  ok('5. після дорослої дати кнопка активна', !(await p.locator('#gate-go').isDisabled()));
+  await p.locator('#gate-go').click();
+  await p.waitForTimeout(1200);
+  /* Вік — перший крок онбордингу: далі екран «тіло», не застосунок. */
+  ok('5. вік пройдено — далі крок «тіло»', page(p.url()) === 'welcome.html' &&
+     await p.locator('#b-weight').count() === 1, page(p.url()));
+
+  const prof = await p.evaluate(async () => {
+    const pr = await window.Store.getProfile();
+    return { birthDate: pr.birthDate, age: pr.age };
+  });
+  ok('5. дата лягла в профіль', prof.birthDate === '1995-03-10', JSON.stringify(prof));
+  ok('5. age порахувався з дати', typeof prof.age === 'number' && prof.age >= 30, String(prof.age));
+
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(900);
+  /* Перезавантаження не повертає до дати: крок виводиться з даних. */
+  ok('5. перезавантаження тримає крок «тіло»',
+     await p.locator('#b-weight').count() === 1, page(p.url()));
+  ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 5б. Повний профіль: доступ, перезавантаження, історія ---- */
+{
+  const { ctx, p, errs } = await fresh(adultProfile());
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(700);
+  ok('5б. повний профіль пускає у застосунок', page(p.url()) === 'index.html', page(p.url()));
+
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(700);
+  ok('5б. перезавантаження не викидає', page(p.url()) === 'index.html', page(p.url()));
+
+  /* «Назад» не має повертати на гейт: replace прибрав його з історії */
+  await p.goBack({ waitUntil: 'load' }).catch(() => {});
+  await p.waitForTimeout(600);
+  ok('5б. «назад» не замикає в циклі', page(p.url()) !== 'welcome.html', page(p.url()));
+
+  /* Пряме відкриття гейта — веде в застосунок */
+  await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
+  await p.waitForTimeout(900);
+  ok('5б. на гейті з повним профілем робити нічого', page(p.url()) === 'index.html', page(p.url()));
+
+  let bad = [];
+  for (const f of PAGES) {
+    await p.goto('file://' + ROOT + '/' + f, { waitUntil: 'load' });
+    await p.waitForTimeout(140);
+    const cur = page(p.url());
+    if (cur === 'welcome.html') bad.push(f);
+  }
+  ok('5б. усі сторінки доступні', bad.length === 0, bad.join(', '));
+  ok('5б. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 6. Імпорт профілю не є обходом ---- */
+{
+  const { ctx, p, errs } = await fresh(null);
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(900);
+  await p.locator('#gate-date').fill('1990-06-15');
+  await p.waitForTimeout(300);
+  await p.locator('#gate-go').click();
+  await p.waitForTimeout(1400);
+
+  await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1000);
+
+  for (const [name, birth, expect] of [
+    ['дитяча дата', '2012-03-03', null],
+    ['биті дані', 'не-дата', null],
+    ['доросла дата', '1988-02-20', '1988-02-20']
+  ]) {
+    const f = path.join(os.tmpdir(), 'gate-' + Buffer.from(name).toString('hex') + '.json');
+    fs.writeFileSync(f, JSON.stringify({ version: 6, weight: 80, birthDate: birth }));
+    await p.setInputFiles('#p-import-file', f);
+    await p.waitForTimeout(1200);
+    const got = await p.evaluate(async () => (await window.Store.getProfile()).birthDate);
+    if (expect === null) {
+      ok('6. імпорт «' + name + '» відкинуто', got === '1990-06-15', String(got));
+    } else {
+      ok('6. імпорт «' + name + '» прийнято', got === expect, String(got));
+    }
+    ok('6. решта профілю ціла після «' + name + '»',
+       await p.evaluate(async () => (await window.Store.getProfile()).weight) === 80);
+  }
+  ok('6. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 7. Мобільний екран ---- */
+for (const w of [320, 390, 430]) {
+  const ctx = await b.newContext({ viewport: { width: w, height: 780 }, isMobile: true, hasTouch: true });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', e => errs.push(e.message));
+  await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
+  await p.waitForTimeout(900);
+  const m = await p.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+    date: Math.round(document.getElementById('gate-date').getBoundingClientRect().height),
+    btn: Math.round(document.getElementById('gate-go').getBoundingClientRect().height),
+    fits: document.documentElement.scrollHeight <= window.innerHeight + 2
+  }));
+  ok(w + 'px: без горизонтального переповнення', !m.overflow);
+  ok(w + 'px: поле дати ≥ 44px', m.date >= 44, m.date + 'px');
+  ok(w + 'px: кнопка ≥ 44px', m.btn >= 44, m.btn + 'px');
+  ok(w + 'px: екран вміщається без скролу', m.fits);
+  ok(w + 'px: без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+await b.close();
+const bad = R.filter(r => !r[1]).length;
+console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок вікового гейта пройшло.');
+process.exit(bad ? 1 : 0);

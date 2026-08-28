@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Добавки: що з них справді працює — FORGE</title>
+<meta name="description" content="Креатин, протеїн, ашваганда, мелатонін, магній: що показують дослідження з PubMed, як приймати, застереження щодо безпеки і вартість добової дози.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Добавки: що з них справді працює — FORGE">
+<meta property="og:description" content="Креатин, протеїн, ашваганда, мелатонін, магній: що показують дослідження з PubMed, як приймати, застереження щодо безпеки і вартість добової дози.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Добавки</h1>
+      <p class="lead reveal" data-d="1">
+        Пʼять позицій, за якими стоять дослідження. Для кожної — що саме показали,
+        як приймати, чого очікувати не варто і скільки коштує доба.
+      </p>
+
+      <div class="notice mt-3 reveal" data-d="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+        <div>
+          <b>Це не медична порада.</b> Добавки взаємодіють із ліками й хворобами,
+          а частина з них має задокументовані ризики — найпомітніший тут в ашваганди.
+          Перед початком, особливо якщо приймаєш будь-які ліки або маєш хронічні
+          захворювання, варто порадитись із лікарем.
+        </div>
+      </div>
+
+      <div class="notice notice--acc mt-2 reveal" data-d="3">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5m0-3h.01"/></svg>
+        <div>
+          Порядок пріоритетів, який випливає з таблиці нижче, простий і нудний:
+          спершу сон, їжа й тренування, потім добавки з міцними доказами
+          (креатин, білок), і лише потім усе інше. Жодна позиція звідси
+          не компенсує недобір білка або хронічний недосип.
+        </div>
+      </div>
+
+      <div id="supps" class="mt-3"></div>
+      <div id="claims" class="mt-3"></div>
+
+      <div class="card mt-3">
+        <h3 class="card__title">Як читати цю сторінку</h3>
+        <p class="small">
+          <b>Рівень доказовості</b> — про надійність, а не про користь:
+        </p>
+        <ul class="small list-note">
+          <li><b>Міцні докази</b> — багато рандомізованих досліджень і мета-аналізів,
+              ефект відтворюється в різних лабораторіях.</li>
+          <li><b>Помірні</b> — ефект є, але вибірки малі, або він залежить від умов
+              (наприклад, магній помітно працює переважно в тих, кому його бракує).</li>
+        </ul>
+        <p class="small">
+          Третього рівня — «слабкі докази» — тут немає навмисно. Він був, і в ньому
+          стояли EAA, коензим Q10 та NAC. Тримати на сторінці позиції, про які сам же
+          пишеш «не показано, що це працює для того, заради чого купують», означає
+          перетворювати довідник на каталог. Якщо колись зʼявляться сильніші дані —
+          повернуться.
+        </p>
+        <p class="small">
+          <b>Вартість дози</b> порахована з цін магазину на момент складання списку.
+          Ціни змінюються — число тут потрібне лише щоб порівнювати банки між собою,
+          а не як прайс.
+        </p>
+        <p class="small mb-0">
+          Джерела — з PubMed, як і на решті сайту. Вони лежать усередині карток,
+          а не в загальному розділі <a href="research.html">Дослідження</a>:
+          там зібрані джерела для тренувань, харчування й кардіо.
+        </p>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<!-- Профіль: тема й бейдж рівня в шапці (у локальному режимі — без мережі) -->
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<script defer src="js/supplements.js"></script>
+<script defer src="js/supplements-view.js"></script>
+</body>
+</html>

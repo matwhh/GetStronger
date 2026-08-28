@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Раціон: продукти, рецепти й план дня — FORGE</title>
+<meta name="description" content="Продукти з КБЖВ, перерахунок сире/готове, рецепти на контейнери та збірка дня проти власної норми.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Раціон: продукти, рецепти й план дня — FORGE">
+<meta property="og:description" content="Продукти з КБЖВ, перерахунок сире/готове, рецепти на контейнери та збірка дня проти власної норми.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Раціон</h1>
+      <p class="lead reveal" data-d="1">
+        Калькулятор на сторінці «Харчування» каже, <i>скільки</i> треба зʼїсти.
+        Тут — <i>чого саме</i>: продукти з КБЖВ, рецепти на контейнери й збірка дня.
+      </p>
+
+      <!-- «День» іде ПЕРШИМ навмисно. Питання, з яким відкривають цю
+           сторінку, — «що я вже зʼїв і скільки лишилось», а не «покажи
+           довідник продуктів». Раніше до дня доводилось гортати повз
+           таблицю на сотню позицій — щоразу, щодня. -->
+      <div id="day" class="mt-3"></div>
+      <div id="foods" class="mt-3"></div>
+      <div id="recipes" class="mt-3"></div>
+
+      <div class="card mt-3" data-longform="Джерела складу продуктів і межі точності">
+        <h3 class="card__title">Звідки числа й наскільки їм вірити</h3>
+        <p class="small">
+          Склад продуктів беруть не з клінічних досліджень, а з таблиць складу
+          харчових продуктів (<b>USDA FoodData Central</b> — мʼясо, крупи, овочі, фрукти)
+          і з етикеток виробника (<b>Barilla, Coca-Cola, Red Bull, Monster, Milka,
+          Snickers, Fuze Tea</b> — звірено з Open Food Facts).
+        </p>
+        <p class="small">
+          Брендові позиції — це числа з конкретної етикетки, а рецептури різняться
+          між країнами й партіями. Якщо цифра важлива — подивись на саму банку.
+          Один запис я свідомо не додав: у публічній базі в нього калорійність
+          не сходилась із макронутрієнтами майже вдвічі, тобто запис просто битий.
+        </p>
+        <p class="small">
+          Точність тут принципово нижча, ніж виглядають цифри після коми:
+        </p>
+        <ul class="small list-note">
+          <li>етикетка в ЄС має законний допуск — для білків і вуглеводів до <b>±20%</b> від заявленого;</li>
+          <li>конкретний шматок мʼяса відрізняється від середнього по базі через породу, годівлю й жирність партії;</li>
+          <li>коефіцієнт виходу після готування залежить від того, скільки й на чому ти готував;</li>
+          <li>олія, що лишилась на сковорідці, у розрахунок не потрапляє, а зʼїдена — потрапляє.</li>
+        </ul>
+        <p class="small">
+          <b>Про кофеїн в енергетиках.</b> У базі він стоїть у примітках до напоїв,
+          бо в калоріях його не видно, а рахувати варто. EFSA вважає безпечними
+          для здорового дорослого разову дозу до <b>200 мг</b> і добову до <b>400 мг</b>.
+          Банка Red Bull 250 мл — це 80 мг, банка Monster 500 мл — уже близько 160 мг.
+        </p>
+        <p class="small mb-0">
+          Тому це інструмент планування, а не аптечні ваги. Систематична помилка в
+          10% тут нормальна — і саме тому головним залишається зважування себе раз
+          на тиждень, а не точність до грама.
+        </p>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<!-- Вікно додавання в день. Вміст малює js/meals.js, тут лише контейнер.
+     hidden знімається при відкритті. -->
+<div class="modal" id="modal" hidden></div>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<script defer src="js/history-core.js"></script>
+<script defer src="js/foods.js"></script>
+<!-- Вбудовані рецепти: дані окремо від рендеру, як і продукти -->
+<script defer src="js/recipes-data.js"></script>
+<!-- Арифметика дня — спільна з «Сьогодні» й головною -->
+<script defer src="js/day-core.js"></script>
+<script defer src="js/nutrition-core.js"></script>
+<!-- Позначає нові факти побаченими для Forge Rating (App.stampRating) -->
+<script defer src="js/meals.js"></script>
+</body>
+</html>

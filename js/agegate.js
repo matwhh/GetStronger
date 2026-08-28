@@ -1,0 +1,140 @@
+/**
+ * Сторож онбордингу: до Forge пускають лише повний профіль.
+ *
+ * Виріс із вікового сторожа (18+) і працює за тим самим принципом:
+ * перевірка стоїть НЕ на екрані кроку, а перед КОЖНОЮ сторінкою — цей
+ * файл підключений синхронно в <head> усіх сторінок Forge, включно з
+ * welcome.html, і ухвалює рішення до першого рядка розмітки.
+ *
+ * Кроки й дозволені сторінки (порядок і критерії — js/onboarding-core.js):
+ *   age     -> welcome.html
+ *   body    -> welcome.html, account.html   (account — шлях для імпорту копії)
+ *   program -> programs.html, plan.html, account.html
+ *   done    -> усе, крім welcome.html
+ *
+ * ЧОМУ СИНХРОННО Й БЕЗ Store/OnboardingCore. Ядра підключені з defer і на
+ * момент перевірки ще не виконались, а чекати на них означало б показати
+ * сторінку раніше за рішення. Тому тут лежить МІНІМАЛЬНА копія критеріїв
+ * ядра (та сама арифметика віку, ті самі межі тіла, той самий критерій
+ * програми) — і нічого більше. Розбір, стани екранів, повні межі — в
+ * ядрах, які під тестами. Це єдине місце в Forge, що читає 'ib.profile'
+ * повз Store; запис лишається за Store, другого джерела правди немає.
+ *
+ * ДЖЕРЕЛО ПРАВДИ — ПРОФІЛЬ. Окремого прапорця «онбординг пройдено» немає
+ * навмисно: такий прапорець і був би тим, що підробляють. Крок щоразу
+ * виводиться з наявності полів, тож підстановка «пройдено» в localStorage
+ * нічого не дає — потрібні самі дані.
+ *
+ * ЧЕСНО ПРО МЕЖУ. Forge — статичний сайт без сервера. Будь-яку клієнтську
+ * перевірку можна обійти, вписавши повний профіль у localStorage руками
+ * або вимкнувши JavaScript. Сторож закриває звичайні шляхи: прямий URL,
+ * «назад»/«вперед», перезавантаження, закладку, стерте чи неповне
+ * сховище. Справжній барʼєр можливий лише там, де рішення ухвалює сервер.
+ */
+(function () {
+  'use strict';
+
+  const LS_PROFILE = 'ib.profile';
+  const MIN_AGE = 18;
+
+  function currentPage() {
+    const file = location.pathname.split('/').pop();
+    return file === '' ? 'index.html' : file;
+  }
+
+  function profile() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LS_PROFILE));
+      return raw && typeof raw === 'object' ? raw : null;
+    } catch (_) { return null; }
+  }
+
+  /* Копія розрахунку з js/age-core.js — навмисна й мінімальна:
+     різниця років мінус ненастале цьогоріч день народження. */
+  function adult(str) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str || ''));
+    if (!m) return false;
+    const y = +m[1], mo = +m[2], d = +m[3];
+    const b = new Date(y, mo - 1, d);
+    if (b.getFullYear() !== y || b.getMonth() !== mo - 1 || b.getDate() !== d) return false;
+    const t = new Date();
+    const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    if (b > today) return false;
+    let years = today.getFullYear() - y;
+    const had = (today.getMonth() > b.getMonth()) ||
+      (today.getMonth() === b.getMonth() && today.getDate() >= b.getDate());
+    if (!had) years -= 1;
+    return years >= MIN_AGE && years <= 120;
+  }
+
+  /* Копії критеріїв js/onboarding-core.js — ті самі межі, що й у
+     валідатора імпорту (js/account.js). */
+  function inRange(v, lo, hi) {
+    const n = Number(v);
+    return isFinite(n) && n >= lo && n <= hi;
+  }
+
+  function hasBody(p) {
+    return (p.sex === 'male' || p.sex === 'female') &&
+      inRange(p.weight, 30, 300) &&
+      inRange(p.height, 120, 250) &&
+      ['1.2', '1.375', '1.55', '1.725', '1.9'].indexOf(String(p.activity)) !== -1 &&
+      ['novice', 'inter', 'adv', 'elite'].indexOf(p.trainingAge) !== -1;
+  }
+
+  function hasProgram(p) {
+    if (!p.activePlan || !p.activePlan.programId) return false;
+    const w = p.weights;
+    if (!w || typeof w !== 'object') return false;
+    for (const k in w) {
+      const n = Number(w[k]);
+      if (isFinite(n) && n > 0) return true;
+    }
+    return false;
+  }
+
+  function nonEmpty(o) {
+    if (!o || typeof o !== 'object') return false;
+    for (const k in o) return true;
+    return false;
+  }
+
+  /* Історія користування = онбординг пройдено (захист наявних профілів). */
+  function hasHistory(p) {
+    return nonEmpty(p.bodyLog) || nonEmpty(p.workLog) ||
+      nonEmpty(p.sessionLog) || nonEmpty(p.mealLog) ||
+      nonEmpty(p.weightLog) || nonEmpty(p.trackerLog);
+  }
+
+  function stepFor(p) {
+    if (!p || !adult(p.birthDate)) return 'age';
+    if (hasHistory(p)) return 'done';
+    if (!hasBody(p)) return 'body';
+    if (!hasProgram(p)) return 'program';
+    return 'done';
+  }
+
+  const ROUTES = {
+    age:     { page: 'welcome.html',  allowed: ['welcome.html'] },
+    body:    { page: 'welcome.html',  allowed: ['welcome.html', 'account.html'] },
+    program: { page: 'programs.html', allowed: ['programs.html', 'plan.html', 'account.html'] },
+    done:    { page: 'index.html',    allowed: null }
+  };
+
+  const step = stepFor(profile());
+  const here = currentPage();
+  const route = ROUTES[step];
+
+  const allowed = route.allowed === null
+    ? here !== 'welcome.html'
+    : route.allowed.indexOf(here) !== -1;
+
+  if (allowed) return;
+
+  /*
+   * location.replace, а не assign: сторінка, з якої нас щойно відвернули,
+   * не має лишатись в історії — інакше «назад» повертало б на неї, і
+   * сторож спрацьовував би знову й знову, замикаючи людину в циклі.
+   */
+  location.replace(route.page);
+})();

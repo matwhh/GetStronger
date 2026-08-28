@@ -1,0 +1,973 @@
+/**
+ * Журнал: вага тіла по днях і позначки тренувань.
+ *
+ * Єдина сторінка сайту, що накопичує історію. Решта профілю — знімок
+ * поточного стану; тут дані живуть за датами й не перетираються.
+ *
+ * bodyLog: { 'YYYY-MM-DD': кг }     — одне число на день, нове перекриває
+ * workLog: { 'YYYY-MM-DD': число }  — скільки разів позначено тренування
+ *
+ * Дати ЛОКАЛЬНІ, не UTC. Зважування о 23:40 має лягти в сьогодні, а
+ * toISOString() у Києві поклав би його у завтра.
+ */
+(function () {
+  'use strict';
+
+  const { $, esc, round, toast, dateLabel, fmt, fmtNum } = window.App;
+  const Store = window.Store;
+
+  const state = {
+    bodyLog: {},
+    workLog: {},
+    sessionLog: {},  // виконання плану по днях (пише «Сьогодні»)
+    weightLog: {},   // історія робочих ваг (пише «Мій план»)
+    mealLog: {},     // закриті дні харчування (пише «Раціон»)
+    trackers: {},    // реєстр модульних трекерів (етап 4)
+    trackerLog: {},  // їхні дані
+    daysTarget: 0,   // скільки днів на тиждень у обраному плані; 0 — план не обрано
+    goal: null,      // ціль харчування — для коридора прогнозу на графіку
+    period: 90,      // вибраний період графіка ваги, днів; 0 = весь час
+    wired: false
+  };
+
+  /* Періоди графіка ваги. 0 — весь час. */
+  const PERIODS = [
+    { days: 7,   label: '7д' },
+    { days: 30,  label: '30д' },
+    { days: 90,  label: '90д' },
+    { days: 180, label: '6м' },
+    { days: 365, label: 'рік' },
+    { days: 0,   label: 'все' }
+  ];
+
+  /* ------------------------------------------------------------------ */
+  /* Дати                                                                */
+  /* ------------------------------------------------------------------ */
+
+  /** Локальна дата → 'YYYY-MM-DD' */
+  function keyOf(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function todayKey() { return keyOf(new Date()); }
+
+  /** 'YYYY-MM-DD' → Date опівночі локального часу */
+  function dateOf(key) {
+    const p = String(key).split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2]);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Вага тіла                                                           */
+  /* ------------------------------------------------------------------ */
+
+  /* Ті самі фізіологічні межі, що в ядрі харчування */
+  const W_MIN = 30, W_MAX = 300;
+
+  /** Відсортовані записи ваги: [{key, kg}] від старих до нових */
+  function weightEntries() {
+    return Object.keys(state.bodyLog)
+      .filter(function (k) {
+        const v = Number(state.bodyLog[k]);
+        return /^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v >= W_MIN && v <= W_MAX;
+      })
+      .sort()
+      .map(function (k) { return { key: k, kg: Number(state.bodyLog[k]) }; });
+  }
+
+  /**
+   * Ковзна середня за 7 днів для кожної точки.
+   *
+   * Середня рахується за КАЛЕНДАРНІ 7 днів назад, а не за 7 останніх
+   * записів: якщо зважувань було три за тиждень, середня йде по трьох.
+   * Інакше пропуски розтягували б вікно на місяць і лінія брехала б.
+   */
+  function rolling(entries) {
+    return entries.map(function (e) {
+      const end = dateOf(e.key).getTime();
+      const start = end - 6 * 86400000;
+      const win = entries.filter(function (x) {
+        const t = dateOf(x.key).getTime();
+        return t >= start && t <= end;
+      });
+      const avg = win.reduce(function (s, x) { return s + x.kg; }, 0) / win.length;
+      return { key: e.key, kg: e.kg, avg: avg };
+    });
+  }
+
+  /**
+   * Графік ваги за останні 90 днів: точки як є + лінія середньої за 7 днів.
+   *
+   * SVG будується рядком без бібліотек, як і решта графіки сайту.
+   * Кольори — точки нейтральним g2, середня акцентом: дивитись треба
+   * саме на неї, тому вона і є кольоровою лінією.
+   */
+  function chartSvg(entries) {
+    const data = state.period
+      ? rolling(entries).filter(function (e) {
+          return e.key >= keyOf(new Date(Date.now() - state.period * 86400000));
+        })
+      : rolling(entries);
+    if (data.length < 2) return '';
+
+    const W = 640, H = 220, PAD = { l: 44, r: 10, t: 12, b: 24 };
+    const t0 = dateOf(data[0].key).getTime();
+    const t1 = dateOf(data[data.length - 1].key).getTime();
+
+    // Коридор прогнозу рахуємо ДО шкали: його межі мають вміститись у
+    // полотно, інакше пунктир упирався б у край і брехав плоскою лінією.
+    const fc = window.ProgressCore && state.goal
+      ? window.ProgressCore.forecast(state.bodyLog, state.goal, state.period || null)
+      : null;
+
+    const kgs = data.map(function (e) { return e.kg; })
+      .concat(data.map(function (e) { return e.avg; }));
+    if (fc) {
+      const spanD = (t1 - dateOf(fc.anchor.d).getTime()) / 86400000;
+      kgs.push(fc.lo(spanD), fc.hi(spanD));
+    }
+    let lo = Math.min.apply(null, kgs), hi = Math.max.apply(null, kgs);
+    // Мінімальний розмах пів кіло: інакше при стабільній вазі шум ±100 г
+    // розтягується на всю висоту й виглядає як драма
+    if (hi - lo < 0.5) { const mid = (hi + lo) / 2; lo = mid - 0.25; hi = mid + 0.25; }
+    const px = function (t) { return PAD.l + (W - PAD.l - PAD.r) * (t - t0) / Math.max(1, t1 - t0); };
+    const py = function (kg) { return PAD.t + (H - PAD.t - PAD.b) * (1 - (kg - lo) / (hi - lo)); };
+
+    const dots = data.map(function (e) {
+      return '<circle cx="' + round(px(dateOf(e.key).getTime()), 1) + '" cy="' + round(py(e.kg), 1) +
+             '" r="3" fill="var(--g2)"><title>' + esc(dateLabel(dateOf(e.key))) + ': ' + e.kg + ' кг</title></circle>';
+    }).join('');
+
+    const line = data.map(function (e, i) {
+      return (i ? 'L' : 'M') + round(px(dateOf(e.key).getTime()), 1) + ' ' + round(py(e.avg), 1);
+    }).join(' ');
+
+    // три горизонтальні позначки шкали
+    const ticks = [lo, (lo + hi) / 2, hi].map(function (kg) {
+      const y = round(py(kg), 1);
+      return '<line x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y +
+             '" stroke="rgba(255,255,255,0.08)"/>' +
+             '<text x="' + (PAD.l - 6) + '" y="' + (y + 4) + '" text-anchor="end" ' +
+             'font-size="11" fill="var(--muted)">' + round(kg, 1) + '</text>';
+    }).join('');
+
+    /*
+     * Прогноз проти факту — коридор цілі поверх графіка.
+     *
+     * Дві пунктирні межі від першої точки видимого періоду: де вага мала б
+     * бути за обраної цілі (числа — ті самі діапазони, що написані словами
+     * в калькуляторі). Смуга між ними ледь тонована. Це модель, не
+     * обіцянка — тому пунктир і нейтральна прозорість, а не друга
+     * «справжня» лінія.
+     */
+    let corridor = '';
+    if (fc) {
+      const t0a = dateOf(fc.anchor.d).getTime();
+      const steps = 24;
+      const seg = function (f) {
+        const pts = [];
+        for (let i = 0; i <= steps; i++) {
+          const t = t0a + (t1 - t0a) * i / steps;
+          pts.push((pts.length ? 'L' : 'M') +
+            round(px(t), 1) + ' ' + round(py(f((t - t0a) / 86400000)), 1));
+        }
+        return pts.join('');
+      };
+      corridor =
+        '<path d="' + seg(fc.hi) + '" fill="none" stroke="var(--g2)" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.7"/>' +
+        '<path d="' + seg(fc.lo) + '" fill="none" stroke="var(--g2)" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.7"/>';
+    }
+
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+           'aria-label="Графік ваги тіла">' +
+             ticks + corridor + dots +
+             '<path d="' + line + '" fill="none" stroke="var(--acc-bar)" stroke-width="2.5"/>' +
+           '</svg>';
+  }
+
+
+  /* ------------------------------------------------------------------ */
+  /* Огляд: «прогресую чи ні» за кілька секунд                           */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Чотири плитки — вага, сила, тренування, харчування. Кожна: головне
+   * число + один рядок тренду. Деталі — нижче у своїх секціях; огляд не
+   * дублює графіки, він відповідає на перше питання сторінки.
+   */
+
+  function overviewTiles() {
+    const PC = window.ProgressCore;
+    const sign = function (n) { return fmtNum.signed(n, 1); };
+    const tiles = [];
+
+    // Вага: середнє за 7 днів + темп за 30 днів
+    const b30 = PC.bodyStats(state.bodyLog, 30);
+    tiles.push(b30
+      ? { val: fmtNum.kg(b30.current) + ' кг', lbl: 'вага',
+          trend: b30.perWeek !== null ? sign(b30.perWeek) + ' кг/тиж' : 'перший запис' }
+      : { val: '—', lbl: 'вага', trend: 'ще без записів' });
+
+    // Сила: найбільший приріст вправи за 8 тижнів
+    const lift = PC.bestLift(state.weightLog, 56);
+    tiles.push(lift
+      ? { val: sign(lift.delta) + ' кг', lbl: 'сила · ' + lift.name, trend: lift.from + ' → ' + lift.to + ' за 8 тиж' }
+      : { val: '—', lbl: 'сила', trend: 'без змін ваг' });
+
+    // Тренування: цього тижня X з Y (або всього)
+    const tr = PC.trainingStats(state.workLog, state.sessionLog, state.daysTarget);
+    tiles.push({
+      val: state.daysTarget ? tr.thisWeek + ' з ' + state.daysTarget : String(tr.thisWeek),
+      lbl: 'тренувань цього тижня',
+      trend: tr.adherence
+        ? tr.adherence.done + ' із ' + tr.adherence.planned + ' за ' + tr.adherence.weeks + ' тиж'
+        : tr.total + ' всього'
+    });
+
+    // Харчування: середнє проти цілі за 30 днів
+    const f = PC.foodStats(state.mealLog, 30);
+    tiles.push(f && f.avgTarget
+      ? { val: f.avgKcal + ' / ' + f.avgTarget, lbl: 'ккал: середнє / ціль',
+          trend: f.inTarget + ' із ' + f.withTarget + ' днів у межах ±5%' }
+      : f
+        ? { val: String(f.avgKcal), lbl: 'ккал у середньому', trend: f.count + ' закритих днів' }
+        : { val: '—', lbl: 'харчування', trend: 'ще без закритих днів' });
+
+    return tiles;
+  }
+
+  function renderOverview() {
+    const host = $('#jr-overview');
+    if (!host || !window.ProgressCore) return;
+
+    const tiles = overviewTiles();
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="kpis">' +
+          tiles.map(function (t) {
+            return '<div class="kpi">' +
+              '<div class="kpi__val mono">' + t.val + '</div>' +
+              '<p class="kpi__lbl">' + esc(t.lbl) + '</p>' +
+              '<p class="kpi__trend small muted">' + esc(t.trend) + '</p>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+  }
+
+  /** Рядок статистики вибраного періоду: зміна, темп, середня */
+  function weightPeriodLine() {
+    const st = window.ProgressCore
+      ? window.ProgressCore.bodyStats(state.bodyLog, state.period || null)
+      : null;
+    if (!st || st.count < 2) return '';
+    const sign = function (n) { return fmtNum.signed(n, 1); };
+    return '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
+      '<span class="small">За період: <b class="mono">' + sign(st.delta) + ' кг</b></span>' +
+      (st.perWeek !== null ? '<span class="small">Темп: <b class="mono">' + sign(st.perWeek) + ' кг/тиж</b></span>' : '') +
+      '<span class="small">Середня: <b class="mono">' + fmtNum.kg(st.avg) + ' кг</b></span>' +
+      '<span class="small muted">' + st.count + ' ' + window.App.plural(st.count, 'запис', 'записи', 'записів') + '</span>' +
+    '</div>';
+  }
+
+  /** Вердикт «прогноз проти факту» — словами, без ілюзії точності */
+  function forecastLine() {
+    const fc = window.ProgressCore && state.goal
+      ? window.ProgressCore.forecast(state.bodyLog, state.goal, state.period || null)
+      : null;
+    if (!fc) return '';
+    const s = function (n) { return fmtNum.signed(n, 1); };
+    const VERDICT = {
+      within: 'у межах моделі',
+      above: 'вище за коридор моделі',
+      below: 'нижче за коридор моделі'
+    };
+    return '<p class="small mt-1" style="margin-bottom:0">' +
+      'Прогноз проти факту за ' + fc.weeks + ' тиж: модель очікувала ' +
+      '<b class="mono">' + s(fc.expectLo) + '…' + s(fc.expectHi) + ' кг</b>, ' +
+      'фактично <b class="mono">' + s(fc.actual) + ' кг</b> — ' + VERDICT[fc.verdict] + '.' +
+    '</p>';
+  }
+
+  function renderWeight() {
+    const host = $('#jr-weight');
+    if (!host) return;
+
+    const entries = weightEntries();
+    const today = todayKey();
+    const todayVal = state.bodyLog[today];
+    const last = entries.slice(-10).reverse();
+    const withAvg = rolling(entries);
+    const avgNow = withAvg.length ? withAvg[withAvg.length - 1].avg : null;
+
+    // Тижнева динаміка середньої: те число, з яким порівнюється ціль
+    let weekDelta = null;
+    if (withAvg.length >= 2) {
+      const weekAgoKey = keyOf(new Date(Date.now() - 7 * 86400000));
+      const older = withAvg.filter(function (e) { return e.key <= weekAgoKey; });
+      if (older.length) weekDelta = avgNow - older[older.length - 1].avg;
+    }
+
+    const svg = chartSvg(entries);
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+          '<h2 style="margin:0">Вага тіла</h2>' +
+          (avgNow !== null
+            /* Кома, як і всюди в показі чисел (App.fmt). Панель показувала
+               «82,5 кг», а цей чип за один клік звідти — «82.5 кг»: те саме
+               число в тих самих одиницях двома написаннями. */
+            ? '<span class="chip chip--acc mono" title="Ковзне середнє за 7 днів">' + fmt(round(avgNow, 1)) + ' кг' +
+              (weekDelta !== null
+                ? ' · ' + (weekDelta >= 0 ? '+' : '') + fmt(round(weekDelta, 2)) + ' / тижд.'
+                : '') + '</span>'
+            : '') +
+        '</div>' +
+
+        '<div class="row mt-2" style="gap:10px;align-items:flex-end;flex-wrap:wrap">' +
+          '<div class="field" style="margin:0">' +
+            '<label class="field__label" for="w-kg">Сьогодні, кг</label>' +
+            '<input class="input mono" type="text" inputmode="decimal" id="w-kg" style="width:130px" ' +
+              'min="' + W_MIN + '" max="' + W_MAX + '" step="0.1" ' +
+              'value="' + (todayVal != null ? esc(todayVal) : '') + '" placeholder="82.4">' +
+          '</div>' +
+          '<button class="btn btn--primary btn--sm" type="button" id="w-add">' +
+            (todayVal != null ? 'Оновити' : 'Записати') +
+          '</button>' +
+          '<span class="small muted">Найкраще — щоранку після туалету, до їжі. Однакові умови важливіші за точність ваг.</span>' +
+        '</div>' +
+
+        (entries.length >= 2
+          ? '<div class="seg mt-2" role="radiogroup" aria-label="Період графіка">' +
+              PERIODS.map(function (pp) {
+                return '<label class="seg__item"><input type="radio" name="w-period" value="' + pp.days + '"' +
+                  (pp.days === state.period ? ' checked' : '') + '><span>' + pp.label + '</span></label>';
+              }).join('') +
+            '</div>'
+          : '') +
+
+        (svg ? '<div class="wchart mt-2">' + svg + '</div>' +
+               weightPeriodLine() +
+               forecastLine() +
+               '<p class="small muted mt-1">Сірі точки — зважування. Лінія — середня за 7 днів; дивись на неї.' +
+               (state.goal && window.ProgressCore && window.ProgressCore.GOAL_RATES[state.goal]
+                 ? ' Пунктир — коридор обраної цілі: модель, не обіцянка.' : '') + '</p>'
+             : '<p class="small muted mt-2">Два записи' + (state.period ? ' у цьому періоді' : '') + ' — і зʼявиться графік.</p>') +
+
+        (last.length
+          ? '<div class="mt-2">' +
+              last.map(function (e) {
+                return '<div class="wlog-row">' +
+                         '<span class="muted small">' + esc(dateLabel(dateOf(e.key))) + '</span>' +
+                         '<span class="mono">' + fmtNum.kg(e.kg) + ' кг</span>' +
+                         '<button class="icon-btn icon-btn--danger" type="button" data-w-del="' + e.key + '" ' +
+                                 'aria-label="Видалити запис за ' + esc(dateLabel(dateOf(e.key))) + '">' +
+                           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
+                         '</button>' +
+                       '</div>';
+              }).join('') +
+            '</div>'
+          : '') +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Тренування: теплокарта                                              */
+  /* ------------------------------------------------------------------ */
+
+  const WEEKS = 12;
+
+  /**
+   * День або тренувальний, або ні. Раніше клітинка мала рівні «1–3 за день»,
+   * але два тренування на день — не та звичка, яку сайт має заохочувати
+   * яскравішим кольором, а клік-перемикач із рівнями несумісний.
+   */
+  function trained(key) {
+    const v = Number(state.workLog[key]);
+    if (Number.isFinite(v)) {
+      /*
+       * Явний 0 — це «знято руками», і він ПЕРЕКРИВАЄ сесію.
+       *
+       * Раніше 0 не відрізнявся від відсутнього запису, а перемикач умів
+       * лише delete. Тож день, підсвічений сесією з «Сьогодні», не можна
+       * було зняти взагалі: delete нічого не міняв, sessionLog лишався,
+       * клітинка світилась далі — і продовжувала годувати статистику
+       * дотримання плану та Forge Rating. Підказка «клікни, щоб зняти»
+       * була неправдою.
+       */
+      return v > 0;
+    }
+    // Сесія з «Сьогодні» — теж тренування: галочки вправ і таймер — два
+    // способи сказати одне й те саме, і клітинка має світитись від обох.
+    const s = state.sessionLog[key];
+    return Boolean(s && Number(s.done) > 0);
+  }
+
+  /** Чи є під днем сесія з «Сьогодні» (тоді зняття треба записати явним 0) */
+  function hasSession(key) {
+    const s = state.sessionLog[key];
+    return Boolean(s && Number(s.done) > 0);
+  }
+
+  const DOW = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+
+  /** Понеділок того тижня, якому належить дата */
+  function mondayOf(d) {
+    const m = new Date(d);
+    m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+    return m;
+  }
+
+  /**
+   * Сітка: колонки — останні WEEKS тижнів, рядки — Пн…Нд з підписами.
+   * Кожна минула клітинка — кнопка: клік ставить або знімає позначку.
+   * Майбутні дні поточного тижня — порожні заглушки, їх клацати нема чого.
+   */
+  function heatmapHtml() {
+    const start = mondayOf(new Date());
+    start.setDate(start.getDate() - (WEEKS - 1) * 7);
+    const todayK = todayKey();
+
+    let cols = '';
+    for (let w = 0; w < WEEKS; w++) {
+      let cells = '';
+      for (let d = 0; d < 7; d++) {
+        const day = new Date(start);
+        day.setDate(start.getDate() + w * 7 + d);
+        const k = keyOf(day);
+        const num = day.getDate();
+        if (k > todayK) {
+          cells += '<i class="heatmap__cell heatmap__cell--future">' + num + '</i>';
+          continue;
+        }
+        const on = trained(k);
+        const label = dateLabel(dateOf(k));
+        cells += '<button type="button" class="heatmap__cell' + (on ? ' heatmap__cell--on' : '') + '" ' +
+                 'data-hm="' + k + '" aria-pressed="' + on + '" ' +
+                 'title="' + esc(label) + (on ? ': тренування' : '') + '" ' +
+                 'aria-label="' + esc(label) + (on ? ': тренування було. ' : ': тренування не позначено. ') +
+                 'Натисни, щоб змінити">' + num + '</button>';
+      }
+      cols += '<div class="heatmap__col">' + cells + '</div>';
+    }
+
+    const days = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
+    return '<div class="heatmap" role="group" aria-label="Календар тренувань за ' + WEEKS + ' тижнів">' +
+             '<div class="heatmap__days" aria-hidden="true">' + days + '</div>' + cols +
+           '</div>';
+  }
+
+  /** Рядок статистики регулярності під теплокартою */
+  function trainStatsLine() {
+    if (!window.ProgressCore) return '';
+    const st = window.ProgressCore.trainingStats(state.workLog, state.sessionLog, state.daysTarget);
+    if (!st.total) return '';
+    return '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
+      '<span class="small">Всього: <b class="mono">' + st.total + '</b></span>' +
+      '<span class="small">За 30 днів: <b class="mono">' + st.thisMonth + '</b></span>' +
+      (st.adherence
+        ? '<span class="small">План за ' + st.adherence.weeks + ' тиж: <b class="mono">' +
+            st.adherence.done + ' із ' + st.adherence.planned + '</b> (' + st.adherence.pct + '%)</span>'
+        : '') +
+    '</div>';
+  }
+
+  function renderTrain() {
+    const host = $('#jr-train');
+    if (!host) return;
+
+    // Позначки за видимі WEEKS тижнів — та сама рамка, що й сітка
+    const gridStart = mondayOf(new Date());
+    gridStart.setDate(gridStart.getDate() - (WEEKS - 1) * 7);
+    const startK = keyOf(gridStart);
+    const total = Object.keys(state.workLog).filter(function (k) {
+      return k >= startK && trained(k);
+    }).length;
+
+    const monday = mondayOf(new Date());
+    let thisWeek = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday); d.setDate(monday.getDate() + i);
+      if (trained(keyOf(d))) thisWeek++;
+    }
+
+    // Ціль — кількість днів обраного плану. Хвалимось акцентом, лише
+    // коли тиждень закритий повністю.
+    const target = state.daysTarget;
+    const weekText = target ? thisWeek + ' з ' + target + ' цього тижня' : thisWeek + ' цього тижня';
+    const done = target && thisWeek >= target;
+    const today = todayKey();
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+          '<h2 style="margin:0">Тренування</h2>' +
+          '<span class="chip mono' + (done ? ' chip--acc' : '') + '">' +
+            weekText + ' · ' + total + ' за ' + WEEKS + ' тижнів</span>' +
+        '</div>' +
+
+        '<div class="mt-2">' + heatmapHtml() + '</div>' +
+        trainStatsLine() +
+        '<p class="small muted mt-1">Клікни по дню, щоб поставити чи зняти позначку.' +
+          (target ? '' : ' Обери план тренувань — і тут зʼявиться ціль на тиждень.') + '</p>' +
+
+        '<div class="row mt-2" style="gap:10px;align-items:center;flex-wrap:wrap">' +
+          // Підпис міняється разом зі станом: сіра кнопка з тим самим
+          // текстом читається як поламана, а не як «уже зроблено».
+          '<button class="btn btn--primary btn--sm" type="button" id="t-mark"' +
+            (trained(today) ? ' disabled' : '') + '>' +
+            (trained(today) ? 'Сьогодні позначено' : 'Відмітити тренування') +
+          '</button>' +
+          '<span class="small muted">День позначається й сам, коли додзвонює таймер відпочинку на «Моєму плані».</span>' +
+        '</div>' +
+      '</div>';
+  }
+
+
+  /* ------------------------------------------------------------------ */
+  /* Робочі ваги: історія по вправах                                     */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Джерело — profile.weightLog, який пише «Мій план» при кожній зміні
+   * ваги (включно з деолоадами: провал на графіку — це чесна частина
+   * шляху, а не шум). Тут лише читання: сторінка прогресу нічого не пише.
+   */
+
+  const LIFTS_SHOWN = 8;
+
+  function liftRow(name) {
+    const H = window.HistoryCore;
+    const st = window.ProgressCore.liftStats(state.weightLog, name);
+    if (!st) return '';
+
+    const open = state.openLift === name;
+    const path = H.sparklinePath(st.series, 120, 30, 3);
+    const spark = path
+      ? '<svg class="lift__spark" viewBox="0 0 120 30" aria-hidden="true">' +
+          '<path d="' + path + '" fill="none" stroke="var(--acc-bar)" stroke-width="2"/>' +
+        '</svg>'
+      : '<span class="lift__spark small muted">один запис</span>';
+
+    const kg = function (n) { return fmtNum.kg(n, { unit: true }); };
+    const deltaTxt = st.count < 2
+      ? 'початок — ' + dateLabel(dateOf(st.firstDate))
+      : (st.delta > 0 ? '+' : '') + fmtNum.n(st.delta, 1) + ' кг з ' +
+        dateLabel(dateOf(st.firstDate));
+
+    /* Розгорнута картка: великий графік + статистика + рекорд.
+       Це «детальніше за бажанням»: огляд лишається рядком, і сторінка
+       не перетворюється на 15 графіків одразу. */
+    const detail = !open ? '' :
+      '<div class="lift__detail">' +
+        (H.sparklinePath(st.series, 600, 120, 6)
+          ? '<svg class="lift__chart" viewBox="0 0 600 120" aria-label="Історія ваги: ' + esc(name) + '">' +
+              '<path d="' + H.sparklinePath(st.series, 600, 120, 6) + '" fill="none" stroke="var(--acc-bar)" stroke-width="2.5"/>' +
+              st.series.map(function (e) {
+                // точки поверх лінії, з підказками дат
+                return '';
+              }).join('') +
+            '</svg>'
+          : '') +
+        '<div class="row" style="gap:14px;flex-wrap:wrap;margin-top:10px">' +
+          '<span class="small">Початкова: <b class="mono">' + kg(st.first) + '</b> <span class="muted">(' + esc(dateLabel(dateOf(st.firstDate))) + ')</span></span>' +
+          '<span class="small">Поточна: <b class="mono">' + kg(st.last) + '</b></span>' +
+          '<span class="small">Приріст: <b class="mono">' + (st.delta > 0 ? '+' : '') + fmtNum.n(st.delta, 1) + ' кг' +
+            (st.pct !== null ? ' (' + (st.pct > 0 ? '+' : '') + fmtNum.n(st.pct, 1) + '%)' : '') + '</b></span>' +
+          '<span class="small">Рекорд: <b class="mono">' + kg(st.max) + '</b> <span class="muted">(' + esc(dateLabel(dateOf(st.maxDate))) + ')</span></span>' +
+        '</div>' +
+        '<p class="small muted" style="margin:8px 0 0">' + st.count + ' ' +
+          window.App.plural(st.count, 'запис', 'записи', 'записів') + '. Значення серії: ' +
+          st.series.map(function (e) { return fmtNum.kg(e.kg); }).join(' → ') + ' кг.</p>' +
+      '</div>';
+
+    return '<li class="lift' + (open ? ' is-open' : '') + '">' +
+        '<button class="lift__head" type="button" data-lift="' + esc(name) + '" aria-expanded="' + open + '">' +
+          '<span class="lift__body">' +
+            '<span class="lift__name">' + esc(name) +
+              (st.isRecord ? ' <span class="chip chip--sm chip--acc">рекорд</span>' : '') + '</span>' +
+            '<span class="lift__delta small ' + (st.delta > 0 ? '' : 'muted') + '">' + esc(deltaTxt) + '</span>' +
+          '</span>' +
+          spark +
+          '<b class="lift__now mono">' + kg(st.last) + '</b>' +
+        '</button>' +
+        detail +
+      '</li>';
+  }
+
+  function renderLifts() {
+    const host = $('#jr-lifts');
+    if (!host || !window.HistoryCore) return;
+
+    const names = window.HistoryCore.weightNames(state.weightLog);
+
+    if (!names.length) {
+      host.innerHTML =
+        '<div class="card">' +
+          '<h2 style="margin:0">Робочі ваги</h2>' +
+          '<p class="small mt-1">Історія почнеться з першої зміни ваги на ' +
+            '<a href="plan.html">«Моєму плані»</a>: кожна нова цифра лягає сюди ' +
+            'з датою, і буде видно, як росте кожна вправа.</p>' +
+        '</div>';
+      return;
+    }
+
+    const shown = state.liftsAll ? names : names.slice(0, LIFTS_SHOWN);
+    const hidden = names.length - shown.length;
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+          '<h2 style="margin:0">Робочі ваги</h2>' +
+          '<span class="small muted">' + names.length + ' ' +
+            window.App.plural(names.length, 'вправа', 'вправи', 'вправ') + '</span>' +
+        '</div>' +
+        '<ul class="lift-list mt-2">' + shown.map(liftRow).join('') + '</ul>' +
+        (hidden > 0
+          ? '<button class="btn btn--ghost btn--sm mt-1" type="button" id="lifts-more">Показати всі (' + names.length + ')</button>'
+          : (state.liftsAll && names.length > LIFTS_SHOWN
+              ? '<button class="btn btn--ghost btn--sm mt-1" type="button" id="lifts-less">Згорнути</button>'
+              : '')) +
+        '<p class="small muted mb-0" style="margin-top:12px">Свіжі зміни — вгорі. ' +
+          'Провали на лініях — деолоади: вони теж частина шляху.</p>' +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Харчування: закриті дні                                             */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Джерело — profile.mealLog, який пише кнопка «Закрити день» у раціоні.
+   * Кожен запис несе ціль СВОГО дня, тому колонка «до цілі» правдива
+   * навіть після зміни профілю.
+   */
+
+  function renderFood() {
+    const host = $('#jr-food');
+    if (!host || !window.HistoryCore) return;
+
+    const entries = window.HistoryCore.lastEntries(state.mealLog, 7);
+
+    if (!entries.length) {
+      host.innerHTML =
+        '<div class="card">' +
+          '<h2 style="margin:0">Харчування</h2>' +
+          '<p class="small mt-1">Наприкінці дня натисни «Закрити день» у ' +
+            '<a href="meals.html">раціоні</a> — підсумок із датою ляже сюди, ' +
+            'і графік ваги отримає контекст: скільки калорій стояло за кожною точкою.</p>' +
+        '</div>';
+      return;
+    }
+
+    const rows = entries.map(function (e) {
+      const v = e.v || {};
+      const hasTarget = Number.isFinite(Number(v.target));
+      const diff = hasTarget ? Math.round(v.kcal - v.target) : null;
+      const over = hasTarget && v.kcal > v.target * 1.05;
+      const under = hasTarget && v.kcal < v.target * 0.95;
+      return '<tr>' +
+        '<td>' + esc(dateLabel(dateOf(e.d))) + '</td>' +
+        '<td class="num mono">' + v.kcal + '</td>' +
+        '<td class="num mono">' + (v.p || 0) + '</td>' +
+        '<td class="num">' + (hasTarget
+          ? '<span class="chip chip--sm' + ((over || under) ? ' chip--warn' : ' chip--ok') + '">' +
+              (diff > 0 ? '+' + diff : '−' + Math.abs(diff)) + '</span>'
+          : '<span class="small muted">без цілі</span>') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const st = window.ProgressCore ? window.ProgressCore.foodStats(state.mealLog, 30) : null;
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+          '<h2 style="margin:0">Харчування</h2>' +
+          (st ? '<span class="chip mono">≈' + st.avgKcal + ' ккал/день</span>' : '') +
+        '</div>' +
+        (st
+          ? '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
+              (st.avgTarget
+                ? '<span class="small">Середнє / ціль: <b class="mono">' + st.avgKcal + ' / ' + st.avgTarget + '</b></span>'
+                : '<span class="small">Середнє: <b class="mono">' + st.avgKcal + ' ккал</b></span>') +
+              '<span class="small">Білок: <b class="mono">' + st.avgP + ' г/день</b></span>' +
+              (st.withTarget
+                ? '<span class="small">У межах ±5%: <b class="mono">' + st.inTarget + ' із ' + st.withTarget + '</b> днів</span>'
+                : '') +
+            '</div>'
+          : '') +
+        '<div class="table-wrap mt-2">' +
+          '<table class="tbl">' +
+            '<thead><tr><th>День</th><th class="num">Ккал</th><th class="num">Білок</th><th class="num">До цілі</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+        '<p class="small muted mb-0" style="margin-top:10px">Останні ' + entries.length + ' закритих ' +
+          window.App.plural(entries.length, 'день', 'дні', 'днів') + '. ' +
+          'Ціль у кожному рядку — та, що діяла саме того дня.</p>' +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Трекери: короткий підсумок (етап 4)                                 */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Одна плитка на увімкнений трекер, а не графік: «Overview → детальніше
+   * за бажанням» діє тут так само, як у решті сторінки. Повна історія й
+   * налаштування — на «Моїх трекерах», сюди виходить лише підсумок за
+   * 7 (сон/настрій — щоденні коливання) або 30 днів (решта).
+   */
+
+  function trackerLine(t) {
+    const TC = window.TrackerCore;
+    const def = TC.defFor(t);
+    const arrow = { up: '↑', down: '↓', flat: '→' };
+
+    if (def.kind === 'boolean') {
+      const st = TC.boolSummary(state.trackerLog, t.id, 30, t.createdAt);
+      return { name: t.name, val: st.pct + '%', trend: st.done + ' із ' + st.total + ' днів' + (st.streak ? ' · ' + st.streak + ' поспіль зараз' : '') };
+    }
+
+    if (def.kind === 'pair') {
+      const parts = def.fields.map(function (f) {
+        const s = TC.pairSummary(state.trackerLog, t.id, f, 30);
+        return s ? (f === 'pain' ? 'біль' : f === 'fatigue' ? 'втома' : f === 'before' ? 'до' : 'після') + ' ' + fmtNum.n(s.avg, 1) : null;
+      }).filter(Boolean);
+      return parts.length ? { name: t.name, val: parts.join(' / '), trend: 'середнє за 30д' } : null;
+    }
+
+    const period = (t.type === 'sleep' || t.type === 'mood') ? 7 : 30;
+    const s = TC.numericSummary(state.trackerLog, t.id, period);
+    if (!s) return null;
+
+    if (t.goal && (def.kind === 'cumulative' || def.kind === 'value' || def.kind === 'duration')) {
+      const ga = TC.goalAdherence(state.trackerLog, t.id, t.goal, period);
+      return { name: t.name, val: (ga ? ga.pct + '%' : '—'), trend: 'середнє виконання цілі за ' + period + 'д' };
+    }
+
+    const val = def.kind === 'duration' ? TC.formatDuration(s.avg) : fmtNum.n(s.avg, 1) + (def.unit ? ' ' + def.unit : '');
+    return { name: t.name, val: val, trend: 'середнє за ' + period + 'д' + (s.trend ? ' · тренд ' + arrow[s.trend] : '') };
+  }
+
+  function renderTrackers() {
+    const host = $('#jr-trackers');
+    if (!host || !window.TrackerCore) return;
+
+    const TC = window.TrackerCore;
+    const lines = TC.active(state.trackers).map(trackerLine).filter(Boolean);
+
+    /* Порожній стан, а не зникла картка.
+       Раніше при вимкнених трекерах увесь блок просто не малювався — і
+       людина, яка ніколи не заходила в «Мої трекери», не дізнавалась, що
+       вони взагалі є. Решта блоків цієї сторінки давно поводяться інакше. */
+    if (!lines.length) {
+      host.innerHTML =
+        '<div class="card">' +
+          '<h2 style="margin:0">Трекери</h2>' +
+          '<p class="small mt-1 mb-0">Жоден трекер не ввімкнено, тому рахувати нічого. ' +
+            'Увімкни сон, кроки чи біль і втому — і тут зʼявиться середнє за період ' +
+            'поруч із вагою й тренуваннями. <a href="trackers.html">Налаштувати трекери</a></p>' +
+        '</div>';
+      return;
+    }
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px">' +
+          '<h2 style="margin:0">Трекери</h2>' +
+          '<a class="small" href="trackers.html">Детальніше</a>' +
+        '</div>' +
+        '<div class="kpis mt-2">' +
+          lines.map(function (l) {
+            return '<div class="kpi">' +
+              '<div class="kpi__val mono">' + esc(l.val) + '</div>' +
+              '<p class="kpi__lbl">' + esc(l.name) + '</p>' +
+              '<p class="kpi__trend small muted">' + esc(l.trend) + '</p>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Збереження й обробники                                              */
+  /* ------------------------------------------------------------------ */
+
+  async function persist(patch) {
+    // Факт записано тут — тут його й позначаємо побаченим для Rating,
+    // інакше він зарахується лише коли (і якщо) людина відкриє «Сьогодні».
+    window.App.stampRating(Object.assign({}, state.profile, patch), patch);
+    try { await Store.saveProfile(patch); }
+    catch (e) {
+      // .queued означає «мережі немає, лежить у черзі» — це не втрата даних,
+      // і лякати людину червоним тостом тут неправильно.
+      toast(e.queued ? e.message : 'Не збереглося: ' + e.message, e.queued ? 'ok' : 'err');
+    }
+  }
+
+  /**
+   * Перемалювати блок, не втрачаючи клавіатурний фокус.
+   *
+   * renderWeight і renderTrain перебудовують innerHTML цілком. Через це
+   * після Enter на клітинці теплокарти фокус летів на <body>, і людина,
+   * яка працює з клавіатури, мусила табати від початку сторінки — після
+   * КОЖНОЇ позначки. Запамʼятовуємо елемент за стабільним data-атрибутом
+   * і повертаємо фокус на його новий екземпляр.
+   */
+  function keepFocus(render) {
+    const before = document.activeElement;
+    let selector = null;
+    if (before && before !== document.body && before.dataset) {
+      if (before.dataset.hm) selector = '[data-hm="' + before.dataset.hm + '"]';
+      else if (before.dataset.wDel) selector = '[data-w-del="' + before.dataset.wDel + '"]';
+      else if (before.id) selector = '#' + before.id;
+    }
+
+    render();
+
+    if (!selector) return;
+    const after = document.querySelector(selector);
+    if (after && after.focus) after.focus();
+  }
+
+  function wire() {
+    if (state.wired) return;
+    state.wired = true;
+
+    $('#jr-weight').addEventListener('click', function (e) {
+      if (e.target.closest('#w-add')) {
+        const input = $('#w-kg');
+        const v = Number(String(input && input.value).replace(',', '.'));
+        if (!Number.isFinite(v) || v < W_MIN || v > W_MAX) {
+          toast('Вага має бути числом від ' + W_MIN + ' до ' + W_MAX + ' кг', 'err');
+          return;
+        }
+        // Пів кроку побутових ваг: 0,1 кг. Точніші цифри — ілюзія точності.
+        state.bodyLog[todayKey()] = Math.round(v * 10) / 10;
+        persist({ bodyLog: state.bodyLog });
+        keepFocus(renderWeight);
+        toast('Записано', 'ok');
+        return;
+      }
+      const del = e.target.closest('[data-w-del]');
+      if (del) {
+        const key = del.dataset.wDel;
+        // Журнал ваги append-only: видалене нізвідки не відновити, а ✕
+        // стоїть у щільному рядку впритул до інших елементів.
+        if (!window.confirm('Видалити запис ваги за ' + key + '? Відновити його буде нічим.')) return;
+        delete state.bodyLog[key];
+        persist({ bodyLog: state.bodyLog });
+        keepFocus(renderWeight);
+        toast('Запис за ' + key + ' видалено', 'ok');
+      }
+    });
+
+    $('#jr-train').addEventListener('click', function (e) {
+      const cell = e.target.closest('[data-hm]');
+      if (cell) {
+        const k = cell.dataset.hm;
+        if (trained(k)) {
+          // Під днем є сесія — просте видалення нічого не дало б, бо
+          // trained() однаково побачив би її. Пишемо явний 0 як перекриття.
+          if (hasSession(k)) state.workLog[k] = 0; else delete state.workLog[k];
+        } else {
+          state.workLog[k] = 1;
+        }
+        persist({ workLog: state.workLog });
+        keepFocus(renderTrain);
+        return;
+      }
+      if (e.target.closest('#t-mark')) {
+        state.workLog[todayKey()] = 1;
+        persist({ workLog: state.workLog });
+        keepFocus(renderTrain);
+        toast('Позначено', 'ok');
+      }
+    });
+  }
+
+  async function init() {
+    if (!$('#jr-weight')) return;
+
+    let p = {};
+    try { p = await Store.getProfile() || {}; } catch (_) {}
+    state.bodyLog = (p.bodyLog && typeof p.bodyLog === 'object' && !Array.isArray(p.bodyLog)) ? p.bodyLog : {};
+    state.workLog = (p.workLog && typeof p.workLog === 'object' && !Array.isArray(p.workLog)) ? p.workLog : {};
+    state.sessionLog = (p.sessionLog && typeof p.sessionLog === 'object') ? p.sessionLog : {};
+    state.weightLog = (p.weightLog && typeof p.weightLog === 'object') ? p.weightLog : {};
+    state.mealLog = (p.mealLog && typeof p.mealLog === 'object') ? p.mealLog : {};
+    state.goal = typeof p.goal === 'string' ? p.goal : null;
+    const days = Number(p.activePlan && p.activePlan.days) || Number(p.daysPerWeek) || 0;
+    state.daysTarget = (Number.isInteger(days) && days >= 1 && days <= 7) ? days : 0;
+    if (window.TrackerCore) {
+      state.trackers = window.TrackerCore.ensureBuiltins(p.trackers);
+      state.trackerLog = (p.trackerLog && typeof p.trackerLog === 'object') ? p.trackerLog : {};
+    }
+
+    wire();
+    renderOverview();
+    keepFocus(renderWeight);
+    keepFocus(renderTrain);
+    renderLifts();
+    renderFood();
+    renderTrackers();
+
+    // Перемикач періоду живе всередині блоку ваги й перемальовується
+    // разом із ним — слухаємо на рівні документа
+    document.addEventListener('change', function (e) {
+      const pp = e.target.closest('input[name="w-period"]');
+      if (pp) { state.period = Number(pp.value); keepFocus(renderWeight); }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('#lifts-more')) { state.liftsAll = true; renderLifts(); return; }
+      if (e.target.closest('#lifts-less')) { state.liftsAll = false; renderLifts(); return; }
+      const lf = e.target.closest('[data-lift]');
+      if (lf) {
+        state.openLift = state.openLift === lf.dataset.lift ? null : lf.dataset.lift;
+        renderLifts();
+      }
+    });
+
+    // Таймер на «Моєму плані» міг позначити день, поки ця вкладка відкрита
+    Store.onChange(function (profile) {
+      if (!profile) return;
+      /*
+       * Умови були виду `if (profile.bodyLog)`, а bodyLog у blankProfile —
+       * це {}, тобто істина ЗАВЖДИ. Через це будь-яке збереження звідки
+       * завгодно перемальовувало картку ваги: набране, але ще не записане
+       * число в полі «Сьогодні, кг» зникало (keepFocus повертав фокус, але
+       * значення вже було затерте збереженим). Тепер перемальовуємо лише
+       * коли обʼєкт РЕАЛЬНО інший, і ніколи — поки в картці щось набирають.
+       */
+      const active = document.activeElement;
+      const typingIn = function (sel) {
+        return active && active.closest && active.closest(sel);
+      };
+
+      if (profile.activePlan && Number(profile.activePlan.days)) {
+        state.daysTarget = Number(profile.activePlan.days);
+      }
+      if (profile.workLog && profile.workLog !== state.workLog) { state.workLog = profile.workLog; keepFocus(renderTrain); }
+      if (profile.sessionLog && profile.sessionLog !== state.sessionLog) { state.sessionLog = profile.sessionLog; keepFocus(renderTrain); }
+      if (profile.bodyLog && profile.bodyLog !== state.bodyLog) {
+        state.bodyLog = profile.bodyLog;
+        if (!typingIn('#jr-weight input')) keepFocus(renderWeight);
+      }
+      if (profile.weightLog && profile.weightLog !== state.weightLog) { state.weightLog = profile.weightLog; renderLifts(); }
+      if (profile.mealLog && profile.mealLog !== state.mealLog) { state.mealLog = profile.mealLog; renderFood(); }
+      if (window.TrackerCore && (profile.trackers || profile.trackerLog)) {
+        if (profile.trackers) state.trackers = window.TrackerCore.ensureBuiltins(profile.trackers);
+        if (profile.trackerLog) state.trackerLog = profile.trackerLog;
+        renderTrackers();
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();

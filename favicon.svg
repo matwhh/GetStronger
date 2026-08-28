@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Фавікон повторює словесний знак: важка квадратна «F».
+       Літера намальована прямокутниками, а не текстом, бо шрифт
+       у контексті фавікона недоступний. -->
+  <rect width="64" height="64" rx="14" fill="#0b0b0d"/>
+  <rect x="4" y="4" width="56" height="56" rx="11" fill="#15243b"/>
+  <g fill="#f2f2f3">
+    <rect x="19" y="15" width="11" height="34"/>
+    <rect x="19" y="15" width="27" height="9"/>
+    <rect x="19" y="27" width="21" height="9"/>
+  </g>
+</svg>

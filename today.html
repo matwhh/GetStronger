@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сьогодні — FORGE</title>
+<!--
+  Екран дня переїхав на головну: index.html і є «Сьогодні».
+  Раніше їх було два — головна переказувала стан, а змінити його можна
+  було лише тут. Ця сторінка лишилась перенаправленням, бо на неї
+  посилаються старі закладки, ярлик «На екран Home» і зовнішні лінки.
+
+  Перенаправлення робить і <meta http-equiv="refresh"> (працює без JS і
+  на file://), і рядок скрипта нижче — він спрацьовує швидше й замінює
+  запис в історії, щоб «Назад» не повертало сюди по колу.
+-->
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url=index.html">
+<link rel="canonical" href="index.html">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>location.replace('index.html' + location.hash);</script>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main id="main" class="section">
+  <div class="wrap wrap--narrow">
+    <p class="lead">«Сьогодні» тепер на головній.
+      <a href="index.html">Перейти →</a></p>
+  </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>План харчування: калорії та макроси — FORGE</title>
+<meta name="description" content="Розрахунок калорій і макронутрієнтів під вагу, зріст, вік і мету: набір, підтримання, скидання ваги.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="План харчування: калорії та макроси — FORGE">
+<meta property="og:description" content="Розрахунок калорій і макронутрієнтів під вагу, зріст, вік і мету: набір, підтримання, скидання ваги.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">План харчування</h1>
+      <p class="lead reveal" data-d="1">
+        Базовий обмін за Mifflin-St Jeor або Katch-McArdle, витрати з поправкою на активність,
+        калорійна ціль під обрану мету й розкладка на макронутрієнти.
+      </p>
+
+      <!-- ---------- Форма ---------- -->
+      <div class="card reveal mt-3" data-d="2" id="nutri-form">
+        <div class="grid" style="gap:26px">
+
+          <div class="field">
+            <label class="field__label">Стать</label>
+            <div class="seg">
+              <label class="seg__item"><input type="radio" name="sex" value="male" checked><span>Чоловік</span></label>
+              <label class="seg__item"><input type="radio" name="sex" value="female"><span>Жінка</span></label>
+            </div>
+            <span class="field__hint">Формула Mifflin-St Jeor має різні константи для чоловіків і жінок.</span>
+          </div>
+
+          <div class="grid grid-4">
+            <div class="field">
+              <label class="field__label" for="n-age">Вік, років</label>
+              <input class="input" id="n-age" type="number" inputmode="numeric" min="14" max="90" step="1" placeholder="25">
+            </div>
+            <div class="field">
+              <label class="field__label" for="n-height">Зріст, см</label>
+              <input class="input" id="n-height" type="number" inputmode="numeric" min="120" max="230" step="1" placeholder="180">
+            </div>
+            <div class="field">
+              <label class="field__label" for="n-weight">Вага, кг</label>
+              <input class="input" id="n-weight" type="text" inputmode="decimal" min="35" max="250" step="0.1" placeholder="80">
+            </div>
+            <div class="field">
+              <label class="field__label" for="n-bodyfat">Жир, % <span class="muted">(необовʼязково)</span></label>
+              <input class="input" id="n-bodyfat" type="text" inputmode="decimal" min="3" max="60" step="0.5" placeholder="—">
+            </div>
+          </div>
+
+          <div class="field" style="max-width:520px">
+            <label class="field__label" for="n-activity">Рівень активності</label>
+            <select class="select" id="n-activity"></select>
+            <span class="field__hint">
+              Найбільше джерело похибки в розрахунку. Якщо сумніваєшся між двома рівнями — бери нижчий.
+            </span>
+          </div>
+
+          <div class="field">
+            <label class="field__label">Мета</label>
+            <div class="seg">
+              <label class="seg__item"><input type="radio" name="goal" value="bulk"><span>Набір маси</span></label>
+              <label class="seg__item"><input type="radio" name="goal" value="bulkfast"><span>Агресивний набір</span></label>
+              <label class="seg__item"><input type="radio" name="goal" value="recomp"><span>Рекомпозиція</span></label>
+              <label class="seg__item"><input type="radio" name="goal" value="maintain" checked><span>Підтримання</span></label>
+              <label class="seg__item"><input type="radio" name="goal" value="cut"><span>Скидання</span></label>
+              <label class="seg__item"><input type="radio" name="goal" value="cutfast"><span>Агресивне схуднення</span></label>
+            </div>
+          </div>
+
+          <div>
+            <button class="btn btn--ghost btn--sm" type="button" id="n-save">Зберегти мої дані</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ---------- Результат ---------- -->
+      <div id="nutri-out" class="mt-3"></div>
+
+      <!-- ---------- Прогноз маси ---------- -->
+      <div id="nutri-forecast"></div>
+
+      <!-- ---------- Пояснення ---------- -->
+      <div class="mt-3">
+        <h2 class="reveal">Що стоїть за цифрами</h2>
+
+        <div class="acc reveal mt-2">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--acc">Білок</span>
+            <span><h3>Скільки треба</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <p class="small">
+              Калькулятор показує <b>діапазон 1,6–2,2 г на кг маси тіла</b> для всіх цілей —
+              набору, підтримання й дефіциту. Це свідомо один діапазон замість трьох
+              різних правил. У розкладку макронутрієнтів береться його верх.
+            </p>
+            <p class="small">
+              Звідки саме ці межі. Мета-регресія на 49 дослідженнях і 1863 учасниках знайшла
+              точку, після якої додатковий білок перестає давати приріст мʼязової маси:
+              <b>1,62 г/кг</b> із 95% довірчим інтервалом <b>(1,03; 2,20)</b>. Тобто 1,6 —
+              це точкова оцінка, а 2,2 — верхня межа того самого інтервалу: скільки вийшло б,
+              якщо читати ті самі дані найобережніше. Діапазон між ними — не запас навмання,
+              а ширина невизначеності однієї цифри.
+            </p>
+            <p class="small">
+              На дефіциті калорій потреба вища: білок стає головним чинником збереження мʼязів,
+              коли енергії не вистачає. Рекомендації для сушки — 2,3–3,1 г на кг <i>сухої</i> маси,
+              що при 15% жиру дає приблизно 2,0–2,6 г на кг загальної маси. Тобто 2,2 г/кг —
+              усередині цього діапазону, ближче до низу: робоча цифра, але якщо сушишся довго
+              й агресивно, є сенс піднімати до 2,4–2,6.
+            </p>
+            <p class="small muted mb-0">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/28698222/" target="_blank" rel="noopener">PMID 28698222</a>
+              &nbsp;·&nbsp;
+              <a href="https://pubmed.ncbi.nlm.nih.gov/24864135/" target="_blank" rel="noopener">PMID 24864135</a>
+            </p>
+          </div></div></div>
+        </div>
+
+        <div class="acc reveal">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--acc">Дефіцит</span>
+            <span><h3>Швидкість втрати ваги</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <p class="small">
+              Рекомендований орієнтир — <b>0,5–1% маси тіла на тиждень</b>.
+              Для 80 кг це 0,4–0,8 кг. У цьому діапазоні втрачається переважно жир.
+            </p>
+            <p class="small">
+              При глибшому дефіциті зростає частка втраченої сухої маси й падає якість тренувань.
+              Режим «агресивне схуднення» розрахований на 8–12 тижнів, не довше.
+            </p>
+            <p class="small muted mb-0">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/24864135/" target="_blank" rel="noopener">PMID 24864135</a>
+            </p>
+          </div></div></div>
+        </div>
+
+        <div class="acc reveal">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--warn">Профіцит</span>
+            <span><h3>Чому агресивний набір не дає більше мʼязів</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <p class="small">
+              Інтуїція каже: більше калорій — швидше росте мʼяз. Найпряміша перевірка цього
+              на сьогодні цього не підтверджує.
+            </p>
+            <p class="small">
+              39 елітних спортсменів рандомізували на дві групи. Обидві додали
+              4 силові тренування на тиждень і працювали на набір 8–12 тижнів. Різниця була
+              тільки в харчуванні: одна група отримувала розписаний план (3585 ккал),
+              друга їла за апетитом (2964 ккал).
+            </p>
+            <div class="table-wrap mt-1">
+              <table class="tbl">
+                <thead><tr><th>Показник</th><th class="num">План (3585 ккал)</th><th class="num">За апетитом (2964 ккал)</th></tr></thead>
+                <tbody>
+                  <tr><td>Маса тіла</td><td class="num mono">+3,9%</td><td class="num mono">+1,5%</td></tr>
+                  <tr><td>Жирова маса</td><td class="num mono">+15%</td><td class="num mono">+3%</td></tr>
+                  <tr><td><b>Суха маса</b></td><td class="num mono" colspan="2"><b>різниці між групами немає</b></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small mt-2">
+              Тобто вища калорійність дала <b>вп’ятеро більший приріст жиру й нуль додаткових мʼязів</b>.
+              Уся «перевага» в цифрі на вагах була жиром і водою.
+            </p>
+            <p class="small">
+              Тому агресивний набір у калькуляторі — це інструмент під конкретну ситуацію,
+              а не «швидший шлях». Він виправданий, якщо ти дуже худий і вага не рушає навіть
+              на +12%, або якщо ціль — набрати вагу як таку (спорт із ваговими категоріями).
+              Якщо ціль — мʼязи, звичайний набір дасть той самий результат із меншим шаром жиру,
+              який потім не доведеться скидати.
+            </p>
+            <p class="small muted mb-0">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/23679146/" target="_blank" rel="noopener">PMID 23679146</a>
+            </p>
+          </div></div></div>
+        </div>
+
+        <div class="acc reveal">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--acc">Формули</span>
+            <span><h3>Mifflin-St Jeor і Katch-McArdle</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <p class="small">
+              <b>Mifflin-St Jeor</b> виведена на 498 здорових людях (247 жінок, 251 чоловік, 19–78 років)
+              з вимірюванням витрат непрямою калориметрією. Це стандарт за замовчуванням,
+              бо вона працює і на людях із нормальною вагою, і на людях з ожирінням.
+            </p>
+            <div class="table-wrap mt-1">
+              <table class="tbl">
+                <thead><tr><th>Формула</th><th>Розрахунок</th></tr></thead>
+                <tbody>
+                  <tr><td>Mifflin-St Jeor, чоловіки</td><td class="mono small">10×вага + 6,25×зріст − 5×вік + 5</td></tr>
+                  <tr><td>Mifflin-St Jeor, жінки</td><td class="mono small">10×вага + 6,25×зріст − 5×вік − 161</td></tr>
+                  <tr><td>Katch-McArdle</td><td class="mono small">370 + 21,6 × суха маса</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small mt-2">
+              При вказаному відсотку жиру калькулятор перемикається на <b>Katch-McArdle</b>:
+              вона рахує від сухої маси й не залежить від статі та віку.
+              Її точність обмежена точністю вимірювання жиру — побутові ваги з біоімпедансом
+              помиляються на 5+ відсоткових пунктів.
+            </p>
+            <p class="small muted mb-0">
+              <a href="https://pubmed.ncbi.nlm.nih.gov/2305711/" target="_blank" rel="noopener">PMID 2305711</a>
+            </p>
+          </div></div></div>
+        </div>
+
+        <div class="acc reveal">
+          <button class="acc__head" type="button" aria-expanded="false">
+            <span class="chip chip--warn">Межі</span>
+            <span><h3>Чого калькулятор не враховує</h3></span>
+            <svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="acc__body"><div class="acc__inner"><div class="acc__pad">
+            <ul class="small list-note">
+              <li>Захворювання, ліки, вагітність, розлади харчової поведінки.</li>
+              <li>NEAT — спонтанну активність, яка сама змінюється при зміні калорійності й дає різницю 200–400 ккал.</li>
+              <li>Генетику, мікробіом, якість сну.</li>
+              <li>ІМТ не розрізняє мʼязи й жир: у тренованої людини він завищений і малоінформативний.</li>
+            </ul>
+            <p class="small mb-0">
+              Порядок дій: тримати розраховану калорійність 2–3 тижні, зважуватись 3–4 рази на тиждень,
+              дивитись на середнє за тиждень. Якщо динаміка не збігається з ціллю — коригувати на 100–200 ккал.
+            </p>
+          </div></div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<script defer src="js/nutrition-core.js"></script>
+<script defer src="js/nutrition.js"></script>
+</body>
+</html>

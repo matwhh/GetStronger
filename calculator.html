@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калькулятор разового максимуму (1ПМ) — FORGE</title>
+<meta name="description" content="Оцінка 1ПМ за сімома формулами: Epley, Brzycki, Lombardi, O'Conner, Lander, Wathen, Mayhew. Таблиця робочих ваг.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Калькулятор разового максимуму (1ПМ) — FORGE">
+<meta property="og:description" content="Оцінка 1ПМ за сімома формулами: Epley, Brzycki, Lombardi, O'Conner, Lander, Wathen, Mayhew. Таблиця робочих ваг.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Разовий максимум</h1>
+      <p class="lead reveal" data-d="1">
+        Оцінка 1ПМ за робочим підходом. Сім формул, підсумок — медіана,
+        плюс таблиця робочих ваг на кожен діапазон повторень.
+      </p>
+
+      <!-- ---------- Форма ---------- -->
+      <div class="card reveal mt-3" data-d="2">
+        <div class="grid grid-3" style="align-items:end">
+          <div class="field">
+            <label class="field__label" for="orm-weight">Вага штанги, кг</label>
+            <input class="input" id="orm-weight" type="text" inputmode="decimal" min="1" max="500" step="0.5" placeholder="100" value="100">
+          </div>
+          <div class="field">
+            <label class="field__label" for="orm-reps">Повторень у підході</label>
+            <input class="input" id="orm-reps" type="number" inputmode="numeric" min="1" max="20" step="1" placeholder="5" value="5">
+          </div>
+          <div class="field">
+            <label class="field__label" for="orm-lift">Вправа</label>
+            <select class="select" id="orm-lift">
+              <option value="squat">Присідання</option>
+              <option value="bench">Жим лежачи</option>
+              <option value="deadlift">Станова тяга</option>
+              <option value="ohp">Жим стоячи</option>
+              <option value="row">Тяга в нахилі</option>
+              <option value="other">Інша вправа</option>
+            </select>
+          </div>
+        </div>
+        <p class="field__hint mt-1" style="margin-bottom:16px">
+          Підхід має бути виконаний з чистою технікою і майже до відмови (запас 0–1 повторення).
+          Формули не знають про запас: підхід із запасом у 4 повторення дасть занижену оцінку.
+        </p>
+        <button class="btn btn--ghost btn--sm" type="button" id="orm-save">Зберегти як рекорд</button>
+      </div>
+
+      <!-- ---------- Результат ---------- -->
+      <div id="onerm-out" class="mt-3"></div>
+
+      <!-- ---------- Рекорди ---------- -->
+      <div class="mt-3">
+        <h2 class="reveal">Мої рекорди</h2>
+        <div id="records" class="mt-2"></div>
+      </div>
+
+      <!-- ---------- Пояснення ---------- -->
+      <div class="mt-3">
+        <div data-longform="Чому сім формул і яка похибка">
+        <h2 class="reveal">Точність оцінки</h2>
+
+        <div class="grid grid-2 mt-2">
+          <div class="card reveal" data-d="1">
+            <h3 class="card__title">Чому сім формул</h3>
+            <p class="small">
+              Кожна формула — регресія на своїй вибірці, часто на конкретній вправі.
+              Жодна не є еталонною.
+            </p>
+            <p class="small mb-0">
+              Розкид між ними сам по собі інформативний: збіг у межах 3% означає надійну оцінку,
+              розліт на 10%+ — що ти в зоні, де формули працюють погано.
+            </p>
+          </div>
+
+          <div class="card reveal" data-d="2">
+            <h3 class="card__title">Де похибка найбільша</h3>
+            <ul class="small list-note">
+              <li><b>Понад 10 повторень</b> — результат обмежує витривалість, а не максимальна сила.</li>
+              <li><b>Станова тяга</b> — формули систематично занижують 1ПМ.</li>
+              <li><b>Ізоляція</b> — формули виводились на базових багатосуглобових рухах.</li>
+              <li><b>Стаж</b> — тренована людина робить більше повторень із того самого відсотка максимуму.</li>
+            </ul>
+            <p class="small mb-0">Найточніший діапазон — 3–6 повторень.</p>
+          </div>
+        </div>
+
+        <div class="card reveal mt-2">
+          <h3 class="card__title">Формули</h3>
+          <div class="table-wrap mt-1">
+            <table class="tbl">
+              <thead><tr><th style="width:130px">Назва</th><th>Формула</th><th>Коментар</th></tr></thead>
+              <tbody>
+                <tr><td><b>Epley</b></td><td class="mono small">w × (1 + r/30)</td><td class="small muted">Найпоширеніша, трохи завищує на 5+ повтореннях</td></tr>
+                <tr><td><b>Brzycki</b></td><td class="mono small">w × 36 / (37 − r)</td><td class="small muted">Точна на 2–10 повтореннях, ламається при r ≥ 37</td></tr>
+                <tr><td><b>Lombardi</b></td><td class="mono small">w × r<sup>0,10</sup></td><td class="small muted">Степенева, консервативна</td></tr>
+                <tr><td><b>O'Conner</b></td><td class="mono small">w × (1 + 0,025 × r)</td><td class="small muted">Найпростіша, дає найнижчі значення</td></tr>
+                <tr><td><b>Lander</b></td><td class="mono small">100w / (101,3 − 2,67123 × r)</td><td class="small muted">Близька до Brzycki</td></tr>
+                <tr><td><b>Wathen</b></td><td class="mono small">100w / (48,8 + 53,8 × e<sup>−0,075r</sup>)</td><td class="small muted">Стабільна на 8–15 повтореннях</td></tr>
+                <tr><td><b>Mayhew</b></td><td class="mono small">100w / (52,2 + 41,9 × e<sup>−0,055r</sup>)</td><td class="small muted">Розроблена на жимі лежачи</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small muted mt-2 mb-0">
+            <b>w</b> — вага штанги, <b>r</b> — кількість виконаних повторень.
+            Підсумкова оцінка — <b>медіана</b> семи формул, а не середнє: Mayhew систематично
+            завищує і перетягував би середнє на себе. Відсотки в таблиці робочих ваг —
+            середнє між Epley і Brzycki; при одному повторенні це 100% за визначенням.
+          </p>
+        </div>
+
+        <div class="notice mt-2 reveal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          <div>
+            Розрахункове значення призначене для підбору робочих ваг, а не для перевірки на практиці.
+            Реальне тестування максимуму потребує підводки, страхуючого і невтомленого стану.
+          </div>
+        </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<!-- Формули 1ПМ лежать окремо: їх використовує ще й періодизація -->
+<script defer src="js/onerm-core.js"></script>
+<script defer src="js/onerm.js"></script>
+</body>
+</html>

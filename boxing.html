@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Бокс: суботнє тренування на мішку — FORGE</title>
+<meta name="description" content="Одна готова боксерська сесія на 60–70 хв: розминка, техніка, тіньовий бій і 6–8 раундів на мішку по 3 хв.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
+<meta property="og:image" content="og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Бокс: суботнє тренування на мішку — FORGE">
+<meta property="og:description" content="Одна готова боксерська сесія на 60–70 хв: розминка, техніка, тіньовий бій і 6–8 раундів на мішку по 3 хв.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
+     не чекає на нього), а після завантаження перемикається на all.
+     Без JS спрацьовує noscript-запасний варіант. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
+   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
+   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
+   інакше при кожному переході блимала б типова графітова темна перед
+   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
+   скрипт відпрацьовує раніше за app.js. */
+document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+
+</head>
+<body>
+
+<!-- Перший елемент у порядку табуляції: дозволяє з клавіатури
+     перескочити меню й потрапити одразу в контент. -->
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Бокс</h1>
+      <p class="lead reveal" data-d="1">
+        Суботнє тренування — 60–70 хв, раунди по 3 хв роботи і 1 хв відпочинку.
+        Розминка, техніка й тіньовий бій — це підготовка; основна робота на мішку.
+      </p>
+
+      <!-- Усе тренування малює js/boxing.js із даних у js/boxing-data.js.
+           Одне джерело і для сторінки, і для копіювання в буфер: інакше
+           текст у нотатках з часом розійшовся б із тим, що на екрані. -->
+      <div id="session" class="mt-3"></div>
+
+      <!-- Запасний шлях копіювання, якщо браузер не дав доступ до буфера.
+           Той самий патерн, що на сторінці «Мій план». -->
+      <div class="card mt-3" id="copy-fallback" hidden>
+        <h3 class="card__title">Текст тренування</h3>
+        <p class="small muted">Браузер не дав доступ до буфера. Виділи й скопіюй вручну.</p>
+        <textarea class="input" rows="16" readonly aria-label="Текст тренування для копіювання вручну" style="width:100%;text-align:left;font-family:var(--font-mono);font-size:0.82rem"></textarea>
+      </div>
+
+      <div class="card mt-3">
+        <h3 class="card__title">Як це читати</h3>
+        <p class="small">
+          <b>Нумерація ударів стандартна:</b> 1 — джеб, 2 — крос, 3 — хук.
+          Запис «1–2 → 3 у корпус» означає джеб, крос, потім хук по корпусу.
+        </p>
+        <p class="small">
+          <b>Відсотки — це інтенсивність, а не пульс.</b> 50–60% означає спокійну
+          технічну роботу, 80–90% — майже все, що є, але з технікою, яка ще тримається.
+          Щойно вона сипеться, відсоток уже неправильний — незалежно від того, що написано.
+        </p>
+        <p class="small mb-0">
+          <b>Раунди 7 і 8 опціональні</b> — вони позначені пунктиром. Сесія повноцінна
+          після шостого: кондиційний і фристайл-раунди мають сенс лише тоді, коли
+          після них удари не перетворюються на махи.
+        </p>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<!-- Профіль: тема й бейдж рівня в шапці (у локальному режимі — без мережі) -->
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<!-- Дані окремо від рендеру, як у програмах і рецептах -->
+<script defer src="js/boxing-data.js"></script>
+<script defer src="js/boxing.js"></script>
+</body>
+</html>

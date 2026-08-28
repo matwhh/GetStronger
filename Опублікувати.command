@@ -32,6 +32,18 @@ git symbolic-ref -q HEAD >/dev/null 2>&1 || git checkout -q -b "$BRANCH" 2>/dev/
 CUR="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
 [ "$CUR" = "$BRANCH" ] || git branch -M "$BRANCH" 2>/dev/null
 
+# --- 1b. Підпис коміта ----------------------------------------------------
+#
+# Vercel БЛОКУЄ збірку, якщо пошта автора коміта не належить акаунту GitHub.
+# Коли user.email у git не налаштована, git підставляє вигадану на кшталт
+# matthew@MacBook-Air-Matvij.local — і кожен пуш блокується.
+#
+# Ставимо адресу-невидимку GitHub: вона назавжди привʼязана до акаунта
+# matwhh, не розкриває справжню пошту й гарантовано проходить перевірку.
+# Налаштування ЛОКАЛЬНЕ (лише цей репозиторій) — глобальний git не чіпаємо.
+git config user.name  "matwhh"
+git config user.email "152515220+matwhh@users.noreply.github.com"
+
 # --- 2. Віддалений сервер -------------------------------------------------
 if git remote get-url origin >/dev/null 2>&1; then
   git remote set-url origin "$REPO_URL"
@@ -79,8 +91,24 @@ else
 fi
 
 # --- 4. Відправка ---------------------------------------------------------
+#
+# Якщо верхівка підписана старою (невалідною) поштою — переписуємо автора,
+# інакше Vercel блокуватиме її знову й знову. Force-push тут безпечний:
+# репозиторій односібний, і йдеться про той самий, щойно зроблений коміт.
+FORCE=""
+LAST_MAIL="$(git log -1 --format='%ae' 2>/dev/null)"
+case "$LAST_MAIL" in
+  *".local"|"") ;;
+  *) LAST_MAIL="" ;;
+esac
+if [ -n "$LAST_MAIL" ]; then
+  say "${Y}· переписую підпис старого коміта ($LAST_MAIL)${N}"
+  git -c commit.gpgsign=false commit -q --amend --reset-author --no-edit || fail "не вдалося переписати коміт"
+  FORCE="--force-with-lease"
+fi
+
 say "· відправляю на GitHub…"
-if ! git push -u origin "$BRANCH" 2>/tmp/forge-push.log; then
+if ! git push -u $FORCE origin "$BRANCH" 2>/tmp/forge-push.log; then
   ERR="$(cat /tmp/forge-push.log)"
   printf "\n${R}Не вдалося відправити.${N}\n%s\n" "$ERR"
   case "$ERR" in

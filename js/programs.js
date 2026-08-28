@@ -541,7 +541,6 @@
     const withLegs = Boolean(state.bumpLegs);
 
     return '' +
-      '<hr class="divider">' +
       '<div class="row" style="justify-content:space-between;align-items:baseline;gap:12px">' +
         '<h3 style="margin:0">Крок робочої ваги</h3>' +
         '<span class="small muted">' + other + ' зверху · ' + legs + ' на ноги</span>' +
@@ -557,14 +556,7 @@
         '<span class="small muted" style="flex-basis:100%;margin:0"></span>' +
         '<button class="btn btn--ghost btn--sm" type="button" data-bump-legs="-5">−5 кг на ноги</button>' +
         '<button class="btn btn--ghost btn--sm" type="button" data-bump-legs="5">+5 кг на ноги</button>' +
-        '<span class="small muted">присід, жим ногами, тяги — окремими кнопками</span>' +
-      '</div>' +
-
-      '<p class="small muted mt-2 mb-0">' +
-        (withLegs
-          ? 'Галочка стоїть: ±2,5 кг піде на всі ' + (other + legs) + ' вправ, ноги теж.'
-          : 'Галочка знята: ±2,5 кг піде на ' + other + ' вправ верху, ноги не зміняться.') +
-      '</p>';
+      '</div>';
   }
 
   /* ------------------------------------------------------------------ */
@@ -724,23 +716,22 @@
     }).join('');
 
     return '' +
-      '<hr class="divider">' +
       '<div class="row" style="justify-content:space-between;align-items:baseline;gap:12px">' +
-        '<h3 style="margin:0">Скидання ваг</h3>' +
+        '<h3 style="margin:0">Зниження робочої ваги у всіх вправах</h3>' +
         (d
           ? '<span class="chip">знижено на ' + d.percent + '%</span>'
           : '<span class="small muted">' + filled + ' ' + plural(filled, 'вага', 'ваги', 'ваг') + ' у книзі</span>') +
       '</div>' +
 
       '<p class="small muted mt-1">' +
-        'Опускає робочу вагу в усіх вправах одразу — після хвороби, перерви ' +
+        'Знижує робочу вагу в усіх вправах одразу — після хвороби, перерви ' +
         'або коли підходи перестали закриватись. Повернути можна одним кліком: ' +
         'числа «до» зберігаються. «Додати +10%» робить зворотне — піднімає ' +
         'всі ваги одразу, наприклад після повернення до нормальних тренувань.' +
       '</p>' +
 
       '<div class="row mt-2" style="gap:10px;align-items:center;flex-wrap:wrap">' +
-        '<label class="small muted" for="deload-pct">Зняти</label>' +
+        '<label class="small muted" for="deload-pct">Знизити на</label>' +
         '<select class="select select--sm" id="deload-pct" style="max-width:110px"' +
           (filled ? '' : ' disabled') + '>' + options + '</select>' +
         '<button class="btn btn--ghost btn--sm" type="button" id="deload-go"' +
@@ -774,6 +765,34 @@
           'швидкість втрати залежить від стажу, віку й причини перерви. ' +
           'Краще зайти нижче, ніж треба, і повернутись за два тижні, ніж зірвати підхід.' +
         '</div>' +
+      '</div>';
+  }
+
+  /**
+   * Ваги — це налаштування, а не щоденна дія: кроком ваги й зниженням
+   * користуються раз на тиждень або раз на місяць. Тримати два блоки
+   * кнопок постійно розгорнутими на сторінці плану означає щодня гортати
+   * повз них. Тому — один згорнутий акордеон; за замовчуванням закритий.
+   */
+  function weightsAcc() {
+    const prog = progressBlock();
+    const del = deloadBlock();
+    if (!prog && !del) return '';
+
+    return '' +
+      '<div class="acc mt-3">' +
+        '<button class="acc__head" type="button" aria-expanded="false">' +
+          '<span>' +
+            '<h3>Робочі ваги</h3>' +
+            '<span class="small muted">Крок ваги та зниження ваги в усіх вправах</span>' +
+          '</span>' +
+          '<svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>' +
+        '</button>' +
+        '<div class="acc__body"><div class="acc__inner"><div class="acc__pad">' +
+          prog +
+          (prog && del ? '<hr class="divider">' : '') +
+          del +
+        '</div></div></div>' +
       '</div>';
   }
 
@@ -1432,9 +1451,7 @@
 
         volumeBlock(plan) +
 
-        progressBlock() +
-
-        deloadBlock() +
+        weightsAcc() +
 
         '<hr class="divider">' +
         '<h3>Перед кожним тренуванням</h3>' +

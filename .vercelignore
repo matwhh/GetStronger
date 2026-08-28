@@ -1,0 +1,10 @@
+# Те, що не має лежати на бойовому сайті: воно потрібне для розробки,
+# а не браузеру. Сам сайт — це html/css/js/icons у корені.
+db/
+tools/
+tests/
+node_modules/
+README.md
+RELEASE.md
+package.json
+*.command

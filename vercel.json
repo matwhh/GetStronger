@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo 'без залежностей'",
+  "buildCommand": "echo 'статичний сайт — збирати нічого'",
+  "outputDirectory": ".",
+  "cleanUrls": false,
+  "trailingSlash": false
+}

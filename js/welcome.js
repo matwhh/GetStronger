@@ -49,6 +49,7 @@
     birth: '',
     body: { sex: null, weight: '', height: '', activity: '', trainingAge: '', hrRest: '', hrMax: '' },
     acc: { username: '', email: '', pass: '', pass2: '' },
+    consents: {},   // c-terms / c-privacy / c-medical
     err: '',
     busy: false
   };
@@ -269,6 +270,10 @@
       numField('b-height', 'height', 'Зріст, см', '', { min: 120, max: 250, ph: '0' }) +
       numField('b-weight', 'weight', 'Вага тіла, кг', '', { min: 30, max: 300, step: 0.1, ph: '0' }) +
 
+      /* BMI рахується сам, щойно є зріст і вага — без окремої кнопки.
+         Це скринінговий показник, і підпис каже це прямо. */
+      '<div id="b-bmi" class="small" style="margin-top:6px"></div>' +
+
       '<div class="field mt-2">' +
         '<label class="field__label" for="b-activity">Рівень активності</label>' +
         '<select class="select" id="b-activity" data-b="activity">' +
@@ -295,6 +300,8 @@
       numField('b-hrrest', 'hrRest', 'Пульс спокою', '', { min: 30, max: 120, ph: 'Необовʼязково' }) +
       numField('b-hrmax', 'hrMax', 'Максимальний пульс', '', { min: 120, max: 230, ph: 'Необовʼязково' }) +
 
+      consentBlock() +
+
       '<button class="btn btn--primary btn--wide mt-2" type="button" id="body-go"' +
         (canGo ? '' : ' disabled') + '>Далі — обрати програму</button>' +
 
@@ -305,10 +312,53 @@
 
   /* Точкове оновлення замість повного render(): перемальовка на кожну
      цифру вибивала б фокус із поля, у яке людина зараз вписує. */
+  /*
+   * Згоди перед поданням заявки. Три ОКРЕМІ чекбокси, жоден не
+   * відмічений заздалегідь; документи відкриваються в новій вкладці.
+   * Показуються лише в хмарному режимі з акаунтом — тобто рівно там,
+   * де заявка реально подається і згоди лягають у серверний журнал.
+   */
+  function consentBlock() {
+    if (!CLOUD || !window.Store.user()) return '';
+    const box = function (id, html) {
+      return '<label class="check" style="align-items:flex-start;margin-top:10px">' +
+        '<input type="checkbox" id="' + id + '"' + (state.consents[id] ? ' checked' : '') + '>' +
+        '<span class="small">' + html + '</span>' +
+      '</label>';
+    };
+    return '<div class="mt-2" id="b-consents" style="border-top:1px solid var(--line);padding-top:14px">' +
+      box('c-terms', 'Я прочитав(ла) та погоджуюся з ' +
+        '<a href="legal.html#terms" target="_blank" rel="noopener">Умовами використання</a> Forge.') +
+      box('c-privacy', 'Я прочитав(ла) ' +
+        '<a href="legal.html#privacy" target="_blank" rel="noopener">Політику конфіденційності</a>.') +
+      box('c-medical', 'Я розумію, що Forge не є медичним сервісом, а інформація на платформі ' +
+        'не замінює консультацію лікаря (<a href="legal.html#medical" target="_blank" rel="noopener">медичне застереження</a>).') +
+    '</div>';
+  }
+
+  function consentsOk() {
+    if (!CLOUD || !window.Store.user()) return true;
+    return Boolean(state.consents['c-terms'] && state.consents['c-privacy'] && state.consents['c-medical']);
+  }
+
+  /** BMI-рядок під полями: живе оновлення, без кнопки Calculate. */
+  function syncBmi() {
+    const el = $('#b-bmi');
+    const BC = window.BmiCore;
+    if (!el || !BC) return;
+    const b = BC.bmi(state.body.weight, state.body.height);
+    if (b === null) { el.innerHTML = ''; return; }
+    const cat = BC.category(b);
+    el.innerHTML = 'BMI: <b class="mono">' + String(b).replace('.', ',') + '</b> — ' +
+      BC.CAT_LABEL[cat] +
+      '<span class="muted"> · скринінговий показник, не діагноз</span>';
+  }
+
   function syncBodyControls() {
+    syncBmi();
     const go = $('#body-go');
     const note = $('#body-note');
-    const canGo = bodyReady();
+    const canGo = bodyReady() && consentsOk();
     if (go) go.disabled = !canGo;
     if (note) {
       note.textContent = canGo
@@ -317,9 +367,31 @@
     }
   }
 
+  /**
+   * Попередження BMI поза нормою — ОДИН раз на категорію.
+   * Підтвердження лягає в профіль (bmiAck): при наступних збереженнях
+   * тієї самої категорії модалка не зʼявляється — без спаму попапами.
+   * Повертає true, коли можна продовжувати (підтверджено або не треба).
+   */
+  function bmiWarnModal() {
+    const BC = window.BmiCore;
+    if (!BC) return Promise.resolve(true);
+    const b = BC.bmi(state.body.weight, state.body.height);
+    const ack = (window.Store.localProfile() || {}).bmiAck;
+    if (!BC.shouldWarn(b, ack)) return Promise.resolve(true);
+
+    return new Promise(function (resolve) {
+      BC.showWarnModal(b, function () {
+        window.Store.saveProfile({ bmiAck: BC.ackFor(b) }).catch(function () {});
+        resolve(true);
+      });
+    });
+  }
+
   async function proceedBody() {
     if (state.busy) return;
-    if (!bodyReady()) { syncBodyControls(); return; }
+    if (!bodyReady() || !consentsOk()) { syncBodyControls(); return; }
+    await bmiWarnModal();
 
     state.busy = true;
     const b = state.body;
@@ -360,8 +432,14 @@
     const uname = (window.Store.localProfile() || {}).displayName || state.acc.username || '';
     const scr = Object.assign({}, patch);
     try {
+      const LV = window.LEGAL_VERSIONS || {};
       await window.Store.rpc('register_request', {
-        p_username: uname, p_birth: state.birth, p_screening: scr
+        p_username: uname, p_birth: state.birth, p_screening: scr,
+        p_consents: [
+          { document: 'terms_of_use',       version: LV.terms_of_use || '1.0' },
+          { document: 'privacy_policy',     version: LV.privacy_policy || '1.0' },
+          { document: 'medical_disclaimer', version: LV.medical_disclaimer || '1.0' }
+        ]
       });
       await window.Store.refreshAccountState();
       state.busy = false;
@@ -610,7 +688,10 @@
       (!CLOUD
         ? '<p class="small muted mt-2" style="text-align:center">Сайт у локальному режимі: акаунти вимкнені, ' +
           'реєстрація збереже дані лише в цьому браузері.</p>'
-        : '');
+        : '') +
+      '<p class="small muted mt-3" style="text-align:center">' +
+        '<a href="legal.html">Правові документи</a> · від 17 років' +
+      '</p>';
   }
 
   function renderLogin(host) {
@@ -853,6 +934,11 @@
     host.addEventListener('change', function (e) {
       const t = e.target;
       if (t.dataset && t.dataset.dob) { refreshAge(); return; }
+      if (t.id === 'c-terms' || t.id === 'c-privacy' || t.id === 'c-medical') {
+        state.consents[t.id] = t.checked;
+        syncBodyControls();
+        return;
+      }
       if (t.name === 'b-sex') { state.body.sex = t.value; syncBodyControls(); return; }
       const b = t.closest('[data-b]');
       if (b) { state.body[b.dataset.b] = b.value; syncBodyControls(); }

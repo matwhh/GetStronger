@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Заміри тіла — FORGE</title>
+<meta name="description" content="Заміри тіла у Forge: обхвати, історія, графіки й порівняння з попереднім заміром.">
+<meta name="theme-color" content="#17181a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/agegate.js"></script>
+<script>document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Заміри тіла</h1>
+      <p class="lead reveal" data-d="1">
+        Обхвати сантиметровою стрічкою: історія по датах, графіки і
+        порівняння з попереднім заміром. Заповнюй лише те, що виміряв, —
+        порожні поля не записуються.
+      </p>
+
+      <!-- Останній замір + кнопка нового -->
+      <div id="ms-last" class="mt-3 reveal" data-d="1"></div>
+
+      <!-- Форма нового/редагованого заміру (ховається, поки не відкрита) -->
+      <div id="ms-form" class="mt-3"></div>
+
+      <!-- Прогрес по параметру: вибір + графік + числа -->
+      <div id="ms-progress" class="mt-3 reveal" data-d="2"></div>
+
+      <!-- Історія замірів -->
+      <div id="ms-history" class="mt-3 reveal" data-d="2"></div>
+
+      <div class="mt-3" data-longform="Як міряти, щоб цифри мали сенс">
+        <h2 class="reveal">Як міряти</h2>
+        <div class="card reveal">
+          <p class="small">
+            Однакові умови важливіші за точність: та сама пора дня (краще
+            зранку), той самий стан (до тренування), стрічка щільно, але без
+            стискання. Обхвати рук і ніг — у розслабленому стані, в одній
+            точці щоразу.
+          </p>
+          <p class="small mb-0">
+            Раз на 1–2 тижні достатньо: обхвати змінюються повільно, а
+            щоденні коливання — це вода, їжа й натяг стрічки, не мʼязи.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/history-core.js"></script>
+<script defer src="js/measure-core.js"></script>
+<script defer src="js/measure.js"></script>
+</body>
+</html>

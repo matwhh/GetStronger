@@ -15,6 +15,11 @@
 --   * register_request() перевіряє вік (17+, міграція age_limit_17) НА СЕРВЕРІ й
 --     унікальність ніка; underage відсікається й прямим викликом.
 --   * усі elo_* RPC мають guard NOT_APPROVED.
+--   * consent_log — журнал згод (документ/версія/час); пише
+--     register_request, обовʼязкові privacy_policy + terms_of_use +
+--     medical_disclaimer (міграція consents_and_deletion).
+--   * delete_account() — повне видалення акаунта користувачем
+--     (delete from auth.users каскадом зносить усі дані).
 -- ============================================================
 
 create table if not exists public.account_status (

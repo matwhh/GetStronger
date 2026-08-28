@@ -73,7 +73,7 @@
    * (не коли додається нове поле — для цього досить blankProfile).
    * migrate() нижче переганяє старі профілі вперед по одному кроку.
    */
-  const SCHEMA_VERSION = 8;
+  const SCHEMA_VERSION = 9;
 
   const listeners = new Set();
   let session = null;   // { access_token, refresh_token, expires_at, user }
@@ -166,6 +166,8 @@
       // mealLog: закриті дні харчування (підсумок + ціль того дня).
       weightLog: {},
       sessionLog: {},
+      // Заміри тіла: обхвати по датах (js/measure-core.js)
+      measureLog: {},
       mealLog: {},
       // МОДУЛЬНІ ТРЕКЕРИ (етап 4). Форма — js/tracker-core.js.
       // trackers:    реєстр { id: {id,type,name,enabled,settings,goal,source,order,createdAt} }.
@@ -364,6 +366,12 @@
     if (v < 8) {
       if (p.scheme !== 'light' && p.scheme !== 'dark') p.scheme = null;
       v = 8;
+    }
+
+    /* 9: зʼявились заміри тіла (measureLog). */
+    if (v < 9) {
+      if (!p.measureLog || typeof p.measureLog !== 'object' || Array.isArray(p.measureLog)) p.measureLog = {};
+      v = 9;
     }
 
     /*
@@ -710,6 +718,20 @@
 
     /** Кешований стан акаунта (sync). null — ще не питали. */
     accountCached: function () { return lsGet(LS_ACCOUNT, null); },
+
+    /**
+     * Повне видалення акаунта: серверний RPC delete_account() зносить
+     * запис auth.users, і каскади прибирають профіль, журнали, рейтинг,
+     * статус заявки і журнал згод. Після успіху чистимо все локальне.
+     */
+    deleteAccount: async function () {
+      if (!CLOUD) throw new Error('Хмарний режим вимкнено');
+      await api.rpc('delete_account');
+      clearIdentityData();
+      try { localStorage.removeItem(LS_BACKUP); } catch (_) {}
+      emit();
+      return true;
+    },
 
     /* ---- Авторизація ---- */
 

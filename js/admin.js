@@ -79,6 +79,13 @@
         (r.decidedAt ? '<span class="small muted">рішення: ' + esc(dt(r.decidedAt)) + '</span>' : '') +
       '</div>' +
       screeningHtml(r) +
+      (Array.isArray(r.consents) && r.consents.length
+        ? '<p class="small muted mt-1" style="margin-bottom:0">Згоди: ' +
+          r.consents.map(function (c) {
+            const NAMES = { privacy_policy: 'конфіденційність', terms_of_use: 'умови', medical_disclaimer: 'мед. застереження' };
+            return esc(NAMES[c.document] || c.document) + ' v' + esc(c.version);
+          }).join(' · ') + '</p>'
+        : '') +
       '<div class="row mt-2" style="gap:10px;flex-wrap:wrap">' + acts.join('') + '</div>' +
     '</div>';
   }

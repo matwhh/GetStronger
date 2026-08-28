@@ -288,7 +288,8 @@
     { href: 'journal.html', label: 'Прогрес', core: true, icon: 'progress', children: [
       { href: 'journal.html',          label: 'Огляд прогресу' },
       { href: 'rating.html',           label: 'Рейтинг' },
-      { href: 'journal.html#history',  label: 'Історія' }
+      { href: 'journal.html#history',  label: 'Історія' },
+      { href: 'measure.html',          label: 'Заміри тіла' }
     ] },
 
     /* «Акаунта» тут немає: він має власний пункт біля правого краю
@@ -317,6 +318,7 @@
     { href: 'nutrition.html',  label: 'План харчування' },
     { href: 'trackers.html',   label: 'Трекери' },
     { href: 'journal.html',    label: 'Прогрес' },
+    { href: 'measure.html',    label: 'Заміри тіла' },
     { href: 'rating.html',     label: 'Рейтинг' },
     { href: 'boxing.html',     label: 'Бокс' },
     { href: 'cardio.html',     label: 'Кардіо' },
@@ -838,6 +840,12 @@
           'Розрахунки калорій, макронутрієнтів і 1ПМ — оцінки за популяційними формулами, ' +
           'індивідуальна похибка до ±10–15%. Не є медичною порадою. ' +
           'За наявності захворювань зміни в тренуваннях і харчуванні варто узгодити з лікарем.' +
+        '</p>' +
+        '<p class="footer__note" style="margin-top:6px">' +
+          '<a href="legal.html#privacy">Політика конфіденційності</a> · ' +
+          '<a href="legal.html#terms">Умови використання</a> · ' +
+          '<a href="legal.html#medical">Медичне застереження</a> · ' +
+          '<a href="legal.html#fitness">Тренування й харчування</a>' +
         '</p>' +
       '</div>';
   }

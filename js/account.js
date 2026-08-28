@@ -516,6 +516,9 @@
               ? '<button class="btn btn--ghost btn--sm" type="button" id="p-restore">Відкотити імпорт</button>'
               : '') +
             '<button class="btn btn--ghost btn--sm" type="button" id="p-clear">Стерти локальні дані</button>' +
+            (Store.isCloud && Store.user()
+              ? '<button class="btn btn--ghost btn--sm" type="button" id="p-delete-acc">Видалити акаунт</button>'
+              : '') +
           '</div>' +
           '<span class="small muted" id="p-saved">' +
             (p.updatedAt ? 'Збережено ' + new Date(p.updatedAt).toLocaleString('uk-UA') : 'Ще нічого не збережено') +
@@ -620,10 +623,28 @@
         // першому малюванні (рядок вище). Інакше позначка мовчки губила
         // дату, щойно людина щось відредагувала.
         if (mark) mark.textContent = 'Збережено ' + new Date().toLocaleString('uk-UA');
+        maybeBmiWarn(patch);
       } catch (e) {
         toast('Не збереглося: ' + e.message, 'err');
       }
     }, 400);
+  }
+
+  /**
+   * BMI-попередження після збереження НОВОЇ ваги/зросту — не при кожному
+   * відкритті профілю. Показ один раз на категорію (bmiAck у профілі);
+   * та сама логіка, що в скринінгу (js/bmi-core.js).
+   */
+  function maybeBmiWarn(patch) {
+    const BC = window.BmiCore;
+    if (!BC) return;
+    if (!('weight' in patch) && !('height' in patch)) return;
+    const p = Store.localProfile() || {};
+    const b = BC.bmi(p.weight, p.height);
+    if (!BC.shouldWarn(b, p.bmiAck)) return;
+    BC.showWarnModal(b, function () {
+      Store.saveProfile({ bmiAck: BC.ackFor(b) }).catch(function () {});
+    });
   }
 
   /**
@@ -655,6 +676,7 @@
       'displayName','pet','scheme',
       'bodyLog','workLog','theme','periodization','deload',
       'weightLog','sessionLog','mealLog','trackers','trackerLog',
+      'measureLog','bmiAck',
       'ratingLog','ratingSeen','ratingAlgorithmVersion',
       /* Латки разових міграцій. Без них імпорт на чистий браузер знімав
          позначку weightsHarvested, і programs.js на завантаженні знову
@@ -1295,6 +1317,42 @@
             });
           }
 
+          case 'measureLog': {
+            // { 'YYYY-MM-DD': { t?: 'ГГ:ХХ', <поле>: число } } — заміри тіла.
+            // Межі полів — ті самі, що на формі (js/measure-core.js).
+            if (!isPlain(v)) return reject(k);
+            const MC = window.MeasureCore;
+            if (!MC) return reject(k);
+            const dates = Object.keys(v);
+            if (dates.length > 4000) return reject(k);
+            const out = {};
+            for (let i = 0; i < dates.length; i++) {
+              const d = dates[i];
+              if (!DATE_KEY.test(d)) continue;
+              const e = v[d];
+              if (!isPlain(e)) continue;
+              const entry = {};
+              let any = false;
+              MC.FIELDS.forEach(function (f) {
+                const n = finite(e[f.k], f.min, f.max);
+                if (n !== null) { entry[f.k] = Math.round(n * 10) / 10; any = true; }
+              });
+              if (/^\d{2}:\d{2}$/.test(String(e.t || ''))) entry.t = e.t;
+              if (any) out[d] = entry;
+            }
+            return accept(k, out);
+          }
+
+          case 'bmiAck': {
+            // Підтвердження BMI-попередження: категорія + значення + час.
+            if (!isPlain(v)) return reject(k);
+            const cat = str(v.category, 10);
+            if (['under', 'over', 'obese'].indexOf(cat) === -1) return reject(k);
+            const b = finite(v.bmi, 5, 100);
+            if (b === null) return reject(k);
+            return accept(k, { category: cat, bmi: b, at: str(v.at, 40) || null });
+          }
+
           default:
             return reject(k);
         }
@@ -1424,6 +1482,31 @@
         Store.clearLocal();
         toast('Дані в цьому браузері стерто', 'ok');
         renderProfile();
+        return;
+      }
+
+      if (e.target.closest('#p-delete-acc')) {
+        /*
+         * ПОВНЕ видалення: серверний RPC зносить акаунт із каскадами
+         * (профіль, журнали, рейтинг, заявка, згоди) — після цього дані
+         * недоступні і через API. Два підтвердження, друге — введенням
+         * слова: подвійний confirm мимоволі проклацується.
+         */
+        if (!confirm('Видалити акаунт НАЗАВЖДИ?\n\nБуде видалено все: профіль, журнали, ' +
+          'заміри, рейтинг, історію сезонів і сам обліковий запис. Відновлення немає.\n\n' +
+          'Радимо спершу «Експортувати JSON».')) return;
+        const word = prompt('Щоб підтвердити, введи слово: ВИДАЛИТИ');
+        if (word !== 'ВИДАЛИТИ') { toast('Видалення скасовано', 'ok'); return; }
+        try {
+          await Store.deleteAccount();
+          alert('Акаунт видалено. Дякуємо, що був із Forge.');
+          location.replace('welcome.html');
+        } catch (err) {
+          const m = String((err && err.message) || '');
+          toast(m.indexOf('LAST_ADMIN') !== -1
+            ? 'Останній адміністратор не може видалити себе'
+            : 'Не вдалося видалити: ' + m, 'err');
+        }
       }
     });
 

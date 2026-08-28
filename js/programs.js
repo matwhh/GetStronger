@@ -1514,18 +1514,31 @@
         '<h3>Після кожного тренування</h3>' +
         ritualBlock('Заминка', 'Однакова для всіх тренувань', window.COOLDOWN, false) +
 
-        '<hr class="divider">' +
-        '<div class="grid grid-2">' +
-          '<div>' +
-            '<h3>Прогресія</h3>' +
-            '<p class="small">' + esc(program.progression) + '</p>' +
-          '</div>' +
-          '<div>' +
-            '<h3>Як це виконувати</h3>' +
-            '<ul class="small list-note" style="margin-bottom:0">' +
-              program.notes.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') +
-            '</ul>' +
-          '</div>' +
+        /* Довідка про програму: читається один раз, а потім щодня займає
+           екран. Той самий згорнутий акордеон, що й решта довгих
+           пояснень на сайті. */
+        '<div class="acc acc--longform mt-3">' +
+          '<button class="acc__head" type="button" aria-expanded="false">' +
+            '<span>' +
+              '<h3>Прогресія та як це виконувати</h3>' +
+              '<span class="small muted">Як додавати вагу і як читати план</span>' +
+            '</span>' +
+            '<svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>' +
+          '</button>' +
+          '<div class="acc__body"><div class="acc__inner"><div class="acc__pad">' +
+            '<div class="grid grid-2">' +
+              '<div>' +
+                '<h3>Прогресія</h3>' +
+                '<p class="small">' + esc(program.progression) + '</p>' +
+              '</div>' +
+              '<div>' +
+                '<h3>Як це виконувати</h3>' +
+                '<ul class="small list-note" style="margin-bottom:0">' +
+                  program.notes.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') +
+                '</ul>' +
+              '</div>' +
+            '</div>' +
+          '</div></div></div>' +
         '</div>' +
       '</div>';
 

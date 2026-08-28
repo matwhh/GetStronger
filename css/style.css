@@ -3593,7 +3593,7 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
    Тому три поля з автопереходом. Ширини задані в ch і рахуються від
    кількості цифр: поле на два символи не має бути таким самим, як на
    чотири, інакше цифри в ньому висять посередині порожнечі. */
-.dob { display: flex; align-items: center; gap: 6px; }
+.dob { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .dob__part {
   text-align: center;
   font-family: var(--font-mono);

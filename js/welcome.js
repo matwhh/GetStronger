@@ -112,7 +112,7 @@
       stepBadge(2) +
       '<h1 class="gate__title">Вкажіть вашу дату народження</h1>' +
 
-      '<div class="field mt-2">' +
+      '<div class="field mt-2" style="text-align:center">' +
         '<span class="field__label" id="dob-label">Дата народження</span>' +
         /*
          * Три числові поля замість календаря. inputmode="numeric" піднімає

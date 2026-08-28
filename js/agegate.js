@@ -42,6 +42,32 @@
     return file === '' ? 'index.html' : file;
   }
 
+  /*
+   * ЗАПОБІЖНИК ЦИКЛІВ. Сторож і welcome.js обидва вміють редиректити;
+   * якщо їхні уявлення про стан колись розійдуться (порожній localStorage
+   * проти повної хмари абощо), сайт втрапляє в нескінченне
+   * перезавантаження, і людина не може зробити НІЧОГО. Тому кожен
+   * редирект сторожа рахується в sessionStorage: понад 4 за 10 секунд —
+   * сторож замовкає і дає сторінці відкритися. Краще один зайвий екран,
+   * ніж мертвий сайт.
+   */
+  function redirectAllowed() {
+    try {
+      const now = Date.now();
+      let st = null;
+      try { st = JSON.parse(sessionStorage.getItem('ib.gateloop')); } catch (_) {}
+      if (!st || typeof st !== 'object' || now - st.t > 10000) st = { t: now, n: 0 };
+      st.n += 1;
+      sessionStorage.setItem('ib.gateloop', JSON.stringify(st));
+      return st.n <= 4;
+    } catch (_) { return true; }
+  }
+
+  function go(page) {
+    if (!redirectAllowed()) return;
+    location.replace(page);
+  }
+
   function lsJson(key) {
     try {
       const v = JSON.parse(localStorage.getItem(key));
@@ -67,13 +93,13 @@
     const here0 = currentPage();
     const sess = lsJson('ib.session');
     if (!sess || !sess.access_token) {
-      if (here0 !== 'welcome.html') { location.replace('welcome.html'); }
+      if (here0 !== 'welcome.html') { go('welcome.html'); }
       return;
     }
     const acct = lsJson('ib.account');
     if (acct && acct.status && acct.status !== 'approved') {
       const ok = here0 === 'welcome.html' || (acct.isAdmin && here0 === 'admin.html');
-      if (!ok) { location.replace('welcome.html'); }
+      if (!ok) { go('welcome.html'); }
       return;
     }
     if (here0 === 'welcome.html') {
@@ -179,5 +205,5 @@
    * не має лишатись в історії — інакше «назад» повертало б на неї, і
    * сторож спрацьовував би знову й знову, замикаючи людину в циклі.
    */
-  location.replace(route.page);
+  go(route.page);
 })();

@@ -670,8 +670,10 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   content: "";
   position: absolute; inset: 0;
   border-radius: inherit;
+  /* Світло, а не колір: тонований відблиск читався б як кольорова пляма
+     на нейтральній поверхні. Значення живе в --fx-rgb / --fx-card. */
   background: radial-gradient(420px 220px at var(--mx, 50%) var(--my, 0%),
-    rgba(var(--acc-2-rgb), 0.16), transparent 70%);
+    rgba(var(--fx-rgb), var(--fx-card)), transparent 70%);
   opacity: 0; transition: opacity var(--t);
   pointer-events: none;
 }
@@ -2641,12 +2643,9 @@ body {
   background: var(--bg);
   letter-spacing: 0.003em;
 }
-.bg-fx {
-  background:
-    radial-gradient(900px 620px at 5% -10%, rgba(var(--acc-rgb), 0.2), transparent 61%),
-    radial-gradient(760px 580px at 96% 30%, rgba(var(--acc-rgb), 0.11), transparent 65%),
-    linear-gradient(145deg, var(--grad-a), var(--grad-b) 48%, var(--grad-c));
-}
+/* Фон малюється вище, у секції ТЕМИ: нейтральним світлом, не акцентом.
+   Тут колись стояли акцентні радіальні плями — саме вони й давали кольорові
+   бліки, через які графітова основа виглядала підфарбованою. */
 .wrap { max-width: 1240px; }
 .section { padding: clamp(58px, 8vw, 104px) 0; }
 

@@ -15,7 +15,7 @@
 (function () {
   'use strict';
 
-  const MIN_AGE = 18;
+  const MIN_AGE = 17;
   const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
   /** Найстарша дата, яку приймаємо: 120 років — межа правдоподібності */
@@ -81,7 +81,7 @@
    * Стан для екрана: що показувати й чи можна далі.
    *   'empty'   — дати ще немає
    *   'invalid' — дата непридатна (майбутнє, неіснуючий день, > 120 років)
-   *   'minor'   — вік менший за 18
+   *   'minor'   — вік менший за 17
    *   'adult'   — можна продовжувати
    */
   function gateState(birth, now) {
@@ -91,7 +91,7 @@
     return { state: a >= MIN_AGE ? 'adult' : 'minor', age: a };
   }
 
-  /** Найпізніша дата народження, за якої вже є 18 — для max у полі вводу */
+  /** Найпізніша дата народження, за якої вже є 17 — для max у полі вводу */
   function latestAdultBirthDate(now) {
     const t = now instanceof Date ? now : new Date();
     const d = new Date(t.getFullYear() - MIN_AGE, t.getMonth(), t.getDate());

@@ -60,6 +60,18 @@ export async function adultContext(browser, opts) {
     let raw = {};
     try { raw = JSON.parse(localStorage.getItem('ib.profile') || '{}') || {}; } catch (_) {}
     localStorage.setItem('ib.profile', JSON.stringify(Object.assign({}, seed, raw)));
+    /*
+     * Хмарний сторож (agegate) без сесії пускає лише на welcome. Для
+     * file://-перевірок садимо фейкову сесію і статус approved: далі
+     * мережеві виклики впадуть і Store чесно читає локальний профіль.
+     */
+    localStorage.setItem('ib.cloud', '1');
+    localStorage.setItem('ib.session', JSON.stringify({
+      access_token: 'test-token', refresh_token: 'test-refresh',
+      expires_at: Date.now() + 86400000,
+      user: { id: '00000000-0000-4000-8000-000000000001', email: 'test@example.com' }
+    }));
+    localStorage.setItem('ib.account', JSON.stringify({ status: 'approved', username: 'Тест', isAdmin: false, t: Date.now() }));
   }, ONBOARDED);
   await p.close();
 

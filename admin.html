@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Адмін — FORGE</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#17181a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<!-- Сторож: без сесії — welcome; не-approved сюди теж не потрапить
+     (окрім адміна). Права на дані все одно перевіряє сервер (is_admin
+     у кожному RPC) — ця сторінка лише інтерфейс. -->
+<script src="js/agegate.js"></script>
+<script>document.documentElement.className='js';
+try{var _r=document.documentElement,
+_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
+amber:'graphite-amber',moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
+_t=localStorage.getItem('forge.theme');
+_t=_m[_t]||_t;
+if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
+var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e6e8ec');}
+}catch(e){}</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Заявки на акаунт</h1>
+      <p class="lead reveal" data-d="1">
+        Ручне підтвердження реєстрацій. Рішення зберігається на сервері й
+        контролюється правами бази — не цією сторінкою.
+      </p>
+
+      <div id="adm" class="mt-3"></div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/admin.js"></script>
+</body>
+</html>

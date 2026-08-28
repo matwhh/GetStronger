@@ -35,17 +35,49 @@
 
   /* ---------------- Блоки ---------------- */
 
-  function renderHeader(st) {
+  /*
+   * Верхня картка — competitive identity, перенесена з «Акаунта»: нік,
+   * ELO з рівнем, нагороди й завершені сезони, маскот-заглушка, посилання
+   * на огляд прогресу та історію. Це відповідь на «хто я в цьому сезоні»,
+   * і жити вона має там, де сам рейтинг, а не в налаштуваннях акаунта.
+   */
+
+  /* Нагороди/сезони вантажаться раз на відкриття: історія міняється лише
+     із закриттям сезону, смикати її на кожен refresh нема чого. */
+  const ident = { awards: 0, seasons: 0, loaded: false };
+
+  async function renderHeader(st) {
+    const host = $('#sz-header');
+    if (!host) return;
+
+    // Нік саме редагують — не зносимо картку під пальцями. Дебаунс
+    // збереження сам домалює свіже значення наступним refresh-ом.
+    const act = document.activeElement;
+    if (act && act.id === 'sz-nick') return;
+
+    if (!ident.loaded) {
+      try {
+        const h = await Api.history();
+        ident.awards = ((h && h.awards) || []).length;
+        ident.seasons = ((h && h.history) || []).length;
+        ident.loaded = true;
+      } catch (_) {}
+    }
+
+    let p = {};
+    try { p = await window.Store.getProfile() || {}; } catch (_) {}
+    const name = (p.displayName || '').trim();
+
     const lvl = EC.levelFor(st.elo, st.config);
     const range = EC.seasonRange(st.season);
     const now = new Date();
     const total = Math.round((range[1] - range[0]) / 86400000) + 1;
     const passed = Math.min(total, Math.max(1, Math.round((now - range[0]) / 86400000) + 1));
 
-    $('#sz-header').innerHTML = card(
-      '<div class="row row--split" style="align-items:baseline;gap:10px">' +
-        '<h2 style="margin:0">' + esc(EC.seasonLabel(st.season)) + '</h2>' +
-        '<span class="small muted">день ' + passed + ' із ' + total + '</span>' +
+    host.innerHTML = card(
+      '<div class="row row--split" style="align-items:baseline;gap:10px;flex-wrap:wrap">' +
+        '<h2 style="margin:0;text-transform:uppercase">' + esc(name || 'Атлет') + '</h2>' +
+        '<span class="small muted">' + esc(EC.seasonLabel(st.season)) + ' · день ' + passed + ' із ' + total + '</span>' +
       '</div>' +
       '<div class="rating-hero mt-2">' +
         '<span class="rating-hero__val mono">' + st.elo + '<span class="tile__of"> ELO</span></span>' +
@@ -62,8 +94,45 @@
           : '<span class="small">До Level ' + (lvl.level + 1) + ': <b class="mono">' +
             (lvl.ceil + 1 - st.elo) + ' ELO</b></span>') +
         (st.rank ? '<span class="small">Місце: <b class="mono">#' + st.rank + '</b> із ' + st.of + '</span>' : '') +
+      '</div>' +
+
+      '<div class="kpis mt-2">' +
+        '<div class="kpi"><div class="kpi__val mono">' + ident.awards + '</div><p class="kpi__lbl">нагород</p></div>' +
+        '<div class="kpi"><div class="kpi__val mono">' + ident.seasons + '</div><p class="kpi__lbl">сезонів завершено</p></div>' +
+      '</div>' +
+
+      '<div class="field mt-2" style="max-width:340px">' +
+        '<label class="field__label" for="sz-nick">Нік у таблиці лідерів</label>' +
+        '<input class="input" id="sz-nick" maxlength="24" placeholder="Атлет" value="' + esc(name) + '">' +
+      '</div>' +
+
+      /* Маскот: місце зарезервовано, системи ще немає — чесно кажемо */
+      '<div class="row mt-2" style="gap:12px;align-items:center;border:1px dashed var(--line);border-radius:14px;padding:12px 14px">' +
+        '<span style="font-size:1.6rem" aria-hidden="true">🐾</span>' +
+        '<div>' +
+          '<b class="small">Forge Pet — Level ' + ((p.pet && p.pet.level) || 1) + '</b>' +
+          '<p class="small muted" style="margin:2px 0 0">Pixel-art компаньйон. Скоро: скіни, настрій і сезонні образи.</p>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="row mt-2" style="gap:14px;flex-wrap:wrap">' +
+        '<a class="small" href="journal.html">Огляд прогресу →</a>' +
+        '<a class="small" href="journal.html#history">Історія →</a>' +
       '</div>');
   }
+
+  /* Нік: делегування на контейнері — картка перемальовується, а слухач
+     живе на хості. Той самий дебаунс, що був в акаунті. */
+  let nickTimer = null;
+  document.addEventListener('input', function (e) {
+    if (!e.target || e.target.id !== 'sz-nick') return;
+    clearTimeout(nickTimer);
+    const v = e.target.value.trim();
+    nickTimer = setTimeout(function () {
+      window.Store.saveProfile({ displayName: v || null }).catch(function () {});
+      Api.setName(v).catch(function () {});
+    }, 600);
+  });
 
   function renderGrace(st) {
     const cfgMax = st.config.graceWeeksPerSeason;

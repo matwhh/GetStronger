@@ -187,11 +187,17 @@
     const user = Store.user();
 
     if (user) {
+      const acct = Store.accountCached && Store.accountCached();
       host.innerHTML =
         '<div class="card">' +
           '<h2 class="card__title">Сесія</h2>' +
           '<p class="small">Пошта: <b>' + esc(user.email) + '</b></p>' +
           '<button class="btn btn--ghost btn--sm" type="button" id="a-signout">Вийти</button>' +
+          /* Посилання видно лише адміну; самі права перевіряє сервер
+             у кожному RPC — сховати/показати лінк нічого не змінює. */
+          (acct && acct.isAdmin
+            ? '<div class="row mt-2"><a class="small" href="admin.html">Адмін-панель: заявки на акаунт →</a></div>'
+            : '') +
         '</div>';
 
       $('#a-signout').addEventListener('click', async function () {
@@ -1435,94 +1441,8 @@
 
   /* ------------------------------------------------------------------ */
 
-  /* ------------------------------------------------------------------ */
-  /* Competitive identity: хто ти в сезоні. Нік, ELO, рівень, нагороди,  */
-  /* маскот-заглушка. Живе лише з акаунтом — сезонний рейтинг на сервері.*/
-  /* ------------------------------------------------------------------ */
-
-  async function renderIdentity() {
-    const host = $('#identity');
-    const Api = window.EloApi, EC = window.EloCore;
-    if (!host || !Api || !EC) return;
-    if (!Api.available()) { host.innerHTML = ''; return; }
-
-    let st = Api.cached();
-    try { st = await Api.refresh(); } catch (_) {}
-    if (!st || !st.config) { host.innerHTML = ''; return; }
-
-    let hist = { history: [], awards: [] };
-    try { hist = await Api.history(); } catch (_) {}
-    const seasonsDone = (hist.history || []).length;
-    const awardsCount = (hist.awards || []).length;
-
-    const p = await Store.getProfile().catch(function () { return {}; }) || {};
-    const lvl = EC.levelFor(st.elo, st.config);
-    const name = (p.displayName || '').trim();
-
-    host.innerHTML = '' +
-      '<div class="card">' +
-        '<div class="row row--split" style="align-items:baseline;gap:10px;flex-wrap:wrap">' +
-          '<h2 style="margin:0;text-transform:uppercase">' + esc(name || 'Атлет') + '</h2>' +
-          '<span class="small muted">' + esc(EC.seasonLabel(st.season)) + '</span>' +
-        '</div>' +
-
-        '<div class="rating-hero mt-2">' +
-          '<span class="rating-hero__val mono">' + st.elo + '<span class="tile__of"> ELO</span></span>' +
-          '<span class="rating-hero__meta">' +
-            '<span class="lvl-circle">' + lvl.level + '</span>' +
-            '<span class="small muted">' + esc(lvl.name) +
-              (st.rank ? ' · #' + st.rank + ' із ' + st.of : '') + '</span>' +
-          '</span>' +
-        '</div>' +
-        '<div class="vol" style="margin-top:8px"><span class="vol__bar"><i style="width:' + lvl.pct + '%"></i></span></div>' +
-
-        '<div class="kpis mt-2">' +
-          '<div class="kpi"><div class="kpi__val mono">' + awardsCount + '</div><p class="kpi__lbl">нагород</p></div>' +
-          '<div class="kpi"><div class="kpi__val mono">' + seasonsDone + '</div><p class="kpi__lbl">сезонів завершено</p></div>' +
-          '<div class="kpi"><div class="kpi__val mono">' + (st.today > 0 ? '+' : '') + (st.today || 0) + '</div><p class="kpi__lbl">ELO сьогодні</p></div>' +
-        '</div>' +
-
-        '<div class="field mt-2" style="max-width:340px">' +
-          '<label class="field__label" for="p-nick">Нік у таблиці лідерів</label>' +
-          '<input class="input" id="p-nick" maxlength="24" placeholder="Атлет" value="' + esc(name) + '">' +
-        '</div>' +
-
-        /* Маскот: місце зарезервовано, системи ще немає — чесно кажемо */
-        '<div class="row mt-2" style="gap:12px;align-items:center;border:1px dashed var(--line);border-radius:14px;padding:12px 14px">' +
-          '<span style="font-size:1.6rem" aria-hidden="true">🐾</span>' +
-          '<div>' +
-            '<b class="small">Forge Pet — Level ' + ((p.pet && p.pet.level) || 1) + '</b>' +
-            '<p class="small muted" style="margin:2px 0 0">Pixel-art компаньйон. Скоро: скіни, настрій і сезонні образи.</p>' +
-          '</div>' +
-        '</div>' +
-
-        /* Прогрес як єдина структура: огляд (аналітика), рейтинг
-           (гейміфікація) та історія (факти) — три різні питання,
-           тому три посилання поруч, а не один змішаний розділ. */
-        '<div class="row mt-2" style="gap:14px;flex-wrap:wrap">' +
-          '<a class="small" href="journal.html">Огляд прогресу →</a>' +
-          '<a class="small" href="rating.html">Рейтинг →</a>' +
-          '<a class="small" href="journal.html#history">Історія →</a>' +
-        '</div>' +
-      '</div>';
-
-    const nick = $('#p-nick');
-    if (nick) {
-      let t = null;
-      nick.addEventListener('input', function () {
-        clearTimeout(t);
-        t = setTimeout(function () {
-          const v = nick.value.trim();
-          Store.saveProfile({ displayName: v || null }).catch(function () {});
-          Api.setName(v).catch(function () {});
-        }, 600);
-      });
-    }
-  }
-
   async function renderAll() {
     renderMode();
-    renderIdentity();
     renderTheme();
     wireTheme();
     renderAuth();

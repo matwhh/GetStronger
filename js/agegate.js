@@ -1,7 +1,7 @@
 /**
  * Сторож онбордингу: до Forge пускають лише повний профіль.
  *
- * Виріс із вікового сторожа (18+) і працює за тим самим принципом:
+ * Виріс із вікового сторожа (17+) і працює за тим самим принципом:
  * перевірка стоїть НЕ на екрані кроку, а перед КОЖНОЮ сторінкою — цей
  * файл підключений синхронно в <head> усіх сторінок Forge, включно з
  * welcome.html, і ухвалює рішення до першого рядка розмітки.
@@ -35,11 +35,54 @@
   'use strict';
 
   const LS_PROFILE = 'ib.profile';
-  const MIN_AGE = 18;
+  const MIN_AGE = 17;
 
   function currentPage() {
     const file = location.pathname.split('/').pop();
     return file === '' ? 'index.html' : file;
+  }
+
+  function lsJson(key) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      return v && typeof v === 'object' ? v : null;
+    } catch (_) { return null; }
+  }
+
+  /* ------------------------------------------------------------------
+   * Хмарний режим: спершу автентифікація і статус акаунта.
+   *
+   * Прапорець ib.cloud пише js/store.js (сторож виконується в <head> до
+   * config.js і сам режим знати не може). ib.session і ib.account — теж
+   * його кеші. ЦЕ UX-МАРШРУТИЗАЦІЯ, НЕ БАРʼЄР: приватні дані захищає RLS
+   * на сервері — pending/rejected/blocked не прочитає їх, навіть якщо
+   * підробить усі три ключі. Сторож лише не дає застосунку прикидатись
+   * відкритим там, де сервер однаково відмовить.
+   *
+   *   без сесії                → тільки welcome.html (стартовий Auth-екран)
+   *   статус ≠ approved        → тільки welcome.html (екран заявки)
+   *   approved / кеш ще пустий → далі профільні кроки, як і раніше
+   * ------------------------------------------------------------------ */
+  if (localStorage.getItem('ib.cloud') === '1') {
+    const here0 = currentPage();
+    const sess = lsJson('ib.session');
+    if (!sess || !sess.access_token) {
+      if (here0 !== 'welcome.html') { location.replace('welcome.html'); }
+      return;
+    }
+    const acct = lsJson('ib.account');
+    if (acct && acct.status && acct.status !== 'approved') {
+      const ok = here0 === 'welcome.html' || (acct.isAdmin && here0 === 'admin.html');
+      if (!ok) { location.replace('welcome.html'); }
+      return;
+    }
+    if (here0 === 'welcome.html') {
+      /* Approved (або статус ще не приїхав) на welcome: хай вирішує сам
+         welcome.js — він знає і статус, і крок онбордингу. Не редіректимо
+         звідси, щоб не зациклитись із його власними replace(). */
+      return;
+    }
+    // далі — звичайні профільні кроки
   }
 
   function profile() {

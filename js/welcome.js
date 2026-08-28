@@ -1,5 +1,5 @@
 /**
- * Перші екрани Forge: вік (18+) і базові дані тіла.
+ * Перші екрани Forge: вік (17+) і базові дані тіла.
  *
  * Це ПЕРШІ КРОКИ онбордингу, а не окрема система. Усе лягає в той самий
  * профіль (Store), яким живе застосунок; власного сховища й прапорця
@@ -42,12 +42,26 @@
    * складається з них, коли всі три заповнені.
    */
   const state = {
-    step: 'age',
+    /* step: start | login | reg | confirm | name | age | body |
+             pending | rejected | blocked */
+    step: 'start',
     dob: { d: '', m: '', y: '' },
     birth: '',
     body: { sex: null, weight: '', height: '', activity: '', trainingAge: '', hrRest: '', hrMax: '' },
+    acc: { username: '', email: '', pass: '', pass2: '' },
+    err: '',
     busy: false
   };
+
+  const CLOUD = Boolean(window.Store && window.Store.isCloud);
+
+  /* Лічильник кроків реєстрації: акаунт → вік → тіло. У локальному
+     режимі акаунта немає, тож і лічильник коротший. */
+  function stepBadge(n) {
+    const total = CLOUD ? 3 : 2;
+    const i = CLOUD ? n : n - 1;
+    return '<p class="small muted" style="margin:0 0 10px">Крок ' + i + ' із ' + total + '</p>';
+  }
 
   /* ------------------------------------------------------------------ */
   /* Крок 1: вік                                                         */
@@ -66,9 +80,9 @@
        */
       return '' +
         '<div class="gate__msg gate__msg--block" role="alert">' +
-          '<p class="gate__msg-title">Forge доступний лише користувачам віком від 18 років.</p>' +
+          '<p class="gate__msg-title">Forge доступний лише користувачам віком від 17 років.</p>' +
           '<p class="small mb-0">Платформа та її тренувальні програми розроблені для ' +
-            'повнолітніх користувачів віком 18 років і старше.</p>' +
+            'користувачів віком 17 років і старше.</p>' +
         '</div>';
     }
     return '';
@@ -94,6 +108,7 @@
 
   function renderAge(host) {
     host.innerHTML = '' +
+      stepBadge(2) +
       '<h1 class="gate__title">Вкажіть вашу дату народження</h1>' +
 
       '<div class="field mt-2">' +
@@ -238,6 +253,7 @@
     };
 
     host.innerHTML = '' +
+      stepBadge(3) +
       '<h1 class="gate__title">Розкажіть про себе</h1>' +
       '<p class="small muted gate__lead">З цього рахуються калорії, білок і пульсові зони. ' +
         'Дані зберігаються лише на цьому пристрої.</p>' +
@@ -321,33 +337,238 @@
 
     try {
       await window.Store.saveProfile(patch);
-      location.replace(NEXT);
     } catch (e) {
-      if (e && e.queued) { location.replace(NEXT); return; }
+      if (!(e && e.queued)) {
+        state.busy = false;
+        window.App.toast('Не збереглося: ' + (e && e.message), 'err');
+        return;
+      }
+    }
+
+    /* Локальний режим: акаунтів немає — далі одразу вибір програми. */
+    if (!CLOUD || !window.Store.user()) {
+      location.replace(NEXT);
+      return;
+    }
+
+    /*
+     * Хмарний режим: скринінг завершено — подаємо ЗАЯВКУ. Сервер ще раз
+     * перевіряє вік (underage не пройде і прямим викликом API) та
+     * унікальність ніка, і ставить статус pending. Доступу до Forge це
+     * ще не дає — RLS відкриється лише після ручного підтвердження.
+     */
+    const uname = (window.Store.localProfile() || {}).displayName || state.acc.username || '';
+    const scr = Object.assign({}, patch);
+    try {
+      await window.Store.rpc('register_request', {
+        p_username: uname, p_birth: state.birth, p_screening: scr
+      });
+      await window.Store.refreshAccountState();
       state.busy = false;
-      window.App.toast('Не збереглося: ' + (e && e.message), 'err');
+      nav('pending');
+    } catch (e) {
+      state.busy = false;
+      const msg = String((e && e.message) || '');
+      if (msg.indexOf('UNDERAGE') !== -1) {
+        state.err = 'Forge доступний із 17 років.';
+        nav('age');
+      } else if (msg.indexOf('USERNAME_TAKEN') !== -1 || msg.indexOf('USERNAME_INVALID') !== -1) {
+        state.err = 'Нік зайнятий або некоректний — обери інший.';
+        nav('name');
+      } else if (msg.indexOf('BLOCKED') !== -1) {
+        nav('blocked');
+      } else {
+        window.App.toast('Не вдалося подати заявку: ' + msg, 'err');
+      }
     }
   }
 
   /* ------------------------------------------------------------------ */
+  /* Дії автентифікації                                                  */
+  /* ------------------------------------------------------------------ */
 
-  function render() {
-    const host = $('#gate-card');
-    if (!host) return;
-    if (state.step === 'body') renderBody(host);
-    else renderAge(host);
+  /** Після входу/реєстрації: розвести за статусом акаунта. */
+  async function routeAfterAuth() {
+    const st = (await window.Store.refreshAccountState()) ||
+               window.Store.accountCached() || { status: 'none' };
+    const status = st.status || 'none';
+
+    if (status === 'pending')  { nav('pending');  return; }
+    if (status === 'rejected') { nav('rejected'); return; }
+    if (status === 'blocked')  { nav('blocked');  return; }
+
+    if (status === 'approved') {
+      /*
+       * Підтверджений акаунт. Якщо хмарний профіль ще порожній, а скринінг
+       * реєстрації лежить локально — доливаємо його (тепер RLS пускає).
+       */
+      let p = {};
+      try { p = await window.Store.getProfile() || {}; } catch (_) {}
+      const localSnap = window.Store.localProfile() || {};
+      if (!p.birthDate && localSnap.birthDate) {
+        const KEYS = ['birthDate', 'age', 'sex', 'weight', 'height', 'activity',
+                      'trainingAge', 'hrRest', 'hrMax', 'displayName'];
+        const fill = {};
+        KEYS.forEach(function (k) { if (localSnap[k] != null) fill[k] = localSnap[k]; });
+        try { p = await window.Store.saveProfile(fill); } catch (_) {}
+      }
+      const step = OC.stepFor(p);
+      if (step === 'done') { location.replace(HOME); return; }
+      if (step === 'program') { location.replace(NEXT); return; }
+      seedFromProfile(p);
+      nav(step);   // 'age' | 'body' — дозаповнити скринінг
+      return;
+    }
+
+    /* 'none': акаунт є, заявки ще немає — продовжити реєстрацію з того
+       кроку, до якого дійшли (дані живуть локально). */
+    const localSnap = window.Store.localProfile() || {};
+    seedFromProfile(localSnap);
+    if (!((localSnap.displayName || state.acc.username || '').trim())) { nav('name'); return; }
+    if (!localSnap.birthDate || !AC.isAdult(localSnap.birthDate)) { nav('age'); return; }
+    nav('body');
   }
 
-  async function init() {
-    if (!$('#gate-card') || !AC || !OC) return;
+  function validAccount() {
+    const a = state.acc;
+    if (a.username.trim().length < 3 || a.username.trim().length > 24) return 'Нік — від 3 до 24 символів.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) return 'Перевір адресу пошти.';
+    if (a.pass.length < 8) return 'Пароль — щонайменше 8 символів.';
+    if (a.pass !== a.pass2) return 'Паролі не збігаються.';
+    return '';
+  }
 
-    /*
-     * Профіль уже може бути частково заповнений: людина повернулась
-     * «назад» або перезавантажила сторінку посеред кроку. Показуємо
-     * рівно той крок, що виводиться з даних, — і з даними в полях.
-     */
-    let p = {};
-    try { p = await window.Store.getProfile() || {}; } catch (_) {}
+  function readAccFields() {
+    const g = function (id) { const el = $('#' + id); return el ? el.value : ''; };
+    if ($('#au-name'))  state.acc.username = g('au-name');
+    if ($('#au-email')) state.acc.email = g('au-email');
+    if ($('#au-pass'))  state.acc.pass = g('au-pass');
+    if ($('#au-pass2')) state.acc.pass2 = g('au-pass2');
+  }
+
+  async function doLogin() {
+    if (state.busy) return;
+    readAccFields();
+    if (!CLOUD) { state.err = 'Сайт у локальному режимі — вхід вимкнено.'; render(); return; }
+    if (!state.acc.email || state.acc.pass.length < 8) {
+      state.err = 'Заповни пошту й пароль (від 8 символів).'; render(); return;
+    }
+    state.busy = true; state.err = ''; render();
+    try {
+      await window.Store.signIn(state.acc.email.trim(), state.acc.pass);
+      state.busy = false;
+      await routeAfterAuth();
+    } catch (e) {
+      state.busy = false;
+      state.err = 'Не вдалося увійти: ' + ((e && e.message) || 'помилка');
+      render();
+    }
+  }
+
+  async function doRegister() {
+    if (state.busy) return;
+    readAccFields();
+    if (!CLOUD) { nav('age'); return; }   // локальний режим — одразу скринінг
+    const v = validAccount();
+    if (v) { state.err = v; render(); return; }
+
+    state.busy = true; state.err = ''; render();
+    try {
+      const res = await window.Store.signUp(state.acc.email.trim(), state.acc.pass);
+      // Нік — у профіль (локально до підтвердження) і в заявку далі
+      try { await window.Store.saveProfile({ displayName: state.acc.username.trim() }); } catch (_) {}
+
+      if (!res || res.confirmed === false) {
+        // Увімкнене підтвердження пошти: сесії ще немає
+        state.busy = false;
+        nav('confirm');
+        return;
+      }
+      state.busy = false;
+      await afterSignupChecks();
+    } catch (e) {
+      state.busy = false;
+      const msg = String((e && e.message) || '');
+      if (/already|зареєстр|registered/i.test(msg)) {
+        // Продовження незавершеної реєстрації: акаунт уже є — входимо
+        try {
+          await window.Store.signIn(state.acc.email.trim(), state.acc.pass);
+          try { await window.Store.saveProfile({ displayName: state.acc.username.trim() }); } catch (_) {}
+          await routeAfterAuth();
+          return;
+        } catch (e2) {
+          state.err = 'Ця пошта вже зареєстрована, але пароль не підійшов.';
+          render(); return;
+        }
+      }
+      state.err = 'Не вдалося створити акаунт: ' + msg;
+      render();
+    }
+  }
+
+  /** Після появи сесії: перевірити нік і рушити в скринінг. */
+  async function afterSignupChecks() {
+    try {
+      const free = await window.Store.rpc('username_free', { p_username: state.acc.username.trim() });
+      if (free === false) { state.err = 'Цей нік уже зайнятий — обери інший.'; nav('name'); return; }
+    } catch (_) { /* перевірить register_request */ }
+    nav('age');
+  }
+
+  async function doConfirmed() {
+    if (state.busy) return;
+    state.busy = true; state.err = ''; render();
+    try {
+      await window.Store.signIn(state.acc.email.trim(), state.acc.pass);
+      state.busy = false;
+      await afterSignupChecks();
+    } catch (e) {
+      state.busy = false;
+      state.err = 'Ще не підтверджено або пароль не підійшов. Спробуй ще раз після кліку в листі.';
+      render();
+    }
+  }
+
+  async function doNameGo() {
+    readAccFields();
+    const n = state.acc.username.trim();
+    if (n.length < 3 || n.length > 24) { state.err = 'Нік — від 3 до 24 символів.'; render(); return; }
+    try { await window.Store.saveProfile({ displayName: n }); } catch (_) {}
+    try {
+      const free = await window.Store.rpc('username_free', { p_username: n });
+      if (free === false) { state.err = 'Цей нік теж зайнятий.'; render(); return; }
+    } catch (_) {}
+    const localSnap = window.Store.localProfile() || {};
+    if (localSnap.birthDate && AC.isAdult(localSnap.birthDate) &&
+        localSnap.sex && localSnap.weight) {
+      // скринінг уже пройдено — одразу подаємо заявку повторно
+      nav('body');
+    } else {
+      nav('age');
+    }
+  }
+
+  async function doSignOut() {
+    try { await window.Store.signOut(); } catch (_) {}
+    state.acc = { username: '', email: '', pass: '', pass2: '' };
+    nav('start');
+  }
+
+  async function doRecheck() {
+    if (state.busy) return;
+    state.busy = true; render();
+    const st = await window.Store.refreshAccountState();
+    state.busy = false;
+    if (st && st.status === 'approved') { await routeAfterAuth(); return; }
+    if (st && st.status === 'rejected') { nav('rejected'); return; }
+    if (st && st.status === 'blocked')  { nav('blocked');  return; }
+    window.App.toast('Поки що очікує підтвердження', 'ok');
+    render();
+  }
+
+  /** Часткове заповнення стану з профілю (продовження після перерви). */
+  function seedFromProfile(p) {
+    if (!p) return;
     if (typeof p.birthDate === 'string') {
       state.birth = p.birthDate;
       state.dob = birthToDob(p.birthDate);
@@ -356,14 +577,199 @@
     ['weight', 'height', 'activity', 'hrRest', 'hrMax'].forEach(function (k) {
       if (p[k] !== null && p[k] !== undefined) state.body[k] = String(p[k]);
     });
+    if (p.displayName && !state.acc.username) state.acc.username = p.displayName;
+  }
 
-    const step = OC.stepFor(p);
-    /* Тим, хто вже далі, тут робити нічого — сторож каже те саме. */
-    if (step === 'program') { location.replace(NEXT); return; }
-    if (step === 'done') { location.replace(HOME); return; }
-    state.step = step;
+  /* ------------------------------------------------------------------ */
+  /* Автентифікація і статус заявки                                      */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Стартовий екран — чистий вибір «Увійти / Зареєструватися». Питань
+   * скринінгу тут немає: вони починаються лише всередині реєстрації.
+   * Уся серверна частина — наявні Store.signIn/signUp (Supabase GoTrue)
+   * плюс RPC register_request / account_state; жодної фейкової
+   * автентифікації.
+   */
 
-    render();
+  function errLine() {
+    return state.err
+      ? '<p class="small" style="color:var(--warn, #d66);margin:10px 0 0">' + esc(state.err) + '</p>'
+      : '';
+  }
+
+  function renderStart(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title" style="text-align:center">Forge</h1>' +
+      '<p class="small muted" style="text-align:center;margin:6px 0 0">' +
+        'Тренування, харчування і прогрес — за твоїм планом.' +
+      '</p>' +
+      '<div class="grid mt-3" style="gap:12px;max-width:320px;margin-left:auto;margin-right:auto">' +
+        '<button class="btn btn--primary" type="button" data-nav="login">Увійти</button>' +
+        '<button class="btn btn--ghost" type="button" data-nav="' + (CLOUD ? 'reg' : 'age') + '">Зареєструватися</button>' +
+      '</div>' +
+      (!CLOUD
+        ? '<p class="small muted mt-2" style="text-align:center">Сайт у локальному режимі: акаунти вимкнені, ' +
+          'реєстрація збереже дані лише в цьому браузері.</p>'
+        : '');
+  }
+
+  function renderLogin(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Вхід</h1>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-email">Пошта</label>' +
+        '<input class="input" id="au-email" type="email" autocomplete="email" placeholder="you@example.com" value="' + esc(state.acc.email) + '">' +
+        '<span class="field__hint">Вхід — за поштою. Нік показується в таблиці лідерів.</span>' +
+      '</div>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-pass">Пароль</label>' +
+        '<input class="input" id="au-pass" type="password" autocomplete="current-password" placeholder="мінімум 8 символів">' +
+      '</div>' +
+      errLine() +
+      '<div class="row mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" id="au-login"' + (state.busy ? ' disabled' : '') + '>Увійти</button>' +
+        '<button class="btn btn--ghost" type="button" data-nav="start">← Назад</button>' +
+      '</div>';
+  }
+
+  function renderReg(host) {
+    host.innerHTML = '' +
+      stepBadge(1) +
+      '<h1 class="gate__title">Створити акаунт</h1>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-name">Нік</label>' +
+        '<input class="input" id="au-name" maxlength="24" autocomplete="username" placeholder="3–24 символи" value="' + esc(state.acc.username) + '">' +
+        '<span class="field__hint">Публічне імʼя в таблиці лідерів. Має бути унікальним.</span>' +
+      '</div>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-email">Пошта</label>' +
+        '<input class="input" id="au-email" type="email" autocomplete="email" placeholder="you@example.com" value="' + esc(state.acc.email) + '">' +
+      '</div>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-pass">Пароль</label>' +
+        '<input class="input" id="au-pass" type="password" autocomplete="new-password" placeholder="мінімум 8 символів">' +
+      '</div>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-pass2">Пароль ще раз</label>' +
+        '<input class="input" id="au-pass2" type="password" autocomplete="new-password" placeholder="той самий пароль">' +
+      '</div>' +
+      errLine() +
+      '<div class="row mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" id="au-reg"' + (state.busy ? ' disabled' : '') + '>Продовжити</button>' +
+        '<button class="btn btn--ghost" type="button" data-nav="start">← Назад</button>' +
+      '</div>';
+  }
+
+  function renderConfirm(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Підтверди пошту</h1>' +
+      '<p class="small mt-1">Ми надіслали лист на <b>' + esc(state.acc.email) + '</b>. ' +
+        'Відкрий його і натисни посилання підтвердження, потім повернись сюди.</p>' +
+      errLine() +
+      '<div class="row mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" id="au-confirmed"' + (state.busy ? ' disabled' : '') + '>Я підтвердив — продовжити</button>' +
+        '<button class="btn btn--ghost" type="button" data-nav="start">← Назад</button>' +
+      '</div>';
+  }
+
+  function renderName(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Обери нік</h1>' +
+      '<p class="small muted mt-1">Цей нік уже зайнятий або ще не вказаний. Потрібен унікальний.</p>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-name">Нік</label>' +
+        '<input class="input" id="au-name" maxlength="24" placeholder="3–24 символи" value="' + esc(state.acc.username) + '">' +
+      '</div>' +
+      errLine() +
+      '<div class="row mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" id="au-name-go"' + (state.busy ? ' disabled' : '') + '>Продовжити</button>' +
+      '</div>';
+  }
+
+  function renderPending(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Заявку на створення акаунта отримано</h1>' +
+      '<p class="small mt-1">Твій профіль зараз очікує підтвердження. ' +
+        'Після підтвердження ти отримаєш доступ до Forge.</p>' +
+      '<p class="small muted mt-1">Це ручна перевірка — зазвичай недовго. ' +
+        'Сторінку можна закрити: заявка нікуди не дінеться.</p>' +
+      errLine() +
+      '<div class="row mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" id="au-recheck"' + (state.busy ? ' disabled' : '') + '>Оновити статус</button>' +
+        '<button class="btn btn--ghost" type="button" id="au-out">Вийти</button>' +
+      '</div>';
+  }
+
+  function renderRejected(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Заявку відхилено</h1>' +
+      '<p class="small mt-1">Цю заявку не підтверджено. Можеш подати нову — ' +
+        'дані скринінгу заповниш ще раз.</p>' +
+      errLine() +
+      '<div class="row mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" data-nav="age">Подати ще раз</button>' +
+        '<button class="btn btn--ghost" type="button" id="au-out">Вийти</button>' +
+      '</div>';
+  }
+
+  function renderBlocked(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Акаунт заблоковано</h1>' +
+      '<p class="small mt-1">Доступ до Forge для цього акаунта закрито адміністратором.</p>' +
+      '<div class="row mt-3" style="gap:10px">' +
+        '<button class="btn btn--ghost" type="button" id="au-out">Вийти</button>' +
+      '</div>';
+  }
+
+  function render() {
+    const host = $('#gate-card');
+    if (!host) return;
+    switch (state.step) {
+      case 'start':    return renderStart(host);
+      case 'login':    return renderLogin(host);
+      case 'reg':      return renderReg(host);
+      case 'confirm':  return renderConfirm(host);
+      case 'name':     return renderName(host);
+      case 'body':     return renderBody(host);
+      case 'pending':  return renderPending(host);
+      case 'rejected': return renderRejected(host);
+      case 'blocked':  return renderBlocked(host);
+      default:         return renderAge(host);
+    }
+  }
+
+  function nav(step) { state.err = ''; state.step = step; render(); }
+
+  async function init() {
+    if (!$('#gate-card') || !AC || !OC) return;
+
+    if (CLOUD) {
+      /*
+       * Хмарний режим: спершу автентифікація, потім статус заявки, і лише
+       * для approved — профільні кроки. Скринінг більше не перший екран.
+       */
+      if (window.Store.user()) {
+        render();               // тимчасовий стан, поки їде статус
+        await routeAfterAuth(); // сам зробить render/redirect
+      } else {
+        state.step = 'start';
+        render();
+      }
+    } else {
+      /*
+       * Локальний режим (ключі Supabase порожні): акаунтів немає. Стартовий
+       * екран той самий; «Зареєструватися» веде одразу в скринінг, дані
+       * живуть у цьому браузері — як і до цієї зміни.
+       */
+      let p = {};
+      try { p = await window.Store.getProfile() || {}; } catch (_) {}
+      seedFromProfile(p);
+      const step = OC.stepFor(p);
+      if (step === 'program') { location.replace(NEXT); return; }
+      if (step === 'done') { location.replace(HOME); return; }
+      state.step = (step === 'age' && !p.birthDate) ? 'start' : step;
+      render();
+    }
 
     const host = $('#gate-card');
 
@@ -461,8 +867,31 @@
       if (go && !go.disabled) proceedAge();
     });
     host.addEventListener('click', function (e) {
-      if (e.target.closest('#gate-go')) proceedAge();
-      if (e.target.closest('#body-go')) proceedBody();
+      const navBtn = e.target.closest('[data-nav]');
+      if (navBtn) {
+        readAccFields();
+        nav(navBtn.dataset.nav);
+        return;
+      }
+      if (e.target.closest('#gate-go')) { proceedAge(); return; }
+      if (e.target.closest('#body-go')) { proceedBody(); return; }
+      if (e.target.closest('#au-login')) { doLogin(); return; }
+      if (e.target.closest('#au-reg')) { doRegister(); return; }
+      if (e.target.closest('#au-confirmed')) { doConfirmed(); return; }
+      if (e.target.closest('#au-name-go')) { doNameGo(); return; }
+      if (e.target.closest('#au-recheck')) { doRecheck(); return; }
+      if (e.target.closest('#au-out')) { doSignOut(); return; }
+    });
+
+    /* Enter у полях автентифікації = головна кнопка екрана */
+    host.addEventListener('keypress', function (e) {
+      if (e.key !== 'Enter') return;
+      if (!e.target.closest('#au-email, #au-pass, #au-pass2, #au-name')) return;
+      e.preventDefault();
+      readAccFields();
+      if (state.step === 'login') doLogin();
+      else if (state.step === 'reg') doRegister();
+      else if (state.step === 'name') doNameGo();
     });
   }
 

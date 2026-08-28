@@ -48,10 +48,25 @@
   const KEY  = String(CFG.anonKey || '');
   const CLOUD = Boolean(URL_ && KEY);
 
+  /*
+   * Підказка синхронному сторожу (js/agegate.js): він виконується в <head>
+   * до config.js і не може знати, чи сайт у хмарному режимі. Пишемо
+   * прапорець тут — сторож читає його на НАСТУПНІЙ навігації.
+   */
+  try { localStorage.setItem('ib.cloud', CLOUD ? '1' : '0'); } catch (_) {}
+
   const LS_SESSION = 'ib.session';
   const LS_PROFILE = 'ib.profile';
   const LS_BACKUP  = 'ib.profile.backup';
   const LS_PENDING = 'ib.pending';
+  const LS_ACCOUNT = 'ib.account';   // кеш статусу акаунта (UX; барʼєр — RLS)
+
+  /*
+   * Підказка синхронному сторожу (js/agegate.js): він виконується в <head>
+   * до config.js і не може знати, чи сайт у хмарному режимі. Пишемо
+   * прапорець один раз тут — сторож читає його на НАСТУПНІЙ навігації.
+   */
+
 
   /**
    * Версія форми даних. Зростає, коли міняється СТРУКТУРА вкладених обʼєктів
@@ -110,7 +125,7 @@
       version: SCHEMA_VERSION,
       // Антропометрія.
       // birthDate ('YYYY-MM-DD') — джерело правди про вік: з нього
-      // виводиться і доступ до Forge (18+, див. js/agegate.js), і саме
+      // виводиться і доступ до Forge (17+, див. js/agegate.js), і саме
       // поле age. age лишається числом, бо його читають розрахунки
       // харчування й пульсу; воно похідне, а не друге джерело.
       birthDate: null,
@@ -479,6 +494,18 @@
     clearSession();
     try { localStorage.removeItem(LS_PROFILE); } catch (_) {}
     try { localStorage.removeItem(LS_PENDING); } catch (_) {}
+    try { localStorage.removeItem(LS_ACCOUNT); } catch (_) {}
+  }
+
+  /*
+   * Чи має сенс ходити в мережу по профіль. Поки акаунт не approved,
+   * RLS однаково відповість 403 — тож не шумимо запитами і не плодимо
+   * чергу: дані реєстрації живуть локально до підтвердження. Це UX-шар;
+   * справжній барʼєр — політики Postgres.
+   */
+  function cloudAllowed() {
+    const a = lsGet(LS_ACCOUNT, null);
+    return !a || a.status === 'approved';
   }
 
   /**
@@ -662,6 +689,28 @@
       });
     },
 
+    /* ---- Статус акаунта (заявки/підтвердження) ---- */
+
+    /**
+     * Стан акаунта з сервера: none | pending | approved | rejected |
+     * blocked (+ isAdmin). Кешується в localStorage для синхронного
+     * сторожа й швидких рішень UI; джерело правди — RPC + RLS.
+     */
+    refreshAccountState: async function () {
+      if (!CLOUD || !session) return null;
+      try {
+        const st = await api.rpc('account_state');
+        if (st && st.status) lsSet(LS_ACCOUNT, { status: st.status, username: st.username || null, isAdmin: Boolean(st.isAdmin), t: Date.now() });
+        return st;
+      } catch (e) {
+        // AUTH_REQUIRED тощо — кеш не чіпаємо, хай вирішує наступний виклик
+        return null;
+      }
+    },
+
+    /** Кешований стан акаунта (sync). null — ще не питали. */
+    accountCached: function () { return lsGet(LS_ACCOUNT, null); },
+
     /* ---- Авторизація ---- */
 
     signUp: async function (email, password) {
@@ -676,6 +725,7 @@
       if (data && data.access_token) {
         storeSession(data);
         cache = null;
+        await api.refreshAccountState();
         const merge = await resolveFirstLogin(local);
         emit();
         return { confirmed: true, merge: merge };
@@ -704,6 +754,7 @@
       });
       storeSession(data);
       cache = null;
+      await api.refreshAccountState();
       const merge = await resolveFirstLogin(local);
       emit();
       return { user: api.user(), merge: merge };
@@ -756,7 +807,7 @@
     getProfile: async function () {
       if (cache) return cache;
 
-      if (CLOUD && session) {
+      if (CLOUD && session && cloudAllowed()) {
         const ok = await ensureFresh();
         if (ok) {
           try {
@@ -928,13 +979,13 @@
      * правильним порядком: спершу зʼясувати, чи можемо писати.
      */
     let fresh = true;
-    if (CLOUD && session) fresh = await ensureFresh();
+    if (CLOUD && session && cloudAllowed()) fresh = await ensureFresh();
 
     cache = next;
     // Локальна копія пишеться завжди — офлайн-резерв
     const okLocal = lsSet(LS_PROFILE, next);
 
-    if (CLOUD && session) {
+    if (CLOUD && session && cloudAllowed()) {
       if (!fresh) {
         throw queuedError(patch, 'Сесія прострочена або немає звʼязку — збережеться пізніше');
       }
@@ -969,6 +1020,9 @@
    */
   async function resolveFirstLogin(local) {
     if (!isMeaningful(local)) return null;
+    // Не-approved акаунт хмарного рядка не має і мати не може (RLS):
+    // локальні дані реєстрації просто чекають підтвердження на місці.
+    if (!cloudAllowed()) return null;
 
     // Резервна копія — завжди, ще до того, як щось вирішимо. Навіть якщо
     // далі щось піде не так, локальна робота лишиться відновлюваною.

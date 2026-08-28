@@ -5,3 +5,4 @@ package-lock.json
 # У репозиторії тримати не варто: він привʼязаний до конкретного домену.
 sitemap.xml
 upd*.zip
+cfg.zip

@@ -16,8 +16,11 @@ window.APP_CONFIG = {
   siteName: 'FORGE',
 
   supabase: {
-    url: '',      // напр. 'https://abcdefgh.supabase.co'
-    anonKey: ''   // напр. 'eyJhbGciOiJI...'
+    url: 'https://sojbyoxcxyiollefupss.supabase.co',
+    /* anon-ключ ПУБЛІЧНИЙ за задумом: він є в кожному браузері, що відкриє
+       сайт. Дані боронить не таємність ключа, а RLS — без свого логіна
+       з ним не видно нічого, крім таблиці лідерів. */
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNvamJ5b3hjeHlpb2xsZWZ1cHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3OTc4NTQsImV4cCI6MjEwMzM3Mzg1NH0.0xqdQq98IUAhYYc3bmopo2XjUPT6L55wn27lnvenw_s'
   },
 
   /**
@@ -26,5 +29,5 @@ window.APP_CONFIG = {
    * Заповниш після деплою — і те, і те зʼявиться саме собою на всіх сторінках.
    * Напр.: 'https://forge.example.com'
    */
-  siteUrl: ''
+  siteUrl: 'https://forge-mold1.vercel.app'
 };

@@ -588,6 +588,17 @@
       // Нік — у профіль (локально до підтвердження) і в заявку далі
       try { await window.Store.saveProfile({ displayName: state.acc.username.trim() }); } catch (_) {}
 
+      if (res && res.exists) {
+        /*
+         * Пошта вже зареєстрована. Сервер каже це не помилкою, а мовчазним
+         * 200 з порожнім identities (див. Store.signUp) — і без цієї гілки
+         * людина йшла на екран «Підтвердіть пошту», де застрягала назавжди:
+         * листа немає, а пароль в акаунті лишився старий.
+         */
+        state.busy = false;
+        navMsg('login', 'Ця пошта вже зареєстрована. Увійдіть — або відновіть пароль, якщо не памʼятаєте.');
+        return;
+      }
       if (!res || res.confirmed === false) {
         // Увімкнене підтвердження пошти: сесії ще немає
         state.busy = false;
@@ -625,6 +636,74 @@
     nav('age');
   }
 
+  /** Лист для відновлення пароля. */
+  async function doForgot() {
+    if (state.busy) return;
+    readAccFields();
+    const mail = (state.acc.email || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+      state.err = 'Перевірте адресу пошти.'; render(); return;
+    }
+    state.busy = true; state.err = ''; render();
+    try {
+      await window.Store.requestPasswordReset(mail);
+      state.busy = false;
+      /* Навмисно НЕ кажемо, чи є така пошта в базі: інакше форму можна
+         використати як перевірку «чи зареєстрований цей чоловік». */
+      navMsg('login', 'Якщо акаунт із такою поштою існує — лист уже в дорозі. ' +
+             'Перевірте теку «Спам».');
+    } catch (e) {
+      state.busy = false;
+      state.err = (e && e.message) || 'Не вдалося надіслати лист.';
+      render();
+    }
+  }
+
+  /** Зберегти новий пароль після переходу з листа відновлення. */
+  async function doNewPass() {
+    if (state.busy) return;
+    readAccFields();
+    const PC = window.PasswordCore;
+    if (PC) {
+      const v = PC.check(state.acc.pass, { email: state.acc.email, username: state.acc.username });
+      if (!v.ok) { state.err = v.problem; render(); return; }
+    } else if ((state.acc.pass || '').length < 8) {
+      state.err = 'Пароль — щонайменше 8 символів.'; render(); return;
+    }
+    if (state.acc.pass !== state.acc.pass2) { state.err = 'Паролі не збігаються.'; render(); return; }
+
+    state.busy = true; state.err = ''; render();
+    try {
+      await window.Store.updatePassword(state.acc.pass);
+      state.busy = false;
+      window.App.toast('Пароль змінено', 'ok');
+      await routeAfterAuth();
+    } catch (e) {
+      state.busy = false;
+      state.err = (e && e.message) || 'Не вдалося зберегти пароль.';
+      render();
+    }
+  }
+
+  /** Повторний лист підтвердження. */
+  async function doResend() {
+    if (state.busy) return;
+    state.busy = true; state.err = ''; render();
+    try {
+      await window.Store.resendConfirmation(state.acc.email.trim());
+      state.busy = false;
+      window.App.toast('Лист надіслано ще раз', 'ok');
+      render();
+    } catch (e) {
+      state.busy = false;
+      /* Ліміт листів — найчастіша причина, і вона не про людину: у
+         вбудованої пошти Supabase він низький. Текст уже перекладений
+         у Store (AUTH_MSG), тут лишається його показати. */
+      state.err = (e && e.message) || 'Не вдалося надіслати лист.';
+      render();
+    }
+  }
+
   async function doConfirmed() {
     if (state.busy) return;
     state.busy = true; state.err = ''; render();
@@ -634,8 +713,24 @@
       await afterSignupChecks();
     } catch (e) {
       state.busy = false;
-      state.err = 'Ще не підтверджено або пароль не підійшов. Спробуйте ще раз після кліку в листі.';
-      render();
+      /*
+       * Дві РІЗНІ причини, і плутати їх не можна — саме на цьому люди
+       * і застрягали. email_not_confirmed означає «клікніть у листі»;
+       * invalid_credentials — що акаунт існує з ІНШИМ паролем (реєстрація
+       * на вже зайняту пошту старий пароль не міняє), і чекати листа
+       * марно: треба входити старим паролем або відновлювати його.
+       */
+      const code = (e && e.code) || '';
+      if (code === 'invalid_credentials') {
+        navMsg('login', 'Акаунт із цією поштою вже існує, але з іншим паролем. ' +
+               'Увійдіть тим паролем, який ставили спершу, або відновіть його.');
+      } else if (code === 'email_not_confirmed') {
+        state.err = 'Пошту ще не підтверджено. Відкрийте лист і натисніть посилання в ньому.';
+        render();
+      } else {
+        state.err = (e && e.message) || 'Не вдалося продовжити. Спробуйте ще раз.';
+        render();
+      }
     }
   }
 
@@ -721,6 +816,10 @@
         ? '<p class="small muted mt-2" style="text-align:center">Сайт у локальному режимі: акаунти вимкнені, ' +
           'реєстрація збереже дані лише в цьому браузері.</p>'
         : '') +
+      /* Стартовий екран теж має вміти пояснити, чому нас сюди викинуло:
+         сюди потрапляє людина з протухлим посиланням із листа, і без
+         цього рядка вона бачила б просто головний екран без причини. */
+      errLine() +
       '<p class="small muted mt-3" style="text-align:center">' +
         '<a href="legal.html">Правові документи</a> · від 17 років' +
       '</p>';
@@ -743,6 +842,54 @@
       '<div class="row mt-3" style="gap:10px">' +
         '<button class="btn btn--primary" type="button" id="au-login"' + (state.busy ? ' disabled' : '') + '>Увійти</button>' +
         '<button class="btn btn--ghost" type="button" data-nav="start">← Назад</button>' +
+      '</div>' +
+      /* Без цього виходу акаунт із забутим паролем був назавжди втрачений:
+         відновлення не існувало ніде на сайті. */
+      '<p class="small muted mt-2 mb-0">' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-nav="forgot">Забули пароль?</button>' +
+      '</p>';
+  }
+
+  /** Крок «надішліть лист для відновлення». */
+  function renderForgot(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Відновлення пароля</h1>' +
+      '<p class="small mt-1">Впишіть пошту акаунта — надішлемо лист із посиланням, ' +
+        'за яким можна поставити новий пароль.</p>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-email">Пошта</label>' +
+        '<input class="input" id="au-email" type="email" autocomplete="email" ' +
+          'placeholder="you@example.com" value="' + esc(state.acc.email) + '">' +
+      '</div>' +
+      errLine() +
+      '<div class="row mt-3" style="gap:10px;flex-wrap:wrap">' +
+        '<button class="btn btn--primary" type="button" id="au-forgot-go"' + (state.busy ? ' disabled' : '') + '>Надіслати лист</button>' +
+        '<button class="btn btn--ghost" type="button" data-nav="login">← Назад</button>' +
+      '</div>';
+  }
+
+  /** Крок «поставте новий пароль» — після переходу з листа відновлення. */
+  function renderNewPass(host) {
+    const PC = window.PasswordCore;
+    const v = PC ? PC.check(state.acc.pass, { email: state.acc.email, username: state.acc.username }) : null;
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Новий пароль</h1>' +
+      '<p class="small mt-1">Посилання прийнято. Поставте новий пароль — після цього ' +
+        'ви одразу ввійдете.</p>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-pass">Новий пароль</label>' +
+        '<input class="input" id="au-pass" type="password" autocomplete="new-password" ' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="від 8 символів">' +
+        (v && state.acc.pass && !v.ok ? '<span class="field__hint">' + esc(v.problem || '') + '</span>' : '') +
+      '</div>' +
+      '<div class="field mt-2">' +
+        '<label class="field__label" for="au-pass2">Ще раз</label>' +
+        '<input class="input" id="au-pass2" type="password" autocomplete="new-password" ' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="повторіть">' +
+      '</div>' +
+      errLine() +
+      '<div class="row mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" id="au-newpass-go"' + (state.busy ? ' disabled' : '') + '>Зберегти пароль</button>' +
       '</div>';
   }
 
@@ -793,11 +940,21 @@
     host.innerHTML = '' +
       '<h1 class="gate__title">Підтвердіть пошту</h1>' +
       '<p class="small mt-1">Ми надіслали лист на <b>' + esc(state.acc.email) + '</b>. ' +
-        'Відкрийте його і натисніть посилання підтвердження, потім поверніться сюди.</p>' +
+        'Відкрийте його і натисніть посилання підтвердження, потім поверніться сюди ' +
+        'і натисніть кнопку нижче.</p>' +
+      /* Найчастіша причина «нічого не працює» — лист у спамі або взагалі
+         не дійшов. Раніше на цьому екрані не було ЖОДНОЇ дії, крім
+         «продовжити», яка без підтвердження нічого не дає. */
+      '<p class="small muted mt-1">Листа немає? Перевірте теку «Спам». ' +
+        'Він приходить від <b>noreply@mail.app.supabase.io</b>.</p>' +
       errLine() +
-      '<div class="row mt-3" style="gap:10px">' +
+      '<div class="row mt-3" style="gap:10px;flex-wrap:wrap">' +
         '<button class="btn btn--primary" type="button" id="au-confirmed"' + (state.busy ? ' disabled' : '') + '>Я підтвердив(ла) — продовжити</button>' +
-        '<button class="btn btn--ghost" type="button" data-nav="start">← Назад</button>' +
+        '<button class="btn btn--ghost" type="button" id="au-resend"' + (state.busy ? ' disabled' : '') + '>Надіслати лист ще раз</button>' +
+      '</div>' +
+      '<div class="row mt-2" style="gap:10px;flex-wrap:wrap">' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-nav="login">Уже маю акаунт — увійти</button>' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-nav="start">← Назад</button>' +
       '</div>';
   }
 
@@ -858,6 +1015,8 @@
       case 'login':    return renderLogin(host);
       case 'reg':      return renderReg(host);
       case 'confirm':  return renderConfirm(host);
+      case 'forgot':   return renderForgot(host);
+      case 'newpass':  return renderNewPass(host);
       case 'name':     return renderName(host);
       case 'body':     return renderBody(host);
       case 'pending':  return renderPending(host);
@@ -879,15 +1038,48 @@
     render();
   }
 
+  /**
+   * Перейти на інший крок І показати там пояснення.
+   *
+   * nav() навмисно гасить state.err при зміні кроку — інакше стара
+   * помилка тягнулась би за людиною по всіх екранах. Але є випадки, де
+   * повідомлення саме й пояснює, ЧОМУ нас сюди перекинуло («ця пошта вже
+   * зареєстрована»), і без нього перехід виглядає як збій.
+   */
+  function navMsg(step, msg) {
+    state.step = step;
+    state.err = msg;
+    render();
+  }
+
   async function init() {
     if (!$('#gate-card') || !AC || !OC) return;
 
     if (CLOUD) {
       /*
-       * Хмарний режим: спершу автентифікація, потім статус заявки, і лише
-       * для approved — профільні кроки. Скринінг більше не перший екран.
+       * ПЕРЕХІД ІЗ ЛИСТА — найперше.
+       *
+       * Supabase повертає людину на сайт із токенами у фрагменті адреси
+       * (#access_token=…&type=signup|recovery). Раніше їх ніхто не читав:
+       * людина клікала в листі, поверталась НЕ ввійденою і мусила
+       * вводити пароль ще раз — а якщо пароль був інший (повторна
+       * реєстрація на ту саму пошту), то не входила вже ніколи.
        */
-      if (window.Store.user()) {
+      let fromLink = null;
+      try { fromLink = await window.Store.adoptUrlSession(); }
+      catch (e) { state.err = (e && e.message) || ''; }
+
+      if (fromLink && fromLink.type === 'recovery') {
+        /* Лист відновлення: сесія вже є, але вести людину в застосунок не
+           можна — спершу новий пароль. Виходити з init() тут не можна:
+           нижче ще навішуються обробники, без них екран мертвий. */
+        state.step = 'newpass';
+        render();
+      } else if (window.Store.user()) {
+        /*
+         * Хмарний режим: спершу автентифікація, потім статус заявки, і лише
+         * для approved — профільні кроки. Скринінг більше не перший екран.
+         */
         render();               // тимчасовий стан, поки їде статус
         await routeAfterAuth(); // сам зробить render/redirect
       } else {
@@ -1029,6 +1221,9 @@
       if (e.target.closest('#au-login')) { doLogin(); return; }
       if (e.target.closest('#au-reg')) { doRegister(); return; }
       if (e.target.closest('#au-confirmed')) { doConfirmed(); return; }
+      if (e.target.closest('#au-resend')) { doResend(); return; }
+      if (e.target.closest('#au-forgot-go')) { doForgot(); return; }
+      if (e.target.closest('#au-newpass-go')) { doNewPass(); return; }
       if (e.target.closest('#au-name-go')) { doNameGo(); return; }
       if (e.target.closest('#au-recheck')) { doRecheck(); return; }
       if (e.target.closest('#au-out')) { doSignOut(); return; }

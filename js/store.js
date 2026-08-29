@@ -452,6 +452,43 @@
     return h;
   }
 
+  /*
+   * Людський текст замість коду Supabase.
+   *
+   * Раніше сюди йшов сирий англійський рядок — і людина бачила
+   * «email rate limit exceeded» без жодної підказки, що робити далі.
+   * Найважливіший тут саме ліміт листів: у вбудованої пошти Supabase він
+   * низький, і при кількох спробах поспіль реєстрація просто перестає
+   * працювати на годину — виглядає як «сайт зламався».
+   */
+  const AUTH_MSG = {
+    over_email_send_rate_limit:
+      'Забагато листів за короткий час. Пошта підтвердження тимчасово недоступна — ' +
+      'спробуйте за годину або увійдіть, якщо акаунт уже створено.',
+    email_not_confirmed:
+      'Пошту ще не підтверджено. Відкрийте лист і натисніть посилання в ньому.',
+    invalid_credentials:
+      'Пошта або пароль не підходять.',
+    user_already_exists:
+      'Ця пошта вже зареєстрована.',
+    email_exists:
+      'Ця пошта вже зареєстрована.',
+    weak_password:
+      'Пароль надто простий — додайте довжини й різних символів.',
+    over_request_rate_limit:
+      'Забагато спроб поспіль. Зачекайте хвилину й повторіть.',
+    validation_failed:
+      'Дані у формі не пройшли перевірку.',
+    signup_disabled:
+      'Реєстрація тимчасово вимкнена на сервері.'
+  };
+
+  function authMessage(code, raw, status) {
+    if (code && AUTH_MSG[code]) return AUTH_MSG[code];
+    if (status === 429) return AUTH_MSG.over_request_rate_limit;
+    return raw;
+  }
+
   async function req(path, options) {
     const opts = options || {};
     const headers = Object.assign(authHeaders(opts.auth), opts.headers || {});
@@ -479,9 +516,15 @@
     }
 
     if (!res.ok) {
-      const msg = (data && (data.error_description || data.msg || data.message || data.error)) ||
+      const raw = (data && (data.error_description || data.msg || data.message || data.error)) ||
                   ('HTTP ' + res.status);
-      const err = new Error(msg);
+      /* Машинний код Supabase зберігаємо окремо від тексту: інтерфейс має
+         розрізняти «пошта не підтверджена» й «пароль не той» — англійський
+         рядок для цього не годиться, а перекладений тим паче. */
+      const code = (data && (data.error_code || data.code)) || '';
+      const err = new Error(authMessage(code, raw, res.status));
+      err.code = code;
+      err.rawMessage = raw;
       err.status = res.status;
 
       /*
@@ -881,7 +924,118 @@
         emit();
         return { confirmed: true, merge: merge };
       }
+
+      /*
+       * ПОШТА ВЖЕ ЗАРЕЄСТРОВАНА — і це НЕ помилка з погляду Supabase.
+       *
+       * Щоб не давати стороннім перевіряти, чи є така пошта в базі, сервер
+       * на повторну реєстрацію відповідає 200 і схожим на справжній
+       * обʼєктом користувача. Відрізнити можна одним полем: у
+       * несправжнього identities порожній.
+       *
+       * Без цієї гілки людина з уже створеним акаунтом потрапляла на екран
+       * «Підтвердіть пошту», якого ніколи не пройде: листа немає, а пароль
+       * в акаунті лишився СТАРИЙ — новий, щойно введений, не підійде
+       * ніколи. Саме в цей тупик впирались реальні спроби реєстрації.
+       */
+      const u = (data && data.user) ? data.user : data;
+      if (u && Array.isArray(u.identities) && u.identities.length === 0) {
+        return { confirmed: false, exists: true };
+      }
       return { confirmed: false };
+    },
+
+    /**
+     * Прийняти сесію з URL після кліку в листі.
+     *
+     * Supabase повертає людину на сайт із токенами у ФРАГМЕНТІ адреси
+     * (#access_token=…&type=signup|recovery). Досі їх ніхто не читав —
+     * тому після підтвердження пошти людина поверталась на сайт
+     * НЕ ввійденою, і мусила тиснути «Я підтвердив» та вводити пароль
+     * ще раз. Саме там усе й ламалось, якщо пароль виявлявся іншим.
+     *
+     * Фрагмент прибираємо одразу: токен не має лишатись ні в адресному
+     * рядку, ні в історії, ні в Referer наступного переходу.
+     *
+     * @returns {{type: string}|null} тип події з листа, якщо сесію взято
+     */
+    adoptUrlSession: async function () {
+      if (!CLOUD) return null;
+      let h = '';
+      try { h = String(location.hash || '').replace(/^#/, ''); } catch (_) { return null; }
+      if (!h || h.indexOf('access_token=') === -1) return null;
+
+      const q = new URLSearchParams(h);
+      const at = q.get('access_token');
+      const rt = q.get('refresh_token');
+      if (!at) return null;
+
+      const expIn = parseInt(q.get('expires_in') || '3600', 10);
+      storeSession({
+        access_token: at,
+        refresh_token: rt || '',
+        expires_in: isFinite(expIn) ? expIn : 3600,
+        user: null
+      });
+      /* Фрагмент прибираємо ДО мережевих викликів: якщо запит нижче впаде,
+         токен усе одно не лишиться в адресному рядку. */
+      try {
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (_) { try { location.hash = ''; } catch (_2) {} }
+
+      /* У фрагменті приходять лише токени, без даних користувача, а
+         storeSession без них лишає user: null — і Store.user() каже
+         «не ввійшов» при цілком робочій сесії. Тому питаємо сервер. */
+      try {
+        const me = await req('/auth/v1/user', { method: 'GET' });
+        if (me && me.id) {
+          session.user = { id: me.id, email: me.email };
+          lsSet(LS_SESSION, session);
+        }
+      } catch (e) {
+        // Прострочене або вже використане посилання з листа.
+        clearSession();
+        emit();
+        const err = new Error('Посилання з листа вже використане або застаріле. Надішліть новий лист.');
+        err.code = 'link_expired';
+        throw err;
+      }
+      cache = null;
+      emit();
+      return { type: q.get('type') || 'signup' };
+    },
+
+    /** Лист для відновлення пароля. */
+    requestPasswordReset: async function (email) {
+      if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
+      return req('/auth/v1/recover', {
+        method: 'POST', auth: false,
+        body: { email: email }
+      });
+    },
+
+    /** Новий пароль для поточної сесії (після листа відновлення). */
+    updatePassword: async function (password) {
+      if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
+      if (!session) throw new Error('Немає активної сесії.');
+      const data = await req('/auth/v1/user', {
+        method: 'PUT',
+        body: { password: password }
+      });
+      return data;
+    },
+
+    /**
+     * Надіслати лист підтвердження ще раз.
+     * Окремий метод, бо екран підтвердження — єдине місце, де людина
+     * може застрягти без жодної дії: лист не дійшов, а зробити нічого.
+     */
+    resendConfirmation: async function (email) {
+      if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
+      return req('/auth/v1/resend', {
+        method: 'POST', auth: false,
+        body: { type: 'signup', email: email }
+      });
     },
 
     /**

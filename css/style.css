@@ -177,6 +177,11 @@ h1, h2, h3, h4 {
   line-height: 1.15;
   letter-spacing: -0.022em;
   font-weight: 700;
+  /* Українські слова довгі, а заголовки великі: «Адміністрування» на 320px
+     не влазить у рядок цілком і розпирає сторінку по горизонталі. Слово
+     переноситься лише тоді, коли інакше не вміщається — на звичайних
+     ширинах нічого не міняється. */
+  overflow-wrap: break-word;
 }
 h1 { font-size: clamp(2.1rem, 5.2vw, 3.9rem); letter-spacing: -0.035em; }
 h2 { font-size: clamp(1.6rem, 3.4vw, 2.5rem); letter-spacing: -0.028em; }

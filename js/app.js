@@ -1365,7 +1365,7 @@
      */
     try {
       const m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', v === 'light' ? '#e6e8ec' : '#17181a');
+      if (m) m.setAttribute('content', v === 'light' ? '#e7e7e7' : '#0b0b0b');
     } catch (_) {}
 
     try {

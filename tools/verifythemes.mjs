@@ -21,9 +21,10 @@ const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
 /* null = типовий Navy Blue: атрибута немає, значення беруться з :root */
-const ACCENTS = [null, 'graphite', 'graphite-navy', 'graphite-pink', 'graphite-violet',
-                 'graphite-crimson', 'graphite-amber', 'graphite-moss',
-                 'graphite-emerald', 'graphite-ocean'];
+/* Палітра одна — монохромна. Старі id лишені в перевірці навмисно:
+   вони ще трапляються в профілях, і кожен мусить давати ті самі
+   монохромні токени з :root, а не «поламану» тему без кольорів. */
+const ACCENTS = [null, 'graphite-pink', 'graphite-ocean'];
 const SCHEMES = ['dark', 'light'];
 
 /* Прибрані кольорові теми: id лишились у старих профілях і мусять
@@ -34,6 +35,9 @@ const LEGACY = { pink: 'graphite-pink', wood: 'graphite', violet: 'graphite-viol
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const ctx = await adultContext(b, { viewport: { width: 1280, height: 900 } });
+/* Мережа не потрібна: перевіряємо обчислені стилі, а не дані. Без цього
+   кожна сторінка чекає на шрифти й Supabase, і прогін не встигає. */
+await ctx.route(/^https?:\/\//, r => r.abort());
 const p = await ctx.newPage();
 const errs = [];
 p.on('pageerror', e => errs.push(e.message));
@@ -126,7 +130,7 @@ for (const scheme of SCHEMES) {
 
 /* ---- API: акцент ---- */
 await p.evaluate(() => { document.documentElement.removeAttribute('data-theme'); });
-for (const t of ['graphite-ocean', 'graphite-crimson', 'graphite']) {
+for (const t of ['graphite-ocean']) {
   const applied = await p.evaluate(t => {
     window.App.setTheme(t, { save: false });
     return { attr: document.documentElement.getAttribute('data-theme'),
@@ -169,7 +173,7 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
   ok('світла схема ставить атрибут і памʼятає', light.attr === 'light' && light.ls === 'light',
      JSON.stringify(light));
   ok('колір системної смуги йде за схемою',
-     light.meta.toLowerCase() === '#e6e8ec' && dark.meta.toLowerCase() === '#17181a',
+     light.meta.toLowerCase() === '#e7e7e7' && dark.meta.toLowerCase() === '#0b0b0b',
      dark.meta + ' → ' + light.meta);
 
   const toggled = await p.evaluate(() => {
@@ -232,7 +236,9 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
   await q.waitForTimeout(1000);
 
   const btns = await q.locator('.theme-btn').count();
-  ok('у виборі акцентів девʼять плашок', btns === 9, String(btns));
+  /* Палітра монохромна — плашка одна. Девʼять кольорових акцентів
+     прибрані разом із їхніми CSS-блоками. */
+  ok('у виборі акцентів одна плашка', btns === 1, String(btns));
 
   const names = await q.evaluate(() =>
     [...document.querySelectorAll('.themes .theme-btn span')].map(s => s.textContent.trim()));
@@ -244,18 +250,19 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
   ok('кружки не повторюються між акцентами', new Set(swatches).size === swatches.length,
      swatches.length - new Set(swatches).size + ' дублів');
 
-  /* натискаємо новий акцент як людина */
-  const pick = q.locator('[data-theme-pick="graphite-ocean"]');
-  ok('плашка «Океан» на місці', await pick.count() === 1);
+  /* натискаємо єдину плашку палітри як людина */
+  const pick = q.locator('.themes .theme-btn').first();
+  ok('плашка палітри на місці', await pick.count() === 1);
   await pick.scrollIntoViewIfNeeded(); await pick.click(); await q.waitForTimeout(700);
   const after = await q.evaluate(async () => ({
     attr: document.documentElement.getAttribute('data-theme'),
-    pressed: document.querySelector('[data-theme-pick="graphite-ocean"]').getAttribute('aria-pressed'),
+    pressed: document.querySelector('.themes .theme-btn').getAttribute('aria-pressed'),
     saved: (await window.Store.getProfile()).theme
   }));
-  ok('клік по плашці застосував акцент', after.attr === 'graphite-ocean', after.attr);
+  /* Монохром — це базовий :root, тож data-theme знімається зовсім. */
+  ok('клік по плашці застосував палітру', after.attr === null, String(after.attr));
   ok('плашка позначена активною', after.pressed === 'true', after.pressed);
-  ok('акцент записаний у профіль', after.saved === 'graphite-ocean', String(after.saved));
+  ok('палітра записана у профіль', after.saved === null, String(after.saved));
 
   /* перемикач схеми на самій сторінці */
   const sw = q.locator('#p-scheme');
@@ -266,11 +273,11 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
      await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === 'light');
   const relit = await q.evaluate(() =>
     [...document.querySelectorAll('.theme-btn i')].map(i => i.style.background)[0]);
-  ok('свотчі перемалювались під світлу схему', /244|245|247/.test(relit), relit);
+  ok('свотчі перемалювались під світлу схему', /26|246/.test(relit), relit);
 
   await q.reload({ waitUntil: 'load' }); await q.waitForTimeout(800);
-  ok('акцент і схема пережили перезавантаження',
-     await q.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'graphite-ocean' &&
+  ok('палітра і схема пережили перезавантаження',
+     await q.evaluate(() => document.documentElement.getAttribute('data-theme')) === null &&
      await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === 'light');
 
   ok('сторінка акаунта без JS-помилок', e2.length === 0, e2.join(' | '));

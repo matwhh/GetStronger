@@ -54,6 +54,17 @@
     const list = programs || window.PROGRAMS || [];
     const program = list.find(function (p) { return p.id === a.programId; });
     if (!program) return null;
+    /*
+     * СТАТЬ — тут, а не лише в розмітці сторінки вибору.
+     *
+     * Через resolvePlan проходять «Сьогодні», «Тренування» і «Мій план»,
+     * тож це вузьке місце для всіх трьох. Без перевірки саме тут план
+     * чужої статі лишався б робочим у збереженому activePlan: людина
+     * змінила стать у налаштуваннях — а тренування далі відкривається
+     * старе. Правило одне для всіх (js/programs-data.js).
+     */
+    const allowed = window.programAllowedFor;
+    if (typeof allowed === 'function' && !allowed(program, profile && profile.sex)) return null;
     const days = String(Number(a.days) || 3);
     const custom = (profile.customPlans || {})[planKey(a.programId, days)];
     const plan = custom || (program.days && program.days[days]);

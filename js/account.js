@@ -594,7 +594,7 @@
     if (!Object.keys(pending).length) return null;
     clearTimeout(saveTimer);
     saveTimer = null;
-    const patch = pending;
+    const patch = detachPlanIfForeign(pending);
     pending = {};
 
     /*
@@ -617,11 +617,37 @@
   });
   window.addEventListener('pagehide', flushSave);
 
+  /*
+   * ЗМІНА СТАТІ ВІДЧІПЛЮЄ ПЛАН ЧУЖОЇ СТАТІ.
+   *
+   * Схеми тренувань розділені за статтю (js/programs-data.js). Якщо
+   * лишити activePlan як є, профіль указував би на схему, якої людина
+   * більше не бачить: сторінки її не покажуть (resolvePlan мовчки віддає
+   * null), і замість плану всюди висів би порожній стан без пояснення.
+   * Тому прив'язку знімаємо одразу й тим самим збереженням.
+   *
+   * customPlans НЕ чіпаємо: це правки, зроблені руками. Якщо стать
+   * повернуть назад, вони мають бути на місці.
+   */
+  function detachPlanIfForeign(patch) {
+    if (!('sex' in patch)) return patch;
+    const allowed = window.programAllowedFor;
+    const list = window.PROGRAMS || [];
+    /* Локальний знімок профілю — той самий, що читає решта сторінки
+       (Store.localProfile), і він синхронний: чекати на мережу тут не
+       можна, патч уже збирається на відправку. */
+    const active = ((Store.localProfile() || {}).activePlan) || null;
+    if (typeof allowed !== 'function' || !active || !active.programId) return patch;
+    const program = list.find(function (p) { return p.id === active.programId; });
+    if (program && allowed(program, patch.sex)) return patch;
+    return Object.assign({}, patch, { activePlan: null, programId: null });
+  }
+
   function queueSave(key, value) {
     pending[key] = value;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async function () {
-      const patch = pending;
+      const patch = detachPlanIfForeign(pending);
       pending = {};
 
       try {

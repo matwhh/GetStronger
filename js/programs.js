@@ -18,7 +18,25 @@
   'use strict';
 
   const { $, $$, esc, clamp, toast, plural, dateLabel } = window.App;
-  const PROGRAMS = window.PROGRAMS || [];
+  const ALL_PROGRAMS = window.PROGRAMS || [];
+
+  /*
+   * СХЕМИ, ДОСТУПНІ ЦІЙ ЛЮДИНІ.
+   *
+   * Реєстр window.PROGRAMS сирий — у ньому лежать і чоловічі, і жіночі
+   * схеми. Уся сторінка працює ТІЛЬКИ з цим зрізом: і сітка вибору, і
+   * пошук за id, і крок онбордингу. Якби фільтр стояв лише в розмітці,
+   * схема чужої статі лишалась би доступною через збережений state,
+   * прямий перехід на plan.html або старий activePlan у профілі.
+   *
+   * Функція, а не константа: стать читається з профілю, який приїжджає
+   * асинхронно, і міняється в налаштуваннях без перезавантаження.
+   */
+  function PROGRAMS_FOR_ME() {
+    const f = window.programsForSex;
+    const sex = state.profile && state.profile.sex;
+    return typeof f === 'function' ? f(sex, ALL_PROGRAMS) : ALL_PROGRAMS;
+  }
   const MUSCLES = window.MUSCLES || [];
   const musclesOfExercise = window.musclesOfExercise;
   const primaryMuscle = window.primaryMuscle;
@@ -347,7 +365,7 @@
   }
 
   function basePlan(programId, days) {
-    const p = PROGRAMS.find(function (x) { return x.id === programId; });
+    const p = PROGRAMS_FOR_ME().find(function (x) { return x.id === programId; });
     if (!p || !supports(p, days)) return null;
     return clonePlan(p.days[String(days)]);
   }
@@ -430,7 +448,7 @@
       return {
         programId: state.programId,
         days: state.days,
-        program: PROGRAMS.find(function (p) { return p.id === state.programId; }) || null,
+        program: PROGRAMS_FOR_ME().find(function (p) { return p.id === state.programId; }) || null,
         plan: state.plan ? hydrate(state.plan) : null
       };
     }
@@ -974,7 +992,7 @@
     if (!host) return;
     const days = state.days;
 
-    host.innerHTML = '<div class="grid grid-3">' + PROGRAMS.map(function (p) {
+    host.innerHTML = '<div class="grid grid-3">' + PROGRAMS_FOR_ME().map(function (p) {
       if (!supports(p, days)) {
         return '' +
           '<article class="card card--off">' +
@@ -1323,7 +1341,7 @@
 
     const wasOpen = Array.isArray(wantOpen) ? wantOpen : openAccIndexes(host);
 
-    const program = PROGRAMS.find(function (p) { return p.id === state.programId; });
+    const program = PROGRAMS_FOR_ME().find(function (p) { return p.id === state.programId; });
     if (!program || !state.plan) { host.innerHTML = ''; return; }
 
     const plan = state.plan;
@@ -1832,7 +1850,7 @@
   }
 
   function refresh() {
-    const available = PROGRAMS.filter(function (p) { return supports(p, state.days); });
+    const available = PROGRAMS_FOR_ME().filter(function (p) { return supports(p, state.days); });
 
     if (state.programId && !available.some(function (p) { return p.id === state.programId; })) {
       state.programId = null;
@@ -2059,6 +2077,14 @@
         return;
       }
       if (e.target.closest('#adopt-plan')) {
+        /* Перевірка перед записом, а не лише при показі: у стан можна
+           потрапити не тільки кліком по картці. */
+        const picked = PROGRAMS_FOR_ME().find(function (x) { return x.id === state.programId; });
+        if (!picked || !supports(picked, state.days)) {
+          toast('Цей план недоступний', 'err');
+          refresh();
+          return;
+        }
         state.active = { programId: state.programId, days: state.days };
         saveOwn({
           activePlan: state.active,
@@ -2071,7 +2097,7 @@
       }
       if (e.target.closest('#copy-plan')) {
         const btn = e.target.closest('#copy-plan');
-        const program = PROGRAMS.find(function (x) { return x.id === state.programId; });
+        const program = PROGRAMS_FOR_ME().find(function (x) { return x.id === state.programId; });
         if (!program || !state.plan) return;
         const ready = hydrate(state.plan);
         const text = planToText(program, state.days, ready);

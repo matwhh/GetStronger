@@ -63,6 +63,10 @@
 
     const program = PROGRAMS.find(function (p) { return p.id === active.programId; });
     if (!program || !program.days) return null;
+    /* Та сама перевірка статі, що в resolvePlan: цикл не має рахуватись
+       на схемі, яка людині більше не належить (js/programs-data.js). */
+    const allowed = window.programAllowedFor;
+    if (typeof allowed === 'function' && !allowed(program, profile.sex)) return null;
     return program.days[String(days)] || null;
   }
 

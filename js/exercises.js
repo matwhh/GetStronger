@@ -123,6 +123,7 @@ const EXERCISES = [
   { name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], lift: 'compound' },
   { name: 'Тяга горизонтального блоку вузьким паралельним хватом', muscles: ['back'], lift: 'compound' },
   { name: 'Тяга з упором',                     muscles: ['back'], lift: 'compound' },
+  { name: 'Горизонтальна тяга в тренажері',    muscles: ['back'], lift: 'compound' },
 
   /* ---- Трапеції ---- */
   { name: 'Шраги у Сміті',                     muscles: ['traps'], lift: 'isolation' },
@@ -175,6 +176,10 @@ const EXERCISES = [
   { name: 'Випади у Сміті на сідниці',         muscles: ['glutes'], lift: 'compound' },
   { name: 'Болгарські випади',                 muscles: ['glutes'], lift: 'compound' },
   { name: 'Ягодичний міст зі штангою',         muscles: ['glutes'], lift: 'compound' },
+  { name: 'Ягодичний міст у тренажері',        muscles: ['glutes'], lift: 'compound' },
+  /* Гіперекстензія з акцентом на сідниці: округлена спина, робота
+     стегном. Головна група — сідниці, тому й стоїть тут, а не в спині. */
+  { name: 'Гіперекстензія на сідниці',         muscles: ['glutes', 'hamstrings'], lift: 'compound' },
   { name: 'Відведення ноги в кросовері',       muscles: ['glutes'], lift: 'isolation' },
 
   /* ---- Привідні / відвідні ---- */

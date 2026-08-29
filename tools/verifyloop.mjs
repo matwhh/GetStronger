@@ -19,8 +19,8 @@ const SEED = {
   daysPerWeek: 3, activePlan: { programId: 'fullbody', days: 3 }, trainingAge: 'inter'
 };
 
-async function open(vp) {
-  const ctx = await adultContext(b, vp || { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+async function open(vp, extra) {
+  const ctx = await adultContext(b, vp || { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, extra);
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(e.message));
@@ -70,7 +70,11 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 
 /* ---- Flow 2: сезонний ELO у локальному режимі чесно вимкнений ---- */
 {
-  const { ctx, p, errs } = await open();
+  /* Саме локальний контекст: у репозиторії лежать справжні ключі Supabase,
+     тож без окремого гасіння цей потік міряв би хмарний режим і мовчки
+     перевіряв не те. adultContext({local:true}) гасить ключі до того, як
+     їх прочитає store.js. */
+  const { ctx, p, errs } = await open(null, { local: true });
   /* Без ключів Supabase сезонний рейтинг не існує: картка пояснює це,
      бейдж у шапці не зʼявляється, локального сурогата немає. */
   ok('2. картка сезону чесно каже про локальний режим',
@@ -89,8 +93,18 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 /* ---- Flow 3: харчування → збереження → головна ---- */
 {
   const { ctx, p, errs } = await open();
-  const before = await cardText(p, '#today .tiles');
-  ok('3. до їжі плитка показує 0 набраних', /\b0\b/.test(before), before.replace(/\n+/g, ' | ').slice(0, 60));
+  /* Плитки харчування на головній більше немає — над ними стоїть повна
+     картка «Харчування» з тими самими числами (js/today.js, tilesStrip).
+     Дивимось саме на неї: у смужці плиток тепер вага й трекери, і вона
+     після додавання їжі закономірно не змінюється. */
+  const kcalCard = () => p.evaluate(() => {
+    const c = [...document.querySelectorAll('#today .card')]
+      .find(x => /набрано, ккал/i.test(x.innerText));   // innerText приходить у CAPS через text-transform
+    return c ? c.innerText : '';
+  });
+  const before = await kcalCard();
+  ok('3. до їжі картка харчування показує 0 набраних', /\b0\b/.test(before),
+     before.replace(/\n+/g, ' | ').slice(0, 60));
 
   await p.goto('file://' + ROOT + '/meals.html', { waitUntil: 'load' });
   await p.waitForTimeout(1100);
@@ -103,8 +117,8 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
-  const after = await cardText(p, '#today .tiles');
-  ok('3. головна показує зʼїдене без жодного налаштування', after !== before,
+  const after = await kcalCard();
+  ok('3. головна показує зʼїдене без жодного налаштування', after !== before && after !== '',
      after.replace(/\n+/g, ' | ').slice(0, 70));
   ok('3. і картка «Харчування» на головній теж',
      /\d/.test(await p.locator('#today').innerText()));

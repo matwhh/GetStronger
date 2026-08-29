@@ -91,10 +91,13 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
  p.on('pageerror',e=>errs.push(e.message));
  await p.goto('file:///root/work/forgesite/account.html');
  await p.waitForTimeout(500);
+ /* Поточну версію схеми беремо з самого застосунку, а не числом у тесті:
+    захардкоджена 6 протрималась до SCHEMA_VERSION=9 і почала брехати. */
+ const CUR=await p.evaluate(async()=>(await window.Store.getProfile()).version);
  await p.evaluate(()=>{localStorage.setItem('ib.profile',JSON.stringify({version:3,weight:75,weights:{'Присід':100}}));});
  await p.reload(); await p.waitForTimeout(900);
  const pr=await p.evaluate(async()=>await window.Store.getProfile());
- ok('міграція v3 → поточна версія', pr.version===6, 'version='+pr.version);
+ ok('міграція v3 → поточна версія', pr.version===CUR, 'version='+pr.version+' очікувалось '+CUR);
  ok('міграція: дані збережені', pr.weight===75 && pr.weights['Присід']===100);
  ok('міграція: створено ratingLog/ratingSeen', !!pr.ratingLog && !!pr.ratingSeen);
  ok('міграція без JS-помилок', errs.length===0, errs.join('|'));

@@ -966,18 +966,41 @@
           try {
             const rows = await req('/rest/v1/profiles?select=data&user_id=eq.' + session.user.id + '&limit=1');
             const data = Array.isArray(rows) && rows[0] ? rows[0].data : null;
-            const remote = migrate(Object.assign(blankProfile(), data || {}), data);
+
+            /*
+             * РЯДКА В ХМАРІ ЩЕ НЕМАЄ — це не те саме, що «в хмарі порожньо».
+             *
+             * Було: data || {} перетворювало відсутність рядка на порожній
+             * бланк, і той бланк ставав cache, а далі lsSet затирав ним
+             * локальний профіль. Тобто достатньо було відкрити сайт із
+             * сесією, для якої рядок ще не створено (щойно зареєструвався,
+             * перший запис не доїхав, рядок видалили) — і локальні дані
+             * зникали без жодного повідомлення.
+             *
+             * Порожня відповідь означає лише, що записувати ще нічого не
+             * встигли. Профіль у цьому випадку — локальний; наступне
+             * збереження створить рядок.
+             */
+            if (!data) {
+              cache = readLocalProfile();
+              return cache;
+            }
+
+            const remote = migrate(Object.assign(blankProfile(), data), data);
 
             /*
              * Локальна копія перемагає, якщо вона НОВІША і є незіслані патчі.
              * Це той самий випадок «працював офлайн»: у хмарі лежить вчорашній
              * рядок, а сьогоднішня робота чекає в черзі. Сліпа перевага хмари
              * тут стирала б день роботи при кожному відкритті сайту.
+             *
+             * !remote.updatedAt — окремий випадок: старий хмарний рядок без
+             * позначки часу не має вигравати в локального, який її має.
              */
             const local = lsGet(LS_PROFILE, null);
             if (local && (pendingGet().length || isDirty()) &&
-                local.updatedAt && remote.updatedAt &&
-                local.updatedAt > remote.updatedAt) {
+                local.updatedAt && (!remote.updatedAt ||
+                local.updatedAt > remote.updatedAt)) {
               cache = migrate(Object.assign(blankProfile(), local), local);
               flushPending().catch(function () {});
               return cache;
@@ -1057,7 +1080,16 @@
       if (!(CLOUD && session)) return okLocal;
 
       const body = JSON.stringify([{ user_id: session.user.id, data: next }]);
-      if (body.length > 60000) {
+      /*
+     * Ліміт keepalive — 64 КБ БАЙТІВ, а не символів. body.length рахує
+     * UTF-16, і кирилиця (назви вправ, трекерів, рецептів) важить удвічі
+     * більше: тіло на 60 000 символів могло сягати ~120 КБ, тобто браузер
+     * відхиляв запит, який за оцінкою «мав влізти».
+     */
+    let bytes;
+    try { bytes = new Blob([body]).size; }
+    catch (_) { bytes = body.length * 2; }
+    if (bytes > 60000) {
         // Не вліземо в ліміт keepalive — краще чесно покласти в чергу,
         // ніж відправити запит, який браузер обірве на півдорозі.
         pendingPush(patch || {});

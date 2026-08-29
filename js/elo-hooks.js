@@ -33,6 +33,28 @@
   }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
 
+  /*
+   * Позначки «надіслано» старші за два тижні прибираємо.
+   *
+   * Ключ має вигляд 'meal:2026-08-29', тобто дата в ньому вже є. Сховище
+   * росло приблизно на пʼять ключів на день і не чистилось ніколи, а
+   * парситься воно на кожен Store.onChange. Вікно подання — 2 дні, тож
+   * старші за 14 днів позначки не впливають ні на що.
+   */
+  function pruneSent(sent) {
+    const cut = (function () {
+      const d = new Date();
+      d.setDate(d.getDate() - 14);
+      return dayKey(d);
+    })();
+    const out = {};
+    Object.keys(sent).forEach(function (k) {
+      const m = /(\d{4}-\d{2}-\d{2})$/.exec(k);
+      if (!m || m[1] >= cut) out[k] = sent[k];
+    });
+    return out;
+  }
+
   function dayKey(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
@@ -117,7 +139,7 @@
     if (busy || !Api || !Api.available() || !profile) return;
     busy = true;
     try {
-      const sent = lsGet(SENT_KEY, {});
+      const sent = pruneSent(lsGet(SENT_KEY, {}));
       const events = collect(profile).filter(function (e) { return !sent[e.key]; });
       for (const e of events) {
         const res = await Api.submit(e.kind, e.key, e.day, e.payload);

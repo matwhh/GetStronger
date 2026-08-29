@@ -328,8 +328,8 @@
         '<span class="small">' + esc(dateLabel(dateOf(k))) + (e.t ? ' <span class="muted">' + esc(e.t) + '</span>' : '') + '</span>' +
         '<span class="small muted">' + filled + ' ' + window.App.plural(filled, 'параметр', 'параметри', 'параметрів') + '</span>' +
         '<span class="row" style="gap:6px">' +
-          '<button class="btn btn--ghost btn--sm" type="button" data-ms-edit="' + k + '">Редагувати</button>' +
-          '<button class="icon-btn icon-btn--danger" type="button" data-ms-del="' + k + '" aria-label="Видалити замір за ' + esc(k) + '">' +
+          '<button class="btn btn--ghost btn--sm" type="button" data-ms-edit="' + esc(k) + '">Редагувати</button>' +
+          '<button class="icon-btn icon-btn--danger" type="button" data-ms-del="' + esc(k) + '" aria-label="Видалити замір за ' + esc(k) + '">' +
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
           '</button>' +
         '</span>' +

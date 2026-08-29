@@ -1,6 +1,7 @@
 /** Наскрізний шлях новачка: від чистого браузера до щоденного вжитку. */
 import { chromium } from 'playwright';
 import { fillBirth } from './dob.mjs';
+import { localMode } from './adult.mjs';
 const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const U=f=>'file:///root/work/forgesite/'+f;
 const b=await chromium.launch({executablePath:CHROME});
@@ -9,6 +10,12 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
    того, з чого починає жива людина — з чистого браузера й онбордингу:
    вік → тіло → програма з робочою вагою. */
 const ctx=await b.newContext({viewport:{width:390,height:844}});
+/* Локальний режим: щасливий шлях новачка тут — саме профільний
+   (вік → тіло → програма). У хмарному перед ним стоять реєстрація й
+   схвалення заявки; вони перевіряються окремо, а тут упирались би в
+   екран входу. localMode() гасить ключі Supabase до завантаження. */
+await localMode(ctx);
+await ctx.route(/^https?:\/\//, r => r.abort());
 const p=await ctx.newPage(); const errs=[];
 p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
 const tap=async l=>{await l.evaluate(e=>e.scrollIntoView({block:'center'})).catch(()=>{}); return l.click({timeout:5000});};
@@ -19,6 +26,11 @@ await p.goto(U('index.html'));
 await p.evaluate(()=>localStorage.clear());
 await p.reload(); await p.waitForTimeout(900);
 ok('0. чистий браузер веде на перевірку віку', here()==='welcome.html', here());
+/* Перший екран welcome — стартовий («Увійти» / «Зареєструватися»).
+   Скринінг стоїть за «Зареєструватися»: у локальному режимі ця кнопка
+   веде просто на крок 'age'. */
+await p.locator('#gate-card [data-nav="age"]').click();
+await p.waitForTimeout(400);
 ok('0. кнопка вимкнена, поки дати немає', await p.locator('#gate-go').isDisabled());
 await fillBirth(p, '1995-03-10'); await p.waitForTimeout(400);
 ok('0. після дорослої дати можна далі', !(await p.locator('#gate-go').isDisabled()));
@@ -33,7 +45,7 @@ ok('1. утеча на головну повертає на крок «тіло�
 /* Порядок полів: стать → вага → зріст → активність → стаж → пульси */
 const fieldOrder = await p.evaluate(()=>[...document.querySelectorAll('#gate-card input:not([type=radio]), #gate-card select')].map(e=>e.id));
 ok('1. порядок полів за специфікацією',
-   JSON.stringify(fieldOrder)===JSON.stringify(['b-weight','b-height','b-activity','b-trainage','b-hrrest','b-hrmax']),
+   JSON.stringify(fieldOrder)===JSON.stringify(['b-height','b-weight','b-activity','b-trainage','b-hrrest','b-hrmax']),
    fieldOrder.join(','));
 ok('1. placeholder обох пульсів — «Необовʼязково»',
    (await p.locator('#b-hrmax').getAttribute('placeholder'))==='Необовʼязково' &&
@@ -55,7 +67,14 @@ ok('1. з заповненими полями можна далі (обидва 
 /* Вписаний пульс спокою зберігається, хоч він і опційний */
 await p.locator('#b-hrrest').fill('58');
 await p.waitForTimeout(300);
-await tap(p.locator('#body-go')); await p.waitForTimeout(1200);
+await tap(p.locator('#body-go')); await p.waitForTimeout(600);
+/* BMI 82,4 кг / 180 см = 25,4 — «надлишкова вага», і крок чесно показує
+   попередження один раз на категорію (js/bmi-core.js). Це не діалог
+   браузера, тож обробник p.on('dialog') його не бачить: підтверджуємо
+   кнопкою, як людина. Без цього proceedBody() чекав би вічно. */
+const bmiOk = p.locator('#bmi-w-ok');
+if (await bmiOk.count()) { await bmiOk.click(); await p.waitForTimeout(400); }
+await p.waitForTimeout(1200);
 ok('1. крок «тіло» веде до програм', here()==='programs.html', here());
 const bodyProf=await p.evaluate(async()=>await window.Store.getProfile());
 ok('1. тіло лягло в профіль', bodyProf.sex==='male'&&bodyProf.weight===82.4&&bodyProf.height===180&&bodyProf.activity===1.55,

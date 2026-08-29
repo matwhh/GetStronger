@@ -220,6 +220,37 @@ describe('Незіслані зміни не затираються хмарою
   });
 });
 
+describe('Рядка в хмарі ще немає', () => {
+  test('порожня відповідь не затирає локальний профіль', async () => {
+    const ls = makeStorage({
+      'ib.profile': JSON.stringify({ weight: 88, bodyLog: { '2026-05-05': 88 }, version: 9 }),
+      'ib.account': JSON.stringify({ status: 'approved' }),
+      'ib.session': JSON.stringify({ access_token: 't', refresh_token: 'r',
+        expires_at: Date.now() + 86400000, user: { id: UID_A, email: 'a@test' } }),
+      'ib.profile.owner': UID_A
+    });
+    // Хмара відповідає порожнім масивом: рядка для цього користувача немає.
+    const f = net(null);
+    const s = loadStore({ fetch: f, storage: ls });
+    const prof = await s.Store.getProfile();
+    assert.equal(prof.weight, 88, 'локальні дані мусять пережити відсутність рядка');
+    assert.equal(JSON.parse(ls.getItem('ib.profile')).weight, 88, 'і не бути затертими бланком');
+  });
+
+  test('наявний хмарний рядок і далі виграє', async () => {
+    const ls = makeStorage({
+      'ib.profile': JSON.stringify({ weight: 88, version: 9 }),
+      'ib.account': JSON.stringify({ status: 'approved' }),
+      'ib.session': JSON.stringify({ access_token: 't', refresh_token: 'r',
+        expires_at: Date.now() + 86400000, user: { id: UID_A, email: 'a@test' } }),
+      'ib.profile.owner': UID_A
+    });
+    const s = loadStore({ fetch: net({ weight: 91, version: 9 }), storage: ls });
+    const prof = await s.Store.getProfile();
+    assert.equal(prof.weight, 91);
+  });
+});
+
 describe('Одночасні записи', () => {
   test('saveProfile і flushPending не відкочують одне одного', async () => {
     const ls = makeStorage();

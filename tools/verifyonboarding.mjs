@@ -9,7 +9,7 @@
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import { adultProfile, ADULT_BIRTH } from './adult.mjs';
+import { adultProfile, ADULT_BIRTH, localMode } from './adult.mjs';
 
 const ROOT = process.cwd();
 const R = [];
@@ -28,8 +28,17 @@ const AGE_ONLY  = { version: 6, birthDate: ADULT_BIRTH, age: 36 };
 const WITH_BODY = Object.assign({}, AGE_ONLY, { sex: 'male', weight: 82, height: 180, activity: 1.55, trainingAge: 'inter', hrRest: 60 });
 const WITH_PLAN = Object.assign({}, WITH_BODY, { activePlan: { programId: 'fullbody', days: 3 }, weights: {} });
 
+/*
+ * ЛОКАЛЬНИЙ РЕЖИМ навмисно: тут перевіряється державна машина онбордингу,
+ * де крок виводиться СУТО з ib.profile. У хмарному режимі перед нею стоїть
+ * автентифікація, і кожен із цих зрізів упирався б у екран входу — тобто
+ * перевірка мовчки міряла б не те. Хмарний шлях суворіший і має власні
+ * перевірки; тут стережемо, що профіль-зріз відчиняє рівно свої сторінки.
+ */
 async function fresh(profile) {
   const ctx = await b.newContext({ viewport: { width: 1100, height: 900 } });
+  await localMode(ctx);
+  await ctx.route(/^https?:\/\//, r => r.abort());
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(e.message));
@@ -42,6 +51,11 @@ async function fresh(profile) {
 }
 
 async function landing(p, f) {
+  /* Запобіжник циклів у js/agegate.js замовкає після 4 редиректів за 10
+     секунд — інакше розбіжність сторожа й welcome.js вішала б сайт. Ці
+     матриці відкривають 17 закритих сторінок поспіль, чого жива людина не
+     робить, тож лічильник скидаємо: інакше з пʼятої міряли б запобіжник. */
+  await p.evaluate(() => { try { sessionStorage.removeItem('ib.gateloop'); } catch (_) {} });
   await p.goto('file://' + ROOT + '/' + f, { waitUntil: 'load' });
   await p.waitForTimeout(160);
   return page(p.url());

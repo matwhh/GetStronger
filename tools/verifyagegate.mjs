@@ -7,7 +7,7 @@
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import { adultProfile } from './adult.mjs';
+import { adultProfile, localMode } from './adult.mjs';
 import { fillBirth } from './dob.mjs';
 
 const ROOT = process.cwd();
@@ -22,8 +22,23 @@ const PAGES = ['index.html', 'workout.html', 'plan.html', 'programs.html', 'nutr
                'boxing.html', 'cardio.html', 'calculator.html', 'supplements.html',
                'research.html', 'account.html', 'today.html'];
 
+/*
+ * ЧОМУ ВЕСЬ ЦЕЙ ФАЙЛ ЙДЕ В ЛОКАЛЬНОМУ РЕЖИМІ.
+ *
+ * Тут перевіряється саме СКРИНІНГ: екран дати народження, його межі й те,
+ * що його не обійти підробкою localStorage. У хмарному режимі цей екран
+ * більше не перший — перед ним стоять реєстрація та схвалення заявки, а
+ * сама дата ще й перевіряється на сервері (RPC, db/account-approval.sql).
+ * Тобто хмарний шлях СУВОРІШИЙ і перевіряється окремо; якби ці сценарії
+ * лишились у ньому, вони міряли б екран входу й мовчки нічого не стерегли.
+ *
+ * localMode() гасить ключі Supabase до завантаження скриптів — сайт бачить
+ * себе форком без сервера, де ib.profile і є єдиним джерелом правди.
+ */
 async function fresh(profile) {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await localMode(ctx);
+  await ctx.route(/^https?:\/\//, r => r.abort());
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(e.message));
@@ -35,11 +50,32 @@ async function fresh(profile) {
   return { ctx, p, errs };
 }
 
+/**
+ * Довести браузер до екрана дати народження.
+ *
+ * Перший екран welcome тепер стартовий («Увійти» / «Зареєструватися») — і
+ * в хмарному режимі, і в локальному. Скринінг стоїть за кнопкою
+ * «Зареєструватися»: у локальному режимі вона веде просто на крок 'age'.
+ * Один клік замість припущення, що дата — перший екран; якщо профіль уже
+ * містить дату, крок 'age' відкривається сам і кнопки немає.
+ */
+async function toAge(p) {
+  await p.waitForTimeout(700);
+  const reg = p.locator('#gate-card [data-nav="age"]');
+  if (await reg.count()) { await reg.click(); await p.waitForTimeout(400); }
+}
+
 /* ---- 1. Чистий браузер: будь-яка сторінка веде на гейт ---- */
 {
   const { ctx, p, errs } = await fresh(null);
   let bad = [];
   for (const f of PAGES) {
+    /* Запобіжник циклів у js/agegate.js навмисно замовкає після 4 редиректів
+       за 10 секунд — інакше розбіжність сторожа й welcome.js вішала б сайт
+       намертво. Людина стільки закритих сторінок поспіль не відкриває, а цей
+       цикл відкриває 17, тож лічильник треба скидати перед кожною: інакше з
+       пʼятої перевірка міряла б запобіжник, а не сторожа. */
+    await p.evaluate(() => { try { sessionStorage.removeItem('ib.gateloop'); } catch (_) {} });
     await p.goto('file://' + ROOT + '/' + f, { waitUntil: 'load' });
     await p.waitForTimeout(160);
     if (page(p.url()) !== 'welcome.html') bad.push(f + '→' + page(p.url()));
@@ -47,7 +83,7 @@ async function fresh(profile) {
   ok('1. усі ' + PAGES.length + ' сторінок ведуть на гейт (прямий URL)', bad.length === 0, bad.join(', '));
 
   await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
-  await p.waitForTimeout(900);
+  await toAge(p);
   ok('1. заголовок екрана точний',
      (await p.locator('#gate-card h1').innerText()).trim() === 'Вкажіть вашу дату народження');
   /* Календаря бути НЕ повинно: дата народження вводиться цифрами. */
@@ -77,17 +113,22 @@ async function fresh(profile) {
 {
   const { ctx, p, errs } = await fresh(null);
   await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
-  await p.waitForTimeout(900);
+  await toAge(p);
 
   await fillBirth(p, '2012-05-05');
   await p.waitForTimeout(400);
   ok('2. кнопка лишається вимкненою', await p.locator('#gate-go').isDisabled());
 
+  /* Межу беремо з застосунку (AgeCore.MIN_AGE), а не зашиваємо числом:
+     вона одна для клієнта, сервера (register_request) і legal.html, і саме
+     їхню узгодженість тут і треба стерегти. Раніше тут стояло «18», межу
+     змінили на 17 — і перевірка почала падати на правильній поведінці. */
+  const MIN = await p.evaluate(() => window.AgeCore.MIN_AGE);
   const msg = await p.locator('#gate-card').innerText();
   ok('2. повідомлення точне за текстом',
-     msg.includes('Forge доступний лише користувачам віком від 18 років.'));
+     msg.includes('Forge доступний лише користувачам віком від ' + MIN + ' років.'), String(MIN));
   ok('2. пояснення на місці',
-     msg.includes('Платформа та її тренувальні програми розроблені для повнолітніх користувачів віком 18 років і старше.'));
+     msg.includes('розроблені для користувачів віком ' + MIN + ' років і старше.'));
 
   /* Профіль не створюється */
   const stored = await p.evaluate(() => localStorage.getItem('ib.profile'));
@@ -116,7 +157,8 @@ async function fresh(profile) {
 
   await p.waitForTimeout(800);
   ok('3. гейт одразу показує заборону',
-     (await p.locator('#gate-card').innerText()).includes('лише користувачам віком від 18'));
+     (await p.locator('#gate-card').innerText()).includes(
+       'лише користувачам віком від ' + await p.evaluate(() => window.AgeCore.MIN_AGE)));
   ok('3. кнопка вимкнена', await p.locator('#gate-go').isDisabled());
   ok('3. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
@@ -163,7 +205,7 @@ async function fresh(profile) {
 {
   const { ctx, p, errs } = await fresh(null);
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
-  await p.waitForTimeout(900);
+  await toAge(p);
   await fillBirth(p, '1995-03-10');
   await p.waitForTimeout(400);
   ok('5. після дорослої дати кнопка активна', !(await p.locator('#gate-go').isDisabled()));
@@ -226,7 +268,7 @@ async function fresh(profile) {
 {
   const { ctx, p, errs } = await fresh(null);
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
-  await p.waitForTimeout(900);
+  await toAge(p);
   await fillBirth(p, '1990-06-15');
   await p.waitForTimeout(300);
   await p.locator('#gate-go').click();
@@ -260,11 +302,13 @@ async function fresh(profile) {
 /* ---- 7. Мобільний екран ---- */
 for (const w of [320, 390, 430]) {
   const ctx = await b.newContext({ viewport: { width: w, height: 780 }, isMobile: true, hasTouch: true });
+  await localMode(ctx);
+  await ctx.route(/^https?:\/\//, r => r.abort());
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(e.message));
   await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
-  await p.waitForTimeout(900);
+  await toAge(p);
   const m = await p.evaluate(() => ({
     overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
     date: Math.round(document.getElementById('dob-d').getBoundingClientRect().height),

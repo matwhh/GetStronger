@@ -239,7 +239,19 @@
           '</div>' +
           '<div class="row">' +
             '<button class="btn btn--primary" type="submit" data-act="in">Увійти</button>' +
-            '<button class="btn btn--ghost" type="button" data-act="up">Зареєструватись</button>' +
+            /*
+             * Тут БІЛЬШЕ НЕМАЄ кнопки реєстрації.
+             *
+             * Вона викликала Store.signUp() напряму, тобто повз усе, що
+             * робить реєстрацію реєстрацією: перевірку пароля
+             * (PasswordCore), нік, підтвердження віку 17+, три обовʼязкові
+             * згоди й сам register_request. Створений так користувач не
+             * мав рядка в account_status — а отже, за RLS, не мав доступу
+             * ні до чого й полагодити це з інтерфейсу не міг.
+             *
+             * Реєстрація живе в одному місці — welcome.html.
+             */
+            '<a class="btn btn--ghost" href="welcome.html">Створити акаунт</a>' +
           '</div>' +
         '</form>' +
       '</div>';
@@ -290,7 +302,7 @@
       }
     }
 
-    async function submit(mode) {
+    async function submit() {
       if (!email.value || pass.value.length < 8) {
         toast('Заповни пошту й пароль (від 8 символів)', 'err');
         return;
@@ -299,17 +311,9 @@
       buttons.forEach(function (b) { b.disabled = true; });
 
       try {
-        let merge = null;
-        if (mode === 'up') {
-          const res = await Store.signUp(email.value.trim(), pass.value);
-          merge = res.merge;
-          toast(res.confirmed ? 'Акаунт створено' : 'Перевір пошту — треба підтвердити адресу', 'ok');
-        } else {
-          const res = await Store.signIn(email.value.trim(), pass.value);
-          merge = res.merge;
-          toast('Вхід виконано', 'ok');
-        }
-        await handleMerge(merge);
+        const res = await Store.signIn(email.value.trim(), pass.value);
+        toast('Вхід виконано', 'ok');
+        await handleMerge(res.merge);
         renderAll();
       } catch (err) {
         toast(err.message, 'err');
@@ -318,8 +322,7 @@
       }
     }
 
-    form.addEventListener('submit', function (e) { e.preventDefault(); submit('in'); });
-    $('#a-form [data-act="up"]').addEventListener('click', function () { submit('up'); });
+    form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
   }
 
   /* ------------------------------------------------------------------ */

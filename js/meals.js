@@ -1113,6 +1113,8 @@
       '</div>';
   }
 
+  let wasOpen = false;
+
   function renderModal() {
     const host = $('#modal');
     if (!host) return;
@@ -1121,7 +1123,7 @@
     if (!m) {
       host.hidden = true;
       host.innerHTML = '';
-      document.body.style.overflow = '';
+      if (wasOpen) { wasOpen = false; window.App.lockScroll(false); }
       return;
     }
 
@@ -1130,7 +1132,9 @@
       : (Foods.byId(m.foodId) || {}).name;
 
     host.hidden = false;
-    document.body.style.overflow = 'hidden';
+    /* renderModal викликається і на кожну перемальовку відкритого вікна —
+       без прапорця лічильник блокувань ріс би з кожним натисканням. */
+    if (!wasOpen) { wasOpen = true; window.App.lockScroll(true); }
     host.innerHTML =
       '<div class="modal__backdrop" data-m-close></div>' +
       '<div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="m-title">' +

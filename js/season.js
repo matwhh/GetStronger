@@ -91,8 +91,11 @@
         '<span class="small">Сьогодні: <b class="mono">' + signed(st.today || 0) + ' ELO</b></span>' +
         (lvl.elite
           ? '<span class="small"><b>ELITE</b> — до стелі ' + (st.config.seasonMax - st.elo) + ' ELO</span>'
-          : '<span class="small">До Level ' + (lvl.level + 1) + ': <b class="mono">' +
-            (lvl.ceil + 1 - st.elo) + ' ELO</b></span>') +
+          /* На десятому рівні наступного рівня немає — далі тільки ELITE.
+             Раніше тут писалось «До Level 11», рівня, якого не існує. */
+          : '<span class="small">До ' +
+            (lvl.level >= st.config.levelCount ? 'ELITE' : 'Level ' + (lvl.level + 1)) +
+            ': <b class="mono">' + (lvl.ceil + 1 - st.elo) + ' ELO</b></span>') +
         (st.rank ? '<span class="small">Місце: <b class="mono">#' + st.rank + '</b> із ' + st.of + '</span>' : '') +
       '</div>' +
 
@@ -270,9 +273,9 @@
     if (rep.graceUsed != null) extra.push('Grace Weeks: <b class="mono">' + rep.graceUsed + '/2</b>');
     if (st.biggestGain != null) extra.push('Найкращий день: <b class="mono">+' + st.biggestGain + '</b>');
     if (st.biggestLoss != null && st.biggestLoss < 0) extra.push('Найгірший день: <b class="mono">' + st.biggestLoss + '</b>');
-    if (st.bestCategory) extra.push('Сильна категорія: <b>' + (CAT_UA[st.bestCategory] || st.bestCategory) + '</b>');
+    if (st.bestCategory) extra.push('Сильна категорія: <b>' + (CAT_UA[st.bestCategory] || esc(st.bestCategory || '')) + '</b>');
     if (st.weakestCategory && st.weakestCategory !== st.bestCategory) {
-      extra.push('Слабка категорія: <b>' + (CAT_UA[st.weakestCategory] || st.weakestCategory) + '</b>');
+      extra.push('Слабка категорія: <b>' + (CAT_UA[st.weakestCategory] || esc(st.weakestCategory || '')) + '</b>');
     }
     if (!rows && !extra.length) return '';
     return (rows ? '<div style="margin-bottom:8px">' + rows + '</div>' : '') +

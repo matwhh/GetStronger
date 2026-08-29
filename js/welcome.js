@@ -391,9 +391,14 @@
   async function proceedBody() {
     if (state.busy) return;
     if (!bodyReady() || !consentsOk()) { syncBodyControls(); return; }
+    /*
+     * busy ставиться ДО очікування модалки BMI, а не після. Було навпаки,
+     * і поки людина читала попередження, кнопка лишалась активною — два
+     * натискання давали дві заявки.
+     */
+    state.busy = true;
     await bmiWarnModal();
 
-    state.busy = true;
     const b = state.body;
     const patch = {
       sex: b.sex,
@@ -862,7 +867,17 @@
     }
   }
 
-  function nav(step) { state.err = ''; state.step = step; render(); }
+  /*
+   * Перехід між кроками. err чиститься лише коли крок СПРАВДІ міняється:
+   * раніше nav() викликали і для того, щоб лишитись на місці й показати
+   * помилку (UNDERAGE, USERNAME_TAKEN, «нік зайнятий») — і повідомлення
+   * гасло тим самим викликом, який мав його показати.
+   */
+  function nav(step) {
+    if (step !== state.step) state.err = '';
+    state.step = step;
+    render();
+  }
 
   async function init() {
     if (!$('#gate-card') || !AC || !OC) return;

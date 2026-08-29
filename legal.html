@@ -47,7 +47,10 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
   <section class="section">
     <div class="wrap legal">
 
-      <a class="small" href="javascript:history.back()">← Назад</a>
+      <!-- button, а не javascript:-посилання: така схема заборонена в
+           App.safeUrl і перестане працювати, щойно з CSP приберуть
+           unsafe-inline. -->
+      <button class="btn btn--ghost btn--sm" type="button" onclick="history.back()">← Назад</button>
 
       <h1 style="margin-top:12px">Правові документи</h1>
       <p class="lead">

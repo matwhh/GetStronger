@@ -495,8 +495,7 @@ p  { margin: 0 0 1em; color: var(--text-2); }
    відображення поточного рівня. Замінено на те саме приглушене коло з
    числом, трохи більше за навігаційне — тут воно самостійний
    елемент картки, а не дрібна іконка в шапці. Коло лишається строго
-   круглим (фіксовані width/height) — підпис «Level» стоїть окремим
-   текстом ліворуч від нього (.lvl-label), а не всередині.
+   круглим (фіксовані width/height).
 
    Тепер усередині не цифра, а готовий малюнок зі шкалою (icons/levels):
    рамку й фон знято з тієї самої причини, що й у шапці — диск уже
@@ -522,12 +521,28 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   -webkit-user-drag: none;
 }
 
-.lvl-label {
-  font-family: var(--font-mono);
-  font-size: 0.86rem;
-  font-weight: 700;
-  color: var(--text-2);
-  margin-right: 8px;
+/*
+ * Значок у СВІТЛІЙ схемі.
+ *
+ * Диск усередині файлу темний (#17181C→#0B0C0E) і таким лишається: це
+ * предмет — жетон, — а не елемент інтерфейсу, що перевертається разом зі
+ * схемою. Перефарбувати його CSS-фільтром не можна: invert зіпсував би
+ * кольори шкали (зелений став би пурпуровим).
+ *
+ * Але на папері темний круг без обведення читається як діра. Тонке
+ * світле кільце ставить його НА поверхню: та сама роль, що в неоморфної
+ * білої грані на решті елементів світлої схеми.
+ */
+html[data-scheme="light"] .lvl-ico {
+  box-shadow: 0 0 0 1px rgba(var(--tint-rgb), 0.10),
+              0 1px 2px rgba(var(--tint-rgb), 0.18);
+}
+
+/* У друку тло сторінки біле незалежно від схеми, тож кільце потрібне
+   завжди. Сам малюнок — <img>, він друкується як є, на відміну від
+   фонових заливок. */
+@media print {
+  .lvl-ico { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25); }
 }
 
 @media (max-width: 1060px) {
@@ -991,40 +1006,11 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 
 /* Головна дія дня. Одна картка-посилання, візуально найважча на сторінці:
    на телефоні саме вона має ловити великий палець першою. */
-.dash-main {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 20px;
-  border: 1px solid var(--line-2); border-radius: var(--r-lg);
-  background: var(--card-1);
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
-}
-.dash-main:hover, .dash-main:focus-visible { border-color: var(--acc-line); color: var(--text); }
-.dash-main:active { transform: translateY(1px); }
-.dash-main__eyebrow {
-  font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--acc-ink);
-}
-.dash-main__title {
-  font-size: clamp(1.4rem, 4.6vw, 2rem); font-weight: 700; line-height: 1.15;
-  letter-spacing: -0.02em;
-}
 .dash-main__sub { font-size: 0.95rem; color: var(--text-2); }
 .dash-main__go { margin-top: 6px; font-size: 0.95rem; font-weight: 600; color: var(--acc-ink); }
-.dash-main.is-done .dash-main__eyebrow { color: var(--ok); }
 
 /* Смужка виконання всередині головної картки — той самий візуальний
    словник, що .qi-bar у трекерах, лише без числа поруч. */
-.dash-main__bar {
-  display: block; height: 6px; margin-top: 8px;
-  border-radius: 999px; background: var(--line); overflow: hidden;
-}
-.dash-main__bar i {
-  display: block; height: 100%; border-radius: inherit;
-  background: var(--acc-bar);
-  transition: width var(--t);
-}
 
 /* Плитки стану. min() у minmax — щоб на вузькому екрані трек не був
    ширший за сам контейнер (та сама пастка, що в .grid-*). */
@@ -1068,18 +1054,6 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 
 /* Решта розділів — компактний перелік посилань, а не сітка карток.
    Повна навігація вже є в шапці й футері; тут лише швидкий доступ. */
-.dash__more { display: flex; flex-wrap: wrap; gap: 8px; }
-.dash__more a {
-  padding: 8px 12px;
-  min-height: 40px; display: inline-flex; align-items: center;
-  border: 1px solid var(--line); border-radius: 999px;
-  font-size: 0.88rem; color: var(--text-2); text-decoration: none;
-  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
-}
-.dash__more a:hover, .dash__more a:focus-visible { border-color: var(--line-2); color: var(--text); }
-.dash__more a:active { background: var(--surface); }
-
-.dash__note { max-width: 68ch; }
 
 /* Орієнтир першого відкриття. Видно лише доти, доки в профілі порожньо. */
 
@@ -1658,6 +1632,9 @@ body.has-rest-timer { --rest-h: 86px; }
   max-width: 460px;
   max-height: min(88vh, 720px);
   overflow-y: auto;
+  /* Дотягування до кінця списку у вікні не має прокручувати сторінку під
+     ним. Те саме правило вже стоїть на .nav__links. */
+  overscroll-behavior: contain;
   padding: 24px;
   border: 1px solid var(--line-2);
   border-radius: var(--r-lg);
@@ -1977,7 +1954,6 @@ main:focus:not(:focus-visible) { outline: none; }
    (tools/verifythemes.mjs): текст ≥ 4,5:1, елементи інтерфейсу ≥ 3:1.
    ========================================================================== */
 
-
 /* Перемикач тем в акаунті: плашка з двома кружками кольорів теми */
 .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .theme-btn {
@@ -2234,7 +2210,6 @@ button.mcal__cell--on:hover { background: var(--acc-ink); color: var(--on-acc); 
 
 /* (кольорові сімʼї прибрані: лишилась одна графітова основа) */
 
-
 /* --------------------------------------------------------------------------
    ДЕКОРАТИВНІ ГРАДІЄНТИ: світло замість кольору
    --------------------------------------------------------------------------
@@ -2443,25 +2418,6 @@ html[data-theme="graphite-ocean"] {
   --on-acc: #ffffff;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* ==========================================================================
    СВІТЛА СХЕМА
    ==========================================================================
@@ -2635,15 +2591,6 @@ html[data-scheme="light"][data-theme="graphite-ocean"] {
   --link: #1b5f70; --link-hover: #296f81;
   --acc-rgb: 41, 111, 129; --acc-ink-rgb: 27, 95, 112;
 }
-
-
-
-
-
-
-
-
-
 
 body {
   background: var(--bg);
@@ -3104,7 +3051,7 @@ button.heatmap__cell::after {
    вже вживає :hover. */
 .acc__head:active { background: rgba(var(--acc-rgb), 0.14); }
 .quick-list__item:active { background: rgba(var(--acc-rgb), 0.18); }
-.dash-main:active, .tile:active { border-color: var(--acc-line); }
+.tile:active { border-color: var(--acc-line); }
 
 @media (max-width: 720px) {
   /* Шапка нижча — отже й змінна нижча. Раніше min-height правився тут, а
@@ -3146,7 +3093,6 @@ button.heatmap__cell::after {
   .acc__head:hover { background: transparent; }
   .quick-list__item:hover { background: transparent; }
   .tile:hover { border-color: var(--line); }
-  .dash__more a:hover { border-color: var(--line); color: var(--text-2); }
 }
 
 /* ==================================================================== */
@@ -3306,7 +3252,7 @@ button.heatmap__cell::after {
   .bg-fx, .skip-link, .toasts, .rest-timer, .modal,
   .btn, .icon-btn, .acc__ico, .row-actions, .seg,
   .tbl__acts, .switch, #copy-fallback,
-  .dash__more, .qi-scale, .qi-row {
+  .qi-scale, .qi-row {
     display: none !important;
   }
 
@@ -3409,14 +3355,11 @@ button.heatmap__cell::after {
 
 /* Розклад по сигналах: назва — смуга — «скільки з максимуму».
    Сітка, а не таблиця: три елементи в рядок, середній тягнеться. */
-.sig-list { display: flex; flex-direction: column; gap: 8px; }
 .sig {
   display: grid;
   grid-template-columns: minmax(84px, auto) 1fr minmax(56px, auto);
   align-items: center; gap: 10px;
 }
-.sig__name { font-size: 0.85rem; color: var(--text-2); }
-.sig__val  { font-size: 0.85rem; text-align: right; white-space: nowrap; }
 /* .vol — сітка з чотирьох треків (назва, смуга, число, залишок), і сама
    смуга там стоїть у другій колонці. Тут потрібна ЛИШЕ смуга: назву й
    число малює .sig своєю сіткою. Тому переводимо в одну колонку — інакше
@@ -3437,7 +3380,6 @@ button.heatmap__cell::after {
 @media (max-width: 380px) {
   .rating-hero__val { font-size: 2.1rem; }
   .sig { grid-template-columns: minmax(70px, auto) 1fr minmax(48px, auto); gap: 8px; }
-  .sig__name, .sig__val { font-size: 0.79rem; }
 }
 
 /* ==========================================================================
@@ -3691,7 +3633,6 @@ button.heatmap__cell::after {
    було чистим для вводу (стандартно браузер тримає його до першого
    символа). Стосується всіх полів вводу — поведінка одна на весь Forge. */
 .input:focus::placeholder { color: transparent; }
-
 
 @media (max-width: 380px) {
   .gate { padding: 18px 14px; }

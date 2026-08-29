@@ -426,7 +426,8 @@
             '<span class="small muted">' +
               (lvl.elite
                 ? 'ELITE' + (st.rank ? ' · #' + st.rank : '')
-                : (st.config.levelSize - (st.elo - lvl.floor)) + ' ELO до Level ' + (lvl.level + 1)) +
+                : (st.config.levelSize - (st.elo - lvl.floor)) + ' ELO до ' +
+                  (lvl.level >= st.config.levelCount ? 'ELITE' : 'Level ' + (lvl.level + 1))) +
             '</span>' +
           '</span>' +
         '</div>' +

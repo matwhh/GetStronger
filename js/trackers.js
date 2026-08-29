@@ -294,7 +294,10 @@
           : '<p class="small muted mt-2 mb-0">Список порожній. Додай першу позицію нижче — ' +
             'вона зʼявиться на «Сьогодні» щоденною позначкою.</p>') +
         '<div class="row mt-2" style="gap:8px;flex-wrap:wrap">' +
-          '<input class="input" type="text" id="add-' + type + '" style="max-width:220px" placeholder="' + esc(placeholder) + '" maxlength="60">' +
+          /* aria-label, а не лише placeholder: підказка зникає з першою
+             літерою, і читалка називала поле безіменним. */
+          '<input class="input" type="text" id="add-' + type + '" style="max-width:220px" ' +
+            'aria-label="' + esc(placeholder) + '" placeholder="' + esc(placeholder) + '" maxlength="60">' +
           '<button class="btn btn--ghost btn--sm" type="button" data-add-custom="' + type + '">' + esc(addLabel) + '</button>' +
         '</div>' +
       '</div>';

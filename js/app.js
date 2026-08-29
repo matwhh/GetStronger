@@ -567,6 +567,46 @@
     window.addEventListener('focus', check);
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Блокування прокрутки фону під модалкою                              */
+  /* ------------------------------------------------------------------ */
+  /*
+   * body { overflow: hidden } на iOS Safari блокує фон ненадійно: сторінка
+   * під вікном усе одно «протягується», а після закриття людина
+   * опиняється не там, де була. Тому позиція фіксується явно, а прокрутка
+   * повертається на те саме місце.
+   *
+   * Лічильник, а не булеве значення: якщо колись відкриються два шари
+   * (вікно поверх вікна), закриття верхнього не має розблоковувати фон.
+   */
+  let scrollLocks = 0;
+  let lockedAt = 0;
+
+  function lockScroll(on) {
+    const b = document.body;
+    if (on) {
+      scrollLocks++;
+      if (scrollLocks > 1) return;
+      lockedAt = window.scrollY || window.pageYOffset || 0;
+      b.style.position = 'fixed';
+      b.style.top = (-lockedAt) + 'px';
+      b.style.left = '0';
+      b.style.right = '0';
+      b.style.width = '100%';
+      b.style.overflow = 'hidden';
+      return;
+    }
+    scrollLocks = Math.max(0, scrollLocks - 1);
+    if (scrollLocks > 0) return;
+    b.style.position = '';
+    b.style.top = '';
+    b.style.left = '';
+    b.style.right = '';
+    b.style.width = '';
+    b.style.overflow = '';
+    window.scrollTo(0, lockedAt);
+  }
+
   function currentPage() {
     const file = location.pathname.split('/').pop();
     return file === '' ? 'index.html' : file;
@@ -1494,6 +1534,42 @@
    */
 
 
+  /* ------------------------------------------------------------------ */
+  /* Service worker                                                      */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Реєструється лише по http(s): при відкритті файлу подвійним кліком
+   * (file://) service worker недоступний, і спроба дала б помилку в
+   * консолі на кожному завантаженні.
+   *
+   * ?nosw=1 — аварійний вимикач: знімає реєстрацію й чистить кеші. Потрібен
+   * саме тому, що зіпсований worker інакше неможливо прибрати з чужого
+   * пристрою.
+   */
+  function initServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+
+    if (location.search.indexOf('nosw=1') !== -1) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) {
+        rs.forEach(function (r) { r.unregister(); });
+      }).catch(function () {});
+      if (window.caches && caches.keys) {
+        caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); })
+          .catch(function () {});
+      }
+      return;
+    }
+
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function (e) {
+        console.warn('[app] service worker не зареєструвався:', e && e.message);
+      });
+    });
+  }
+
+  initServiceWorker();
+
   window.App = {
     $: $, $$: $$,
     esc: esc, round: round, clamp: clamp, num: num,
@@ -1513,6 +1589,7 @@
     dateLabel: dateLabel,
     setTheme: setTheme,
     levelIcon: levelIcon,
+    lockScroll: lockScroll,
     onDayChange: onDayChange,
     normTheme: normTheme,
     themes: THEMES,

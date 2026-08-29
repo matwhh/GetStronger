@@ -88,17 +88,25 @@ await p.evaluate(async () => {
 await p.reload({ waitUntil: 'load' });
 await p.waitForTimeout(600);
 
-/* 2. Rating рахуємо на його власній сторінці — саме там він і живе */
+/*
+ * 2. Знімок профілю ПЕРЕД експортом.
+ *
+ * Раніше тут рахувався ratingLog — локальний кеш старої формули «Forge
+ * Rating». Тієї формули на клієнті більше немає: рейтинг рахує сервер
+ * (elo_submit / elo_facts), а profiles.data лишається єдиним джерелом
+ * фактів. Тобто перевірка «кеш відновився до тих самих чисел» перевіряла
+ * поле, яке вже ніхто не пише, — і мовчки падала. Її змістовний спадкоємець
+ * — звірка profiles.data полем за полем нижче: якщо факти пережили
+ * round-trip, сервер порахує з них те саме.
+ *
+ * Сторінку сезону все одно відкриваємо: вона має відмалюватись на цій
+ * історії без JS-помилок.
+ */
 await p.goto('file://' + ROOT + '/rating.html', { waitUntil: 'load' });
 await p.waitForTimeout(900);
-const before = await p.evaluate(async () => {
-  const pr = await window.Store.getProfile();
-  const days = Object.keys(pr.ratingLog || {}).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
-  return { profile: pr, ratingDays: days.length,
-    rating: days.length ? pr.ratingLog[days.sort()[days.length - 1]].rating : 0 };
-});
-ok('Rating порахувався на сідованій історії', before.ratingDays > 30 && before.rating > 0,
-   before.ratingDays + ' днів, ' + before.rating + ' Elo');
+ok('сторінка сезону відмалювалась на сідованій історії',
+   await p.locator('#sz-header').count() > 0 && errs.length === 0, errs.join(' | '));
+const before = await p.evaluate(async () => ({ profile: await window.Store.getProfile() }));
 
 /* 3. Експорт справжньою кнопкою */
 await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
@@ -120,6 +128,22 @@ const cleared = await p.evaluate(() => {
   return { hasProfile: !!(pr && (pr.weight || pr.plan)), keys: Object.keys(localStorage).filter(k => /^(ib\.|forge\.)/.test(k)) };
 });
 ok('після стирання профілю в localStorage немає', !cleared.hasProfile, cleared.keys.join(',') || 'порожньо');
+
+/*
+ * Кнопка «Стерти локальні дані» тепер зносить і сесію — так і задумано:
+ * після неї браузер чужий, і сторож правильно відвертає на welcome. Тому
+ * перед продовженням сценарію повертаємо сесію, як це зробила б людина,
+ * увійшовши знову. Без цього кроки 6–8 міряли б поведінку сторожа, а не
+ * імпорт.
+ */
+await p.evaluate(() => {
+  localStorage.setItem('ib.session', JSON.stringify({
+    access_token: 'test-token', refresh_token: 'test-refresh',
+    expires_at: Date.now() + 86400000,
+    user: { id: '00000000-0000-4000-8000-000000000001', email: 'test@example.com' } }));
+  localStorage.setItem('ib.account', JSON.stringify({
+    status: 'approved', username: 'Тест', isAdmin: false, t: Date.now() }));
+});
 
 /* 5. Імпорт справжнім file input */
 await p.setInputFiles('#p-import-file', file);
@@ -177,18 +201,11 @@ ok('періодизація збережена', same(B.periodization, after.pe
    JSON.stringify(after.periodization));
 ok('делоад збережено', same(B.deload, after.deload), JSON.stringify(after.deload));
 
-/* 7. Rating: не переносимо кеш, а перевіряємо, що він відновлюється до тих самих чисел */
+/* 7. Сторінка сезону після імпорту: відкривається на відновленій історії */
 await p.goto('file://' + ROOT + '/rating.html', { waitUntil: 'load' });
 await p.waitForTimeout(1200);
-const ratingAfter = await p.evaluate(async () => {
-  const pr = await window.Store.getProfile();
-  const days = Object.keys(pr.ratingLog || {}).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
-  return { days: days.length, rating: days.length ? pr.ratingLog[days[days.length - 1]].rating : 0 };
-});
-ok('Forge Rating після імпорту той самий', ratingAfter.rating === before.rating,
-   before.rating + ' → ' + ratingAfter.rating + ' Elo');
-ok('днів у ratingLog стільки ж', ratingAfter.days === before.ratingDays,
-   before.ratingDays + ' → ' + ratingAfter.days);
+ok('сторінка сезону відкрилась після імпорту',
+   await p.locator('#sz-header').count() > 0);
 
 /* 8. Відкат імпорту доступний */
 await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });

@@ -510,6 +510,27 @@
     document.body.classList.add('has-tabbar');
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Значок рівня                                                        */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Десять готових малюнків (icons/levels/lvl-1..10.svg): диск зі шкалою,
+   * яка заповнюється з рівнем, і числом усередині. Раніше рівень малювався
+   * кружком із цифрою на CSS — тепер цифра вже всередині файлу, тож
+   * обгортка не мусить малювати ні рамки, ні фону, інакше вийде коло в колі.
+   *
+   * <img>, а не inline SVG: малюнок один на всі місця, і браузер кешує
+   * його між сторінками. Розмір задається обгорткою.
+   */
+  const LEVEL_MIN = 1, LEVEL_MAX = 10;
+
+  function levelIcon(level, label) {
+    const n = Math.min(LEVEL_MAX, Math.max(LEVEL_MIN, Math.round(Number(level) || LEVEL_MIN)));
+    return '<img class="lvl-ico" src="icons/levels/lvl-' + n + '.svg" ' +
+           'width="512" height="512" alt="' + esc(label || ('Level ' + n)) + '" ' +
+           'draggable="false">';
+  }
+
   function currentPage() {
     const file = location.pathname.split('/').pop();
     return file === '' ? 'index.html' : file;
@@ -532,6 +553,42 @@
     setTimeout(function () { whenReady(check, cb, triesLeft - 1); }, 30);
   }
 
+  /*
+   * Значок рівня має два законні місця, і це не примха верстки:
+   *
+   *   ≥ 1061px — між «Іншим» і «Акаунтом» усередині .nav__links;
+   *   ≤ 1060px — .nav__links стає fixed-накладкою й ховається в бургер,
+   *              тож значок переїжджає в .nav__actions, інакше зникав би
+   *              із шапки разом із меню.
+   *
+   * Один елемент, який переставляється, а не два копії: дві копії
+   * розійшлися б станами (is-active, aria-label) при першій же правці.
+   */
+  const NAV_WIDE = window.matchMedia ? window.matchMedia('(min-width: 1061px)') : null;
+
+  function placeRatingBadge(el) {
+    const badge = el || document.querySelector('.nav__rating');
+    if (!badge) return;
+    const links = document.querySelector('.nav__links');
+    const acts  = document.querySelector('.nav__actions');
+    const edge  = document.querySelector('.nav__link--edge');
+    const wide  = !NAV_WIDE || NAV_WIDE.matches;
+    if (wide) {
+      /* Строго перед «Акаунтом»: саме цей порядок дає центрування в
+         проміжку (авто-поля значка проти margin-left:0 у краю). */
+      if (links && edge && badge.nextElementSibling !== edge) links.insertBefore(badge, edge);
+    } else if (acts) {
+      const scheme = acts.querySelector('[data-scheme-toggle]');
+      if (badge.nextElementSibling !== scheme) acts.insertBefore(badge, scheme);
+    }
+  }
+
+  if (NAV_WIDE) {
+    const onWidth = function () { placeRatingBadge(); };
+    if (NAV_WIDE.addEventListener) NAV_WIDE.addEventListener('change', onWidth);
+    else if (NAV_WIDE.addListener) NAV_WIDE.addListener(onWidth);
+  }
+
   function renderRatingBadge(el, page) {
     if (!el) return;
     el.classList.toggle('is-active', page === 'rating.html');
@@ -543,8 +600,9 @@
       if (!st || !st.config) { el.hidden = true; return; }
       const lvl = EC.levelFor(st.elo, st.config);
       el.hidden = false;
-      el.textContent = String(lvl.level);
+      el.innerHTML = levelIcon(lvl.level, lvl.name);
       el.classList.toggle('is-elite', lvl.elite);
+      placeRatingBadge(el);
       el.setAttribute('aria-label',
         'Рейтинг: ' + st.elo + ' ELO, ' + lvl.name +
         (st.today ? ', сьогодні ' + (st.today > 0 ? '+' : '') + st.today : '') + ' — детальніше');
@@ -698,6 +756,10 @@
                drop +
              '</div>';
     }).join('') +
+      /* Значок рівня стоїть МІЖ «Іншим» і «Акаунтом» і центрується в
+         проміжку між ними (див. .nav__rating у CSS). hidden доти, доки
+         рейтинг реально не порахований. */
+      '<a class="nav__rating" href="rating.html" aria-label="Forge Rating" hidden></a>' +
       '<a class="nav__link nav__link--edge' + (NAV_EDGE.href === page ? ' is-active' : '') +
         '" href="' + NAV_EDGE.href + '">' + esc(NAV_EDGE.label) + '</a>';
 
@@ -714,12 +776,11 @@
           '<span>' + esc(CFG.siteName || 'FORGE') + '</span>' +
         '</a>' +
         '<nav class="nav__links">' + links + '</nav>' +
-        // Бургер і бейдж Forge Rating згруповані в один блок: на десктопі
-        // він просто стоїть після nav__links (тобто правіше «Акаунта»), а
-        // на мобільному, де nav__links стає fixed-накладкою й випадає з
-        // потоку, ці двоє лишаються єдиною видимою парою праворуч від
-        // логотипа — без цього при space-between бейдж «відлітав» би
-        // в середину шапки, відірваний від бургера.
+        // Праворуч: стан синхронізації, перемикач схеми, бургер. Значок
+        // рівня живе в nav__links (між «Іншим» і «Акаунтом»), але на
+        // мобільному цей список стає fixed-накладкою й випадає з потоку —
+        // тоді placeRatingBadge() переносить значок сюди, щоб він не
+        // зникав із шапки разом із меню.
         '<div class="nav__actions">' +
           // Стан синхронізації. За звичайних умов його НЕМАЄ взагалі —
           // зʼявляється лише коли є що досилати (див. renderSyncBadge).
@@ -727,10 +788,6 @@
             '<span class="nav__sync-dot" aria-hidden="true"></span>' +
             '<span class="nav__sync-txt">Не синхронізовано</span>' +
           '</a>' +
-          // hidden за замовчуванням: показується, лише коли рейтинг реально
-          // порахований (див. renderRatingBadge). Інакше на першому відкритті
-          // в шапці блимало б «1» без жодних даних за ним.
-          '<a class="nav__rating" href="rating.html" aria-label="Forge Rating" hidden></a>' +
           schemeButtonHtml() +
           '<button class="nav__burger" type="button" aria-label="Меню" aria-expanded="false">' +
             '<span></span><span></span><span></span>' +
@@ -1459,6 +1516,7 @@
     busy: busy,
     dateLabel: dateLabel,
     setTheme: setTheme,
+    levelIcon: levelIcon,
     normTheme: normTheme,
     themes: THEMES,
     setScheme: setScheme,

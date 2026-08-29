@@ -450,8 +450,9 @@ p  { margin: 0 0 1em; color: var(--text-2); }
 }
 
 /* Перемикач світлої/темної схеми в шапці.
-   Геометрія однакова з .nav__rating — вони стоять поруч, і будь-яка різниця
-   в розмірі чи радіусі читалась би як недбалість, а не як задум. */
+   Геометрія однакова зі значком рівня (.nav__rating): на вузькому екрані
+   вони стоять поруч, і будь-яка різниця в розмірі чи радіусі читалась би
+   як недбалість, а не як задум. */
 .nav__scheme {
   display: flex;
   align-items: center;
@@ -471,6 +472,20 @@ p  { margin: 0 0 1em; color: var(--text-2); }
 .nav__scheme:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
 .nav__scheme svg { display: block; }
 
+/* Значок рівня в шапці.
+
+   Рамки й фону тут НЕМАЄ навмисно: диск, шкала й цифра намальовані в
+   самому файлі (icons/levels/lvl-N.svg), і будь-яке коло згори читалося б
+   як друге кільце навколо першого. Обгортка лишає тільки розмір, фокус і
+   позицію.
+
+   ПОЗИЦІЯ. Значок стоїть у рядку пунктів між «Іншим» і «Акаунтом», і
+   авто-поля з обох боків ділять вільне місце навпіл — тобто він рівно
+   посередині проміжку. Раніше правий край тримав «Акаунт»
+   (.nav__link--edge{margin-left:auto}); поки значок видимий, цю роль
+   перебирає його праве авто-поле, тому в краю поле знімається. Коли
+   значка немає (немає акаунта або рейтинг ще не порахований), правило
+   не спрацьовує й «Акаунт» притискається до краю, як і раніше. */
 .nav__rating {
   display: flex;
   align-items: center;
@@ -478,19 +493,23 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   width: 34px;
   height: 34px;
   flex-shrink: 0;
+  margin-left: auto;
+  margin-right: auto;
   border-radius: 50%;
-  border: 1px solid var(--line);
-  background: rgba(var(--tint-rgb), 0.04);
-  color: var(--text-2);
-  font-family: var(--font-mono);
-  font-size: 0.86rem;
-  font-weight: 700;
-  line-height: 1;
-  transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
 }
 .nav__rating[hidden] { display: none; }   /* display:flex вище перебиває hidden */
-.nav__rating:hover { color: var(--text); background: rgba(var(--tint-rgb), 0.08); }
-.nav__rating.is-active { color: var(--text); border-color: rgba(var(--acc-rgb), 0.55); }
+.nav__rating:not([hidden]) ~ .nav__link--edge { margin-left: 0; }
+.nav__rating .lvl-ico { width: 100%; height: 100%; display: block; }
+/* На мобільному значок переїжджає в .nav__actions (див. placeRatingBadge):
+   там він просто ще одна кнопка в ряду, а не роздільник — авто-поля
+   знімаються, інакше він розштовхував би сусідів. */
+.nav__actions .nav__rating { margin-left: 0; margin-right: 0; }
+.nav__rating:hover { transform: translateY(-1px); }
+.nav__rating:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
+/* Поточна сторінка — тонке кільце навколо диска, а не зміна кольору:
+   кольори всередині значка означають рівень і чіпати їх не можна. */
+.nav__rating.is-active { box-shadow: 0 0 0 2px rgba(var(--acc-rgb), 0.55); }
 
 /* Те саме коло, що в шапці, але для карток (Сьогодні → «Forge Rating»,
    rating.html → заголовок): раніше тут був суцільний акцентний чип
@@ -499,7 +518,11 @@ p  { margin: 0 0 1em; color: var(--text-2); }
    числом, трохи більше за навігаційне — тут воно самостійний
    елемент картки, а не дрібна іконка в шапці. Коло лишається строго
    круглим (фіксовані width/height) — підпис «Level» стоїть окремим
-   текстом ліворуч від нього (.lvl-label), а не всередині. */
+   текстом ліворуч від нього (.lvl-label), а не всередині.
+
+   Тепер усередині не цифра, а готовий малюнок зі шкалою (icons/levels):
+   рамку й фон знято з тієї самої причини, що й у шапці — диск уже
+   намальований у файлі. Розмір лишився 40px. */
 .lvl-circle {
   display: inline-flex;
   align-items: center;
@@ -508,17 +531,19 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   height: 40px;
   flex-shrink: 0;
   border-radius: 50%;
-  border: 1px solid var(--line);
-  background: rgba(var(--tint-rgb), 0.04);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-weight: 700;
   line-height: 1;
 }
+.lvl-circle .lvl-ico { width: 100%; height: 100%; display: block; }
 
 /* Підпис «Level» ліворуч від круглого бейджа — окремий текст, не всередині
    кола (щоб коло лишалось колом, а не капсулою). */
+.lvl-ico {
+  flex-shrink: 0;
+  border-radius: 50%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .lvl-label {
   font-family: var(--font-mono);
   font-size: 0.86rem;
@@ -3593,12 +3618,6 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
    Тому три поля з автопереходом. Ширини задані в ch і рахуються від
    кількості цифр: поле на два символи не має бути таким самим, як на
    чотири, інакше цифри в ньому висять посередині порожнечі. */
-/* Знак Forge монохромний. Файл logo-mark.svg лишається без змін —
-   brightness(0) робить його суцільно чорним для світлої схеми, invert(1)
-   довертає до білого для темної. Форма, пропорції й розмір ті самі. */
-.logo__mark { filter: brightness(0) invert(1); }
-html[data-scheme="light"] .logo__mark { filter: brightness(0); }
-
 .dob { display: flex; align-items: center; justify-content: center; gap: 6px; }
 
 /* --------------------------------------------------------------------

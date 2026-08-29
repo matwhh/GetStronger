@@ -82,7 +82,7 @@
       '<div class="rating-hero mt-2">' +
         '<span class="rating-hero__val mono">' + st.elo + '<span class="tile__of"> ELO</span></span>' +
         '<span class="rating-hero__meta">' +
-          '<span class="lvl-circle">' + lvl.level + '</span>' +
+          '<span class="lvl-circle">' + window.App.levelIcon(lvl.level, lvl.name) + '</span>' +
           '<span class="small muted">' + esc(lvl.name) + '</span>' +
         '</span>' +
       '</div>' +
@@ -288,7 +288,7 @@
       '<div class="rating-hero">' +
         '<span class="rating-hero__val mono">' + rep.elo + '<span class="tile__of"> ELO</span></span>' +
         '<span class="rating-hero__meta">' +
-          '<span class="lvl-circle">' + rep.level + '</span>' +
+          '<span class="lvl-circle">' + window.App.levelIcon(rep.level, 'Level ' + rep.level) + '</span>' +
           '<span class="small muted">Level ' + rep.level + (rep.elite ? ' — ELITE' : '') + '</span>' +
         '</span>' +
       '</div>' +

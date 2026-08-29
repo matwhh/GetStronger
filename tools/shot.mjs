@@ -43,6 +43,9 @@ for (const scheme of ['dark', 'light']) {
   await boot.goto(ROOT + 'welcome.html', { waitUntil: 'load' });
   await boot.evaluate(seedScript);
   await boot.evaluate(s => localStorage.setItem('forge.scheme', s), scheme);
+  if (process.env.FORGE_THEME) {
+    await boot.evaluate(t => localStorage.setItem('forge.theme', t), process.env.FORGE_THEME);
+  }
   await boot.close();
   for (const p of PAGES) {
     const page = await ctx.newPage();

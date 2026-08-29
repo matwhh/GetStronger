@@ -1271,17 +1271,18 @@
    */
   const THEMES = [
     'graphite', 'graphite-navy', 'graphite-pink', 'graphite-violet',
-    'graphite-crimson', 'graphite-amber', 'graphite-moss',
-    'graphite-emerald', 'graphite-ocean'
+    'graphite-crimson', 'graphite-moss', 'graphite-emerald', 'graphite-ocean'
   ];
 
+  /* Бурштин прибраний: обидва його id (короткий і повний) свідомо НЕ
+     перекладаються ні на що — normTheme поверне null, тобто монохром. */
   const THEME_MIGRATE = {
     pink: 'graphite-pink', wood: 'graphite', violet: 'graphite-violet',
-    crimson: 'graphite-crimson', amber: 'graphite-amber', moss: 'graphite-moss',
+    crimson: 'graphite-crimson', moss: 'graphite-moss',
     emerald: 'graphite-emerald', ocean: 'graphite-ocean'
   };
 
-  /** Старий id → чинний; невідоме → null (типовий Navy). */
+  /** Старий id → чинний; невідоме → null (монохром). */
   function normTheme(id) {
     if (!id) return null;
     if (THEMES.indexOf(id) !== -1) return id;
@@ -1294,7 +1295,7 @@
    * Порядок сховищ важливий: localStorage читається інлайн-скриптом у head
    * ДО завантаження CSS — це прибирає блимання типової теми при переході
    * між сторінками. Профіль — щоб вибір переїхав у хмару, якщо вона є.
-   * null означає типовий Navy: атрибут знімається, змінні повертаються з :root.
+   * null означає монохром: атрибут знімається, змінні повертаються з :root.
    */
   function setTheme(id, opts) {
     const t = normTheme(id);

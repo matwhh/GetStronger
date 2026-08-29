@@ -244,7 +244,7 @@
           '<h2 style="margin:0">Настрій</h2>' +
           '<a class="small" href="trackers.html">Вимкнути</a>' +
         '</div>' +
-        '<p class="small muted" style="margin:6px 0 0">Необовʼязково. Позначай, коли хочеться — ' +
+        '<p class="small muted" style="margin:6px 0 0">Необовʼязково. Позначайте, коли хочеться — ' +
           'запис привʼязується до цього тренування.</p>' +
         pairPicker('workoutMood', def, today) +
       '</div>';
@@ -307,8 +307,8 @@
     return '' +
       '<div class="card">' +
         '<h2 style="margin:0">План ще не обрано</h2>' +
-        '<p class="small mt-1">Постав кількість днів у залі, подивись схеми — ' +
-          'і тут зʼявиться список вправ із твоїми робочими вагами.</p>' +
+        '<p class="small mt-1">Поставте кількість днів у залі, подивіться схеми — ' +
+          'і тут зʼявиться список вправ із вашими робочими вагами.</p>' +
         '<a class="btn btn--primary mt-1" href="programs.html">Обрати програму</a>' +
       '</div>';
   }

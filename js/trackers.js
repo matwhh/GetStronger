@@ -291,7 +291,7 @@
         '<p class="small mt-1">' + esc(hint) + '</p>' +
         (items.length
           ? '<ul class="tr-custom-list mt-2">' + items.map(function (t) { return customRow(t, type); }).join('') + '</ul>'
-          : '<p class="small muted mt-2 mb-0">Список порожній. Додай першу позицію нижче — ' +
+          : '<p class="small muted mt-2 mb-0">Список порожній. Додайте першу позицію нижче — ' +
             'вона зʼявиться на «Сьогодні» щоденною позначкою.</p>') +
         '<div class="row mt-2" style="gap:8px;flex-wrap:wrap">' +
           /* aria-label, а не лише placeholder: підказка зникає з першою
@@ -417,7 +417,7 @@
           return;
         }
         const v = Number(raw.replace(',', '.'));
-        if (!Number.isFinite(v)) { toast('Введи число', 'err'); return; }
+        if (!Number.isFinite(v)) { toast('Введіть число', 'err'); return; }
         saveLog(T.logValue(state.trackers, state.log, id, v, todayKey()));
         renderBuiltins();
         toast('Записано', 'ok');
@@ -455,7 +455,7 @@
         const type = ac.dataset.addCustom;
         const input = $('#add-' + type);
         const r = T.addCustom(state.trackers, type, input && input.value);
-        if (!r) { toast('Введи назву', 'err'); return; }
+        if (!r) { toast('Введіть назву', 'err'); return; }
         state.trackers = r.trackers;
         persist({ trackers: r.trackers });
         renderSupplements();

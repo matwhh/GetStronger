@@ -28,7 +28,7 @@
             'таблиця лідерів і нагороди вимкнені. Дані тренувань і харчування ' +
             'при цьому працюють як звичайно.'
           : 'Сезонний ELO рахує сервер і він привʼязаний до акаунта. ' +
-            '<a href="account.html">Увійди або зареєструйся</a> — і сезон ' +
+            '<a href="account.html">Увійдіть або зареєструйтесь</a> — і сезон ' +
             'почнеться з 0 ELO, як у всіх.') +
       '</p>');
   }
@@ -185,7 +185,7 @@
       if (!Array.isArray(events) || !events.length) {
         $('#sz-events').innerHTML = card(
           '<h3 class="card__title">Події ELO</h3>' +
-          '<p class="small muted mb-0">Ще порожньо. Закрий тренування, день харчування ' +
+          '<p class="small muted mb-0">Ще порожньо. Закрийте тренування, день харчування ' +
           'чи відміть сон — і перші очки прийдуть одразу.</p>');
         return;
       }
@@ -218,7 +218,7 @@
         '<div class="mt-1">' + rows.map(function (r) {
           return '<div class="row row--split small" style="padding:7px 0;border-bottom:1px solid var(--line);gap:10px' +
               (r.me ? ';font-weight:700' : '') + '">' +
-            '<span><span class="mono">#' + r.rank + '</span> ' + esc(r.name) + (r.me ? ' (ти)' : '') + '</span>' +
+            '<span><span class="mono">#' + r.rank + '</span> ' + esc(r.name) + (r.me ? ' (ви)' : '') + '</span>' +
             '<b class="mono">' + r.elo + ' ELO</b>' +
           '</div>';
         }).join('') + '</div>');

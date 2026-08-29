@@ -104,25 +104,16 @@
       '<div class="card">' +
         '<h2 class="card__title">Оформлення</h2>' +
 
-        '<div class="row row--split" style="gap:14px;align-items:flex-start">' +
-          '<div>' +
-            '<h3 class="card__title" style="margin:0 0 2px">Світла тема</h3>' +
-            '<p class="small muted" style="margin:0">' +
-              'Ті самі поверхні, перевернуті на папір. Акцент лишається тим, який обрано нижче.' +
-            '</p>' +
-          '</div>' +
-          '<label class="switch" style="margin-top:4px">' +
+        '<div class="row row--split" style="gap:14px;align-items:center">' +
+          '<h3 class="card__title" style="margin:0">Світла тема</h3>' +
+          '<label class="switch">' +
             '<input type="checkbox" id="p-scheme"' + (light ? ' checked' : '') + '>' +
             '<span class="switch__track"><span class="switch__thumb"></span></span>' +
             '<span class="sr-only">Світла тема</span>' +
           '</label>' +
         '</div>' +
 
-        '<h3 class="card__title mt-3" style="margin-bottom:2px">Акцент</h3>' +
-        '<p class="small muted" style="margin:0 0 10px">' +
-          'Поверхні спільні для всіх: колір лишається там, де він щось означає — ' +
-          'кнопки, активні стани, дані, фокус.' +
-        '</p>' +
+        '<h3 class="card__title mt-3" style="margin-bottom:10px">Акцент</h3>' +
         '<div class="themes">' + swatches + '</div>' +
       '</div>';
   }
@@ -168,9 +159,9 @@
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5m0-3h.01"/></svg>' +
           '<div>' +
             '<b>Локальний режим.</b> Дані зберігаються тільки в цьому браузері й нікуди не відправляються. ' +
-            'Це працює одразу і нічого не коштує, але з іншого пристрою ти їх не побачиш, ' +
+            'Це працює одразу і нічого не коштує, але з іншого пристрою ви їх не побачите, ' +
             'а очищення історії браузера їх зітре.<br><br>' +
-            'Щоб увімкнути спільний акаунт для тебе й друзів — заповни ключі Supabase у ' +
+            'Щоб увімкнути спільний акаунт для вас і друзів — заповніть ключі Supabase у ' +
             '<code>js/config.js</code> і виконай <code>db/schema.sql</code>. Інструкція в <code>README.md</code>.' +
           '</div>' +
         '</div>';
@@ -181,11 +172,11 @@
     host.innerHTML = user
       ? '<div class="notice notice--acc">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>' +
-          '<div>Ти увійшов як <b>' + esc(user.email) + '</b>. Дані синхронізуються між пристроями.</div>' +
+          '<div>Ви увійшли як <b>' + esc(user.email) + '</b>. Дані синхронізуються між пристроями.</div>' +
         '</div>'
       : '<div class="notice notice--acc">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5m0-3h.01"/></svg>' +
-          '<div>Хмара підключена, але ти не увійшов. Поки що дані зберігаються локально в браузері.</div>' +
+          '<div>Хмара підключена, але ви не увійшли. Поки що дані зберігаються локально в браузері.</div>' +
         '</div>';
   }
 
@@ -217,7 +208,7 @@
 
       $('#a-signout').addEventListener('click', async function () {
         await Store.signOut();
-        toast('Ти вийшов', 'ok');
+        toast('Ви вийшли', 'ok');
         renderAll();
       });
       return;
@@ -304,7 +295,7 @@
 
     async function submit() {
       if (!email.value || pass.value.length < 8) {
-        toast('Заповни пошту й пароль (від 8 символів)', 'err');
+        toast('Заповніть пошту й пароль (від 8 символів)', 'err');
         return;
       }
       const buttons = $$('#a-form button');
@@ -474,7 +465,7 @@
         '<h3 class="group-title">Харчування</h3>' +
         '<div class="grid grid-2" style="gap:18px">' +
           field('Рівень активності', selectInput('activity', p.activity, ACTIVITY),
-                'Найбільше джерело похибки. Сумніваєшся — бери нижчий.', fieldId('activity')) +
+                'Найбільше джерело похибки. Сумніваєтесь — беріть нижчий.', fieldId('activity')) +
           field('Мета', selectInput('goal', p.goal, goalOptions()), '', fieldId('goal')) +
           field('Прийомів їжі на добу', numberInput('meals', p.meals, { min: 3, max: 6, placeholder: '4' }), '', fieldId('meals')) +
         '</div>' +
@@ -517,7 +508,7 @@
           : '<hr class="divider">' +
             '<div class="notice">' +
               '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
-              '<div class="small">Щоб зʼявився розрахунок калорій, заповни стать, вік, зріст і вагу.</div>' +
+              '<div class="small">Щоб зʼявився розрахунок калорій, заповніть стать, вік, зріст і вагу.</div>' +
             '</div>') +
 
         '<hr class="divider">' +
@@ -1545,8 +1536,8 @@
         const msg = cloud
           ? 'Стерти дані в цьому браузері й вийти з акаунта?\n\n' +
             'Те, що збережено в акаунті, ЛИШИТЬСЯ — після наступного входу ' +
-            'дані повернуться. Щоб видалити їх назовсім, спершу експортуй ' +
-            'копію, а потім видали акаунт у Supabase.'
+            'дані повернуться. Щоб видалити їх назовсім, спершу експортуйте ' +
+            'копію, а потім видаліть акаунт у Supabase.'
           : 'Стерти всі дані в цьому браузері? Дію не можна скасувати — ' +
             'іншої копії немає. Спершу варто зробити «Експортувати JSON».';
         if (!confirm(msg)) return;
@@ -1566,7 +1557,7 @@
         if (!confirm('Видалити акаунт НАЗАВЖДИ?\n\nБуде видалено все: профіль, журнали, ' +
           'заміри, рейтинг, історію сезонів і сам обліковий запис. Відновлення немає.\n\n' +
           'Радимо спершу «Експортувати JSON».')) return;
-        const word = prompt('Щоб підтвердити, введи слово: ВИДАЛИТИ');
+        const word = prompt('Щоб підтвердити, введіть слово: ВИДАЛИТИ');
         if (word !== 'ВИДАЛИТИ') { toast('Видалення скасовано', 'ok'); return; }
         try {
           await Store.deleteAccount();

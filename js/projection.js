@@ -248,7 +248,7 @@
   function tierPicker() {
     return '' +
       '<div class="field">' +
-        '<label class="field__label">Скільки часу тренуєшся з залізом</label>' +
+        '<label class="field__label">Скільки часу тренуєтесь з залізом</label>' +
         '<div class="seg">' +
           TIERS.map(function (t) {
             return '<label class="seg__item">' +
@@ -378,7 +378,7 @@
           '<h2 style="margin-top:0">Прогноз</h2>' +
           '<div class="notice">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5m0-3h.01"/></svg>' +
-            '<div>Спершу заповни робочі ваги в плані вище — хоч в одній вправі. ' +
+            '<div>Спершу заповніть робочі ваги в плані вище — хоч в одній вправі. ' +
             'Рахувати приріст немає від чого.</div>' +
           '</div>' +
         '</div>';
@@ -395,7 +395,7 @@
           'Порахований для <b>' + cov.filled + '</b> ' +
           (cov.filled === 1 ? 'вправи' : 'вправ') + ' із ' + cov.total + ', де задано вагу.' +
           (cov.filled < cov.total
-            ? ' Решта зʼявиться тут, щойно впишеш їм вагу.'
+            ? ' Решта зʼявиться тут, щойно впишете їм вагу.'
             : '') +
         '</p>' +
 

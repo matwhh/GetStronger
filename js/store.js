@@ -865,7 +865,7 @@
     /* ---- Авторизація ---- */
 
     signUp: async function (email, password) {
-      if (!CLOUD) throw new Error('Хмарний режим вимкнено. Заповни ключі Supabase у js/config.js.');
+      if (!CLOUD) throw new Error('Хмарний режим вимкнено. Заповніть ключі Supabase у js/config.js.');
       const local = readLocalProfile();
       const data = await req('/auth/v1/signup', {
         method: 'POST', auth: false,
@@ -897,7 +897,7 @@
      * писало бланк поверх усього, що людина накопичила за місяць.
      */
     signIn: async function (email, password) {
-      if (!CLOUD) throw new Error('Хмарний режим вимкнено. Заповни ключі Supabase у js/config.js.');
+      if (!CLOUD) throw new Error('Хмарний режим вимкнено. Заповніть ключі Supabase у js/config.js.');
       const local = readLocalProfile();
       const data = await req('/auth/v1/token?grant_type=password', {
         method: 'POST', auth: false,

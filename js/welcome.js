@@ -71,7 +71,7 @@
   function messageFor(g) {
     if (g.state === 'invalid') {
       return '<p class="gate__msg gate__msg--err" role="alert">' +
-        'Перевір дату: вона має бути справжньою й не з майбутнього.</p>';
+        'Перевірте дату: вона має бути справжньою й не з майбутнього.</p>';
     }
     if (g.state === 'minor') {
       /*
@@ -327,7 +327,7 @@
       '</label>';
     };
     return '<div class="mt-2" id="b-consents" style="border-top:1px solid var(--line);padding-top:14px">' +
-      box('c-terms', 'Я прочитав(ла) та погоджуюся з ' +
+      box('c-terms', 'Я прочитав(ла) та погоджуюсь із ' +
         '<a href="legal.html#terms" target="_blank" rel="noopener">Умовами використання</a> Forge.') +
       box('c-privacy', 'Я прочитав(ла) ' +
         '<a href="legal.html#privacy" target="_blank" rel="noopener">Політику конфіденційності</a>.') +
@@ -456,7 +456,7 @@
         state.err = 'Forge доступний із 17 років.';
         nav('age');
       } else if (msg.indexOf('USERNAME_TAKEN') !== -1 || msg.indexOf('USERNAME_INVALID') !== -1) {
-        state.err = 'Нік зайнятий або некоректний — обери інший.';
+        state.err = 'Нік зайнятий або некоректний — оберіть інший.';
         nav('name');
       } else if (msg.indexOf('BLOCKED') !== -1) {
         nav('blocked');
@@ -515,7 +515,7 @@
   function validAccount() {
     const a = state.acc;
     if (a.username.trim().length < 3 || a.username.trim().length > 24) return 'Нік — від 3 до 24 символів.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) return 'Перевір адресу пошти.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) return 'Перевірте адресу пошти.';
 
     /* Надійність пароля — окреме ядро (js/password-core.js), тут лише
        його вердикт. Мінімальна довжина продубльована на сервері
@@ -561,7 +561,7 @@
     readAccFields();
     if (!CLOUD) { state.err = 'Сайт у локальному режимі — вхід вимкнено.'; render(); return; }
     if (!state.acc.email || state.acc.pass.length < 8) {
-      state.err = 'Заповни пошту й пароль (від 8 символів).'; render(); return;
+      state.err = 'Заповніть пошту й пароль (від 8 символів).'; render(); return;
     }
     state.busy = true; state.err = ''; render();
     try {
@@ -620,7 +620,7 @@
   async function afterSignupChecks() {
     try {
       const free = await window.Store.rpc('username_free', { p_username: state.acc.username.trim() });
-      if (free === false) { state.err = 'Цей нік уже зайнятий — обери інший.'; nav('name'); return; }
+      if (free === false) { state.err = 'Цей нік уже зайнятий — оберіть інший.'; nav('name'); return; }
     } catch (_) { /* перевірить register_request */ }
     nav('age');
   }
@@ -634,7 +634,7 @@
       await afterSignupChecks();
     } catch (e) {
       state.busy = false;
-      state.err = 'Ще не підтверджено або пароль не підійшов. Спробуй ще раз після кліку в листі.';
+      state.err = 'Ще не підтверджено або пароль не підійшов. Спробуйте ще раз після кліку в листі.';
       render();
     }
   }
@@ -711,7 +711,7 @@
     host.innerHTML = '' +
       '<h1 class="gate__title" style="text-align:center">Forge</h1>' +
       '<p class="small muted" style="text-align:center;margin:6px 0 0">' +
-        'Тренування, харчування і прогрес — за твоїм планом.' +
+        'Тренування, харчування і прогрес — за вашим планом.' +
       '</p>' +
       '<div class="grid mt-3" style="gap:12px;max-width:320px;margin-left:auto;margin-right:auto">' +
         '<button class="btn btn--primary" type="button" data-nav="login">Увійти</button>' +
@@ -737,7 +737,7 @@
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass">Пароль</label>' +
         '<input class="input" id="au-pass" type="password" autocomplete="current-password" ' +
-          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="твій пароль">' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ваш пароль">' +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
@@ -791,19 +791,19 @@
 
   function renderConfirm(host) {
     host.innerHTML = '' +
-      '<h1 class="gate__title">Підтверди пошту</h1>' +
+      '<h1 class="gate__title">Підтвердіть пошту</h1>' +
       '<p class="small mt-1">Ми надіслали лист на <b>' + esc(state.acc.email) + '</b>. ' +
-        'Відкрий його і натисни посилання підтвердження, потім повернись сюди.</p>' +
+        'Відкрийте його і натисніть посилання підтвердження, потім поверніться сюди.</p>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
-        '<button class="btn btn--primary" type="button" id="au-confirmed"' + (state.busy ? ' disabled' : '') + '>Я підтвердив — продовжити</button>' +
+        '<button class="btn btn--primary" type="button" id="au-confirmed"' + (state.busy ? ' disabled' : '') + '>Я підтвердив(ла) — продовжити</button>' +
         '<button class="btn btn--ghost" type="button" data-nav="start">← Назад</button>' +
       '</div>';
   }
 
   function renderName(host) {
     host.innerHTML = '' +
-      '<h1 class="gate__title">Обери нік</h1>' +
+      '<h1 class="gate__title">Оберіть нік</h1>' +
       '<p class="small muted mt-1">Цей нік уже зайнятий або ще не вказаний. Потрібен унікальний.</p>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-name">Нік</label>' +
@@ -818,8 +818,8 @@
   function renderPending(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title">Заявку на створення акаунта отримано</h1>' +
-      '<p class="small mt-1">Твій профіль зараз очікує підтвердження. ' +
-        'Після підтвердження ти отримаєш доступ до Forge.</p>' +
+      '<p class="small mt-1">Ваш профіль зараз очікує підтвердження. ' +
+        'Після підтвердження ви отримаєте доступ до Forge.</p>' +
       '<p class="small muted mt-1">Це ручна перевірка — зазвичай недовго. ' +
         'Сторінку можна закрити: заявка нікуди не дінеться.</p>' +
       errLine() +
@@ -832,8 +832,8 @@
   function renderRejected(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title">Заявку відхилено</h1>' +
-      '<p class="small mt-1">Цю заявку не підтверджено. Можеш подати нову — ' +
-        'дані скринінгу заповниш ще раз.</p>' +
+      '<p class="small mt-1">Цю заявку не підтверджено. Можете подати нову — ' +
+        'дані скринінгу заповните ще раз.</p>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
         '<button class="btn btn--primary" type="button" data-nav="age">Подати ще раз</button>' +

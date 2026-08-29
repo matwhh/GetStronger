@@ -193,7 +193,7 @@
         ta.select();
         box.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      toast('Буфер недоступний — текст нижче, скопіюй вручну', 'err');
+      toast('Буфер недоступний — текст нижче, скопіюйте вручну', 'err');
     });
   }
 

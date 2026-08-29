@@ -145,7 +145,7 @@
               'value="' + esc(entry.t || nowHM()) + '" aria-label="Час заміру">' +
           '</div>' +
         '</div>' +
-        '<p class="small muted mt-1">Заповнюй лише виміряне — порожні поля не записуються. Кома чи крапка — байдуже.</p>' +
+        '<p class="small muted mt-1">Заповнюйте лише виміряне — порожні поля не записуються. Кома чи крапка — байдуже.</p>' +
         sections +
         '<div class="row mt-3" style="gap:10px;flex-wrap:wrap">' +
           '<button class="btn btn--primary" type="button" id="ms-save"' + (state.busy ? ' disabled' : '') + '>Зберегти</button>' +

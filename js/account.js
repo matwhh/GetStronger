@@ -102,10 +102,10 @@
 
     host.innerHTML =
       '<div class="card">' +
-        '<h2 class="card__title">Оформлення</h2>' +
-
+        /* Без підписів: лишились самі контроли. Перемикач і свотчі
+           говорять самі за себе, а для читалок екрана підпис нікуди не
+           дівся — він у .sr-only всередині <label> і в aria-label свотчів. */
         '<div class="row row--split" style="gap:14px;align-items:center">' +
-          '<h3 class="card__title" style="margin:0">Світла тема</h3>' +
           '<label class="switch">' +
             '<input type="checkbox" id="p-scheme"' + (light ? ' checked' : '') + '>' +
             '<span class="switch__track"><span class="switch__thumb"></span></span>' +
@@ -113,8 +113,7 @@
           '</label>' +
         '</div>' +
 
-        '<h3 class="card__title mt-3" style="margin-bottom:10px">Акцент</h3>' +
-        '<div class="themes">' + swatches + '</div>' +
+        '<div class="themes mt-3">' + swatches + '</div>' +
       '</div>';
   }
 

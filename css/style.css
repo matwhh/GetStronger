@@ -449,29 +449,6 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   .nav__sync-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 
-/* Перемикач світлої/темної схеми в шапці.
-   Геометрія однакова зі значком рівня (.nav__rating): на вузькому екрані
-   вони стоять поруч, і будь-яка різниця в розмірі чи радіусі читалась би
-   як недбалість, а не як задум. */
-.nav__scheme {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: rgba(var(--tint-rgb), 0.04);
-  color: var(--text-2);
-  cursor: pointer;
-  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
-}
-.nav__scheme:hover { color: var(--text); border-color: var(--acc-line); background: rgba(var(--tint-rgb), 0.08); }
-.nav__scheme:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
-.nav__scheme svg { display: block; }
-
 /* Значок рівня в шапці.
 
    Рамки й фону тут НЕМАЄ навмисно: диск, шкала й цифра намальовані в

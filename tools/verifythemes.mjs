@@ -204,16 +204,19 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
   await q.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await q.waitForTimeout(900);
 
-  const btn = q.locator('.nav__scheme');
-  ok('кнопка схеми є в шапці', await btn.count() === 1, String(await btn.count()));
-  ok('кнопка підписана дією', (await btn.getAttribute('aria-label')) === 'Увімкнути світлу тему',
-     String(await btn.getAttribute('aria-label')));
+  /* Перемикача в шапці більше немає — вибір схеми живе тільки в акаунті.
+     Перевіряємо саме відсутність: якщо кнопка колись повернеться сюди
+     випадково, це має впасти, а не «просто зʼявитись». */
+  ok('кнопки схеми в шапці немає', await q.locator('.nav__scheme').count() === 0,
+     String(await q.locator('.nav__scheme').count()));
+  ok('у шапці немає жодного перемикача схеми',
+     await q.locator('[data-scheme-toggle]').count() === 0);
 
-  await btn.click(); await q.waitForTimeout(400);
-  ok('клік вмикає світлу схему',
+  /* Схема все одно мусить застосовуватись і переживати перезавантаження —
+     тепер через API, яким користується сторінка акаунта. */
+  await q.evaluate(() => window.App.setScheme('light')); await q.waitForTimeout(400);
+  ok('setScheme вмикає світлу схему',
      await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === 'light');
-  ok('підпис кнопки перемалювався', (await btn.getAttribute('aria-label')) === 'Увімкнути темну тему',
-     String(await btn.getAttribute('aria-label')));
 
   await q.reload({ waitUntil: 'load' }); await q.waitForTimeout(800);
   ok('схема пережила перезавантаження',
@@ -221,8 +224,8 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
   ok('схема записалась у профіль',
      (await q.evaluate(async () => (await window.Store.getProfile()).scheme)) === 'light');
 
-  await btn.click(); await q.waitForTimeout(400);
-  ok('клік повертає темну схему',
+  await q.evaluate(() => window.App.setScheme('dark')); await q.waitForTimeout(400);
+  ok('setScheme повертає темну схему',
      await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === null);
 
   ok('головна без JS-помилок', e4.length === 0, e4.join(' | '));

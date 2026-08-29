@@ -578,8 +578,8 @@
          проміжку (авто-поля значка проти margin-left:0 у краю). */
       if (links && edge && badge.nextElementSibling !== edge) links.insertBefore(badge, edge);
     } else if (acts) {
-      const scheme = acts.querySelector('[data-scheme-toggle]');
-      if (badge.nextElementSibling !== scheme) acts.insertBefore(badge, scheme);
+      const burger = acts.querySelector('.nav__burger');
+      if (badge.nextElementSibling !== burger) acts.insertBefore(badge, burger);
     }
   }
 
@@ -703,11 +703,9 @@
               '<span class="nav__sync-dot" aria-hidden="true"></span>' +
               '<span class="nav__sync-txt">Не синхронізовано</span>' +
             '</a>' +
-            schemeButtonHtml() +
           '</div>' +
         '</div>';
       renderSyncBadge($('.nav__sync', host));
-      paintSchemeButton($('[data-scheme-toggle]', host));
       /* Довгі тексти сторінки згортаються незалежно від меню. */
       initLongform(document);
       const onScroll = function () { host.classList.toggle('is-stuck', window.scrollY > 8); };
@@ -788,7 +786,6 @@
             '<span class="nav__sync-dot" aria-hidden="true"></span>' +
             '<span class="nav__sync-txt">Не синхронізовано</span>' +
           '</a>' +
-          schemeButtonHtml() +
           '<button class="nav__burger" type="button" aria-label="Меню" aria-expanded="false">' +
             '<span></span><span></span><span></span>' +
           '</button>' +
@@ -802,7 +799,6 @@
     const menu   = $('.nav__links', host);
     renderRatingBadge($('.nav__rating', host), page);
     renderSyncBadge($('.nav__sync', host));
-    paintSchemeButton($('[data-scheme-toggle]', host));
 
     burger.addEventListener('click', function () {
       const open = menu.classList.toggle('is-open');
@@ -1448,55 +1444,19 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Кнопка схеми в шапці                                                */
+  /* Схема                                                               */
   /* ------------------------------------------------------------------ */
   /*
-   * Перемикач стоїть у шапці, а не лише в акаунті: схему міняють не «раз і
-   * назавжди», а посеред дня — коли зайшов у зал з вікнами або, навпаки,
-   * ліг з телефоном. Дорога «Акаунт → прокрутити → Тема» для такого руху
-   * задовга, і людина просто лишається в незручній схемі.
+   * Перемикача в шапці НЕМАЄ. Він там був — міркування було «схему міняють
+   * посеред дня, дорога через акаунт задовга», — але кнопка стояла в
+   * кожній шапці поруч зі значком рівня й бургером і читалась як ще один
+   * розділ, а не як налаштування. Єдине місце вибору — Акаунт →
+   * Оформлення, там же, де акцент: схема й палітра — одне рішення.
    *
-   * Іконка показує, що БУДЕ після натискання (сонце в темряві, місяць у
-   * світлі) — так само, як це роблять системні перемикачі.
+   * Подія forge:scheme лишається: її слухає сторінка акаунта, щоб
+   * перемалювати свотчі під діючу схему.
    */
-  const ICON_SUN =
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
-    'stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
-    '<circle cx="12" cy="12" r="4.2"/>' +
-    '<path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2' +
-    'M5.4 5.4l1.6 1.6M17 17l1.6 1.6M18.6 5.4L17 7M7 17l-1.6 1.6"/></svg>';
 
-  const ICON_MOON =
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
-    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-    '<path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2z"/></svg>';
-
-  function schemeButtonHtml() {
-    return '<button class="nav__scheme" type="button" data-scheme-toggle></button>';
-  }
-
-  function paintSchemeButton(btn) {
-    if (!btn) return;
-    const light = currentScheme() === 'light';
-    /* Підпис описує ДІЮ, а не поточний стан: читалка вимовляє «Увімкнути
-       темну тему», а не «Світла тема», і людина знає, що станеться. */
-    const label = light ? 'Увімкнути темну тему' : 'Увімкнути світлу тему';
-    btn.innerHTML = light ? ICON_MOON : ICON_SUN;
-    btn.setAttribute('aria-label', label);
-    btn.setAttribute('title', label);
-  }
-
-  /** Один делегований обробник на документ: кнопок може бути кілька. */
-  function wireSchemeToggle() {
-    document.addEventListener('click', function (e) {
-      const btn = e.target.closest && e.target.closest('[data-scheme-toggle]');
-      if (!btn) return;
-      toggleScheme();
-    });
-    document.addEventListener('forge:scheme', function () {
-      $$('[data-scheme-toggle]').forEach(paintSchemeButton);
-    });
-  }
 
   window.App = {
     $: $, $$: $$,
@@ -1593,7 +1553,7 @@
      */
     [buildNav, buildFooter, function () { initReveal(document); }, injectCanonical,
      function () { initAccordions(document); }, initCardGlow, injectJsonLd,
-     wireSchemeToggle, adoptProfileTheme]
+     adoptProfileTheme]
       .forEach(function (step) {
         try { step(); } catch (e) { console.error('[app] крок ініціалізації впав:', e); }
       });

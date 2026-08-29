@@ -119,6 +119,40 @@ describe('збережений план чужої статі не відкри�
   });
 });
 
+describe('згинання ніг — сидячи в усіх схемах', () => {
+  /* Домовленість продукту: варіант сидячи, а не лежачи й не «просто
+     згинання». Тест ловить схему, у якій лишили стару назву. */
+  it('жодна схема не містить лежачого чи безіменного варіанта', () => {
+    for (const program of w.PROGRAMS) {
+      for (const days of Object.keys(program.days)) {
+        for (const day of program.days[days]) {
+          for (const ex of day.exercises) {
+            assert.notEqual(ex.name, 'Згинання ніг лежачи', `${program.id}/${days}`);
+            assert.notEqual(ex.name, 'Згинання ніг', `${program.id}/${days}`);
+          }
+        }
+      }
+    }
+  });
+
+  it('там, де згинання є, це «Згинання ніг сидячи»', () => {
+    let found = 0;
+    for (const program of w.PROGRAMS) {
+      for (const days of Object.keys(program.days)) {
+        for (const day of program.days[days]) {
+          for (const ex of day.exercises) {
+            if (ex.pattern === 'Згинання гомілки') {
+              assert.equal(ex.name, 'Згинання ніг сидячи', `${program.id}/${days}`);
+              found++;
+            }
+          }
+        }
+      }
+    }
+    assert.ok(found > 0, 'згинання гомілки не знайдено взагалі');
+  });
+});
+
 describe('жіночий план: дані', () => {
   const women = () => w.PROGRAMS.find((p) => p.id === 'women4');
 
@@ -171,21 +205,31 @@ describe('жіночий план: дані', () => {
     assert.equal(totals.glutes, 14);
     assert.equal(totals.quads, 12);
     assert.equal(totals.back, 12);
-    assert.equal(totals.hamstrings, 8);
+    assert.equal(totals.hamstrings, 12);
     assert.equal(totals.calves, 8);
     assert.equal(totals.chest, 6);
     for (const [id, sets] of Object.entries(totals)) {
       assert.ok(sets <= cap(id), `${id}: ${sets} підходів при стелі ${cap(id)}`);
     }
     const all = Object.values(totals).reduce((a, b) => a + b, 0);
-    assert.equal(all, 92, 'разом підходів за тиждень');
+    assert.equal(all, 96, 'разом підходів за тиждень');
   });
 
-  it('навантаження рівне по днях: 23 підходи в кожному', () => {
-    for (const day of women().days['4']) {
-      const sets = day.exercises.reduce((a, ex) => a + Number(ex.sets), 0);
-      assert.equal(sets, 23, `${day.title}: ${sets} підходів`);
-    }
+  it('Push 23 підходи, Pull 25 — різниця навмисна', () => {
+    /* Pull важчий: у ньому румунська тяга. Числа зафіксовані, щоб правка
+       схеми не роз'їхалася з описом обʼєму в самому файлі даних. */
+    const sets = (d) => d.exercises.reduce((a, ex) => a + Number(ex.sets), 0);
+    const d = women().days['4'];
+    assert.equal(sets(d[0]), 23, 'Push');
+    assert.equal(sets(d[1]), 25, 'Pull');
+  });
+
+  it('у Pull є румунська тяга на 3 підходи, і вона йде в біцепс стегна', () => {
+    const pull = women().days['4'][1];
+    const rdl = pull.exercises.find((e) => e.name === 'Румунська тяга');
+    assert.ok(rdl, 'румунської тяги немає в дні Pull');
+    assert.equal(rdl.sets, 3);
+    assert.equal(w.primaryMuscle(rdl), 'hamstrings');
   });
 
   it('діапазони повторень підставляє RepsCore, а не дані плану', () => {

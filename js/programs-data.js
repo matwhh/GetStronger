@@ -175,7 +175,7 @@ const UL_LOWER = {
     { pattern: 'Тазостегновий шарнір',  name: 'Румунська тяга',                      muscles: ['hamstrings', 'glutes'],    sets: 3, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: 'Підводні: 1–2 підходи × 6' },
     { pattern: 'Односторонній рух ніг', name: 'Випади у Сміті на сідниці',           muscles: ['glutes'],                  sets: 3, reps: '6–8', weight: null, rir: '2', rest: '2 хв',   note: '' },
     { pattern: 'Розгинання гомілки',    name: 'Розгинання ніг',                      muscles: ['quads'],                   sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с',   note: '' },
-    { pattern: 'Згинання гомілки',      name: 'Згинання ніг',                        muscles: ['hamstrings'],              sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с',   note: '' },
+    { pattern: 'Згинання гомілки',      name: 'Згинання ніг сидячи',                        muscles: ['hamstrings'],              sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с',   note: '' },
     { pattern: 'Литки',                 name: 'Підйом на ікри у Сміті стоячи',       muscles: ['calves'],                  sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с',   note: '' },
     { pattern: 'Привідні / відвідні',   name: 'Зведення / розведення ніг у тренажері', muscles: ['adductors', 'abductors'], sets: 4, reps: '8–10', weight: null, rir: '1', rest: '60 с',   note: '4 підходи на зведення + 4 на розведення' },
     { pattern: 'Брахіорадіаліс',    name: 'Зворотний підйом у кросовері на передпліччя', muscles: ['brachiorad'],        sets: 4, reps: '8–10',  weight: null, rir: '1', rest: '60 с',   note: '' },
@@ -233,7 +233,7 @@ const PPL_LEGS = {
     { pattern: 'Тазостегновий шарнір', name: 'Румунська тяга',                     muscles: ['hamstrings', 'glutes'],    sets: 3, reps: '6–8', rir: '2', rest: '2–3 хв', note: 'Підходи зараховуються і біцепсу стегна, і сідницям' },
     { pattern: 'Односторонній рух ніг', name: 'Випади у Сміті на сідниці',         muscles: ['glutes'],                  sets: 3, reps: '6–8', rir: '2', rest: '2 хв',   note: '' },
     { pattern: 'Розгинання гомілки',   name: 'Розгинання ніг',                     muscles: ['quads'],                   sets: 3, reps: '6–8', rir: '1', rest: '90 с',   note: '' },
-    { pattern: 'Згинання гомілки',     name: 'Згинання ніг',                       muscles: ['hamstrings'],              sets: 3, reps: '6–8', rir: '1', rest: '90 с',   note: '' },
+    { pattern: 'Згинання гомілки',     name: 'Згинання ніг сидячи',                       muscles: ['hamstrings'],              sets: 3, reps: '6–8', rir: '1', rest: '90 с',   note: '' },
     { pattern: 'Литки',                name: 'Підйом на ікри у Сміті стоячи',      muscles: ['calves'],                  sets: 4, reps: '8–10', rir: '1', rest: '60 с',   note: '' },
     { pattern: 'Привідні / відвідні',  name: 'Зведення / розведення ніг у тренажері', muscles: ['adductors', 'abductors'], sets: 4, reps: '8–10', rir: '1', rest: '60 с',  note: '4 підходи на зведення + 4 на розведення' },
     { pattern: 'Брахіорадіаліс',   name: 'Зворотний підйом у кросовері на передпліччя', muscles: ['brachiorad'],       sets: 4, reps: '8–10',  rir: '1', rest: '60 с',   note: '' },
@@ -275,11 +275,12 @@ const W_PULL = {
   exercises: [
     { pattern: 'Тазостегновий шарнір', name: 'Гіперекстензія на сідниці',          muscles: ['glutes', 'hamstrings'], sets: 1, reps: '10–12', weight: null, rir: '2', rest: '90 с', note: 'Розминочний підхід перед мостом' },
     { pattern: 'Тазостегновий шарнір', name: 'Ягодичний міст у тренажері',         muscles: ['glutes'],               sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },
+    { pattern: 'Тазостегновий шарнір', name: 'Румунська тяга',                     muscles: ['hamstrings', 'glutes'], sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2–3 хв', note: '' },
     { pattern: 'Вертикальна тяга',     name: 'Тяга верхнього блоку звичайним хватом', muscles: ['back'],              sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },
     { pattern: 'Горизонтальна тяга',   name: 'Горизонтальна тяга в тренажері',     muscles: ['back'],                 sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },
     { pattern: 'Трапеції / шраги',     name: 'Шраги з гантелями',                  muscles: ['traps'],                sets: 2, reps: '10–12', weight: null, rir: '1', rest: '90 с', note: '' },
     { pattern: 'Задня дельта',         name: 'Задні дельти у тренажері',           muscles: ['rearDelts'],            sets: 2, reps: '10–12', weight: null, rir: '1', rest: '60 с', note: '' },
-    { pattern: 'Згинання гомілки',     name: 'Згинання ніг лежачи',                muscles: ['hamstrings'],           sets: 4, reps: '10–12', weight: null, rir: '1', rest: '90 с', note: 'Можна сидячи — на вибір' },
+    { pattern: 'Згинання гомілки',     name: 'Згинання ніг сидячи',                muscles: ['hamstrings'],           sets: 3, reps: '10–12', weight: null, rir: '1', rest: '90 с', note: '' },
     { pattern: 'Біцепс',               name: 'Біцепс у тренажері',                 muscles: ['biceps'],               sets: 3, reps: '10–12', weight: null, rir: '1', rest: '90 с', note: '' },
     { pattern: 'Литки',                name: 'Підйом на ікри в тренажері стоячи',  muscles: ['calves'],               sets: 2, reps: '10–12', weight: null, rir: '1', rest: '60 с', note: '' }
   ]
@@ -353,7 +354,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 2, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -372,7 +373,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 2, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -391,7 +392,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 4, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 2, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -412,7 +413,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 1, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -431,7 +432,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 1, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -449,7 +450,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 2, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -468,7 +469,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 2, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -488,7 +489,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 1, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 1, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -506,7 +507,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 2, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 1, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 3, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -525,7 +526,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 1, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -544,7 +545,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 1, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -563,7 +564,7 @@ window.PROGRAMS = [
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Вертикальна тяга (варіація)', name: 'Тяга верхнього блоку широким хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Розгинання гомілки', name: 'Розгинання ніг', muscles: ['quads'], sets: 2, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
-            { pattern: 'Згинання гомілки', name: 'Згинання ніг', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
+            { pattern: 'Згинання гомілки', name: 'Згинання ніг сидячи', muscles: ['hamstrings'], sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Вертикальний жим', name: 'Жим гантелей сидячи', muscles: ['frontDelts'], sets: 1, reps: '8–10', weight: null, rir: '2', rest: '2 хв', note: '' },
             { pattern: 'Бічна дельта', name: 'Відведення рук у кросовері', muscles: ['sideDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '90 с', note: '' },
             { pattern: 'Задня дельта', name: 'Задні дельти у тренажері', muscles: ['rearDelts'], sets: 2, reps: '8–10', weight: null, rir: '1', rest: '60 с', note: '' },
@@ -676,14 +677,16 @@ window.PROGRAMS = [
      Тижневий обʼєм (підходи йдуть у ПЕРШУ групу в muscles — те саме
      правило, що для решти схем; стелі з VOLUME_CAP у js/exercises.js):
 
-       сідниці      14 / 14      квадрицепс   12 / 14
-       спина        12 / 14      біцепс стегна 8 / 14
-       ікри          8 / 12      груди         6 / 14
-       передні д.    6 / 12      середні д.    6 / 12
-       трицепс       6 / 12      біцепс        6 / 12
-       трапеції      4 / 12      задні д.      4 / 12
+       сідниці      14 / 14      квадрицепс    12 / 14
+       спина        12 / 14      біцепс стегна 12 / 14
+       ікри          8 / 12      груди          6 / 14
+       передні д.    6 / 12      середні д.     6 / 12
+       трицепс       6 / 12      біцепс         6 / 12
+       трапеції      4 / 12      задні д.       4 / 12
 
-     Разом 92 підходи за тиждень, по 23 в кожному з чотирьох днів.
+     Разом 96 підходів за тиждень: 23 у кожному Push і 25 у кожному Pull.
+     Дні навмисно нерівні — Pull несе румунську тягу, найважчу вправу
+     плану, і саме він тягне біцепс стегна до 12 підходів.
      Сідниці стоять рівно на стелі — це навмисно, вони тут головна ціль.
   */
   {
@@ -703,8 +706,8 @@ window.PROGRAMS = [
     progression: PROGRESSION_DOUBLE,
     notes: COMMON_NOTES.concat([
       'Порядок тижня: Push / Pull / відпочинок / Push / Pull / два дні відпочинку.',
-      'Акцент на сідниці й біцепс стегна: 14 і 8 підходів за тиждень.',
-      'Уся база — у тренажерах і Сміті: техніка простіша, страховка не потрібна.',
+      'Акцент на сідниці й біцепс стегна: 14 і 12 підходів за тиждень.',
+      'База — у тренажерах і Сміті; єдина вправа зі штангою — румунська тяга.',
       'Дні описані один раз і використовуються двічі — правка в одному місці змінює обидва входження.'
     ]),
 

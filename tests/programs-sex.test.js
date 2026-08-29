@@ -160,7 +160,7 @@ describe('жіночий план: дані', () => {
     const p = women();
     assert.equal(p.daysSupported.join(','), '4');
     assert.equal(p.days['4'].length, 4);
-    assert.equal(p.name, 'Жіночий план');
+    assert.equal(p.name, 'PUSH/PULL');
   });
 
   it('Push і Pull повторюються двічі тими самими обʼєктами', () => {

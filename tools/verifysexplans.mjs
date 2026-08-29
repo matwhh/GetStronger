@@ -15,6 +15,8 @@ import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 
 const ROOT = process.cwd();
+const WOMEN = 'PUSH/PULL';
+const MEN = ['Full Body', 'UL', 'Push / Pull / Legs', 'UL/PPL'];
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
@@ -51,7 +53,7 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.waitForTimeout(1200);
   const names = await listedPlans(p);
   ok('1. чоловік бачить чоловічі схеми', names.length >= 3, names.join(' | '));
-  ok('1. жіночого плану в списку немає', !names.some((n) => /Жіночий/.test(n)), names.join(' | '));
+  ok('1. жіночого плану в списку немає', !names.some((n) => n === WOMEN), names.join(' | '));
   ok('1. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -63,8 +65,8 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.waitForTimeout(1200);
   const names = await listedPlans(p);
   ok('2. жінка бачить рівно один план', names.length === 1, names.join(' | '));
-  ok('2. і це «Жіночий план»', names[0] === 'Жіночий план', String(names[0]));
-  ok('2. жодної чоловічої схеми', !/Full Body|UL|PPL/.test(names.join(' ')), names.join(' | '));
+  ok('2. і це «PUSH/PULL»', names[0] === WOMEN, String(names[0]));
+  ok('2. жодної чоловічої схеми', !names.some((n) => MEN.includes(n)), names.join(' | '));
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -119,7 +121,7 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.goto('file://' + ROOT + '/programs.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
   const names = await listedPlans(p);
-  ok('4. список став жіночим', names.length === 1 && names[0] === 'Жіночий план', names.join(' | '));
+  ok('4. список став жіночим', names.length === 1 && names[0] === WOMEN, names.join(' | '));
   ok('4. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -144,7 +146,7 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.goto('file://' + ROOT + '/programs.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
   const names = await listedPlans(p);
-  ok('5. список став чоловічим', names.length >= 3 && !names.some((n) => /Жіночий/.test(n)), names.join(' | '));
+  ok('5. список став чоловічим', names.length >= 3 && !names.some((n) => n === WOMEN), names.join(' | '));
   ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -185,7 +187,7 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.waitForTimeout(1400);
   const mine = await p.locator('#my-plan').innerText();
   ok('7. «Мій план» не відкриває чоловічу схему жінці',
-     /План ще не обрано/.test(mine) || !/Push|Pull|Legs/.test(mine), mine.split('\n')[0]);
+     /План ще не обрано/.test(mine) || !MEN.some((n) => mine.includes(n)), mine.split('\n')[0]);
   ok('7. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

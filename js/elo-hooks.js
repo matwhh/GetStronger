@@ -122,6 +122,14 @@
       for (const e of events) {
         const res = await Api.submit(e.kind, e.key, e.day, e.payload);
         if (!res) continue;
+        /*
+         * retry — сервер не знайшов дії у профілі. Відколи ELO рахується з
+         * profiles.data, а не з payload, таке буває нормально: черга
+         * профілю (Store) і черга подій (EloApi) незалежні, і подія може
+         * випередити збереження. Позначити її надісланою означало б
+         * втратити нарахування назавжди.
+         */
+        if (res.ok === false && res.retry) continue;
         sent[e.key] = true;
         lsSet(SENT_KEY, sent);
         if (res.delta && !res.duplicate && window.App && window.App.toast) {

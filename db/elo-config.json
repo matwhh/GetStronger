@@ -177,5 +177,12 @@
     10,
     3,
     1
-  ]
+  ],
+  "floors": {
+    "sleepGoalMin": 240,
+    "sleepMax": 960,
+    "stepsGoalMin": 3000,
+    "stepsMax": 100000,
+    "workoutTotalMin": 3
+  }
 }

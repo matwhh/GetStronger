@@ -666,6 +666,20 @@
 
     render();
 
+    /* Північ: ключ дня оновлюється, день перечитується, екран
+       перемальовується — без перезавантаження сторінки. */
+    if (window.App && window.App.onDayChange) {
+      window.App.onDayChange(function () {
+        state.todayKey = localDateKey();
+        if (state.plan && state.plan.length) {
+          const nd = WC.readDay(state.profile, state.todayKey, state.plan.length);
+          state.dayIdx = nd.dayIdx;
+          state.done = nd.done;
+        }
+        if (!fieldBusy()) render();
+      });
+    }
+
     /*
      * Сторож вводу.
      *

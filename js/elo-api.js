@@ -52,11 +52,24 @@
   /* ---------------- Черга ---------------- */
 
   function queueGet() { return lsGet(LS_QUEUE, []); }
+  /** id користувача поточної сесії — черга належить саме йому. */
+  function currentUid() {
+    try {
+      const u = window.Store && window.Store.user && window.Store.user();
+      return (u && u.id) || null;
+    } catch (_) { return null; }
+  }
+
   function queuePush(item) {
     const q = queueGet();
     if (q.some(function (x) { return x.key === item.key; })) return;
+    /* uid у самому елементі — другий рубіж поверх очищення при виході.
+       Раніше черга переживала вихід, і події одного користувача
+       досилалися під сесією наступного. */
+    item.uid = currentUid();
     q.push(item);
-    lsSet(LS_QUEUE, q);
+    /* Ліміт: черга не має рости безмежно, коли мережі немає тижнями. */
+    lsSet(LS_QUEUE, q.slice(-200));
   }
 
   async function flush() {
@@ -65,16 +78,26 @@
     if (!q.length) return;
     flushing = true;
     try {
+      const me = currentUid();
+      const drop = function (key) {
+        lsSet(LS_QUEUE, queueGet().filter(function (x) { return x.key !== key; }));
+      };
       for (const item of q.slice()) {
+        /* Чужа подія (лишилась від попереднього користувача) не відправляється
+           взагалі — і з черги прибирається, щоб не висіти вічно. */
+        if (item.uid && me && item.uid !== me) { drop(item.key); continue; }
         try {
-          await window.Store.rpc('elo_submit', {
+          const res = await window.Store.rpc('elo_submit', {
             p_kind: item.kind, p_action_key: item.key, p_day: item.day, p_payload: item.payload
           });
-          lsSet(LS_QUEUE, queueGet().filter(function (x) { return x.key !== item.key; }));
+          /* no_data: профіль ще не доїхав у хмару (черга Store незалежна).
+             Подію лишаємо в черзі — повтор має сенс. */
+          if (res && res.ok === false && res.retry) continue;
+          drop(item.key);
         } catch (e) {
           if (e && e.offline) break;         // мережі немає — решта почекає
           // 4xx (out_of_window тощо) — з черги прибираємо, повтор марний
-          lsSet(LS_QUEUE, queueGet().filter(function (x) { return x.key !== item.key; }));
+          drop(item.key);
         }
       }
       await refresh().catch(function () {});
@@ -159,14 +182,35 @@
   /** Закрити минулий сезон, якщо ще не закритий (звіт + нагороди). */
   async function closeSeasonIfDue() {
     if (!available() || !window.EloCore) return null;
-    const prev = new Date();
-    prev.setMonth(prev.getMonth() - 3);
-    const code = window.EloCore.seasonOf(prev);
+
+    /*
+     * ПОПЕРЕДНІЙ СЕЗОН = день перед початком поточного.
+     *
+     * Було setMonth(getMonth() - 3), і воно переповнювалось: 31 травня
+     * мінус три місяці — це «31 лютого», тобто 3 березня, тобто ВЕСНА —
+     * поточний сезон. Сервер відповідав season_running, а клієнт усе одно
+     * позначав сезон закритим. Коли він реально закінчувався, done[code]
+     * уже стояв — і сезон не закривався ніколи: ні історії, ні нагород,
+     * ні звіту. Вікно бага: 29–31 травня щороку.
+     *
+     * seasonRange повертає межі поточного сезону; день перед його початком
+     * гарантовано належить попередньому, у будь-якому місяці.
+     */
+    const now = new Date();
+    const range = window.EloCore.seasonRange(window.EloCore.seasonOf(now));
+    const dayBefore = new Date(range[0].getFullYear(), range[0].getMonth(), range[0].getDate() - 1);
+    const code = window.EloCore.seasonOf(dayBefore);
+
     const done = lsGet('ib.eloClosed', {});
     if (done[code]) return null;
     try {
       const res = await window.Store.rpc('elo_close_season', { p_season: code });
-      done[code] = true; lsSet('ib.eloClosed', done);
+      /*
+       * Позначка ставиться ЛИШЕ на остаточний результат. Раніше вона
+       * ставилась безумовно, тож тимчасова відповідь (season_running,
+       * no_data) назавжди блокувала закриття сезону.
+       */
+      if (res && (res.ok === true)) { done[code] = true; lsSet('ib.eloClosed', done); }
       return res && res.ok && !res.duplicate ? res : null;
     } catch (_) { return null; }
   }

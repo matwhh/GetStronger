@@ -531,6 +531,42 @@
            'draggable="false">';
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Перехід через північ                                                */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Сторінки рахують ключ дня один раз при завантаженні (state.todayKey) і
+   * далі використовують його в кожному записі. Вкладка, відкрита ввечері й
+   * не перезавантажена, після півночі писала галочки тренування і трекери
+   * у ВЧОРАШНЮ дату — тобто перетирала вчорашню сесію й лишала дірку в
+   * сьогоднішній.
+   *
+   * Тут один спільний сторож: перевірка щохвилини й при поверненні на
+   * вкладку (телефон уночі спить, таймери не спрацьовують). Сторінка сама
+   * вирішує, що робити — зазвичай перечитати ключ і перемалюватись.
+   */
+  function localDayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function onDayChange(cb) {
+    if (typeof cb !== 'function') return;
+    let seen = localDayKey();
+    const check = function () {
+      const now = localDayKey();
+      if (now === seen) return;
+      seen = now;
+      try { cb(now); } catch (e) { console.warn('[app] onDayChange:', e && e.message); }
+    };
+    setInterval(check, 60000);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) check();
+    });
+    window.addEventListener('focus', check);
+  }
+
   function currentPage() {
     const file = location.pathname.split('/').pop();
     return file === '' ? 'index.html' : file;
@@ -1477,6 +1513,7 @@
     dateLabel: dateLabel,
     setTheme: setTheme,
     levelIcon: levelIcon,
+    onDayChange: onDayChange,
     normTheme: normTheme,
     themes: THEMES,
     setScheme: setScheme,

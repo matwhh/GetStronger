@@ -71,30 +71,38 @@ alter table public.profiles force row level security;
 -- to authenticated — щоб політики не оцінювались для анонімних запитів:
 -- дірки не було й раніше (auth.uid() = null не збігається ні з чим),
 -- але кожен анонімний запит їх дарма проганяв.
+-- ВАЖЛИВО. Умова is_approved(auth.uid()) — не прикраса, а барʼєр: до
+-- підтвердження заявки акаунт не має доступу до profiles ЗОВСІМ. Цей файл
+-- раніше створював політики без неї, і виконання документованої процедури
+-- («встав уміст у SQL Editor → Run») тихо знімало барʼєр із продакшену.
+-- Тепер файл збігається з фактичним станом бази — звірено з pg_policies.
+--
+-- (select auth.uid()) у дужках навмисно: так планувальник обчислює виклик
+-- один раз на запит (InitPlan), а не на кожен рядок.
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own"
   on public.profiles for select
   to authenticated
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id and (select public.is_approved(auth.uid())));
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own"
   on public.profiles for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check ((select auth.uid()) = user_id and (select public.is_approved(auth.uid())));
 
 drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own"
   on public.profiles for update
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id and (select public.is_approved(auth.uid())))
+  with check ((select auth.uid()) = user_id and (select public.is_approved(auth.uid())));
 
 drop policy if exists "profiles_delete_own" on public.profiles;
 create policy "profiles_delete_own"
   on public.profiles for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id and (select public.is_approved(auth.uid())));
 
 -- -----------------------------------------------------------------------------
 -- Права для ролей PostgREST

@@ -193,7 +193,7 @@
    * зберігає те, що показувалось людині, а не сирі дроби.
    * target може бути null — день без порахованої норми теж день.
    */
-  function summarizeDay(totals, targetKcal) {
+  function summarizeDay(totals, targetKcal, targetProtein) {
     const t = totals || {};
     const out = {
       kcal: Math.round(Number(t.kcal) || 0),
@@ -204,15 +204,26 @@
     };
     const tk = Math.round(Number(targetKcal));
     if (Number.isFinite(tk) && tk > 0) out.target = tk;
+    /*
+     * Цільовий білок дня — записується разом із калорійною ціллю.
+     *
+     * Раніше його не було ніде, і сервер ELO отримував proteinTarget із
+     * запиту. Клієнт брав його з NutritionCalc, який підключений лише на
+     * пʼятьох сторінках із сімнадцяти: той самий день коштував 7 або 4 ELO
+     * залежно від того, з якої сторінки прийшов сабміт. Тепер ціль стоїть
+     * у самому записі — один день, одне число, незалежно від сторінки.
+     */
+    const tp = Math.round(Number(targetProtein));
+    if (Number.isFinite(tp) && tp > 0) out.pTarget = tp;
     return out;
   }
 
   /** Закрити день: повертає НОВИЙ mealLog із записом за дату */
-  function closeDay(log, date, totals, targetKcal) {
+  function closeDay(log, date, totals, targetKcal, targetProtein) {
     const src = (log && typeof log === 'object') ? log : {};
     const d = DATE_KEY.test(date) ? date : todayKey();
     const out = Object.assign({}, src);
-    out[d] = summarizeDay(totals, targetKcal);
+    out[d] = summarizeDay(totals, targetKcal, targetProtein);
     return out;
   }
 

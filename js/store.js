@@ -57,7 +57,41 @@
 
   const LS_SESSION = 'ib.session';
   const LS_PROFILE = 'ib.profile';
-  const LS_BACKUP  = 'ib.profile.backup';
+  const LS_BACKUP  = 'ib.profile.backup';         // копія ПЕРЕД імпортом
+  /*
+   * Копія перед розвʼязанням конфлікту входу — окремий слот.
+   *
+   * Був один. resolveFirstLogin писав у нього при КОЖНОМУ вході, тому
+   * невдалий імпорт + повторний вхід затирали доімпортну копію поточним
+   * (уже зіпсованим) станом, і кнопка «Відкотити імпорт» відновлювала
+   * зіпсоване. Два слоти — два незалежні рішення користувача.
+   */
+  const LS_BACKUP_LOGIN = 'ib.profile.backup.login';
+  /*
+   * Чий це локальний профіль. Без цього поля дані попереднього
+   * користувача на спільному пристрої вважалися «своїми» для наступного:
+   * resolveFirstLogin бачив непорожній локальний профіль і заливав його
+   * в чужий акаунт.
+   */
+  const LS_OWNER   = 'ib.profile.owner';
+  /*
+   * Стійка позначка «є зміни, які могли не доїхати».
+   *
+   * Ставиться ПЕРЕД мережевим записом і знімається лише після
+   * підтвердження. Черга (ib.pending) для цього не годиться: коли
+   * сторінку вивантажують посеред fetch, запит скасовується, а
+   * .catch(pendingPush) уже не виконується — черга лишається порожньою,
+   * і getProfile робив висновок «локальних змін немає» та затирав
+   * локальну копію хмарною.
+   */
+  const DIRTY_KEY  = 'ib.profile.dirty';
+  /*
+   * Стан ELO прив'язаний до особи так само, як профіль. Раніше ці ключі
+   * переживали вихід, і черга подій одного користувача досилалася під
+   * сесією наступного.
+   */
+  const ELO_KEYS = ['ib.eloState', 'ib.eloPending', 'ib.eloSent',
+                    'ib.eloWeeks', 'ib.eloClosed', 'ib.eloReport'];
   const LS_PENDING = 'ib.pending';
   const LS_ACCOUNT = 'ib.account';   // кеш статусу акаунта (UX; барʼєр — RLS)
 
@@ -220,7 +254,19 @@
    */
   function isMeaningful(p) {
     if (!p || typeof p !== 'object') return false;
-    const SKIP = { version: 1, updatedAt: 1, theme: 1, scheme: 1, weightsHarvested: 1 };
+    /*
+     * SKIP — поля, які НЕ є ознакою роботи людини.
+     *
+     * Сюди довелось додати бухгалтерію міграцій, і це був не косметичний
+     * недогляд: blankProfile() ставить ratingAlgorithmVersion: 0, а
+     * migrate() виставляє weightLogSeeded: true. Нуль не дорівнює false,
+     * тож some() спрацьовував на порожньому профілі й isMeaningful()
+     * повертав true ЗАВЖДИ. Через це кожен вхід у чистому браузері
+     * пропонував «взяти дані з цього браузера», де даних не було.
+     */
+    const SKIP = { version: 1, updatedAt: 1, theme: 1, scheme: 1, weightsHarvested: 1,
+                   weightLogSeeded: 1, ratingAlgorithmVersion: 1,
+                   ratingLog: 1, ratingSeen: 1 };
     return Object.keys(p).some(function (k) {
       if (SKIP[k]) return false;
       const v = p[k];
@@ -445,10 +491,22 @@
        * збереження вічно падало б із «JWT expired», а користувач так і не
        * зрозумів би, що треба просто перезайти.
        */
-      if ((res.status === 401 || res.status === 403) && opts.auth !== false) {
+      /*
+       * 401 і 403 — РІЗНІ речі, і плутати їх не можна.
+       *
+       * 401 — сесії немає або токен не чинний: перезайти.
+       * 403 — сесія чинна, але прав на цей рядок немає. Для Forge це
+       *       звичайний стан акаунта зі статусом pending: RLS не пускає
+       *       його до profiles. Раніше 403 теж стирав сесію, тому людина
+       *       з правильним паролем бачила «Не вдалося увійти» одразу
+       *       після успішного входу.
+       */
+      if (res.status === 401 && opts.auth !== false) {
         err.authExpired = true;
         clearSession();
         emit();
+      } else if (res.status === 403) {
+        err.forbidden = true;
       }
       throw err;
     }
@@ -465,6 +523,35 @@
       user:          s.user ? { id: s.user.id, email: s.user.email } : null
     };
     lsSet(LS_SESSION, session);
+  }
+
+  /*
+   * Звірити власника локальних даних із поточною сесією.
+   *
+   * Викликається і при вході, і при відновленні сесії. Позначку НЕ можна
+   * ставити в storeSession: вона виконується ДО resolveFirstLogin, і тоді
+   * порівнювати вже не було б із чим — чужі дані виглядали б своїми.
+   *
+   * Повертає true, якщо локальні дані належали іншій людині й були
+   * відкладені (нічого не видалено назавжди: попередній користувач
+   * побачить їх, коли ввійде знову).
+   */
+  function enforceOwner(local) {
+    const me = (session && session.user) ? session.user.id : null;
+    if (!me) return false;
+    const owner = lsGet(LS_OWNER, null);
+    if (!owner) { lsSet(LS_OWNER, me); return false; }
+    if (owner === me) return false;
+
+    lsSet(LS_BACKUP_LOGIN, Object.assign(
+      { savedAt: new Date().toISOString(), owner: owner },
+      local || lsGet(LS_PROFILE, {})));
+    [LS_PROFILE, LS_PENDING, DIRTY_KEY].concat(ELO_KEYS).forEach(function (k) {
+      try { localStorage.removeItem(k); } catch (_) {}
+    });
+    cache = null;
+    lsSet(LS_OWNER, me);
+    return true;
   }
 
   /**
@@ -500,9 +587,11 @@
    */
   function clearIdentityData() {
     clearSession();
-    try { localStorage.removeItem(LS_PROFILE); } catch (_) {}
-    try { localStorage.removeItem(LS_PENDING); } catch (_) {}
-    try { localStorage.removeItem(LS_ACCOUNT); } catch (_) {}
+    [LS_PROFILE, LS_PENDING, LS_ACCOUNT, LS_OWNER, LS_BACKUP_LOGIN]
+      .concat(ELO_KEYS).forEach(function (k) {
+        try { localStorage.removeItem(k); } catch (_) {}
+      });
+    try { localStorage.removeItem(DIRTY_KEY); } catch (_) {}
   }
 
   /*
@@ -511,9 +600,17 @@
    * чергу: дані реєстрації живуть локально до підтвердження. Це UX-шар;
    * справжній барʼєр — політики Postgres.
    */
+  /*
+   * Чи можна писати в хмару. FAIL-CLOSED: без відомого статусу — не можна.
+   *
+   * Було `!a || a.status === 'approved'`, тобто відсутність кешу означала
+   * «дозволено». Перший запис не-approved акаунта йшов у хмару, отримував
+   * 403 і (через попередній баг) знищував сесію. Тепер невідомий статус
+   * означає «почекати, поки статус приїде», а не «спробувати й зламатись».
+   */
   function cloudAllowed() {
     const a = lsGet(LS_ACCOUNT, null);
-    return !a || a.status === 'approved';
+    return !!(a && a.status === 'approved');
   }
 
   /**
@@ -593,7 +690,26 @@
     return lsSet(LS_PENDING, q.slice(-200));
   }
 
-  async function flushPending() {
+  /*
+   * ОДИН ланцюг записів на вкладку.
+   *
+   * flushPending робить власний read-modify-write профілю (getProfile →
+   * накладання патчів → pushToCloud → перезапис cache і ib.profile) і
+   * викликався з трьох місць повз saveChain. Коли мережа поверталась
+   * (подія online) саме під час збереження, flush устигав перезаписати
+   * cache своїм старішим знімком — після зеленого тоста «збережено».
+   * Тепер обидві операції стоять в одну чергу.
+   */
+  function queueWrite(fn) {
+    saveChain = saveChain.then(fn, fn);
+    return saveChain;
+  }
+
+  function flushPending() {
+    return queueWrite(doFlushPending);
+  }
+
+  async function doFlushPending() {
     if (!CLOUD || !session) return 0;
     const q = pendingGet();
     if (!q.length) return 0;
@@ -632,13 +748,26 @@
     return q.length;
   }
 
+  function markDirty() {
+    try { localStorage.setItem(DIRTY_KEY, String(Date.now())); } catch (_) {}
+  }
+  function clearDirty() {
+    try { localStorage.removeItem(DIRTY_KEY); } catch (_) {}
+  }
+  function isDirty() {
+    try { return !!localStorage.getItem(DIRTY_KEY); } catch (_) { return false; }
+  }
+
   async function pushToCloud(profile, keepalive) {
-    return req('/rest/v1/profiles?on_conflict=user_id', {
+    markDirty();
+    const out = await req('/rest/v1/profiles?on_conflict=user_id', {
       method: 'POST',
       headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: [{ user_id: session.user.id, data: profile }],
       keepalive: keepalive === true
     });
+    clearDirty();
+    return out;
   }
 
   /* ------------------------------------------------------------------ */
@@ -796,7 +925,9 @@
 
     /** Залити локальний профіль у хмару (кнопка «взяти мої дані з цього браузера») */
     adoptLocalProfile: async function () {
-      const local = lsGet(LS_BACKUP, null);
+      /* Саме копія ВХОДУ, не копія перед імпортом: це розвʼязання
+         конфлікту входу, і брати чужий слот означало б відкотити імпорт. */
+      const local = lsGet(LS_BACKUP_LOGIN, null);
       if (!local) throw new Error('Резервної копії немає.');
       cache = migrate(Object.assign(blankProfile(), local), local);
       return api.saveProfile({});
@@ -844,7 +975,8 @@
              * тут стирала б день роботи при кожному відкритті сайту.
              */
             const local = lsGet(LS_PROFILE, null);
-            if (local && pendingGet().length && local.updatedAt && remote.updatedAt &&
+            if (local && (pendingGet().length || isDirty()) &&
+                local.updatedAt && remote.updatedAt &&
                 local.updatedAt > remote.updatedAt) {
               cache = migrate(Object.assign(blankProfile(), local), local);
               flushPending().catch(function () {});
@@ -896,12 +1028,7 @@
      * мережа», а не «втрачено».
      */
     saveProfile: function (patch) {
-      saveChain = saveChain.then(function () {
-        return doSave(patch);
-      }, function () {
-        return doSave(patch);
-      });
-      return saveChain;
+      return queueWrite(function () { return doSave(patch); });
     },
 
     /**
@@ -973,8 +1100,9 @@
          s. Тобто кнопка обіцяла прибрати все, а стан тренування лишався
          видимим наступній людині за спільним компʼютером. Стару назву
          тримаємо для прибирання за минулими версіями. */
-      [LS_PROFILE, LS_SESSION, LS_BACKUP, LS_PENDING, 'forge.theme', 'forge.scheme',
-       'forge.today', 'ib.meals.fold', 'ib.meals.folds'].forEach(function (k) {
+      [LS_PROFILE, LS_SESSION, LS_BACKUP, LS_BACKUP_LOGIN, LS_PENDING, LS_OWNER,
+       LS_ACCOUNT, DIRTY_KEY, 'forge.theme', 'forge.scheme',
+       'forge.today', 'ib.meals.fold', 'ib.meals.folds'].concat(ELO_KEYS).forEach(function (k) {
         try { localStorage.removeItem(k); } catch (_) {}
       });
       session = null;
@@ -1026,8 +1154,14 @@
       try {
         saveInFlight++;
         try { await pushToCloud(next); } finally { saveInFlight--; }
-        // Доїхали — саме час спробувати й те, що чекало в черзі.
-        if (pendingGet().length) flushPending().catch(function () {});
+        /*
+         * Доїхали — саме час спробувати й те, що чекало в черзі. БЕЗ await
+         * і поза ланцюгом: flushPending сам стає в чергу, а чекати на нього
+         * зсередини ланцюга означало б чекати на самого себе.
+         */
+        if (pendingGet().length) {
+          setTimeout(function () { flushPending().catch(function () {}); }, 0);
+        }
       } catch (e) {
         if (e && (e.offline || !e.status)) {
           throw queuedError(patch, 'Немає звʼязку — збережеться, коли зʼявиться мережа');
@@ -1036,9 +1170,20 @@
         emit();
         throw e;
       }
-    } else if (!okLocal) {
+    }
+
+    /*
+     * Переповнене сховище — помилка В ОБОХ режимах.
+     *
+     * Було: перевірка стояла в гілці «хмари немає». У хмарному режимі
+     * результат lsSet не дивився ніхто, тому офлайн-резерв зникав мовчки,
+     * а сторож (agegate.js читає саме ib.profile) починав ганяти сторінки
+     * по колу. Тепер запис у хмару вже стався — дані не втрачені, — але
+     * людина мусить знати, що локальної копії немає.
+     */
+    if (!okLocal) {
       emit();
-      throw new Error('Сховище браузера переповнене — дані не збереглись');
+      throw new Error('Сховище браузера переповнене — локальну копію не збережено');
     }
 
     // Раніше цього виклику тут не було, і підписники Store.onChange
@@ -1053,6 +1198,18 @@
    * Викликається одразу після storeSession, до будь-якого збереження.
    */
   async function resolveFirstLogin(local) {
+    /*
+     * ЧУЖІ ЛОКАЛЬНІ ДАНІ.
+     *
+     * clearSession (401, відкликаний токен, зміна пароля) навмисно лишає
+     * ib.profile: це може бути єдина копія незісланої роботи. Але без
+     * позначки власника наступний користувач за тим самим браузером
+     * успадковував її як свою — і resolveFirstLogin заливав журнали
+     * попередньої людини в чужий акаунт БЕЗ жодного діалогу (гілка
+     * 'adopted' спрацьовує сама, коли в хмарі порожньо).
+     */
+    if (enforceOwner(local)) return 'foreign';
+
     if (!isMeaningful(local)) return null;
     // Не-approved акаунт хмарного рядка не має і мати не може (RLS):
     // локальні дані реєстрації просто чекають підтвердження на місці.
@@ -1060,7 +1217,7 @@
 
     // Резервна копія — завжди, ще до того, як щось вирішимо. Навіть якщо
     // далі щось піде не так, локальна робота лишиться відновлюваною.
-    lsSet(LS_BACKUP, Object.assign({ savedAt: new Date().toISOString() }, local));
+    lsSet(LS_BACKUP_LOGIN, Object.assign({ savedAt: new Date().toISOString() }, local));
 
     let remote = null;
     try {
@@ -1108,6 +1265,9 @@
     const saved = lsGet(LS_SESSION, null);
     if (saved && saved.access_token) {
       session = saved;
+      /* Та сама звірка власника, що й при вході: сесія могла відновитись
+         у браузері, де лишились дані іншої людини. */
+      enforceOwner(null);
       ensureFresh().then(function (ok) {
         if (!ok) return;
         emit();

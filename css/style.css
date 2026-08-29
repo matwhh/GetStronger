@@ -1385,6 +1385,22 @@ tr.tbl__band:hover td { background: rgba(var(--acc-rgb), 0.14); }
 .select--sm { padding-right: 30px; background-position: right 10px center; }
 .input--sm { width: 70px; text-align: right; }
 
+/* iOS Safari масштабує сторінку при фокусі в полі з font-size < 16px і
+   назад сама не повертає. Найгірше це б'є саме тут: поля робочої ваги на
+   «Моєму плані» й на тренуванні — це головний сценарій у залі, 42 і 14
+   полів відповідно. Кегль піднімаємо тільки на вузьких екранах, десктопну
+   типографіку не чіпаємо; висоту компенсують падінги. */
+@media (max-width: 640px) {
+  .select--sm, .input--sm, .input--weight,
+  .tbl .input--sm[type="number"], .tbl .input--sm[type="text"] {
+    font-size: 16px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  /* Поле «скопіювати план» теж отримує фокус (programs.js робить select()) */
+  #plan-share { font-size: 16px; }
+}
+
 /* Поле робочої ваги: доступне і в режимі перегляду, тому виглядає
    спокійніше за інші поля — рамка проявляється тільки при взаємодії. */
 .input--weight {
@@ -2383,7 +2399,7 @@ html[data-theme="graphite-crimson"] {
   --acc-line: #dd423d;
   --link:       #efaba8;
   --link-hover: #efd4d4;
-  --acc-rgb:     199, 35, 29;
+  --acc-rgb:     219, 48, 42;
   --acc-ink-rgb: 239, 171, 168;
   --on-acc: #ffffff;
 }
@@ -2396,7 +2412,7 @@ html[data-theme="graphite-moss"] {
   --acc-line: #5c8e38;
   --link:       #86cf51;
   --link-hover: #d1ecbe;
-  --acc-rgb:     58, 116, 16;
+  --acc-rgb:     80, 128, 46;
   --acc-ink-rgb: 134, 207, 81;
   --on-acc: #ffffff;
 }
@@ -2409,7 +2425,7 @@ html[data-theme="graphite-emerald"] {
   --acc-line: #33906e;
   --link:       #66cfa8;
   --link-hover: #bfeddc;
-  --acc-rgb:     30, 116, 85;
+  --acc-rgb:     31, 131, 94;
   --acc-ink-rgb: 102, 207, 168;
   --on-acc: #ffffff;
 }
@@ -2422,7 +2438,7 @@ html[data-theme="graphite-ocean"] {
   --acc-line: #34899e;
   --link:       #5ecae5;
   --link-hover: #cbe5eb;
-  --acc-rgb:     41, 111, 129;
+  --acc-rgb:     13, 126, 154;
   --acc-ink-rgb: 94, 202, 229;
   --on-acc: #ffffff;
 }
@@ -3033,6 +3049,17 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
   background: var(--footer-bg);
 }
 .heatmap__cell { border-radius: 8px; box-shadow: var(--neo-inset-sm); }
+/* Клітинка 32×32 з проміжком 4px дає крок 36px при нормі дотику 44.
+   Клік по ній МИТТЄВО переписує журнал тренувань, тож промах коштує
+   даних. Розширюємо саме зону дотику псевдоелементом — той самий прийом,
+   що вже застосований для .icon-btn: графіка й сітка не змінюються. */
+button.heatmap__cell { position: relative; }
+button.heatmap__cell::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 12px;
+}
 /*
  * color лишається ТЕМНИМ.
  *

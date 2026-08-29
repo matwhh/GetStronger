@@ -125,7 +125,9 @@
       return { items: items };
     });
 
-    return { meals: applySchema(meals) };
+    const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+    const date = (day && DATE_KEY.test(day.date)) ? day.date : null;
+    return { meals: applySchema(meals), date: date };
   }
 
   /** Кількість контейнерів рецепта як ціле число в межах */
@@ -158,9 +160,29 @@
     modal: null             // чернетка додавання в день, див. блок «Вікно додавання»
   };
 
+  /*
+   * ДЕНЬ НЕСЕ ВЛАСНУ ДАТУ.
+   *
+   * Раніше profile.day не мав дати зовсім, і закриття писало підсумок у
+   * дату НАТИСКАННЯ кнопки. Забув закрити понеділок — уся понеділкова їжа
+   * лягала у вівторок разом із вівторковою, а понеділок лишався порожнім.
+   * Переліт на захід міг перезаписати вже закритий день.
+   *
+   * date проставляється при першому продукті (stampDay) і саме за нею день
+   * закривається. null означає «день ще порожній».
+   */
   const EMPTY_DAY = function () {
-    return { meals: applySchema([]) };
+    return { meals: applySchema([]), date: null };
   };
+
+  /** Проставити дату дню, якщо її ще немає. Викликати перед кожним записом. */
+  function stampDay() {
+    if (!state.day) state.day = EMPTY_DAY();
+    if (!state.day.date && window.HistoryCore) {
+      state.day.date = window.HistoryCore.todayKey();
+    }
+    return state.day.date;
+  }
 
   /**
    * Вбудовані рецепти з js/recipes-data.js. Вони йдуть першими й доступні
@@ -188,6 +210,12 @@
 
   async function persist() {
     try {
+      /* Дата дня фіксується на першому ж збереженні з їжею — далі вона
+         не міняється, хоч би скільки день лишався незакритим. */
+      if (state.day && state.day.meals &&
+          state.day.meals.some(function (m) { return m.items && m.items.length; })) {
+        stampDay();
+      }
       await window.Store.saveProfile({ recipes: state.recipes, day: state.day });
     } catch (e) {
       toast('Не збереглося: ' + e.message, 'err');
@@ -1185,17 +1213,26 @@
       return;
     }
 
-    const key = window.HistoryCore.todayKey();
+    /*
+     * Закриваємо за ДАТОЮ ДНЯ, а не за датою натискання кнопки. Різниця
+     * помітна саме тоді, коли її найлегше не помітити: забув закрити
+     * учора — підсумок мусить лягти у вчора.
+     */
+    const today = window.HistoryCore.todayKey();
+    const key = (state.day && state.day.date) || today;
     const t = target();
     const existing = state.profile.mealLog && state.profile.mealLog[key];
+    const stale = key !== today;
     const q = existing
-      ? 'Сьогодні вже закривали (' + existing.kcal + ' ккал). Перезаписати підсумок і очистити день?'
-      : 'Закрити день? Підсумок (' + Math.round(got.kcal) + ' ккал, білок ' +
-        Math.round(got.p) + ' г) ляже в історію, день очиститься.';
+      ? (stale ? 'День ' + key + ' уже закривали' : 'Сьогодні вже закривали') +
+        ' (' + existing.kcal + ' ккал). Перезаписати підсумок і очистити день?'
+      : 'Закрити день' + (stale ? ' за ' + key : '') + '? Підсумок (' +
+        Math.round(got.kcal) + ' ккал, білок ' + Math.round(got.p) +
+        ' г) ляже в історію, день очиститься.';
     if (!confirm(q)) return;
 
     const log = window.HistoryCore.closeDay(
-      state.profile.mealLog, key, got, t ? t.kcal : null);
+      state.profile.mealLog, key, got, t ? t.kcal : null, t ? t.protein : null);
     state.profile.mealLog = log;
     state.day = EMPTY_DAY();
 

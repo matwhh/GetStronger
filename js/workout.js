@@ -386,6 +386,19 @@
     catch (_) { state.profile = {}; }
 
     state.todayKey = WC.todayKey();
+    /* Північ: див. App.onDayChange. Тренування, почате ввечері, після
+       00:00 має писатись у новий день, а не перетирати вчорашній. */
+    if (window.App && window.App.onDayChange) {
+      window.App.onDayChange(function () {
+        state.todayKey = WC.todayKey();
+        if (state.plan && state.plan.length) {
+          const nd = WC.readDay(state.profile, state.todayKey, state.plan.length);
+          state.dayIdx = nd.dayIdx;
+          state.done = nd.done;
+        }
+        render();
+      });
+    }
     if (window.TrackerCore) {
       state.trackers = window.TrackerCore.ensureBuiltins(state.profile.trackers);
       state.trackerLog = (state.profile.trackerLog && typeof state.profile.trackerLog === 'object') ? state.profile.trackerLog : {};

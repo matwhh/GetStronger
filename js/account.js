@@ -136,6 +136,14 @@
       window.App.setTheme(btn.dataset.themePick || null);
       renderTheme();
     });
+    /*
+     * Схему міняє не лише цей перемикач: App.setScheme викликають
+     * adoptProfileTheme (вхід на новому пристрої) та імпорт JSON. Подія
+     * forge:scheme розсилалась, але слухача не мав ніхто — перемикач і
+     * свотчі лишались у старому стані, показуючи темні поверхні на папері.
+     */
+    document.addEventListener('forge:scheme', function () { renderTheme(); });
+
     host.addEventListener('change', function (e) {
       if (!e.target || e.target.id !== 'p-scheme') return;
       window.App.setScheme(e.target.checked ? 'light' : 'dark');
@@ -757,6 +765,23 @@
     function isPlain(v) {
       return v && typeof v === 'object' && !Array.isArray(v);
     }
+
+    /** Налаштування трекера: до 20 скалярних ключів, рядки до 120 символів. */
+    function cleanSettings(v) {
+      if (!isPlain(v)) return {};
+      const out = {};
+      let n = 0;
+      Object.keys(v).forEach(function (k) {
+        if (n >= 20 || k.length > 40) return;
+        if (k === '__proto__' || k === 'constructor' || k === 'prototype') return;
+        const x = v[k];
+        const t = typeof x;
+        if (t === 'number' && Number.isFinite(x)) { out[k] = x; n++; }
+        else if (t === 'boolean') { out[k] = x; n++; }
+        else if (t === 'string' && x.length <= 120) { out[k] = x; n++; }
+      });
+      return out;
+    }
     function finite(v, lo, hi) {
       const n = Number(v);
       return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
@@ -847,7 +872,9 @@
         }
         meals.push({ name: str(m.name, 60) || ('Прийом ' + (i + 1)), items: items });
       }
-      return { meals: meals };
+      /* Дата дня (js/meals.js): за нею закривається незакритий день. */
+      const DK = /^\d{4}-\d{2}-\d{2}$/;
+      return { meals: meals, date: DK.test(day.date) ? day.date : null };
     }
 
     function cleanRecipes(list) {
@@ -1083,6 +1110,11 @@
               };
               const target = finite(s.target, 500, 20000);
               if (target !== null) entry.target = Math.round(target);
+              /* Цільовий білок дня (див. HistoryCore.summarizeDay): з нього
+                 сервер рахує ELO за харчування. Межі — ті самі, що в
+                 nutrition-core: нижче 20 г це не ціль, вище 500 — помилка. */
+              const pTarget = finite(s.pTarget, 20, 500);
+              if (pTarget !== null) entry.pTarget = Math.round(pTarget);
               out[d] = entry;
             }
             return accept(k, out);
@@ -1131,7 +1163,10 @@
               const entry = {
                 id: id, type: t.type, name: name,
                 enabled: t.enabled === true,
-                settings: isPlain(t.settings) ? t.settings : {},
+                /* settings не мали ЖОДНОГО обмеження — ні за розміром, ні за
+           глибиною, ні за кількістю ключів, і множились на 200 трекерів.
+           Беремо лише скаляри верхнього рівня, не більше 20 ключів. */
+        settings: cleanSettings(t.settings),
                 goal: t.goal === null ? null : finite(t.goal, 0, 100000),
                 source: (t.source === 'manual' || t.source === 'apple_health') ? t.source : null,
                 order: finite(t.order, 0, 100000) || 0,
@@ -1395,6 +1430,32 @@
       }
       if (!known) {
         toast('Жодне поле не пройшло перевірку: ' + res.rejected.join(', '), 'err');
+        return;
+      }
+
+      /*
+       * СУМАРНА СТЕЛЯ РОЗМІРУ.
+       *
+       * Поштучні ліміти були (300 вправ × 2000 записів, 200 трекерів ×
+       * 4000 дат, 20000 ключів ratingSeen), але жоден не обмежував суму, а
+       * trackers[].settings не обмежувався взагалі. Разом це дозволяло
+       * зібрати профіль на десятки мегабайтів: у хмару він писався, у
+       * localStorage — ні, і сайт ставав непрацездатним без способу
+       * полагодити його з інтерфейсу.
+       *
+       * Перевірка ПІСЛЯ валідації і ДО резервної копії: відхилений імпорт
+       * не чіпає ні даних, ні копії.
+       */
+      const MAX_PATCH_BYTES = 1024 * 1024;   // 1 МБ — вище стелі реального профілю за роки
+      let patchBytes = 0;
+      try {
+        patchBytes = new Blob([JSON.stringify(res.patch)]).size;
+      } catch (_) {
+        patchBytes = JSON.stringify(res.patch).length * 2;   // груба оцінка UTF-16
+      }
+      if (patchBytes > MAX_PATCH_BYTES) {
+        toast('Файл завеликий: ' + Math.round(patchBytes / 1024) + ' КБ при межі ' +
+              Math.round(MAX_PATCH_BYTES / 1024) + ' КБ. Нічого не змінено.', 'err');
         return;
       }
 

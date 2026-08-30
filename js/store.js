@@ -107,7 +107,7 @@
    * (не коли додається нове поле — для цього досить blankProfile).
    * migrate() нижче переганяє старі профілі вперед по одному кроку.
    */
-  const SCHEMA_VERSION = 9;
+  const SCHEMA_VERSION = 10;
 
   const listeners = new Set();
   let session = null;   // { access_token, refresh_token, expires_at, user }
@@ -298,6 +298,63 @@
    * («версії не було») і `undefined` як «аргумент не передали» — це два
    * різні випадки, а розрізнити їх по самому значенню неможливо.
    */
+  /**
+   * Зливає дві історії робочих ваг однієї вправи в одну.
+   *
+   * Записи ЦІЛЬОВОЇ назви йдуть першими, тож при збігу дати виграють вони:
+   * під новою назвою значення свідоміше — його вводили пізніше.
+   */
+  function mergeWeightLog(fromLog, toLog) {
+    const A = Array.isArray(fromLog) ? fromLog : [];
+    const B = Array.isArray(toLog) ? toLog : [];
+    const seen = Object.create(null);
+    const out = [];
+    B.concat(A).forEach(function (rec) {
+      if (!rec || typeof rec !== 'object' || seen[rec.d]) return;
+      seen[rec.d] = 1;
+      out.push(rec);
+    });
+    return out.sort(function (x, y) { return String(x.d) < String(y.d) ? -1 : 1; });
+  }
+
+  /**
+   * Перейменовує ключі словника за мапою {стара назва: нова}.
+   * merge — необовʼязкове злиття, коли обидва ключі зайняті; без нього
+   * цільове значення лишається як є, а старе зникає.
+   */
+  function renameKeys(box, map, merge) {
+    if (!box || typeof box !== 'object') return;
+    Object.keys(map).forEach(function (from) {
+      const to = map[from];
+      if (from === to || !Object.prototype.hasOwnProperty.call(box, from)) return;
+      if (!Object.prototype.hasOwnProperty.call(box, to)) box[to] = box[from];
+      else if (merge) box[to] = merge(box[from], box[to]);
+      delete box[from];
+    });
+  }
+
+  /** Та сама мапа — і по збережених правках планів, і по вагах. */
+  function renameExercises(p, map) {
+    const plans = p.customPlans;
+    if (plans && typeof plans === 'object') {
+      Object.keys(plans).forEach(function (key) {
+        const days = plans[key];
+        if (!Array.isArray(days)) return;
+        days.forEach(function (day) {
+          const list = day && day.exercises;
+          if (!Array.isArray(list)) return;
+          list.forEach(function (ex) {
+            if (ex && typeof ex === 'object' && map[ex.name]) ex.name = map[ex.name];
+          });
+        });
+      });
+    }
+    /* Поточна вага: під новою назвою значення свідоміше — воно й лишається. */
+    renameKeys(p.weights, map, null);
+    /* Історія ваг: НІЧОГО не втрачаємо, записи зливаються за датою. */
+    renameKeys(p.weightLog, map, mergeWeightLog);
+  }
+
   function migrate(p, stored) {
     if (!p || typeof p !== 'object') return p;
     const hasStored = stored !== undefined && stored !== null && typeof stored === 'object';
@@ -418,6 +475,31 @@
     if (v < 9) {
       if (!p.measureLog || typeof p.measureLog !== 'object' || Array.isArray(p.measureLog)) p.measureLog = {};
       v = 9;
+    }
+
+    /*
+     * 9 -> 10: вправу перейменовано в реєстрі — переносимо назву і в
+     * ЗБЕРЕЖЕНІ ПРАВКИ ПЛАНІВ.
+     *
+     * customPlans — заморожена копія плану з редактора, і вона СИЛЬНІША за
+     * реєстр: js/workout-core.js бере її першою. Тому правка назви у
+     * js/programs-data.js сама по собі до людини не доходить — на екрані
+     * лишається стара назва, а робоча вага, ключована назвою, висить під
+     * старим ключем і в новий рядок не підставляється.
+     *
+     * Перейменування — не редагування плану: стару назву людина не
+     * обирала, це та сама вправа. Тому переносимо мовчки.
+     *
+     * ІСТОРІЮ НЕ ЧІПАЄМО: sessionLog зберігає день і кількість вправ, а не
+     * назви, тож переписувати там нічого. weightLog — історія саме цієї
+     * вправи, і вона переїжджає разом із назвою, а не зникає.
+     */
+    if (v < 10) {
+      renameExercises(p, {
+        'Згинання ніг': 'Згинання ніг сидячи',
+        'Згинання ніг лежачи': 'Згинання ніг сидячи'
+      });
+      v = 10;
     }
 
     /*

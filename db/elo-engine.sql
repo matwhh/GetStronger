@@ -3,7 +3,7 @@
 -- Конфіг читається з elo_config (дзеркало db/elo-config.json).
 -- =============================================================================
 
-insert into public.elo_config (id, data) values (1, '{"version":2,"seasonMax":2500,"levelSize":200,"levelCount":10,"eliteFloor":2000,"weeklyBudget":200,"weights":{"training":0.3,"nutrition":0.3,"sleep":0.2,"recovery":0.1,"activity":0.1},"categoryShare":0.857,"cleanDayBonus":3,"cleanWeekBonus":9,"cleanThreshold":0.9,"nutritionSplit":{"kcal":0.55,"protein":0.45},"tolerance":{"training":[[0.99,1.0],[0.97,0.82],[0.9,0.45],[0.8,0.45],[0.65,0.3],[0.5,0.12],[0,0.05]],"kcalBand":[[0.02,1.0],[0.05,0.82],[0.1,0.5],[0.2,0.45],[0.35,0.15],[1,0.05]],"protein":[[0.99,1.0],[0.95,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]],"sleep":[[0.99,1.0],[0.97,0.82],[0.9,0.55],[0.8,0.5],[0.65,0.22],[0,0.05]],"activity":[[0.99,1.0],[0.97,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]]},"recoveryFillShare":0.6,"recoveryGoodValue":7,"missedWorkoutPenalty":-8,"openMealPenalty":-3,"dayLossFloor":-15,"dayGainCap":45,"graceWeeksPerSeason":2,"graceDays":7,"submitWindowDays":2,"minUsersForPercentile":20,"leaderboardTops":[0.1,0.05,0.01],"leaderboardRanks":[1000,100,10,3,1]}'::jsonb)
+insert into public.elo_config (id, data) values (1, '{"version":2,"seasonMax":2500,"levelSize":200,"levelCount":10,"eliteFloor":2000,"weeklyBudget":200,"weights":{"training":0.3,"nutrition":0.3,"sleep":0.2,"recovery":0.1,"activity":0.1},"categoryShare":0.857,"cleanDayBonus":3,"cleanWeekBonus":9,"cleanThreshold":0.9,"nutritionSplit":{"kcal":0.55,"protein":0.45},"tolerance":{"training":[[0.99,1.0],[0.97,0.82],[0.9,0.45],[0.8,0.45],[0.65,0.3],[0.5,0.12],[0,0.05]],"kcalBand":[[0.02,1.0],[0.05,0.82],[0.1,0.5],[0.2,0.45],[0.35,0.15],[1,0.05]],"protein":[[0.99,1.0],[0.95,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]],"sleep":[[0.99,1.0],[0.97,0.82],[0.9,0.55],[0.8,0.5],[0.65,0.22],[0,0.05]],"activity":[[0.99,1.0],[0.97,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]]},"recoveryFillShare":0.6,"recoveryGoodValue":7,"missedWorkoutPenalty":-8,"openMealPenalty":-3,"dayLossFloor":-15,"dayGainCap":45,"graceWeeksPerSeason":2,"graceDays":7,"submitWindowDays":2,"minUsersForPercentile":8,"leaderboardTops":[0.1,0.05,0.01],"leaderboardRanks":[1000,100,10,3,1]}'::jsonb)
 on conflict (id) do update set data = excluded.data, updated_at = now();
 
 -- Драбина якості: масив [[поріг, множник], ...] згори вниз
@@ -363,6 +363,10 @@ end;
 $$;
 
 -- Лідерборд сезону: топ N + мій рядок
+-- УВАГА: обидві функції нижче ПЕРЕВИЗНАЧЕНІ пізнішими міграціями —
+-- db/account-approval.sql (перевірка is_approved) і db/leaderboard-name.sql
+-- (ім'я береться із затвердженого account_status.username). Порядок при
+-- чистій установці: цей файл → account-approval.sql → leaderboard-name.sql.
 create or replace function public.elo_leaderboard(p_limit int default 50)
 returns jsonb
 language plpgsql security definer set search_path = public as $$

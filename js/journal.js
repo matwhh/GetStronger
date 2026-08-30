@@ -669,7 +669,7 @@
               ? '<button class="btn btn--ghost btn--sm mt-1" type="button" id="lifts-less">Згорнути</button>'
               : '')) +
         '<p class="small muted mb-0" style="margin-top:12px">Свіжі зміни — вгорі. ' +
-          'Провали на лініях — деолоади: вони теж частина шляху.</p>' +
+          'Провали на лініях — делоади.</p>' +
       '</div>';
   }
 

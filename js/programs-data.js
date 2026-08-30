@@ -141,7 +141,7 @@ window.COOLDOWN = COOLDOWN;
    ========================================================================= */
 
 const UL_UPPER = {
-  title: 'Upper', focus: 'Верх тіла повністю',
+  title: 'Upper', focus: 'Верх тіла',
   exercises: [
     { pattern: 'Горизонтальний жим', name: 'Жим у тренажері',                 muscles: ['chest'],      sets: 2, reps: '6–8',  weight: null,   rir: '2', rest: '2–3 хв', note: 'Підводні: 1–2 підходи × 6' },
     { pattern: 'Вертикальна тяга',   name: 'Підтягування з вагою',            muscles: ['back'],       sets: 2, reps: '6–8',  weight: null,   rir: '2', rest: '2–3 хв', note: 'З додатковою вагою на поясі' },
@@ -169,7 +169,7 @@ const UL_UPPER = {
 };
 
 const UL_LOWER = {
-  title: 'Lower', focus: 'Низ тіла повністю',
+  title: 'Lower', focus: 'Низ тіла',
   exercises: [
     { pattern: 'Присідальний рух',      name: 'Присідання зі штангою',               muscles: ['quads'],                   sets: 3, reps: '6–8', weight: null, rir: '2', rest: '3 хв',   note: 'Підводні: 1–2 підходи × 6' },
     { pattern: 'Тазостегновий шарнір',  name: 'Румунська тяга',                      muscles: ['hamstrings', 'glutes'],    sets: 3, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: 'Підводні: 1–2 підходи × 6' },
@@ -347,7 +347,7 @@ window.PROGRAMS = [
     days: {
       3: [
         {
-          title: 'День A', focus: 'Усе тіло · 34 підходів',
+          title: 'День A', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
@@ -366,7 +366,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День B', focus: 'Усе тіло · 34 підходів',
+          title: 'День B', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
@@ -385,7 +385,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День C', focus: 'Усе тіло · 34 підходів',
+          title: 'День C', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
@@ -406,7 +406,7 @@ window.PROGRAMS = [
       ],
       4: [
         {
-          title: 'День A', focus: 'Усе тіло · 30 підходів',
+          title: 'День A', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
@@ -425,7 +425,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День B', focus: 'Усе тіло · 30 підходів',
+          title: 'День B', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
@@ -444,7 +444,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День C', focus: 'Усе тіло · 30 підходів',
+          title: 'День C', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
@@ -462,7 +462,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День D', focus: 'Усе тіло · 30 підходів',
+          title: 'День D', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
@@ -483,7 +483,7 @@ window.PROGRAMS = [
       ],
       5: [
         {
-          title: 'День A', focus: 'Усе тіло · 24 підходів',
+          title: 'День A', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
@@ -501,7 +501,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День B', focus: 'Усе тіло · 24 підходів',
+          title: 'День B', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Вертикальна тяга', name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
@@ -519,7 +519,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День C', focus: 'Усе тіло · 24 підходів',
+          title: 'День C', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
@@ -538,7 +538,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День D', focus: 'Усе тіло · 24 підходів',
+          title: 'День D', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
@@ -557,7 +557,7 @@ window.PROGRAMS = [
           ]
         },
         {
-          title: 'День E', focus: 'Усе тіло · 24 підходів',
+          title: 'День E', focus: 'Усе тіло',
           exercises: [
             { pattern: 'Горизонтальний жим', name: 'Жим у тренажері', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },
             { pattern: 'Горизонтальний жим (варіація)', name: 'Жим штанги під нахилом', muscles: ['chest'], sets: 1, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: '' },

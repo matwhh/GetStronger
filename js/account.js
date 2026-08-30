@@ -216,7 +216,6 @@
     host.innerHTML =
       '<div class="card">' +
         '<h2 class="card__title">Вхід</h2>' +
-        '<p class="small muted">Один акаунт — доступ до своїх даних із будь-якого пристрою.</p>' +
         '<form id="a-form" class="grid" style="gap:16px;max-width:420px">' +
           '<div class="field">' +
             '<label class="field__label" for="a-email">Пошта</label>' +
@@ -225,7 +224,7 @@
           '<div class="field">' +
             '<label class="field__label" for="a-pass">Пароль</label>' +
             '<input class="input" id="a-pass" type="password" autocomplete="current-password" required minlength="8" placeholder="мінімум 8 символів">' +
-            '<span class="field__hint">Не використовуй пароль, який стоїть десь іще.</span>' +
+            '<span class="field__hint">Не використовуйте пароль з інших сайтів.</span>' +
           '</div>' +
           '<div class="row">' +
             '<button class="btn btn--primary" type="submit" data-act="in">Увійти</button>' +
@@ -443,10 +442,7 @@
             c.done + ' / ' + c.total + ' для розрахунків' +
           '</span>' +
         '</div>' +
-        '<p class="small muted mt-1">' +
-          'Міняється просто тут і зберігається одразу. Ці числа використовують ' +
-          'калькулятор харчування, раціон, кардіо й прогноз ваг.' +
-        '</p>' +
+        '<p class="small muted mt-1">Зберігається одразу, без окремої кнопки.</p>' +
 
         '<h3 class="group-title mt-3">Тіло</h3>' +
         '<div class="grid" style="gap:18px">' +
@@ -478,8 +474,7 @@
                 'Керує швидкістю кривої в прогнозі робочих ваг.', fieldId('trainingAge')) +
         '</div>' +
         '<p class="small muted">' +
-          'Сам план тренувань редагується на сторінці <a href="plan.html">Мій план</a> — ' +
-          'це не одне число, а розклад із вправами.' +
+          'План тренувань редагується на сторінці <a href="plan.html">Мій план</a>.' +
           (p.activePlan
             ? ' Зараз обрано: <b>' + esc((PROGRAM_NAMES[p.activePlan.programId] || p.activePlan.programId)) +
               ', ' + esc(p.activePlan.days) + ' дн.</b>'
@@ -1009,7 +1004,12 @@
             return str(v, 60) ? accept(k, v.trim()) : reject(k);
 
           case 'displayName':
-            return str(v, 24) ? accept(k, v.trim()) : reject(k);
+            /* 13 — та сама межа, що в register_request і в CHECK на
+               account_status.username (db/nick-length.sql). Довше ім'я з
+               давньої копії відхиляється ГУЧНО (потрапляє в список
+               відхилених полів), а не лягає в профіль значенням, під яке
+               не розрахована ні дошка лідерів, ні адмінка. */
+            return str(v, 13) ? accept(k, v.trim()) : reject(k);
 
           case 'pet': {
             // Місце під маскота: приймаємо лише мінімальну відому форму.
@@ -1586,7 +1586,7 @@
         if (word !== 'ВИДАЛИТИ') { toast('Видалення скасовано', 'ok'); return; }
         try {
           await Store.deleteAccount();
-          alert('Акаунт видалено. Дякуємо, що був із Forge.');
+          alert('Акаунт видалено.');
           location.replace('welcome.html');
         } catch (err) {
           const m = String((err && err.message) || '');

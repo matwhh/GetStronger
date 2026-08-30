@@ -382,8 +382,7 @@
     host.innerHTML = '' +
       stepBadge(3) +
       '<h1 class="gate__title">Розкажіть про себе</h1>' +
-      '<p class="small muted gate__lead">З цього рахуються калорії, білок і пульсові зони. ' +
-        'Дані зберігаються лише на цьому пристрої.</p>' +
+      '<p class="small muted gate__lead">З цього рахуються калорії, білок і пульсові зони.</p>' +
 
       '<div class="field mt-2">' +
         '<span class="field__label" id="b-sex-l">Стать</span>' +
@@ -641,7 +640,7 @@
 
   function validAccount() {
     const a = state.acc;
-    if (a.username.trim().length < 3 || a.username.trim().length > 24) return 'Нік — від 3 до 24 символів.';
+    if (a.username.trim().length < 3 || a.username.trim().length > 13) return 'Нік — від 3 до 13 символів.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) return 'Перевірте адресу пошти.';
 
     /* Надійність пароля — окреме ядро (js/password-core.js), тут лише
@@ -879,7 +878,7 @@
   async function doNameGo() {
     readAccFields();
     const n = state.acc.username.trim();
-    if (n.length < 3 || n.length > 24) { state.err = 'Нік — від 3 до 24 символів.'; render(); return; }
+    if (n.length < 3 || n.length > 13) { state.err = 'Нік — від 3 до 13 символів.'; render(); return; }
     try { await window.Store.saveProfile({ displayName: n }); } catch (_) {}
     try {
       const free = await window.Store.rpc('username_free', { p_username: n });
@@ -948,9 +947,6 @@
   function renderStart(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title" style="text-align:center">Forge</h1>' +
-      '<p class="small muted" style="text-align:center;margin:6px 0 0">' +
-        'Тренування, харчування і прогрес — за вашим планом.' +
-      '</p>' +
       '<div class="grid mt-3" style="gap:12px;max-width:320px;margin-left:auto;margin-right:auto">' +
         '<button class="btn btn--primary" type="button" data-nav="login">Увійти</button>' +
         '<button class="btn btn--ghost" type="button" data-nav="' + (CLOUD ? 'reg' : 'age') + '">Зареєструватися</button>' +
@@ -974,7 +970,6 @@
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-email">Пошта</label>' +
         '<input class="input" id="au-email" type="email" autocomplete="email" placeholder="you@example.com" value="' + esc(state.acc.email) + '">' +
-        '<span class="field__hint">Вхід — за поштою. Нік показується в таблиці лідерів.</span>' +
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass">Пароль</label>' +
@@ -997,8 +992,7 @@
   function renderForgot(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title">Відновлення пароля</h1>' +
-      '<p class="small mt-1">Впишіть пошту акаунта — надішлемо лист із посиланням, ' +
-        'за яким можна поставити новий пароль.</p>' +
+      '<p class="small mt-1">Надішлемо лист із посиланням для нового пароля.</p>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-email">Пошта</label>' +
         '<input class="input" id="au-email" type="email" autocomplete="email" ' +
@@ -1042,8 +1036,8 @@
       '<h1 class="gate__title">Створити акаунт</h1>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-name">Нік</label>' +
-        '<input class="input" id="au-name" maxlength="24" autocomplete="username" placeholder="3–24 символи" value="' + esc(state.acc.username) + '">' +
-        '<span class="field__hint">Публічне імʼя в таблиці лідерів. Має бути унікальним.</span>' +
+        '<input class="input" id="au-name" maxlength="13" autocomplete="username" placeholder="3–13 символів" value="' + esc(state.acc.username) + '">' +
+        '<span class="field__hint">Видно всім у таблиці лідерів.</span>' +
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-email">Пошта</label>' +
@@ -1064,8 +1058,8 @@
           '<span class="pwm__bar"><i></i></span>' +
           '<span class="pwm__txt small"></span>' +
         '</div>' +
-        '<span class="field__hint">Тільки англійська розкладка. Потрібні велика й мала літери, ' +
-          'цифра і символ — наприклад <b class="mono">Kyiv#Gym24</b>. Довший пароль — надійніший.</span>' +
+        '<span class="field__hint">Латиниця, велика й мала літери, цифра і символ — ' +
+          'наприклад <b class="mono">Kyiv#Gym24</b>.</span>' +
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass2">Пароль ще раз</label>' +
@@ -1104,10 +1098,10 @@
   function renderName(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title">Оберіть нік</h1>' +
-      '<p class="small muted mt-1">Цей нік уже зайнятий або ще не вказаний. Потрібен унікальний.</p>' +
+      '<p class="small muted mt-1">Цей нік зайнятий або ще не вказано.</p>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-name">Нік</label>' +
-        '<input class="input" id="au-name" maxlength="24" placeholder="3–24 символи" value="' + esc(state.acc.username) + '">' +
+        '<input class="input" id="au-name" maxlength="13" placeholder="3–13 символів" value="' + esc(state.acc.username) + '">' +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
@@ -1118,8 +1112,6 @@
   function renderPending(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title">Заявку на створення акаунта отримано</h1>' +
-      '<p class="small mt-1">Ваш профіль зараз очікує підтвердження. ' +
-        'Після підтвердження ви отримаєте доступ до Forge.</p>' +
       '<p class="small muted mt-1">Це ручна перевірка — зазвичай недовго. ' +
         'Сторінку можна закрити: заявка нікуди не дінеться.</p>' +
       errLine() +

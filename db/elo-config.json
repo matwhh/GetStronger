@@ -165,7 +165,7 @@
   "graceWeeksPerSeason": 2,
   "graceDays": 7,
   "submitWindowDays": 2,
-  "minUsersForPercentile": 20,
+  "minUsersForPercentile": 8,
   "leaderboardTops": [
     0.1,
     0.05,

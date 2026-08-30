@@ -66,7 +66,23 @@
 
     let p = {};
     try { p = await window.Store.getProfile() || {}; } catch (_) {}
-    const name = (p.displayName || '').trim();
+
+    /*
+     * Ім'я на дошці — ЗАТВЕРДЖЕНИЙ нік із заявки (account_status.username).
+     * Він унікальний у базі, його бачить адмін при підтвердженні, і саме
+     * його тепер віддає elo_leaderboard (db/leaderboard-name.sql).
+     *
+     * Тому поле редагування показуємо лише тим, у кого ніка немає — це
+     * акаунти, створені до появи анкети. Лишити поле всім означало б
+     * малювати редактор, який більше нічого не змінює: людина вписала б
+     * нове ім'я, побачила б його в себе — і не побачила б на дошці.
+     */
+    let approved = '';
+    try {
+      const acc = window.Store.accountCached && window.Store.accountCached();
+      approved = ((acc && acc.username) || '').trim();
+    } catch (_) {}
+    const name = approved || (p.displayName || '').trim();
 
     const lvl = EC.levelFor(st.elo, st.config);
     const range = EC.seasonRange(st.season);
@@ -105,18 +121,14 @@
       '</div>' +
 
       '<div class="field mt-2" style="max-width:340px">' +
-        '<label class="field__label" for="sz-nick">Нік у таблиці лідерів</label>' +
-        '<input class="input" id="sz-nick" maxlength="24" placeholder="Атлет" value="' + esc(name) + '">' +
+        (approved
+          ? '<span class="field__label">Нік у таблиці лідерів</span>' +
+            '<p class="mono" style="margin:4px 0 0">' + esc(approved) + '</p>' +
+            '<span class="field__hint">Закріплений за акаунтом.</span>'
+          : '<label class="field__label" for="sz-nick">Нік у таблиці лідерів</label>' +
+            '<input class="input" id="sz-nick" maxlength="13" placeholder="Атлет" value="' + esc(name) + '">') +
       '</div>' +
 
-      /* Маскот: місце зарезервовано, системи ще немає — чесно кажемо */
-      '<div class="row mt-2" style="gap:12px;align-items:center;border:1px dashed var(--line);border-radius:14px;padding:12px 14px">' +
-        '<span style="font-size:1.6rem" aria-hidden="true">🐾</span>' +
-        '<div>' +
-          '<b class="small">Forge Pet — Level ' + ((p.pet && p.pet.level) || 1) + '</b>' +
-          '<p class="small muted" style="margin:2px 0 0">Pixel-art компаньйон. Скоро: скіни, настрій і сезонні образи.</p>' +
-        '</div>' +
-      '</div>' +
 
       '<div class="row mt-2" style="gap:14px;flex-wrap:wrap">' +
         '<a class="small" href="journal.html">Огляд прогресу →</a>' +
@@ -325,7 +337,9 @@
 
     if (!Api.available()) { renderLocked(); return; }
 
-    /* Імʼя для лідерборду — з displayName профілю (якщо є) */
+    /* Підпис у season_state підтягуємо один раз за завантаження. Сервер
+       усе одно підставить затверджений нік, якщо він є (elo_set_name);
+       аргумент важить лише для акаунтів без ніка. */
     try {
       const p = await window.Store.getProfile();
       if (p && p.displayName) Api.setName(p.displayName).catch(function () {});

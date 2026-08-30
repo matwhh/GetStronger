@@ -671,7 +671,6 @@
         '<div class="field">' +
           '<label class="field__label" for="r-url">Посилання на відео чи рецепт <span class="muted">(необовʼязково)</span></label>' +
           '<input class="input" id="r-url" type="url" value="' + esc(d.url || '') + '" placeholder="https://www.youtube.com/watch?v=…">' +
-          '<span class="field__hint">Зберігається як є — щоб потім знайти першоджерело.</span>' +
         '</div>' +
 
         '<h4 class="mt-2" style="margin-bottom:8px">Інгредієнти</h4>' +
@@ -715,19 +714,13 @@
 
     host.innerHTML =
       '<div class="card">' +
-        foldHead('recipes', 'Рецепти на контейнери',
+        foldHead('recipes', 'Рецепти',
           allRecipes().length
             ? allRecipes().length + ' ' + (allRecipes().length === 1 ? 'рецепт' : 'рецептів')
             : 'жодного рецепта') +
         (folded ? '' :
-          '<p class="small muted mt-1">' +
-            'Забиваєте інгредієнти в грамах і кількість контейнерів — сайт рахує КБЖВ порції. ' +
-            'Дивитесь відео, тиснете «Створити рецепт», вбиваєте свої грами й лишаєте посилання на джерело.' +
-          '</p>' +
           (allRecipes().length ? '' :
-            '<p class="small muted">Рецептів ще немає. Рецепт — це набір інгредієнтів ' +
-            'у грамах і кількість контейнерів; після збереження його можна класти в день ' +
-            'одним дотиком. Почніть з кнопки нижче.</p>') +
+            '<p class="small muted mt-1">Рецептів ще немає — створіть перший кнопкою нижче.</p>') +
           recipeForm()
         ) +
       '</div>' +
@@ -868,9 +861,7 @@
         '</div>' +
 
         (t
-          ? '<p class="small muted mt-1">Норма з калькулятора: <b>' + esc(t.goalLabel) + '</b>, ' +
-            round(t.kcal, 0) + ' ккал.</p>' +
-            '<div class="vol-list mt-2">' +
+          ? '<div class="vol-list mt-2">' +
               progressRow('Калорії',   got.kcal,  t.kcal,    'ккал') +
               progressRow('Білок',     got.p,     t.protein, 'г') +
               progressRow('Жири',      got.f,     t.fat,     'г') +
@@ -902,9 +893,7 @@
         '</div>' +
 
         '<p class="small muted" style="margin:14px 0 0">' +
-          'Прийоми — ' + state.day.meals.length + ', як у розкладці на сторінці ' +
-          '<a href="nutrition.html">Харчування</a>. Щоб змінити їх кількість або назви, ' +
-          'перемкніть там «Розподіл на прийоми їжі».' +
+          'Кількість і назви прийомів — на сторінці <a href="nutrition.html">Харчування</a>.' +
         '</p>' +
       '</div>' +
       meals;

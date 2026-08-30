@@ -56,6 +56,83 @@
 
   const CLOUD = Boolean(window.Store && window.Store.isCloud);
 
+  /* ------------------------------------------------------------------ */
+  /* Чернетка реєстрації                                                 */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Екран реєстрації НЕ переживав перезавантаження: людина йшла в пошту
+   * по лист підтвердження, поверталась — і всі поля були порожні, а на
+   * екрані стояв стартовий «Forge», ніби нічого й не було. Половина
+   * кинутих реєстрацій — саме тут.
+   *
+   * Тому все набране лягає в localStorage і піднімається назад при
+   * завантаженні. ПАРОЛЬ СЮДИ НЕ ПИШЕТЬСЯ НІКОЛИ — він живе лише в
+   * памʼяті вкладки; після перезавантаження людину веде вхід, а не
+   * підставлений із диска пароль.
+   *
+   * Чернетка — не друге джерело правди: профіль сильніший. Вона лише
+   * заповнює порожні поля (див. loadDraft) і зникає, щойно заявку подано.
+   */
+  const DRAFT_KEY = 'ib.regdraft';
+
+  function saveDraft(patch) {
+    try {
+      let prev = {};
+      try { prev = JSON.parse(localStorage.getItem(DRAFT_KEY)) || {}; } catch (_) {}
+      const d = {
+        v: 1,
+        stage: (patch && patch.stage) || prev.stage || '',
+        username: state.acc.username || '',
+        email: state.acc.email || '',
+        dob: state.dob,
+        body: state.body,
+        consents: state.consents
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    } catch (_) { /* приватний режим або переповнене сховище — не привід падати */ }
+  }
+
+  function readDraft() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY));
+      return (d && typeof d === 'object' && d.v === 1) ? d : null;
+    } catch (_) { return null; }
+  }
+
+  /** Піднімає чернетку в state, НЕ затираючи вже заповнене. */
+  function loadDraft() {
+    const d = readDraft();
+    if (!d) return null;
+    if (d.username && !state.acc.username) state.acc.username = String(d.username);
+    if (d.email && !state.acc.email) state.acc.email = String(d.email);
+
+    if (d.dob && typeof d.dob === 'object' && !state.birth) {
+      DOB_PARTS.forEach(function (part) {
+        const v = d.dob[part.k];
+        if (typeof v === 'string') state.dob[part.k] = v.replace(/\D+/g, '').slice(0, part.len);
+      });
+      state.birth = dobToBirth(state.dob);
+    }
+    if (d.body && typeof d.body === 'object') {
+      Object.keys(state.body).forEach(function (k) {
+        const cur = state.body[k];
+        const val = d.body[k];
+        if ((cur === '' || cur === null || cur === undefined) &&
+            val !== null && val !== undefined && val !== '') state.body[k] = val;
+      });
+    }
+    if (d.consents && typeof d.consents === 'object') {
+      ['c-terms', 'c-privacy', 'c-medical'].forEach(function (k) {
+        if (d.consents[k]) state.consents[k] = true;
+      });
+    }
+    return d;
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
+  }
+
   /* Лічильник кроків реєстрації: акаунт → вік → тіло. У локальному
      режимі акаунта немає, тож і лічильник коротший. */
   function stepBadge(n) {
@@ -151,6 +228,7 @@
    */
   function refreshAge() {
     state.birth = dobToBirth(state.dob);
+    saveDraft();
     const g = AC.gateState(state.birth);
     const canGo = g.state === 'adult';
 
@@ -228,6 +306,51 @@
       hrOk(state.body.hrMax, 120, 230);
   }
 
+  function numIn(v, lim) {
+    const n = Number(v);
+    return v !== '' && Number.isFinite(n) && n >= lim[0] && n <= lim[1];
+  }
+
+  /*
+   * ЧОГО САМЕ БРАКУЄ.
+   *
+   * Кнопка «Далі» вимикалась мовчки: людина заповнювала анкету, тиснула —
+   * і НІЧОГО не відбувалось, без жодного слова чому. Найчастіша причина —
+   * три згоди, які легко прогорнути повз, бо вони під довгою формою.
+   * Саме на цьому місці й застрягла жива реєстрація.
+   *
+   * Перелік будується з ТИХ САМИХ значень, що й критерій (OnboardingCore
+   * віддає межі назовні) — тому розійтися з кнопкою він не може.
+   */
+  const CONSENT_ITEM = 'три згоди';
+
+  function missingBody() {
+    const b = state.body;
+    const out = [];
+    if (OC.SEX.indexOf(b.sex) === -1) out.push('стать');
+    if (!numIn(b.height, OC.LIMITS.height)) out.push('зріст (' + OC.LIMITS.height.join('–') + ' см)');
+    if (!numIn(b.weight, OC.LIMITS.weight)) out.push('вагу (' + OC.LIMITS.weight.join('–') + ' кг)');
+    if (OC.ACTIVITY.indexOf(String(Number(b.activity))) === -1) out.push('рівень активності');
+    if (OC.TRAINING_AGE.indexOf(b.trainingAge) === -1) out.push('стаж тренувань');
+    if (!hrOk(b.hrRest, 30, 120)) out.push('пульс спокою 30–120 (або лишіть поле порожнім)');
+    if (!hrOk(b.hrMax, 120, 230)) out.push('максимальний пульс 120–230 (або лишіть поле порожнім)');
+    if (!consentsOk()) out.push(CONSENT_ITEM);
+    return out;
+  }
+
+  /** Підпис під кнопкою: або що далі, або чого бракує. Порожнім не буває. */
+  function bodyNote() {
+    const miss = missingBody();
+    if (!miss.length) return 'Крок 2 з 3. Далі: програма тренувань і робоча вага.';
+    const fields = miss.filter(function (x) { return x !== CONSENT_ITEM; });
+    const parts = [];
+    if (fields.length) parts.push('Щоб продовжити, заповніть: ' + fields.join(', ') + '.');
+    if (miss.indexOf(CONSENT_ITEM) !== -1) {
+      parts.push('Відмітьте три згоди вище — без них заявку подати не можна.');
+    }
+    return parts.join(' ');
+  }
+
   function numField(id, key, label, hint, opts) {
     return '<div class="field mt-2">' +
       '<label class="field__label" for="' + id + '">' + label + '</label>' +
@@ -243,7 +366,10 @@
   function renderBody(host) {
     const NC = window.NutritionCalc;
     const acts = Object.keys(NC.ACTIVITY);
-    const canGo = bodyReady();
+    /* Згоди входять в умову і ТУТ теж. Раніше розмітка малювала кнопку
+       активною лише за bodyReady(), а клік перевіряв ще й згоди — тож
+       кнопка виглядала робочою, а натискання не робило нічого. */
+    const canGo = bodyReady() && consentsOk();
 
     const sexBtn = function (v, label) {
       return '<label class="seg__item">' +
@@ -305,8 +431,8 @@
       '<button class="btn btn--primary btn--wide mt-2" type="button" id="body-go"' +
         (canGo ? '' : ' disabled') + '>Далі — обрати програму</button>' +
 
-      '<p class="small muted gate__note" id="body-note">' +
-        (canGo ? 'Крок 2 з 3. Далі: програма тренувань і робоча вага.' : '') +
+      '<p class="small gate__note' + (canGo ? ' muted' : '') + '" id="body-note">' +
+        esc(bodyNote()) +
       '</p>';
   }
 
@@ -361,10 +487,10 @@
     const canGo = bodyReady() && consentsOk();
     if (go) go.disabled = !canGo;
     if (note) {
-      note.textContent = canGo
-        ? 'Крок 2 з 3. Далі: програма тренувань і робоча вага.'
-        : '';
+      note.textContent = bodyNote();
+      note.classList.toggle('muted', canGo);
     }
+    saveDraft();
   }
 
   /**
@@ -447,6 +573,7 @@
         ]
       });
       await window.Store.refreshAccountState();
+      clearDraft();          // заявка подана — чернетці більше нічого стерегти
       state.busy = false;
       nav('pending');
     } catch (e) {
@@ -554,6 +681,8 @@
     if ($('#au-email')) state.acc.email = g('au-email');
     if ($('#au-pass'))  state.acc.pass = g('au-pass');
     if ($('#au-pass2')) state.acc.pass2 = g('au-pass2');
+    /* Нік і пошта — у чернетку; паролі лишаються тільки в памʼяті. */
+    saveDraft();
   }
 
   async function doLogin() {
@@ -600,7 +729,10 @@
         return;
       }
       if (!res || res.confirmed === false) {
-        // Увімкнене підтвердження пошти: сесії ще немає
+        /* Увімкнене підтвердження пошти: сесії ще немає. Позначаємо стадію,
+           щоб перезавантаження повернуло людину саме на цей екран, а не на
+           стартовий, де про створений акаунт немає й слова. */
+        saveDraft({ stage: 'confirm' });
         state.busy = false;
         nav('confirm');
         return;
@@ -706,6 +838,16 @@
 
   async function doConfirmed() {
     if (state.busy) return;
+    /*
+     * Пароль у чернетку не пишеться навмисно, тож після перезавантаження
+     * його тут немає. Раніше в цьому місці йшов signIn('', '') — сервер
+     * відповідав «невірні дані», і людина читала це як «підтвердження не
+     * зарахувалось». Ведемо на вхід і кажемо прямо, що робити.
+     */
+    if (!state.acc.pass) {
+      navMsg('login', 'Пошту підтверджено? Тоді увійдіть тим паролем, який ви створили під час реєстрації.');
+      return;
+    }
     state.busy = true; state.err = ''; render();
     try {
       await window.Store.signIn(state.acc.email.trim(), state.acc.pass);
@@ -755,6 +897,7 @@
 
   async function doSignOut() {
     try { await window.Store.signOut(); } catch (_) {}
+    clearDraft();
     state.acc = { username: '', email: '', pass: '', pass2: '' };
     nav('start');
   }
@@ -1055,6 +1198,10 @@
   async function init() {
     if (!$('#gate-card') || !AC || !OC) return;
 
+    /* Найперше — підняти набране до перезавантаження. Профіль, який
+       приїде нижче, сильніший: loadDraft заповнює лише порожні поля. */
+    const draft = loadDraft();
+
     if (CLOUD) {
       /*
        * ПЕРЕХІД ІЗ ЛИСТА — найперше.
@@ -1083,7 +1230,10 @@
         render();               // тимчасовий стан, поки їде статус
         await routeAfterAuth(); // сам зробить render/redirect
       } else {
-        state.step = 'start';
+        /* Сесії немає. Якщо акаунт уже створено і ми чекали лист —
+           повертаємо той самий екран, а не стартовий: інакше людина
+           бачить «Forge» і вирішує, що реєстрація не зберіглася. */
+        state.step = (draft && draft.stage === 'confirm' && state.acc.email) ? 'confirm' : 'start';
         render();
       }
     } else {

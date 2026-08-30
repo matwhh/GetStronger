@@ -136,6 +136,13 @@
   }
 
   window.OnboardingCore = {
+    /* Межі відкриті назовні НАВМИСНО: екран реєстрації має сказати, чого
+       саме бракує («зріст 120–250»), і робити це власним списком значень
+       він не може — другий список розійшовся б із критерієм мовчки. */
+    LIMITS: LIMITS,
+    SEX: SEX,
+    ACTIVITY: ACTIVITY,
+    TRAINING_AGE: TRAINING_AGE,
     hasAge: hasAge,
     hasBody: hasBody,
     hasProgram: hasProgram,

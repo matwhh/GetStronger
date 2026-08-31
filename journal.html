@@ -57,9 +57,10 @@ _m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graph
 moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
 _t=localStorage.getItem('forge.theme');
 _t=_m[_t]||_t;if(_t==='graphite-amber')_t='';
-if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
+if(_t&&(_t.indexOf('graphite')===0||_t==='forest'))_r.setAttribute('data-theme',_t);
 if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
 var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e7e7e7');}
+if(_t==='forest'){var _f=document.querySelector('meta[name=theme-color]');if(_f)_f.setAttribute('content','#a7aaa8');}
 }catch(e){}</script>
 
 </head>
@@ -102,9 +103,6 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
 
       <!-- Виконання плану: тренування і харчування у відсотках, з періодами -->
       <div id="jr-adherence" class="mt-3 reveal" data-d="1"></div>
-
-      <!-- Цей тиждень / цей місяць: короткі підсумки з History -->
-      <div id="jr-summary" class="mt-3 reveal" data-d="2"></div>
 
       <!-- Вага тіла: ввід + графік + останні записи -->
       <div id="jr-weight" class="mt-3 reveal" data-d="1"></div>

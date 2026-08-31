@@ -1286,49 +1286,6 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Цей тиждень / цей місяць                                            */
-  /* ------------------------------------------------------------------ */
-
-  function summaryCard(title, sum) {
-    const rows = [];
-    rows.push('<div class="kpi"><div class="kpi__val mono">' + sum.workouts + '</div><p class="kpi__lbl">' +
-      window.App.plural(sum.workouts, 'тренування', 'тренування', 'тренувань') + '</p></div>');
-    if (sum.vol !== null) rows.push('<div class="kpi"><div class="kpi__val mono">≈' + thou(sum.vol) + '</div><p class="kpi__lbl">кг обʼєму</p></div>');
-    if (sum.sets) rows.push('<div class="kpi"><div class="kpi__val mono">' + sum.sets + '</div><p class="kpi__lbl">підходів</p></div>');
-    if (sum.avgMin !== null) rows.push('<div class="kpi"><div class="kpi__val mono">' + durTxt(sum.avgMin) + '</div><p class="kpi__lbl">середнє тренування</p></div>');
-    if (sum.prs) rows.push('<div class="kpi"><div class="kpi__val mono">' + sum.prs + '</div><p class="kpi__lbl">PR</p></div>');
-
-    return '<div class="card">' +
-      '<h3 class="card__title">' + esc(title) + '</h3>' +
-      (sum.workouts || sum.prs
-        ? '<div class="kpis mt-2">' + rows.join('') + '</div>'
-        : '<p class="small muted mt-1 mb-0">Поки порожньо — записи зʼявляться з першим тренуванням.</p>') +
-    '</div>';
-  }
-
-  function renderSummary() {
-    const host = $('#jr-summary');
-    const PC = window.ProgressCore;
-    if (!host || !PC || !PC.rangeSummary) return;
-
-    const now = new Date();
-    const todayK = todayKey();
-
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-    const week = PC.rangeSummary(sn.sessionLog, sn.weightLog, sn.workLog, keyOf(monday), todayK);
-
-    const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    const month = PC.rangeSummary(sn.sessionLog, sn.weightLog, sn.workLog, keyOf(first), todayK);
-
-    host.innerHTML =
-      '<div class="grid grid-2">' +
-        summaryCard('Цей тиждень', week) +
-        summaryCard(MONTHS_NOM[now.getMonth()] + ' ' + now.getFullYear(), month) +
-      '</div>';
-  }
-
-  /* ------------------------------------------------------------------ */
   /* Особисті рекорди                                                    */
   /* ------------------------------------------------------------------ */
   /*
@@ -1713,7 +1670,6 @@
     wire();
     renderOverview();
     renderAdherence();
-    renderSummary();
     keepFocus(renderWeight);
     keepFocus(renderTrain);
     renderLifts();
@@ -1803,13 +1759,13 @@
       if (profile.workLog && profile.workLog !== state.workLog) {
         state.workLog = profile.workLog;
         seasonize();
-        keepFocus(renderTrain); renderAdherence(); renderSummary();
+        keepFocus(renderTrain); renderAdherence();
         if (state.view === 'history') { renderHcal(); renderDay(); }
       }
       if (profile.sessionLog && profile.sessionLog !== state.sessionLog) {
         state.sessionLog = profile.sessionLog;
         seasonize();
-        keepFocus(renderTrain); renderOverview(); renderAdherence(); renderSummary();
+        keepFocus(renderTrain); renderOverview(); renderAdherence();
         if (state.view === 'history') { renderHcal(); renderDay(); }
       }
       if (profile.bodyLog && profile.bodyLog !== state.bodyLog) {
@@ -1819,7 +1775,7 @@
       if (profile.weightLog && profile.weightLog !== state.weightLog) {
         state.weightLog = profile.weightLog;
         seasonize();
-        renderLifts(); renderPrs(); renderExercise(); renderAdherence(); renderSummary();
+        renderLifts(); renderPrs(); renderExercise(); renderAdherence();
         if (state.view === 'history') renderDay();
       }
       if (profile.mealLog && profile.mealLog !== state.mealLog) {

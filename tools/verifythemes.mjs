@@ -242,14 +242,41 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
   await q.waitForTimeout(1000);
 
   const btns = await q.locator('.theme-btn').count();
-  /* Монохром + сім кольорових акцентів. «Бурштин» прибраний — якщо він
-     повернеться в список без CSS-блоку, плашок стане девʼять і це впаде. */
-  ok('у виборі акцентів девʼять плашок', btns === 9, String(btns));
+  /* Монохром + сім кольорових акцентів + «Ліс» (власні поверхні).
+     «Бурштин» прибраний — якщо він повернеться в список без CSS-блоку,
+     плашок стане одинадцять і це впаде. */
+  ok('у виборі акцентів десять плашок', btns === 10, String(btns));
+
+  /* Справжній інваріант за лічильником: кожна плашка мусить мати СВІЙ
+     CSS-блок. Тема без блоку виглядала б у списку, але нічого не міняла —
+     саме це й ловилось магічним числом, тільки непрямо. */
+  const dead = await q.evaluate(() => {
+    const root = document.documentElement;
+    const was = root.dataset.theme || '';
+    const read = () => {
+      const cs = getComputedStyle(root);
+      return cs.getPropertyValue('--acc').trim() + '|' + cs.getPropertyValue('--bg').trim();
+    };
+    delete root.dataset.theme;
+    const base = read();
+    const bad = [];
+    [...document.querySelectorAll('[data-theme-pick]')].forEach(btn => {
+      const id = btn.dataset.themePick;
+      if (!id) return;                       // монохром — це і є база
+      root.dataset.theme = id;
+      if (read() === base) bad.push(id);
+      delete root.dataset.theme;
+    });
+    if (was) root.dataset.theme = was;
+    return bad;
+  });
+  ok('кожна плашка має свій CSS-блок', dead.length === 0, dead.join(', ') || 'усі мають');
 
   const names0 = await q.evaluate(() =>
     [...document.querySelectorAll('.themes .theme-btn span')].map(s => s.textContent.trim()));
   ok('монохром перший у списку', names0[0] === 'Монохром', names0[0]);
   ok('«Бурштин» прибраний зі списку', !names0.includes('Бурштин'), names0.join(', '));
+  ok('«Ліс» є у списку', names0.includes('Ліс'), names0.join(', '));
 
   const names = await q.evaluate(() =>
     [...document.querySelectorAll('.themes .theme-btn span')].map(s => s.textContent.trim()));

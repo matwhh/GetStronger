@@ -117,9 +117,19 @@
       '</div>';
   }
 
+  /* Слухачі вішаються РІВНО ОДИН РАЗ. wireTheme() викликається з renderAll,
+     а renderAll — це Store.onChange; без цього guard кожне збереження теми
+     (setTheme -> saveProfile -> onChange -> renderAll) додавало б ще один
+     click-слухач на постійний #theme і ще один на document. Клік теми тоді
+     плодив setTheme -> saveProfile -> onChange по колу, слухачі росли
+     експоненційно, і після 3-4 перемикань сторінка зависала. Делегування
+     живе на контейнері, що не зникає (renderTheme() міняє лише innerHTML),
+     тож одноразового навішування досить назавжди. */
+  let themeWired = false;
   function wireTheme() {
     const host = $('#theme');
-    if (!host) return;
+    if (!host || themeWired) return;
+    themeWired = true;
     host.addEventListener('click', function (e) {
       const btn = e.target.closest('[data-theme-pick]');
       if (!btn) return;
@@ -423,6 +433,38 @@
     return { done: done.length, total: keys.length };
   }
 
+  /**
+   * Стать — ТІЛЬКИ показ. Задається один раз при реєстрації і в акаунті не
+   * змінюється: від неї залежить набір програм (жіночі/чоловічі схеми), і
+   * мовчазна зміна тут відчіпляла б активний план та плутала розрахунки.
+   * Якщо стать чомусь не задана (не мало б статись після онбордингу) —
+   * лишаємо вибір, щоб користувач не застряг без можливості її вказати.
+   */
+  /* Адмінові стать редагується (для тестів схем), звичайному користувачу —
+     ні. Це UI-запобіжник, не безпека: стать не привілейоване поле, а чужий
+     план однаково блокує серверний resolvePlan. isAdmin — із account_state
+     (сервер), кешований; підміна кешу відкрила б перемикач лише для власної
+     статі, що й так робиться правкою профілю — привілеїв це не піднімає. */
+  function isAdmin() {
+    try {
+      const acc = Store.accountCached && Store.accountCached();
+      return Boolean(acc && acc.isAdmin);
+    } catch (_) { return false; }
+  }
+
+  function sexField(p) {
+    const cur = SEX.filter(function (o) { return o.v === p.sex; })[0];
+    // Стать не задана (не мало б статись після онбордингу) або адмін —
+    // показуємо вибір, щоб було чим її поставити/змінити.
+    if (!cur || isAdmin()) {
+      return field('Стать', segInput('sex', p.sex, SEX),
+        cur ? 'Змінюється лише в адмін-акаунті.' : 'Задається під час реєстрації.');
+    }
+    return field('Стать',
+      '<p class="mono" style="margin:8px 0 0">' + esc(cur.label) + '</p>',
+      'Задається під час реєстрації і тут не змінюється.');
+  }
+
   async function renderProfile() {
     const host = $('#profile');
     if (!host) return;
@@ -444,9 +486,8 @@
         '</div>' +
         '<p class="small muted mt-1">Зберігається одразу, без окремої кнопки.</p>' +
 
-        '<h3 class="group-title mt-3">Тіло</h3>' +
-        '<div class="grid" style="gap:18px">' +
-          field('Стать', segInput('sex', p.sex, SEX)) +
+        '<div class="grid mt-3" style="gap:18px">' +
+          sexField(p) +
           '<div class="grid grid-4">' +
             field('Вік, років', numberInput('age', p.age, { min: 14, max: 90, placeholder: '25' }), '', fieldId('age')) +
             field('Зріст, см', numberInput('height', p.height, { min: 120, max: 230, placeholder: '180' }), '', fieldId('height')) +

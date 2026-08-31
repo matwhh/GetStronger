@@ -101,47 +101,66 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await ctx.close();
 }
 
-/* ---- 4. Чоловік міняє стать на жіночу в акаунті ---- */
+/* ---- 4. Акаунт НЕ дає міняти стать (лише реєстрація) ---- */
 {
   const { ctx, p, errs } = await open(
     Object.assign({}, MALE, { activePlan: { programId: 'ppl', days: 6 }, programId: 'ppl', daysPerWeek: 6 }));
 
   await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
-  await p.locator('.seg__item:has(input[data-p="sex"][value="female"]) span').first().click();
-  await p.waitForTimeout(1200);
-
-  const after = await p.evaluate(async () => {
-    const pr = await window.Store.getProfile();
-    return { sex: pr.sex, active: pr.activePlan };
-  });
-  ok('4. стать змінилась', after.sex === 'female', after.sex);
-  ok('4. чоловічий план відчепився від профілю', !after.active, JSON.stringify(after.active));
-
-  await p.goto('file://' + ROOT + '/programs.html', { waitUntil: 'load' });
-  await p.waitForTimeout(1300);
-  const names = await listedPlans(p);
-  ok('4. список став жіночим', names.length === 1 && names[0] === WOMEN, names.join(' | '));
+  /* Головне: у профілі більше немає жодного контролу зміни статі. */
+  const sexInputs = await p.locator('#profile input[data-p="sex"]').count();
+  ok('4. в акаунті немає перемикача статі', sexInputs === 0, 'знайдено input: ' + sexInputs);
+  /* Стать усе одно показана — як текст, а не як вибір. */
+  const shown = await p.locator('#profile').innerText();
+  ok('4. поточна стать показана текстом', /Чоловік/.test(shown), '');
+  ok('4. клік нікуди — стать лишилась чоловічою', true);
+  const after = await p.evaluate(async () => (await window.Store.getProfile()).sex);
+  ok('4. стать у профілі не змінилась', after === 'male', String(after));
   ok('4. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 
-/* ---- 5. Жінка міняє стать на чоловічу ---- */
+/* ---- 4b. Адмін БАЧИТЬ перемикач статі (для тестів схем) ---- */
+{
+  const { ctx, p, errs } = await open(MALE);
+  await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
+  /* Позначаємо сесію адміном так само, як це робить account_state. */
+  await p.evaluate(() => {
+    localStorage.setItem('ib.account', JSON.stringify({ status: 'approved', isAdmin: true, t: Date.now() }));
+  });
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(1400);
+  const sexInputs = await p.locator('#profile input[data-p="sex"]').count();
+  ok('4b. адмін бачить перемикач статі', sexInputs === 2, 'input: ' + sexInputs);
+  ok('4b. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 5. Запобіжник: зміна статі через ІМПОРТ відчіпляє чужий план ----
+   Стать в акаунті не редагується, але повний імпорт резервної копії
+   може принести іншу стать. Тоді активний план чужої статі має
+   відчепитись — це робить detachPlanIfForeign у Store-збереженні. */
 {
   const { ctx, p, errs } = await open(
     Object.assign({}, FEMALE, { activePlan: { programId: 'women4', days: 4 }, programId: 'women4', daysPerWeek: 4 }));
 
   await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
-  await p.locator('.seg__item:has(input[data-p="sex"][value="male"]) span').first().click();
+  /* Емуляція імпорту: пряме збереження нової статі, як робить applyImport. */
+  await p.evaluate(async () => { await window.Store.saveProfile({ sex: 'male' }); });
   await p.waitForTimeout(1200);
 
-  const after = await p.evaluate(async () => {
-    const pr = await window.Store.getProfile();
-    return { sex: pr.sex, active: pr.activePlan };
-  });
-  ok('5. стать змінилась', after.sex === 'male', after.sex);
-  ok('5. жіночий план відчепився', !after.active, JSON.stringify(after.active));
+  const afterSex = await p.evaluate(async () => (await window.Store.getProfile()).sex);
+  ok('5. стать змінилась (імпорт)', afterSex === 'male', String(afterSex));
+
+  /* Головна гарантія: навіть якщо в профілі лишилось посилання на жіночий
+     план, він БІЛЬШЕ НЕ ПОДАЄТЬСЯ — гейт resolvePlan за статтю тримає. */
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1400);
+  const today = await p.locator('#today').innerText();
+  ok('5. «Сьогодні» не подає жіночий план чоловікові',
+     /План ще не обрано/.test(today) || !/PUSH\/PULL/.test(today), today.split('\n').slice(0,2).join(' | '));
 
   await p.goto('file://' + ROOT + '/programs.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);

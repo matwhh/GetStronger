@@ -441,6 +441,7 @@
   }
 
   const DOW = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+  const MON = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
 
   /** Понеділок того тижня, якому належить дата */
   function mondayOf(d) {
@@ -482,9 +483,25 @@
       cols += '<div class="heatmap__col">' + cells + '</div>';
     }
 
+    /* Ряд місяців над колонками: підпис зʼявляється там, де понеділок
+       колонки належить іншому місяцю, ніж у попередньої (або на першій). */
+    let months = '<span class="heatmap__months-pad" aria-hidden="true"></span>';
+    let prevMon = -1;
+    for (let w = 0; w < WEEKS; w++) {
+      const mon = new Date(start);
+      mon.setDate(start.getDate() + w * 7);
+      const m = mon.getMonth();
+      const show = (w === 0 || m !== prevMon);
+      prevMon = m;
+      months += '<span class="heatmap__month">' + (show ? MON[m] : '') + '</span>';
+    }
+
     const days = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
     return '<div class="heatmap" role="group" aria-label="Календар тренувань за ' + WEEKS + ' тижнів">' +
-             '<div class="heatmap__days" aria-hidden="true">' + days + '</div>' + cols +
+             '<div class="heatmap__months" aria-hidden="true">' + months + '</div>' +
+             '<div class="heatmap__grid">' +
+               '<div class="heatmap__days" aria-hidden="true">' + days + '</div>' + cols +
+             '</div>' +
            '</div>';
   }
 

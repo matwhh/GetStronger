@@ -161,22 +161,34 @@
     } catch (_) { return 3; }
   }
 
-  /** Ліниво оцінити минулі тижні (штрафи/бонуси). Раз на сесію сторінки. */
+  /**
+   * Дооцінити ВСІ пропущені тижні (штрафи за недобір / бонуси за чистий).
+   *
+   * Раніше клієнт крутив фіксоване вікно «2 тижні назад від сьогодні» —
+   * і в цьому були дві діри: (1) хто зникав на 3+ тижні, за старіші тижні
+   * штрафу не діставав; (2) вікно рахувалось від СЬОГОДНІ без прив'язки до
+   * дати вступу, тож той, хто приєднається в середині сезону, дістав би
+   * штраф за тижні ДО реєстрації.
+   *
+   * Тепер одна серверна RPC elo_catch_up: вона йде від першого запису
+   * людини в сезоні до сьогодні й оцінює кожен незакритий тиждень
+   * (ідемпотентно; тижні до вступу не чіпає — прив'язка до min(day) подій).
+   * Дросель — раз на добу: новий тиждень закривається лише в понеділок,
+   * тож частіше кликати нема сенсу, а щоденний виклик ловить свіжозакритий.
+   */
   async function evaluateWeeks() {
-    if (!available() || !window.EloCore) return;
-    const done = lsGet('ib.eloWeeks', {});
-    const now = new Date();
-    for (let back = 1; back <= 2; back++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - 7 * back);
-      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // понеділок
-      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-      if (done[key]) continue;
-      try {
-        const res = await window.Store.rpc('elo_evaluate_week', { p_week_start: key });
-        if (res && res.ok !== undefined) { done[key] = true; lsSet('ib.eloWeeks', done); }
-      } catch (_) { break; }
-    }
+    if (!available()) return;
+    const today = new Date();
+    const stamp = today.getFullYear() + '-' +
+      String(today.getMonth() + 1).padStart(2, '0') + '-' +
+      String(today.getDate()).padStart(2, '0');
+    /* ib.eloWeeks лишається тим самим ключем (його вже чистить вихід із
+       акаунта), але тепер тримає дату останнього прогону, а не мапу тижнів. */
+    if (lsGet('ib.eloWeeks', null) === stamp) return;
+    try {
+      const res = await window.Store.rpc('elo_catch_up', {});
+      if (res && res.ok) lsSet('ib.eloWeeks', stamp);
+    } catch (_) { /* офлайн або NOT_APPROVED — спробуємо наступного заходу */ }
   }
 
   /** Закрити минулий сезон, якщо ще не закритий (звіт + нагороди). */

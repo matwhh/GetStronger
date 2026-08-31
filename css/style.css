@@ -2072,30 +2072,51 @@ main:focus:not(:focus-visible) { outline: none; }
    3+ → найсвітліший акцент. Це те саме правило «статус яскравістю». */
 /* 12 тижнів × Пн…Нд. Клітинки — кнопки-перемикачі з числом місяця,
    як у календарі; 24px — щоб число читалось і день ловився пальцем */
-.heatmap { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 6px; }
-.heatmap__col { display: flex; flex-direction: column; gap: 3px; }
+/* Теплокарта тренувань — у стилі календаря внесків GitHub: пласкі
+   квадратики (без неоморфізму), заповнений день = акцент теми (--acc-bar,
+   тож фіолетова тема → фіолетові, зелена → зелені), і ряд назв місяців
+   згори. Розмір/крок/ширина підписів — на змінних, щоб мобільний варіант
+   лише перевизначав їх, а вирівнювання рахувалось само. */
+.heatmap {
+  --hm-cell: 30px;   /* сторона квадратика */
+  --hm-gap: 5px;     /* проміжок між квадратиками й колонками */
+  --hm-label: 28px;  /* ширина стовпця підписів Пн…Нд */
+  display: flex; flex-direction: column; gap: var(--hm-gap);
+  overflow-x: auto; padding-bottom: 6px;
+}
+.heatmap__grid { display: flex; gap: var(--hm-gap); }
+.heatmap__col { display: flex; flex-direction: column; gap: var(--hm-gap); }
 .heatmap__days {
-  display: flex; flex-direction: column; gap: 3px;
-  margin-right: 6px;
+  display: flex; flex-direction: column; gap: var(--hm-gap);
+  width: var(--hm-label); margin-right: 6px; flex: 0 0 auto;
 }
 .heatmap__days span {
-  height: 24px; line-height: 24px;
-  font-size: 0.68rem; color: var(--muted);
+  height: var(--hm-cell); line-height: var(--hm-cell);
+  font-size: 0.72rem; color: var(--muted);
+}
+/* Ряд місяців: перший слот-заглушка під ширину підписів днів, далі по
+   одному слоту на колонку; підпис може вільно виступати праворуч над
+   порожніми слотами — як на GitHub. */
+.heatmap__months { display: flex; }
+.heatmap__months-pad { width: var(--hm-label); margin-right: 6px; flex: 0 0 auto; }
+.heatmap__month {
+  width: var(--hm-cell); margin-right: var(--hm-gap); flex: 0 0 auto;
+  font-size: 0.7rem; color: var(--muted); white-space: nowrap;
 }
 .heatmap__cell {
-  width: 24px; height: 24px; border-radius: 5px;
-  border: 0; padding: 0;
+  width: var(--hm-cell); height: var(--hm-cell); border-radius: 6px;
+  border: 0; padding: 0; flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(var(--tint-rgb), 0.06);
+  background: rgba(var(--tint-rgb), 0.07);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   color: var(--muted);
   cursor: pointer;
-  transition: background var(--t-fast), transform var(--t-fast), color var(--t-fast);
+  transition: background var(--t-fast), color var(--t-fast);
 }
-button.heatmap__cell:hover { background: rgba(var(--tint-rgb), 0.14); color: var(--text); transform: scale(1.1); }
+button.heatmap__cell:hover { background: rgba(var(--tint-rgb), 0.16); color: var(--text); }
 button.heatmap__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 1px; }
-/* Позначений день: число має читатись на акцентній заливці */
+/* Позначений день: суцільна акцентна заливка теми, число читабельне */
 .heatmap__cell--on { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; }
 button.heatmap__cell--on:hover { background: var(--acc-ink); color: var(--on-acc); }
 .heatmap__cell--future {
@@ -3034,7 +3055,7 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
      ставав нечитабельним. Тепер це токен, і кожна схема дає своє. */
   background: var(--footer-bg);
 }
-.heatmap__cell { border-radius: 8px; box-shadow: var(--neo-inset-sm); }
+/* Пласко, без неоморфізму: жодних inset-тіней на клітинках. */
 /* Клітинка 32×32 з проміжком 4px дає крок 36px при нормі дотику 44.
    Клік по ній МИТТЄВО переписує журнал тренувань, тож промах коштує
    даних. Розширюємо саме зону дотику псевдоелементом — той самий прийом,
@@ -3054,7 +3075,7 @@ button.heatmap__cell::after {
  * --on-acc: у темній схемі смуга --acc-bar світла, тож текст на ній
  * темний; у світлій навпаки. Обидва напрямки дають ≥ 9:1.
  */
-.heatmap__cell--on { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; box-shadow: var(--acc-raised-xs); }
+.heatmap__cell--on { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; }
 
 :focus-visible {
   outline: 2px solid var(--acc-ink);
@@ -3148,14 +3169,11 @@ button.heatmap__cell::after {
      їх усі одразу. */
   :root { --ctl-h-sm: 44px; }
 
-  /* Клітинка теплокарти — кнопка, що ставить/знімає позначку тренування
-     в журналі. 24px із числом 9,9px читались і ловились однаково погано;
-     сітка й далі скролиться горизонтально, і це нормально. */
-  .heatmap { gap: 4px; }
-  .heatmap__col { gap: 4px; }
-  .heatmap__days { gap: 4px; }
-  .heatmap__days span { height: 32px; line-height: 32px; font-size: 0.75rem; }
-  .heatmap__cell { width: 32px; height: 32px; font-size: 0.74rem; }
+  /* Мобільний: більший квадратик під палець. Решта (крок, ширина
+     підписів, вирівнювання місяців) рахується з тих самих змінних. */
+  .heatmap { --hm-cell: 36px; --hm-label: 30px; }
+  .heatmap__cell { font-size: 0.8rem; }
+  .heatmap__days span { font-size: 0.78rem; }
 
   /* Текст, який НЕ дрібний шрифт, а самі дані: відсоток 1ПМ і повтори в
      клітинці періодизації, запас RIR, стан «сире/готове» біля продукту. */

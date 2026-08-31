@@ -115,6 +115,9 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
       <!-- Робочі ваги: історія по вправах (weightLog) -->
       <div id="jr-lifts" class="mt-3 reveal" data-d="2"></div>
 
+      <!-- Прогрес окремої вправи: графік по метриці, факти, історія -->
+      <div id="jr-exercise" class="mt-3 reveal" data-d="2"></div>
+
       <!-- Особисті рекорди: максимуми з weightLog, свіжі — з позначкою -->
       <div id="jr-prs" class="mt-3 reveal" data-d="2"></div>
 
@@ -185,6 +188,9 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
 <script defer src="js/progress-core.js"></script>
 <!-- Виконання плану тренувань/харчування у відсотках (чисте ядро) -->
 <script defer src="js/adherence-core.js"></script>
+<!-- Прогрес окремої вправи зі знімків сесій; 1ПМ бере js/onerm-core.js -->
+<script defer src="js/onerm-core.js"></script>
+<script defer src="js/exercise-core.js"></script>
 <script defer src="js/tracker-core.js"></script>
 <!-- Позначає нові факти побаченими для Forge Rating (App.stampRating) -->
 <script defer src="js/journal.js"></script>

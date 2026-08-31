@@ -28,6 +28,9 @@
     goal: null,      // ціль харчування — для коридора прогнозу на графіку
     period: 90,      // вибраний період графіка ваги, днів; 0 = весь час
     adhPeriod: 7,    // період карток «виконання плану», днів
+    exName: '',      // обрана вправа в «Прогресі вправи»; '' — ще не обрано
+    exMetric: 'kg',  // метрика її графіка: kg | vol | reps | e1rm
+    exPeriod: 90,    // період графіка вправи, днів; 0 = весь час
     view: 'overview',// 'overview' | 'history'
     hcalY: 0,        // рік/місяць календаря історії
     hcalM: 0,
@@ -735,6 +738,224 @@
               : '')) +
         '<p class="small muted mb-0" style="margin-top:12px">Свіжі зміни — вгорі. ' +
           'Провали на лініях — делоади.</p>' +
+      '</div>';
+  }
+
+
+  /* ------------------------------------------------------------------ */
+  /* Прогрес окремої вправи: графік по метриці + факти + історія         */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Джерело — знімки сесій (js/exercise-core.js). Кожна точка = реальне
+   * тренування, тому графік чесно порожній для вправ, яких ще не робили
+   * після релізу відмітки по підходах.
+   */
+
+  const EX_PERIODS = [
+    { days: 30,  label: '30д' },
+    { days: 90,  label: '90д' },
+    { days: 180, label: '6м' },
+    { days: 365, label: 'рік' },
+    { days: 0,   label: 'все' }
+  ];
+
+  /** Формат значення метрики під її одиниці */
+  function exVal(v, m) {
+    if (v === null || v === undefined) return '—';
+    const n = m.digits ? fmtNum.n(v, m.digits) : thou(v);
+    return n + (m.unit ? ' ' + m.unit : '');
+  }
+
+  /**
+   * Лінія з точками. Осі підписані, кожна точка має <title> із датою й
+   * повним розкладом підходів — це те, що замінює тултип без JS.
+   */
+  function exChartSvg(pts, metric) {
+    const EC = window.ExerciseCore;
+    const m = EC.METRICS.find(function (x) { return x.id === metric; });
+    const vals = pts.map(function (p) { return EC.valueOf(p, metric); });
+    if (!vals.length) return '';
+
+    const W = 640, H = 200, PAD = { l: 54, r: 10, t: 12, b: 26 };
+    const lo = Math.min.apply(null, vals);
+    const hi = Math.max.apply(null, vals);
+    /* Плаский ряд (усі значення однакові) не має нульової висоти:
+       малюємо його посередині, інакше лінія злипається з віссю. */
+    const span = (hi - lo) || Math.max(1, hi * 0.1);
+    const base = (hi === lo) ? lo - span / 2 : lo;
+    const px = function (i) {
+      return pts.length === 1
+        ? (PAD.l + (W - PAD.l - PAD.r) / 2)
+        : PAD.l + (W - PAD.l - PAD.r) * i / (pts.length - 1);
+    };
+    const py = function (v) {
+      return PAD.t + (H - PAD.t - PAD.b) * (1 - (v - base) / span);
+    };
+
+    const ticks = [lo, hi].map(function (v, i) {
+      if (i === 1 && hi === lo) return '';
+      const y = Math.round(py(v) * 10) / 10;
+      return '<line x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y +
+             '" stroke="rgba(var(--tint-rgb), 0.08)"/>' +
+             '<text x="' + (PAD.l - 6) + '" y="' + (y + 4) + '" text-anchor="end" ' +
+             'font-size="11" fill="var(--muted)">' + (m.digits ? fmtNum.n(v, m.digits) : thou(v)) + '</text>';
+    }).join('');
+
+    const line = pts.length > 1
+      ? '<path d="' + pts.map(function (p, i) {
+          return (i ? 'L' : 'M') + px(i).toFixed(1) + ' ' + py(EC.valueOf(p, metric)).toFixed(1);
+        }).join('') + '" fill="none" stroke="var(--acc-bar)" stroke-width="2.5" ' +
+        'stroke-linejoin="round" stroke-linecap="round"/>'
+      : '';
+
+    const dots = pts.map(function (p, i) {
+      const v = EC.valueOf(p, metric);
+      const parts = [dateLabel(dateOf(p.d)) + ': ' + exVal(v, m)];
+      parts.push(p.sets + ' × ' + (p.perSet ? fmtNum.n(p.perSet, 0) : '?') +
+                 (p.kg ? ' × ' + fmtNum.kg(p.kg) + ' кг' : ''));
+      return '<circle cx="' + px(i).toFixed(1) + '" cy="' + py(v).toFixed(1) + '" r="4" ' +
+             'fill="var(--acc-bar)"><title>' + esc(parts.join(' · ')) + '</title></circle>';
+    }).join('');
+
+    /* Підписи дат: перша, остання і, якщо влазить, середня. Більше на
+       640px злипається в кашу. */
+    const idx = pts.length > 2 ? [0, Math.floor((pts.length - 1) / 2), pts.length - 1] : [0, pts.length - 1];
+    const xlab = idx.filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (i) {
+      const anchor = i === 0 ? 'start' : (i === pts.length - 1 ? 'end' : 'middle');
+      return '<text x="' + px(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '" ' +
+             'font-size="10" fill="var(--muted)">' + esc(shortDate(pts[i].d)) + '</text>';
+    }).join('');
+
+    const axis = '<line x1="' + PAD.l + '" y1="' + (H - PAD.b) + '" x2="' + (W - PAD.r) +
+                 '" y2="' + (H - PAD.b) + '" stroke="rgba(var(--tint-rgb), 0.14)"/>';
+
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+             'aria-label="Прогрес: ' + esc(m.label) + ', ' + pts.length + ' тренувань">' +
+             ticks + axis + line + dots + xlab +
+           '</svg>';
+  }
+
+  /** '2026-08-31' → '31.08' */
+  function shortDate(k) { return k.slice(8, 10) + '.' + k.slice(5, 7); }
+
+  function renderExercise() {
+    const host = $('#jr-exercise');
+    const EC = window.ExerciseCore;
+    if (!host || !EC) return;
+
+    const names = EC.exerciseNames(state.sessionLog);
+
+    if (!names.length) {
+      host.innerHTML =
+        '<div class="card">' +
+          '<h2 style="margin:0">Прогрес вправи</h2>' +
+          '<p class="small mt-1 mb-0">Ще немає даних. Кожна точка графіка — ' +
+            'реальне тренування: позначайте підходи на сторінці ' +
+            '<a href="workout.html">«Тренування»</a>, і тут зʼявиться історія ' +
+            'кожної вправи — вага, обʼєм, повторення й оцінка разового максимуму.</p>' +
+        '</div>';
+      return;
+    }
+
+    /* Обрана вправа могла зникнути з плану — тоді беремо найсвіжішу */
+    const name = names.indexOf(state.exName) >= 0 ? state.exName : names[0];
+    const metric = EC.isMetric(state.exMetric) ? state.exMetric : 'kg';
+    const m = EC.METRICS.find(function (x) { return x.id === metric; });
+
+    const from = state.exPeriod
+      ? window.AdherenceCore.addDays(todayKey(), -(state.exPeriod - 1))
+      : '';
+    const pts = EC.series(state.sessionLog, name, from, todayKey());
+    const st = EC.stats(pts, metric);
+
+    const picker =
+      '<select class="select" id="ex-pick" aria-label="Обрати вправу">' +
+        names.map(function (n) {
+          return '<option value="' + esc(n) + '"' + (n === name ? ' selected' : '') + '>' + esc(n) + '</option>';
+        }).join('') +
+      '</select>';
+
+    const tabs = '<div class="seg" role="radiogroup" aria-label="Показник">' +
+      EC.METRICS.map(function (x) {
+        return '<label class="seg__item"><input type="radio" name="ex-metric" value="' + x.id + '"' +
+          (x.id === metric ? ' checked' : '') + '><span>' + esc(x.label) + '</span></label>';
+      }).join('') + '</div>';
+
+    const periods = '<div class="seg" role="radiogroup" aria-label="Період">' +
+      EX_PERIODS.map(function (pp) {
+        return '<label class="seg__item"><input type="radio" name="ex-period" value="' + pp.days + '"' +
+          (pp.days === state.exPeriod ? ' checked' : '') + '><span>' + pp.label + '</span></label>';
+      }).join('') + '</div>';
+
+    let body;
+    if (!st) {
+      /* Метрика незастосовна (планка не має ваги) або в періоді порожньо —
+         це різні речі, і сказати треба різне. */
+      const any = pts.length > 0;
+      body = '<p class="small muted mt-2 mb-0">' +
+        (any
+          ? 'Для цієї вправи показник «' + esc(m.label) + '» не рахується: ' +
+            'у ній не задано робочої ваги. Подивіться «Повтори».'
+          : 'За цей період тренувань із цією вправою не було. Візьміть ширший період.') +
+        '</p>';
+    } else {
+      const trend = EC.trend(pts, metric);
+      const TREND = { up: '↑ Росте', down: '↓ Знижується', flat: '→ Стабільно' };
+      const dTxt = st.delta === null
+        ? 'перший запис'
+        : (st.delta > 0 ? '+' : '') + (m.digits ? fmtNum.n(st.delta, m.digits) : thou(st.delta)) +
+          (m.unit ? ' ' + m.unit : '') +
+          (st.pct === null ? '' : ' (' + (st.pct > 0 ? '+' : '') + fmtNum.n(st.pct, 1) + '%)');
+
+      body =
+        '<div class="wchart mt-2">' + exChartSvg(st.points, metric) + '</div>' +
+        '<div class="kpis mt-2">' +
+          '<div class="kpi"><div class="kpi__val mono">' + exVal(st.current, m) + '</div>' +
+            '<p class="kpi__lbl">поточне · ' + esc(shortDate(st.currentDate)) + '</p></div>' +
+          '<div class="kpi"><div class="kpi__val mono">' + exVal(st.previous, m) + '</div>' +
+            '<p class="kpi__lbl">попереднє' + (st.previousDate ? ' · ' + esc(shortDate(st.previousDate)) : '') + '</p></div>' +
+          '<div class="kpi"><div class="kpi__val mono">' + esc(dTxt) + '</div>' +
+            '<p class="kpi__lbl">зміна</p></div>' +
+          '<div class="kpi"><div class="kpi__val mono">' + exVal(st.pr, m) +
+            (st.isPr ? ' <span class="chip chip--acc">PR</span>' : '') + '</div>' +
+            '<p class="kpi__lbl">рекорд · ' + esc(shortDate(st.prDate)) + '</p></div>' +
+        '</div>' +
+        (trend
+          ? '<p class="small mt-1" style="margin-bottom:0">Тренд за період: <b>' + TREND[trend] + '</b> ' +
+            '<span class="muted">(перша третина серії проти останньої).</span></p>'
+          : '') +
+
+        '<div class="table-wrap mt-2">' +
+          '<table class="tbl"><thead><tr>' +
+            '<th>Дата</th><th class="num">Вага</th><th class="num">Підходи</th>' +
+            '<th class="num">Повтори</th><th class="num">Обʼєм</th>' +
+          '</tr></thead><tbody>' +
+            st.points.slice(-10).reverse().map(function (p) {
+              return '<tr>' +
+                '<td data-l="Дата">' + esc(dateLabel(dateOf(p.d))) + '</td>' +
+                '<td class="num mono" data-l="Вага">' + (p.kg ? fmtNum.kg(p.kg) + ' кг' : '—') + '</td>' +
+                '<td class="num mono" data-l="Підходи">' + p.sets + '</td>' +
+                '<td class="num mono" data-l="Повтори">' + (p.reps || '—') + '</td>' +
+                '<td class="num mono" data-l="Обʼєм">' + (p.vol ? thou(p.vol) + ' кг' : '—') + '</td>' +
+              '</tr>';
+            }).join('') +
+          '</tbody></table>' +
+        '</div>' +
+        '<p class="small muted mt-1 mb-0">' + st.count + ' ' +
+          window.App.plural(st.count, 'тренування', 'тренування', 'тренувань') +
+          ' за період. Обʼєм і 1ПМ рахуються з ЗАКРИТИХ підходів і робочої ваги того дня.</p>';
+    }
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
+          '<h2 style="margin:0">Прогрес вправи</h2>' +
+          periods +
+        '</div>' +
+        '<div class="row mt-2" style="gap:10px;flex-wrap:wrap;align-items:center">' +
+          picker + tabs +
+        '</div>' +
+        body +
       '</div>';
   }
 
@@ -1497,6 +1718,7 @@
     keepFocus(renderTrain);
     renderLifts();
     renderPrs();
+    renderExercise();
     renderFood();
     renderTrackers();
 
@@ -1515,6 +1737,12 @@
 
       const vp = e.target.closest('input[name="adh-period"]');
       if (vp) { state.adhPeriod = Number(vp.value); renderAdherence(); return; }
+
+      const em = e.target.closest('input[name="ex-metric"]');
+      if (em) { state.exMetric = em.value; renderExercise(); return; }
+      const ep = e.target.closest('input[name="ex-period"]');
+      if (ep) { state.exPeriod = Number(ep.value); renderExercise(); return; }
+      if (e.target.id === 'ex-pick') { state.exName = e.target.value; renderExercise(); return; }
 
       const vw = e.target.closest('input[name="jr-view"]');
       if (vw) setView(vw.value);
@@ -1591,7 +1819,7 @@
       if (profile.weightLog && profile.weightLog !== state.weightLog) {
         state.weightLog = profile.weightLog;
         seasonize();
-        renderLifts(); renderPrs(); renderAdherence(); renderSummary();
+        renderLifts(); renderPrs(); renderExercise(); renderAdherence(); renderSummary();
         if (state.view === 'history') renderDay();
       }
       if (profile.mealLog && profile.mealLog !== state.mealLog) {

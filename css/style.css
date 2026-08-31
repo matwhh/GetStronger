@@ -767,48 +767,47 @@ a.card > .btn {
   display: flex; flex-direction: column;
   border-bottom: 1px solid var(--line);
 }
-/* Верхній рядок вправи: галочка + назва зі схемою + таймер */
+/* Верхній рядок вправи: назва зі схемою + таймер відпочинку */
 .tdy-ex__top { display: flex; align-items: center; gap: 10px; }
 .tdy-ex:last-child { border-bottom: 0; }
-.tdy-ex__main {
-  flex: 1;
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 13px 0;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+/* Кнопки підходів: одна на кожен запланований підхід. Тап по n-й закриває
+   1..n, повторний тап по останній закритій відкочує її. Розмір — під
+   палець у залі, стан — тим самим акцентом, що й решта контролів. */
+.tdy-ex__sets {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 0 10px;
 }
-/* Рідний чекбокс схований, але лишається у фокус-ланцюжку — стилізований
-   квадрат поруч малюється від його стану, і клавіатура працює як звикла */
-.tdy-ex__main input {
-  position: absolute; opacity: 0; width: 1px; height: 1px;
-}
-.tdy-ex__check {
-  flex: 0 0 auto;
-  width: 26px; height: 26px;
-  margin-top: 1px;
-  border-radius: 8px;
+.tdy-ex__set {
+  width: 44px; height: 44px;
+  border-radius: 10px;
   border: 1px solid var(--line-2);
   background: var(--field, var(--surface-2));
   box-shadow: var(--neo-inset, none);
-  position: relative;
-  transition: background var(--t-fast), border-color var(--t-fast);
+  color: var(--muted);
+  font: 600 0.85rem/1 var(--font-mono, monospace);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  -webkit-tap-highlight-color: transparent;
 }
-.tdy-ex__check::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: center / 14px no-repeat
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
-  opacity: 0; transition: opacity var(--t-fast);
-}
-.tdy-ex__main input:checked + .tdy-ex__check {
+.tdy-ex__set.is-on {
   background: var(--acc);
   border-color: transparent;
+  color: var(--on-acc, #fff);
   box-shadow: var(--acc-raised-xs, none);
 }
-.tdy-ex__main input:checked + .tdy-ex__check::after { opacity: 1; }
-.tdy-ex__main input:focus-visible + .tdy-ex__check {
-  outline: 2px solid var(--acc-ink);
-  outline-offset: 2px;
+.tdy-ex__set:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
+.tdy-ex__set:disabled { opacity: 0.55; cursor: default; }
+.tdy-ex__sets-num { font-size: 0.85rem; color: var(--muted); margin-left: 2px; }
+
+/* Великий відсоток виконання плану на «Прогресі» — головне число картки */
+.adh__pct {
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-top: 10px;
+  letter-spacing: -0.02em;
 }
 .tdy-ex__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .tdy-ex__name { font-weight: 600; line-height: 1.3; }
@@ -823,7 +822,7 @@ a.card > .btn {
    Відступ зліва вирівнює поле під текст назви, а не під галочку. */
 .tdy-ex__wt {
   display: flex; align-items: center; gap: 8px;
-  padding: 0 0 12px 34px;
+  padding: 0 0 12px;
 }
 .tdy-ex__wt-lbl { font-size: 0.8rem; color: var(--muted); }
 .tdy-ex__wt-unit { font-size: 0.85rem; color: var(--muted); }
@@ -1130,7 +1129,7 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 /* ---------- Трекери (етап 4) ---------- */
 
 /* Перемикач увімк/вимк. Прихований чекбокс лишається у фокус-ланцюжку —
-   той самий підхід, що .tdy-ex__check: видимий стан малює сусідній span. */
+   видимий стан малює сусідній span. */
 .switch { position: relative; flex: 0 0 auto; display: inline-flex; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .switch__track {
@@ -3349,14 +3348,14 @@ button.heatmap__cell::after {
     appearance: none; -webkit-appearance: none;
   }
 
-  /* Галочку виконання малює фон + SVG-картинка, а фони в друку вимкнені:
-     квадрат виходив однаковий і для зробленого, і для ні. Друкуємо порожню
-     рамку — її ставлять олівцем у залі, що для аркуша й правильніше. */
-  .tdy-ex__check {
+  /* Стан підходів малює фон, а фони в друку вимкнені: кнопки виходили
+     однакові для зробленого й ні. Друкуємо порожні рамки — їх ставлять
+     олівцем у залі, що для аркуша й правильніше. */
+  .tdy-ex__set {
     background: none !important;
     border: 1.4px solid #000 !important;
+    color: #000 !important;
   }
-  .tdy-ex__check::after { display: none !important; }
   .tdy-ex.is-done .tdy-ex__name { text-decoration: none; color: #000; }
 
   /* Компонування аркуша */

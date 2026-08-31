@@ -79,13 +79,19 @@
     const target = NC ? NC.targetFor(profile) : null;
 
     days.forEach(function (d) {
-      /* Тренування: сьогодні — лише повне; минулі дні — як є */
+      /*
+       * Тренування. Подається, щойно сесію ЗАВЕРШЕНО кнопкою (s.end) —
+       * незалежно від повноти: сервер нарахує пропорційно. Старі правила
+       * лишаються для сесій без end (легасі або незакритий день):
+       * сьогодні — лише повне, минулі дні — як є.
+       */
       const s = (profile.sessionLog || {})[d];
       if (s && Number(s.total) > 0) {
         const full = Number(s.done) >= Number(s.total);
-        if (d !== today || full) {
+        if (s.end || d !== today || full) {
           events.push({ kind: 'workout', key: 'workout:' + d, day: d,
-            payload: { done: Number(s.done) || 0, total: Number(s.total) || 0 },
+            payload: { done: Number(s.done) || 0, total: Number(s.total) || 0,
+                       doneSets: Number(s.doneSets) || 0, totalSets: Number(s.totalSets) || 0 },
             reason: 'Тренування' });
         }
       }

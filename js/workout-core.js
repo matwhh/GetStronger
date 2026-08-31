@@ -91,6 +91,140 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Підходи і тривалість                                                */
+  /* ------------------------------------------------------------------ */
+  /*
+   * З етапу «завершення тренування» done[i] — ЧИСЛО закритих підходів
+   * вправи i, а не булева галочка. Стара форма (true/false) читається як
+   * «всі підходи»/«жодного»: 'forge.today' живе один день, тож легасі
+   * зникає саме собою, а перехідний день не втрачає прогресу.
+   */
+
+  /* Ті самі числа, що в оцінці тривалості на «Моєму плані» (js/programs.js):
+     два джерела з різними константами показували б людині два різні часи. */
+  const SET_WORK_SEC = 40;
+  const WARMUP_MIN = 10;
+
+  /** Скільки підходів заплановано у вправі: ціле 0..10 */
+  function plannedSets(ex) {
+    const n = Math.round(Number(ex && ex.sets) || 0);
+    return Math.min(10, Math.max(0, n));
+  }
+
+  /** Закриті підходи з запису денного стану, обрізані до плану */
+  function doneSetsFor(entry, planned) {
+    if (entry === true) return planned;
+    const n = Math.round(Number(entry) || 0);
+    return Math.min(planned, Math.max(0, n));
+  }
+
+  /**
+   * Підсумок дня: закриті/усі підходи і закриті/усі вправи.
+   * Вправа «закрита», коли закриті ВСІ її підходи.
+   */
+  function dayStats(day, done) {
+    const d = Array.isArray(done) ? done : [];
+    const out = { doneSets: 0, totalSets: 0, doneEx: 0, totalEx: 0 };
+    ((day && day.exercises) || []).forEach(function (ex, i) {
+      const ps = plannedSets(ex);
+      if (!ps) return;
+      const ds = doneSetsFor(d[i], ps);
+      out.totalSets += ps;
+      out.doneSets += ds;
+      out.totalEx += 1;
+      if (ds >= ps) out.doneEx += 1;
+    });
+    return out;
+  }
+
+  /**
+   * Оцінка тривалості дня, хвилин. Без done — повний день, і формула
+   * ДЗЕРКАЛИТЬ js/programs.js → dayMinutes(): підхід + відпочинок за
+   * кожен підхід, мінус відпочинок після найостаннішого (після нього
+   * йдуть додому), плюс розминка. З done — залишок: та сама арифметика
+   * по НЕзакритих підходах; розминка рахується, лише поки не зроблено
+   * жодного підходу — хто вже працює, той уже розім'явся.
+   */
+  function dayMinutes(day, done) {
+    const d = Array.isArray(done) ? done : [];
+    let sec = 0, lastRest = 0, anyDone = false, anyLeft = false;
+    ((day && day.exercises) || []).forEach(function (ex, i) {
+      const ps = plannedSets(ex);
+      if (!ps) return;
+      const ds = doneSetsFor(d[i], ps);
+      if (ds > 0) anyDone = true;
+      const rem = ps - ds;
+      if (rem <= 0) return;
+      const rest = restSecFor(ex);
+      sec += rem * (SET_WORK_SEC + rest);
+      lastRest = rest;
+      anyLeft = true;
+    });
+    if (!anyLeft) return 0;
+    return Math.round(Math.max(0, sec - lastRest) / 60) + (anyDone ? 0 : WARMUP_MIN);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Тиждень і завершені сесії                                           */
+  /* ------------------------------------------------------------------ */
+
+  /** 'YYYY-MM-DD' + n днів, у локальному календарі */
+  function addDaysKey(key, n) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ''));
+    if (!m) return key;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + n);
+    return todayKey(d);
+  }
+
+  /**
+   * Понеділок тижня, якому належить дата. Локальний календар — той самий,
+   * яким підписані всі журнали профілю, і те саме визначення тижня
+   * (ISO, пн–нд), яким сервер ELO оцінює недобори: два різні «тижні»
+   * означали б, що блокування і штрафи розходяться.
+   */
+  function weekStartKey(key) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ''));
+    if (!m) return key;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return addDaysKey(key, -((d.getDay() + 6) % 7));
+  }
+
+  /** Запис сесії за дату, або null */
+  function sessionFor(profile, key) {
+    const s = profile && profile.sessionLog && profile.sessionLog[key];
+    return (s && typeof s === 'object') ? s : null;
+  }
+
+  /** Сьогоднішня ЗАВЕРШЕНА сесія (кнопкою), або null */
+  function completedToday(profile, key) {
+    const s = sessionFor(profile, key);
+    return (s && s.end) ? s : null;
+  }
+
+  /**
+   * Завершені цього тижня дні АКТИВНОГО плану: {dayIdx: 'YYYY-MM-DD'}.
+   * Джерело — sessionLog у профілі, тому блокування переживає refresh,
+   * повторний вхід і зміну пристрою, а нового тижня чекає саме собою:
+   * у понеділок вікно пошуку зсувається — і все знову доступне.
+   */
+  function completedThisWeek(profile, key) {
+    const out = {};
+    const log = profile && profile.sessionLog;
+    if (!log || typeof log !== 'object') return out;
+    const mine = activeKey(profile);
+    const ws = weekStartKey(key);
+    const we = addDaysKey(ws, 6);
+    Object.keys(log).forEach(function (d) {
+      if (d < ws || d > we) return;
+      const s = log[d];
+      if (!s || typeof s !== 'object' || !s.end) return;
+      if (planKey(s.programId, s.days) !== mine) return;
+      out[Number(s.dayIdx) || 0] = d;
+    });
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Денний стан                                                         */
   /* ------------------------------------------------------------------ */
 
@@ -114,7 +248,9 @@
     if (mine && raw.date === key) {
       return {
         dayIdx: clampDay(raw.dayIdx, planLen),
-        done: Array.isArray(raw.done) ? raw.done.map(Boolean) : [],
+        /* Значення лишаються як є: числа підходів (нова форма) або булеві
+           (легасі-день) — їх нормалізує doneSetsFor у момент читання. */
+        done: Array.isArray(raw.done) ? raw.done.slice() : [],
         fresh: false
       };
     }
@@ -144,11 +280,6 @@
     } catch (_) { /* показ важливіший за памʼять */ }
   }
 
-  /** Скільки вправ закрито — з масиву галочок */
-  function doneCount(done) {
-    return (Array.isArray(done) ? done : []).filter(Boolean).length;
-  }
-
   window.WorkoutCore = {
     LS_TODAY: LS_TODAY,
     todayKey: todayKey,
@@ -159,6 +290,14 @@
     restSecFor: restSecFor,
     readDay: readDay,
     writeDay: writeDay,
-    doneCount: doneCount
+    plannedSets: plannedSets,
+    doneSetsFor: doneSetsFor,
+    dayStats: dayStats,
+    dayMinutes: dayMinutes,
+    addDaysKey: addDaysKey,
+    weekStartKey: weekStartKey,
+    sessionFor: sessionFor,
+    completedToday: completedToday,
+    completedThisWeek: completedThisWeek
   };
 })();

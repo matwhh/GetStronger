@@ -132,3 +132,52 @@ describe('ELO: бонуси і стелі дня', () => {
     assert.equal(E.applyDayCaps([5, -3], CFG), 2);
   });
 });
+
+/* =========================================================================
+   Пропорційне тренування (етап «завершення тренування»).
+   Дзеркало серверної db/elo-proportional.sql: earned = base × done/total,
+   БЕЗ драбини; частка по підходах, коли запис їх має.
+   ========================================================================= */
+describe('ELO: пропорційне тренування', () => {
+  const base = (days) =>
+    CFG.weeklyBudget * CFG.categoryShare * CFG.weights.training / days;
+
+  it('лінійно за спекою: 0/1/5/15/29/30 із 30 (6 днів)', () => {
+    const d = (done) =>
+      E.actionDelta('workout', { done, total: 30 }, CFG, { plannedDays: 6 }).delta;
+    for (const done of [0, 1, 5, 15, 29, 30]) {
+      assert.equal(d(done), Math.round(base(6) * done / 30), 'done=' + done);
+    }
+  });
+
+  it('quality — сира частка, без сходинок драбини', () => {
+    const q = (done, total) =>
+      E.actionDelta('workout', { done, total }, CFG, { plannedDays: 4 }).quality;
+    assert.equal(q(7, 14), 0.5);
+    assert.equal(q(0, 14), 0);
+    assert.equal(q(14, 14), 1);
+  });
+
+  it('підходи точніші за вправи: частка береться з doneSets/totalSets', () => {
+    const r = E.actionDelta('workout',
+      { done: 3, total: 8, doneSets: 10, totalSets: 20 }, CFG, { plannedDays: 3 });
+    assert.equal(r.quality, 0.5);
+    assert.equal(r.delta, Math.round(base(3) * 0.5));
+  });
+
+  it('накрутка понад план клампиться: doneSets=99 із 20 — не більше повної', () => {
+    const cheat = E.actionDelta('workout',
+      { done: 8, total: 8, doneSets: 99, totalSets: 20 }, CFG, { plannedDays: 3 });
+    const full = E.actionDelta('workout',
+      { done: 8, total: 8, doneSets: 20, totalSets: 20 }, CFG, { plannedDays: 3 });
+    assert.equal(cheat.delta, full.delta);
+    assert.equal(cheat.quality, 1);
+  });
+
+  it('grace week: тренування коштує нуль, як і раніше', () => {
+    const g = E.actionDelta('workout',
+      { done: 20, total: 20, doneSets: 60, totalSets: 60 }, CFG,
+      { plannedDays: 6, grace: true });
+    assert.equal(g.delta, 0);
+  });
+});

@@ -1143,6 +1143,33 @@
               if (sets !== null) out[d].sets = Math.round(sets);
               if (reps !== null) out[d].reps = Math.round(reps);
               if (vol !== null) out[d].vol = Math.round(vol);
+              /* Етап «завершення тренування»: закриті/планові підходи,
+                 позначка завершення і знімок вправ. Без них відновлений
+                 із файлу профіль втрачав би блокування тижня і сировину
+                 аналітики — форма та сама, що пише history-core. */
+              const dSets = finite(s.doneSets, 0, 300);
+              const tSets = finite(s.totalSets, 0, 300);
+              if (dSets !== null) out[d].doneSets = Math.round(dSets);
+              if (tSets !== null) out[d].totalSets = Math.round(tSets);
+              if (s.end) out[d].end = 1;
+              if (Array.isArray(s.ex)) {
+                const rows = [];
+                for (let j = 0; j < s.ex.length && rows.length < 30; j++) {
+                  const e = s.ex[j];
+                  if (!isPlain(e)) continue;
+                  const nEx = str(e.n, 60);
+                  const ps = finite(e.ps, 1, 10);
+                  if (!nEx || ps === null) continue;
+                  const row = { n: nEx, ps: Math.round(ps),
+                    ds: Math.round(Math.min(finite(e.ds, 0, 10) || 0, ps)) };
+                  const kg = finite(e.kg, 0, 500);
+                  if (kg !== null && kg > 0) row.kg = kg;
+                  const r = finite(e.r, 0, 50);
+                  if (r !== null && r > 0) row.r = r;
+                  rows.push(row);
+                }
+                if (rows.length) out[d].ex = rows;
+              }
             }
             return accept(k, out);
           }

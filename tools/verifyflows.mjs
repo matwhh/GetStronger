@@ -54,7 +54,7 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
  await p.evaluate(async s=>{await window.Store.saveProfile(s);},SEED);
  await p.waitForTimeout(400);
  await p.goto('file:///root/work/forgesite/workout.html'); await p.waitForTimeout(1100);
- await p.locator('.tdy-ex__main').first().click(); await p.waitForTimeout(2200);
+ await p.locator('.tdy-ex [data-set-n="1"]').first().click(); await p.waitForTimeout(2200);
  const sl=await p.evaluate(async()=>{const pr=await window.Store.getProfile();return pr.sessionLog;});
  ok('Тренування: галочка пише сесію в історію', Object.keys(sl||{}).length>0, JSON.stringify(sl));
  const inp=p.locator('[data-wt]').first(); const nm=await inp.getAttribute('data-wt');

@@ -140,7 +140,7 @@ ok('5. ціль калорій рахується', !!(await p.evaluate(async()=
 // 6. Тренування
 await p.goto(U('workout.html')); await p.waitForTimeout(1100);
 ok('6. сторінка тренування показує список вправ', await p.locator('.tdy-ex').count()>0);
-await tap(p.locator('.tdy-ex__main').first()); await p.waitForTimeout(2200);
+await tap(p.locator('.tdy-ex [data-set-n="1"]').first()); await p.waitForTimeout(2200);
 const sess=await p.evaluate(async()=>(await window.Store.getProfile()).sessionLog);
 ok('6. галочка потрапила в історію', Object.keys(sess||{}).length>0);
 const wt2=p.locator('[data-wt]').first();

@@ -74,7 +74,8 @@ const b = await chromium.launch();
   const s = await p.evaluate(() => ({
     floor: window.SeasonCore.floorKey(),
     overview: (document.querySelector('#jr-overview') || {}).innerText || '',
-    vol: (document.querySelector('#jr-volume .chip') || {}).textContent || '',
+    adh: (document.querySelector('#jr-adherence') || {}).innerText || '',
+    adhPeriods: document.querySelectorAll('#jr-adherence input[name="adh-period"]').length,
     prs: (document.querySelector('#jr-prs') || {}).innerText || ''
   }));
   ok('межа періоду статистики = 2026-09-01', s.floor === '2026-09-01', s.floor);
@@ -84,8 +85,12 @@ const b = await chromium.launch();
      /Статистика з 1 вересня 2026/.test(s.overview),
      (s.overview.split('\n')[1] || '').slice(0, 60));
   ok('в огляді немає слова «сезон»', !/[Сс]езон/.test(s.overview));
-  ok('обʼєм рахує лише період (28 000 із 53 000)',
-     s.vol.includes('28 000') && !s.vol.includes('53'), s.vol);
+  /* Замість графіка тоннажу — виконання плану: дві картки + 7 періодів */
+  ok('блок виконання плану: обидві картки на місці',
+     /План тренувань/.test(s.adh) && /План харчування/.test(s.adh),
+     s.adh.replace(/\n+/g, ' | ').slice(0, 90));
+  ok('перемикач періодів: День…Рік (7 опцій)', s.adhPeriods === 7, String(s.adhPeriods));
+  ok('графіка тоннажу більше немає', !/Тренувальний обʼєм/.test(s.adh + s.overview));
   ok('PR лише за період: Жим є, давніше Присідання — ні',
      s.prs.includes('Жим лежачи') && !s.prs.includes('Присідання'));
 
@@ -175,7 +180,7 @@ for (const [when, expect] of [['2026-08-31T23:59:59', null], ['2026-09-01T00:00:
   await p.waitForTimeout(900);
   const before = await p.evaluate(() =>
     Object.keys(JSON.parse(localStorage.getItem('ib.profile')).sessionLog).length);
-  const cb = await p.$('input[data-ex="0"]');
+  const cb = await p.$('[data-set-ex="0"][data-set-n="1"]');
   if (cb) {
     await cb.click({ force: true });
     await p.waitForTimeout(200);

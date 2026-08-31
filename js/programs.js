@@ -117,11 +117,19 @@
     return r === '—' ? 20 : (r === '3 хв' ? 180 : 120);
   }
 
-  /** Оцінка тривалості одного дня, хвилин */
+  /**
+   * Оцінка тривалості одного дня, хвилин.
+   *
+   * Джерело правди — WorkoutCore.dayMinutes: те саме число бачить людина
+   * і тут, і на екрані тренування як «залишилось». Локальна формула
+   * лишається запасним виходом на випадок, якщо ядро не завантажилось,
+   * і зобовʼязана давати ті самі числа (спільні константи).
+   */
   function dayMinutes(day) {
+    if (window.WorkoutCore && window.WorkoutCore.dayMinutes) {
+      return window.WorkoutCore.dayMinutes(day);
+    }
     // Після ОСТАННЬОГО підходу дня ніхто не відпочиває — він іде додому.
-    // Раніше відпочинок додавався до кожного підходу без винятку, і кожен
-    // день систематично завищувався на 2–3 хвилини.
     let sec = 0, lastRest = 0;
     day.exercises.forEach(function (ex) {
       const sets = Number(ex.sets) || 0;
@@ -1180,7 +1188,10 @@
           '<span>' +
             '<h3>' + esc(day.title) + '</h3>' +
             '<span class="small muted">' + esc(day.focus) + ' · ' + day.exercises.length + ' вправ · ' +
-              day.exercises.reduce(function (s, e) { return s + (Number(e.sets) || 0); }, 0) + ' підходів</span>' +
+              day.exercises.reduce(function (s, e) { return s + (Number(e.sets) || 0); }, 0) + ' підходів' +
+              /* Тривалість КОЖНОГО дня, не середня по програмі: дні різні,
+                 і людина планує час під конкретний день. */
+              ' · ~' + dayMinutes(day) + ' хв</span>' +
           '</span>' +
           '<svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>' +
         '</button>' +

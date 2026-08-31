@@ -52,7 +52,7 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   const before = await p.locator('#tdy-training').innerText();
   await tap(p.locator('#tdy-training'));
   await p.waitForTimeout(1300);
-  await tap(p.locator('#workout .tdy-ex__main').first());
+  await tap(p.locator('#workout .tdy-ex [data-set-n="1"]').first());
   await p.waitForTimeout(2400);
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
@@ -157,7 +157,7 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   const { ctx, p, errs } = await open();
   await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
-  await tap(p.locator('#workout .tdy-ex__main').first());
+  await tap(p.locator('#workout .tdy-ex [data-set-n="1"]').first());
   await p.waitForTimeout(2400);
   const wt = p.locator('[data-wt]').first();
   const nm = await wt.getAttribute('data-wt');

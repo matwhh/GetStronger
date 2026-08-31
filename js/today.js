@@ -155,10 +155,16 @@
     }
 
     const day = state.plan[state.dayIdx];
-    const total = day.exercises.length;
-    const done = WC.doneCount(state.done);
-    const finished = total > 0 && done >= total;
-    const started = done > 0;
+    const st = WC.dayStats(day, state.done);
+    const total = st.totalSets;
+    const done = st.doneSets;
+    const eta = WC.dayMinutes(day, state.done);
+    /* «Виконано» тепер означає ЗАВЕРШЕНО кнопкою, а не всі галочки:
+       завершити можна і 5/10 — день однаково використаний до понеділка. */
+    const ended = WC.completedToday(state.profile, state.todayKey) ||
+                  WC.completedThisWeek(state.profile, state.todayKey)[state.dayIdx];
+    const finished = Boolean(ended);
+    const started = !finished && done > 0;
 
     return '' +
       /* Уся картка — посилання: у залі ціль дотику має бути картка, а не
@@ -180,13 +186,13 @@
         (day.focus ? '<span class="tdy-entry__focus">' + esc(day.focus) + '</span>' : '') +
 
         '<span class="tdy-entry__status">' +
-          (finished ? 'Виконано — ' + total + ' ' + plural(total, 'вправа', 'вправи', 'вправ')
-            : started ? 'Виконано ' + done + ' з ' + total
-            : total + ' ' + plural(total, 'вправа', 'вправи', 'вправ') + ' · ще не розпочато') +
+          (finished ? 'Завершено — ' + done + ' з ' + total + ' підходів · знову з понеділка'
+            : started ? 'Виконано ' + done + ' з ' + total + ' підходів · ≈' + eta + ' хв залишилось'
+            : st.totalEx + ' ' + plural(st.totalEx, 'вправа', 'вправи', 'вправ') + ' · ≈' + eta + ' хв · ще не розпочато') +
         '</span>' +
 
         '<span class="vol" style="margin-top:8px"><span class="vol__bar">' +
-          '<i id="tdy-bar" style="width:' + (total ? Math.round(done / total * 100) : 0) + '%"></i>' +
+          '<i id="tdy-bar" style="width:' + (finished ? 100 : total ? Math.round(done / total * 100) : 0) + '%"></i>' +
         '</span></span>' +
 
         '<span class="tdy-entry__cta">' +
@@ -656,12 +662,25 @@
       });
     }
 
+    /* Свіжий день: підказаний день міг бути завершений цього тижня —
+       тоді картка-вхід пропонує перший ще доступний (як на тренуванні). */
+    function adjustFreshDay(d) {
+      if (!d.fresh || !state.plan || !WC.completedThisWeek) return d.dayIdx;
+      if (WC.completedToday(state.profile, state.todayKey)) return d.dayIdx;
+      const week = WC.completedThisWeek(state.profile, state.todayKey);
+      for (let k = 0; k < state.plan.length; k++) {
+        const idx = (d.dayIdx + k) % state.plan.length;
+        if (!week[idx]) return idx;
+      }
+      return d.dayIdx;
+    }
+
     const resolved = WC && WC.resolvePlan(state.profile);
     if (resolved) {
       state.program = resolved.program;
       state.plan = resolved.plan;
       const d = WC.readDay(state.profile, state.todayKey, state.plan.length);
-      state.dayIdx = d.dayIdx;
+      state.dayIdx = adjustFreshDay(d);
       state.done = d.done;
     }
 
@@ -674,7 +693,7 @@
         state.todayKey = localDateKey();
         if (state.plan && state.plan.length) {
           const nd = WC.readDay(state.profile, state.todayKey, state.plan.length);
-          state.dayIdx = nd.dayIdx;
+          state.dayIdx = adjustFreshDay(nd);
           state.done = nd.done;
         }
         if (!fieldBusy()) render();
@@ -730,7 +749,7 @@
            ставлять на сторінці тренування, і головна має показувати
            СВІЖИЙ прогрес, коли на неї повертаються. */
         const d = WC.readDay(state.profile, state.todayKey, r.plan.length);
-        state.dayIdx = d.dayIdx;
+        state.dayIdx = adjustFreshDay(d);
         state.done = d.done;
       }
       if (window.TrackerCore) {

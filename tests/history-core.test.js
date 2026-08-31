@@ -135,3 +135,49 @@ describe('mealLog: закриття дня', () => {
     assert.equal(out[1].d, '2026-08-16');
   });
 });
+
+/* =========================================================================
+   Етап «завершення тренування»: нові поля запису сесії.
+   ========================================================================= */
+describe('history-core: сесія з підходами і завершенням', () => {
+  it('doneSets/totalSets/end/ex проходять і санітизуються', () => {
+    const log = H.upsertSession({}, '2026-09-01', {
+      programId: 'ppl', days: 6, dayIdx: 2, title: 'Pull', done: 3, total: 5,
+      doneSets: 9, totalSets: 15, end: 1,
+      ex: [
+        { n: 'Тяга', ds: 4, ps: 4, kg: 90, r: 7 },
+        { n: 'Підйом', ds: 99, ps: 3, kg: 9999, r: -2 },     // сміття → кламп/відкидання
+        { n: '', ds: 2, ps: 2 },                              // без назви — геть
+        { n: 'Планка', ds: 1, ps: 2 }                         // без ваги — ок
+      ]
+    });
+    const s = log['2026-09-01'];
+    assert.equal(s.doneSets, 9);
+    assert.equal(s.totalSets, 15);
+    assert.equal(s.end, 1);
+    assert.equal(s.ex.length, 3);                 // порожня назва відкинута
+    assert.equal(s.ex[0].kg, 90);
+    assert.equal(s.ex[1].ds, 10);                 // кламп 0..10
+    assert.equal(s.ex[1].kg, undefined);          // 9999 не вага
+    assert.equal(s.ex[1].r, undefined);           // відʼємні повтори — геть
+    assert.equal(s.ex[2].kg, undefined);
+  });
+
+  it('end не знімається пізнішим дописом без end', () => {
+    let log = H.upsertSession({}, '2026-09-01',
+      { programId: 'p', days: 3, dayIdx: 0, done: 2, total: 4, end: 1 });
+    log = H.upsertSession(log, '2026-09-01',
+      { programId: 'p', days: 3, dayIdx: 0, done: 3, total: 4 });
+    assert.equal(log['2026-09-01'].end, 1);
+  });
+
+  it('старі записи без нових полів лишаються валідними', () => {
+    const log = H.upsertSession({}, '2026-09-02',
+      { programId: 'p', days: 3, dayIdx: 1, done: 4, total: 4 });
+    const s = log['2026-09-02'];
+    assert.equal(s.done, 4);
+    assert.equal(s.end, undefined);
+    assert.equal(s.ex, undefined);
+    assert.equal(s.doneSets, undefined);
+  });
+});

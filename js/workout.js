@@ -22,7 +22,7 @@
 (function () {
   'use strict';
 
-  const { $, esc, toast, fmtNum } = window.App;
+  const { $, esc, toast, fmtNum, dateLabel } = window.App;
   const WC = window.WorkoutCore;
 
   const state = {
@@ -115,6 +115,25 @@
     scheduleSessionLog();
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Стан завершення                                                     */
+  /* ------------------------------------------------------------------ */
+
+  /** Сьогоднішня сесія вже закрита кнопкою (будь-який день плану) */
+  function endedToday() {
+    return Boolean(WC.completedToday(state.profile, state.todayKey));
+  }
+
+  /** Обраний день плану вже завершено цього тижня → дата, інакше null */
+  function endedThisWeek(dayIdx) {
+    return WC.completedThisWeek(state.profile, state.todayKey)[dayIdx] || null;
+  }
+
+  /** Чи можна зараз працювати з обраним днем */
+  function locked() {
+    return endedToday() || Boolean(endedThisWeek(state.dayIdx));
+  }
+
   /*
    * Сесія дня — у профіль (sessionLog): який день програми робили і
    * скільки вправ закрито. Це вже ІСТОРІЯ, тому вона їде в профіль, а не
@@ -142,50 +161,107 @@
    * рахуються в підходи. Це оцінка за схемою дня, не ваги кожного
    * підходу — тому сторінка прогресу підписує її «≈».
    */
+  /*
+   * Факти рахуються ПО ПІДХОДАХ: закрито 2 з 4 підходів жиму — у тоннаж
+   * і повторення йдуть саме два. Вправа вважається закритою, лише коли
+   * закриті всі її підходи (це число їде в done/total для сумісності зі
+   * старою формою запису і серверною перевіркою «мінімум 3 вправи»).
+   */
   function sessionFacts(day, done, weights) {
     let sets = 0, reps = 0, vol = 0;
-    day.exercises.forEach(function (ex, i) {
-      if (!done[i]) return;
-      const s = Number(ex.sets) || 0;
-      const r = repMid(ex.reps);
-      const w = Number(weights && weights[ex.name]);
-      sets += s;
-      reps += s * r;
-      if (Number.isFinite(w) && w > 0) vol += s * r * w;
+    const ex = [];
+    day.exercises.forEach(function (e, i) {
+      const ps = WC.plannedSets(e);
+      if (!ps) return;
+      const ds = WC.doneSetsFor(done[i], ps);
+      const r = repMid(e.reps);
+      const w = Number(weights && weights[e.name]);
+      sets += ds;
+      reps += ds * r;
+      if (ds > 0 && Number.isFinite(w) && w > 0) vol += ds * r * w;
+      const row = { n: e.name, ds: ds, ps: ps };
+      if (Number.isFinite(w) && w > 0) row.kg = w;
+      if (r > 0) row.r = r;
+      ex.push(row);
     });
-    return { sets: sets, reps: Math.round(reps), vol: Math.round(vol) };
+    return { sets: sets, reps: Math.round(reps), vol: Math.round(vol), ex: ex };
+  }
+
+  /** Повний запис сесії за поточним станом; end=true — закрито кнопкою */
+  function sessionRecord(end) {
+    const day = state.plan[state.dayIdx];
+    const a = state.profile.activePlan || {};
+    const st = WC.dayStats(day, state.done);
+    const facts = sessionFacts(day, state.done, state.profile.weights);
+    const now = Date.now();
+    const rec = {
+      programId: a.programId,
+      days: Number(a.days) || 0,
+      dayIdx: state.dayIdx,
+      title: day.title || ('День ' + (state.dayIdx + 1)),
+      done: st.doneEx,
+      total: st.totalEx,
+      doneSets: st.doneSets,
+      totalSets: st.totalSets,
+      t0: now,   // upsertSession лишає найперший t0 — початок сесії
+      t1: now,
+      sets: facts.sets,
+      reps: facts.reps,
+      vol: facts.vol,
+      ex: facts.ex
+    };
+    if (end) rec.end = 1;
+    return rec;
   }
 
   function scheduleSessionLog() {
     if (!state.plan || !window.HistoryCore) return;
-    const done = WC.doneCount(state.done);
-    if (!done) return;   // порожній день — не сесія
+    if (endedToday()) return;   // закриту сесію пізніші дотики не переписують
+    const st = WC.dayStats(state.plan[state.dayIdx], state.done);
+    if (!st.doneSets) return;   // порожній день — не сесія
 
     clearTimeout(sessionTimer);
     sessionTimer = setTimeout(function () {
-      const day = state.plan[state.dayIdx];
-      const a = state.profile.activePlan || {};
-      const facts = sessionFacts(day, state.done, state.profile.weights);
-      const now = Date.now();
       const log = window.HistoryCore.upsertSession(
-        state.profile.sessionLog, state.todayKey, {
-          programId: a.programId,
-          days: Number(a.days) || 0,
-          dayIdx: state.dayIdx,
-          title: day.title || ('День ' + (state.dayIdx + 1)),
-          done: done,
-          total: day.exercises.length,
-          t0: now,   // upsertSession лишає найперший t0 — початок сесії
-          t1: now,
-          sets: facts.sets,
-          reps: facts.reps,
-          vol: facts.vol
-        });
+        state.profile.sessionLog, state.todayKey, sessionRecord(false));
       state.profile.sessionLog = log;
       saveOwn({ sessionLog: log }).catch(function (e) {
         if (!(e && e.queued)) console.warn('[workout] сесія не збереглась:', e.message);
       });
     }, 1500);
+  }
+
+  /*
+   * «Завершити тренування». Можна в БУДЬ-який момент — 0/10 теж
+   * завершення, лише чесно попереджене: день стане використаним до
+   * понеділка, а тижнева оцінка ELO порахує його за фактом виконання
+   * (нуль підходів для неї — те саме, що пропуск).
+   */
+  function finishWorkout() {
+    if (!state.plan || locked()) return;
+    const day = state.plan[state.dayIdx];
+    const st = WC.dayStats(day, state.done);
+
+    let msg = 'Завершити тренування?\n\nВиконано ' + st.doneSets + ' з ' +
+      st.totalSets + ' підходів (' + st.doneEx + '/' + st.totalEx + ' вправ).' +
+      '\nПовторити цей день можна буде з понеділка.';
+    if (!st.doneSets) {
+      msg = 'Завершити з нульовим виконанням?\n\nЖодного підходу не закрито: ' +
+        'день буде використано до понеділка, а тижнева оцінка порахує його ' +
+        'як пропуск.';
+    }
+    if (!confirm(msg)) return;
+
+    clearTimeout(sessionTimer);
+    const log = window.HistoryCore
+      ? window.HistoryCore.upsertSession(state.profile.sessionLog, state.todayKey, sessionRecord(true))
+      : state.profile.sessionLog;
+    state.profile.sessionLog = log;
+    WC.writeDay(state.profile, state.todayKey, state.dayIdx, state.done);
+    render();
+    saveOwn({ sessionLog: log }).catch(function (e) {
+      if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err');
+    });
   }
 
   /** Записати зміну трекера дня й одразу оновити екран */
@@ -262,31 +338,46 @@
    * за НАЗВОЮ вправи), тож правка тут — та сама правка, що на «Моєму
    * плані»: жодної другої системи ваг не зʼявляється.
    */
+  /**
+   * Рядок вправи. Замість однієї галочки — кнопка на КОЖЕН підхід:
+   * тап по n-му закриває підходи 1..n, повторний тап по останньому
+   * закритому відкочує його. Вправа «виконана», коли закриті всі.
+   */
   function exerciseRow(ex, i) {
     const w = state.profile.weights && state.profile.weights[ex.name];
-    const done = Boolean(state.done[i]);
+    const ps = WC.plannedSets(ex);
+    const ds = WC.doneSetsFor(state.done[i], ps);
+    const full = ps > 0 && ds >= ps;
     const sec = WC.restSecFor(ex);
+    const off = locked();
+
+    let pips = '';
+    for (let n = 1; n <= ps; n++) {
+      pips += '<button class="tdy-ex__set' + (n <= ds ? ' is-on' : '') + '" type="button" ' +
+        'data-set-ex="' + i + '" data-set-n="' + n + '"' + (off ? ' disabled' : '') +
+        ' aria-pressed="' + (n <= ds) + '" aria-label="Підхід ' + n + ': ' + esc(ex.name) + '">' +
+        n + '</button>';
+    }
 
     return '' +
-      '<li class="tdy-ex' + (done ? ' is-done' : '') + '">' +
+      '<li class="tdy-ex' + (full ? ' is-done' : '') + '">' +
         '<div class="tdy-ex__top">' +
-          '<label class="tdy-ex__main">' +
-            '<input type="checkbox" data-ex="' + i + '"' + (done ? ' checked' : '') +
-              ' aria-label="Виконано: ' + esc(ex.name) + '">' +
-            '<span class="tdy-ex__check" aria-hidden="true"></span>' +
-            '<span class="tdy-ex__body">' +
-              '<span class="tdy-ex__name">' + esc(ex.name) + '</span>' +
-              '<span class="tdy-ex__scheme mono">' +
-                esc(ex.sets) + '×' + esc(ex.reps) +
-                (ex.rir ? ' · RIR ' + esc(ex.rir) : '') +
-              '</span>' +
-              (ex.note ? '<span class="tdy-ex__note">' + esc(ex.note) + '</span>' : '') +
+          '<div class="tdy-ex__body" style="flex:1;padding:13px 0 6px">' +
+            '<span class="tdy-ex__name">' + esc(ex.name) + '</span>' +
+            '<span class="tdy-ex__scheme mono">' +
+              esc(ex.sets) + '×' + esc(ex.reps) +
+              (ex.rir ? ' · RIR ' + esc(ex.rir) : '') +
             '</span>' +
-          '</label>' +
+            (ex.note ? '<span class="tdy-ex__note">' + esc(ex.note) + '</span>' : '') +
+          '</div>' +
           '<button class="tdy-ex__rest btn btn--ghost btn--sm" type="button" ' +
                   'data-rest-sec="' + sec + '" data-rest-name="' + esc(ex.name) + '">' +
             Math.floor(sec / 60) + ' хв' +
           '</button>' +
+        '</div>' +
+        '<div class="tdy-ex__sets" role="group" aria-label="Підходи: ' + esc(ex.name) + '">' +
+          pips +
+          '<span class="tdy-ex__sets-num mono" data-sets-num="' + i + '">' + ds + '/' + ps + '</span>' +
         '</div>' +
         '<div class="tdy-ex__wt">' +
           '<label class="tdy-ex__wt-lbl" for="wk-w-' + i + '">Робоча вага</label>' +
@@ -313,10 +404,35 @@
       '</div>';
   }
 
+  /** Плашка стану завершеного дня (сьогодні чи раніше цього тижня) */
+  function endedNote() {
+    const weekDate = endedThisWeek(state.dayIdx);
+    if (weekDate) {
+      const s = WC.sessionFor(state.profile, weekDate) || {};
+      const dsTxt = Number.isFinite(Number(s.doneSets)) && Number.isFinite(Number(s.totalSets))
+        ? s.doneSets + ' з ' + s.totalSets + ' підходів'
+        : (s.done || 0) + ' з ' + (s.total || 0) + ' вправ';
+      return '<div class="notice mt-1" id="wk-ended">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+        '<div><b>Завершено' + (weekDate === state.todayKey ? ' сьогодні' : ' ' + dateLabel(weekDate)) + '</b> — ' +
+          dsTxt + '. Цей день знову доступний із понеділка.</div>' +
+      '</div>';
+    }
+    if (endedToday()) {
+      return '<div class="notice mt-1" id="wk-ended">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+        '<div><b>Сьогоднішнє тренування вже завершене.</b> Наступне можна ' +
+          'почати завтра — один день, одна сесія.</div>' +
+      '</div>';
+    }
+    return '';
+  }
+
   function workoutCard() {
     const day = state.plan[state.dayIdx];
-    const done = WC.doneCount(state.done);
-    const total = day.exercises.length;
+    const st = WC.dayStats(day, state.done);
+    const eta = WC.dayMinutes(day, state.done);
+    const off = locked();
 
     const tabs = state.plan.map(function (d, i) {
       return '<label class="seg__item">' +
@@ -332,21 +448,31 @@
           : '') +
 
         (day.focus ? '<p class="small muted" style="margin:12px 0 0">' + esc(day.focus) + '</p>' : '') +
+        endedNote() +
 
         '<div class="row mt-1" style="justify-content:space-between;align-items:center">' +
-          '<span class="small">Виконано <b class="mono" id="wk-done">' + done + '/' + total + '</b></span>' +
-          '<a class="small" href="plan.html">Редагувати план</a>' +
+          '<span class="small">Підходи <b class="mono" id="wk-done">' + st.doneSets + '/' + st.totalSets + '</b></span>' +
+          (off
+            ? '<a class="small" href="plan.html">Редагувати план</a>'
+            : '<span class="small muted mono" id="wk-eta">' +
+                (eta > 0 ? '≈' + eta + ' хв залишилось' : 'готово') + '</span>') +
         '</div>' +
         '<div class="vol" style="margin-top:6px"><span class="vol__bar">' +
-          '<i id="wk-bar" style="width:' + (total ? Math.round(done / total * 100) : 0) + '%"></i>' +
+          '<i id="wk-bar" style="width:' + (st.totalSets ? Math.round(st.doneSets / st.totalSets * 100) : 0) + '%"></i>' +
         '</span></div>' +
 
         '<ul class="tdy-list mt-2">' + day.exercises.map(exerciseRow).join('') + '</ul>' +
 
-        '<p class="small muted mb-0" style="margin-top:14px">' +
-          'Кнопка з хвилинами запускає таймер відпочинку. Галочки живуть до ' +
-          'кінця дня — це стан тренування, а не журнал.' +
-        '</p>' +
+        (off
+          ? ''
+          : '<button class="btn btn--primary mt-2" type="button" id="wk-finish" style="width:100%">' +
+              'Завершити тренування' +
+            '</button>' +
+            '<p class="small muted mb-0" style="margin-top:10px">' +
+              'Тапайте по номерах підходів у міру виконання — час, що залишився, ' +
+              'рахується сам. Завершити можна в будь-який момент; після цього ' +
+              'день стає використаним до понеділка.' +
+            '</p>') +
       '</div>';
   }
 
@@ -364,16 +490,22 @@
     host.innerHTML = state.plan ? (workoutCard() + moodCard()) : emptyCard();
   }
 
-  /** Оновити лише прогрес — щоб галочка не перемальовувала список під пальцем */
+  /**
+   * Оновити лише прогрес — щоб тап по підходу не перемальовував список під
+   * пальцем. Старого тоста «Тренування виконано 💪» тут більше немає
+   * навмисно: статус видно в лічильнику і в часі, а завершення дня — це
+   * тепер явна кнопка, а не побічний ефект останньої галочки.
+   */
   function refreshProgress() {
     const day = state.plan[state.dayIdx];
-    const done = WC.doneCount(state.done);
-    const total = day.exercises.length;
+    const st = WC.dayStats(day, state.done);
+    const eta = WC.dayMinutes(day, state.done);
     const bar = $('#wk-bar');
     const label = $('#wk-done');
-    if (bar) bar.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
-    if (label) label.textContent = done + '/' + total;
-    if (total && done === total) toast('Тренування виконано 💪', 'ok');
+    const etaEl = $('#wk-eta');
+    if (bar) bar.style.width = (st.totalSets ? Math.round(st.doneSets / st.totalSets * 100) : 0) + '%';
+    if (label) label.textContent = st.doneSets + '/' + st.totalSets;
+    if (etaEl) etaEl.textContent = eta > 0 ? '≈' + eta + ' хв залишилось' : 'готово';
   }
 
   /* ------------------------------------------------------------------ */
@@ -411,6 +543,15 @@
       const d = WC.readDay(state.profile, state.todayKey, state.plan.length);
       state.dayIdx = d.dayIdx;
       state.done = d.done;
+      /* Свіжий день: якщо підказаний день уже завершено цього тижня,
+         пропонуємо перший ще не завершений — а не замкнені двері. */
+      if (d.fresh && !endedToday()) {
+        const week = WC.completedThisWeek(state.profile, state.todayKey);
+        for (let k = 0; k < state.plan.length; k++) {
+          const idx = (d.dayIdx + k) % state.plan.length;
+          if (!week[idx]) { state.dayIdx = idx; break; }
+        }
+      }
     }
 
     render();
@@ -479,20 +620,21 @@
     host.addEventListener('change', function (e) {
       const day = e.target.closest('input[name="wk-day"]');
       if (day) {
-        state.dayIdx = WC.clampDay(Number(day.value), state.plan.length);
+        const want = WC.clampDay(Number(day.value), state.plan.length);
+        if (want === state.dayIdx) return;
+        /* Перемикання дня скидає закриті підходи — це усвідомлений крок,
+           а не випадковий тап по сусідній вкладці. */
+        const st = WC.dayStats(state.plan[state.dayIdx], state.done);
+        if (st.doneSets > 0 && !locked() &&
+            !confirm('Змінити день? Закриті підходи поточного (' +
+                     st.doneSets + ' з ' + st.totalSets + ') буде скинуто.')) {
+          render();
+          return;
+        }
+        state.dayIdx = want;
         state.done = [];
-        saveDayState();
+        if (!locked()) saveDayState();
         render();
-        return;
-      }
-
-      const ex = e.target.closest('input[data-ex]');
-      if (ex) {
-        const i = Number(ex.dataset.ex);
-        state.done[i] = ex.checked;
-        ex.closest('.tdy-ex').classList.toggle('is-done', ex.checked);
-        saveDayState();
-        refreshProgress();
         return;
       }
 
@@ -501,6 +643,34 @@
     });
 
     host.addEventListener('click', function (e) {
+      const pip = e.target.closest('[data-set-ex]');
+      if (pip && !pip.disabled && !locked()) {
+        const i = Number(pip.dataset.setEx);
+        const n = Number(pip.dataset.setN);
+        const ex = state.plan[state.dayIdx].exercises[i];
+        const ps = WC.plannedSets(ex);
+        const cur = WC.doneSetsFor(state.done[i], ps);
+        const next = (n === cur) ? n - 1 : n;   // тап по останньому закритому — відкат
+        state.done[i] = next;
+
+        /* Точкове оновлення рядка — без перемальовки списку під пальцем */
+        const row = pip.closest('.tdy-ex');
+        row.querySelectorAll('[data-set-ex]').forEach(function (b) {
+          const on = Number(b.dataset.setN) <= next;
+          b.classList.toggle('is-on', on);
+          b.setAttribute('aria-pressed', String(on));
+        });
+        row.classList.toggle('is-done', ps > 0 && next >= ps);
+        const num = row.querySelector('[data-sets-num]');
+        if (num) num.textContent = next + '/' + ps;
+
+        saveDayState();
+        refreshProgress();
+        return;
+      }
+
+      if (e.target.closest('#wk-finish')) { finishWorkout(); return; }
+
       const rest = e.target.closest('[data-rest-sec]');
       if (rest) {
         window.App.restTimer.start(Number(rest.dataset.restSec) || 120, rest.dataset.restName || '');

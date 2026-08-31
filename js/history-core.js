@@ -176,11 +176,39 @@
     const t1 = Number(session.t1) || 0;
     if (t0 > 0) out[d].t0 = t0;
     if (t1 > 0) out[d].t1 = Math.max(t1, t0);
-    ['sets', 'reps', 'vol'].forEach(function (k) {
+    ['sets', 'reps', 'vol', 'doneSets', 'totalSets'].forEach(function (k) {
       const v = Number(session[k]);
       if (Number.isFinite(v) && v >= 0) out[d][k] = Math.round(v);
       else if (Number.isFinite(Number(prev[k]))) out[d][k] = Number(prev[k]);
     });
+
+    /*
+     * Етап «завершення тренування» додає записові дві речі:
+     *
+     *   end — сесію закрито кнопкою. Ставиться раз і не знімається:
+     *         завершене тренування не «розвершується» пізнішим дописом.
+     *   ex  — знімок вправ у момент тренування: назва, закриті/планові
+     *         підходи, робоча вага дня і середина діапазону повторень.
+     *         Це сировина аналітики прогресу; пишеться санітизованою,
+     *         бо історію читатимуть графіки, а не тільки люди.
+     */
+    if (session.end || prev.end) out[d].end = 1;
+    const exSrc = Array.isArray(session.ex) ? session.ex
+                : Array.isArray(prev.ex) ? prev.ex : null;
+    if (exSrc) {
+      out[d].ex = exSrc.slice(0, 30).map(function (e) {
+        const row = {
+          n: String((e && e.n) || '').slice(0, 60),
+          ds: Math.min(10, Math.max(0, Math.round(Number(e && e.ds) || 0))),
+          ps: Math.min(10, Math.max(0, Math.round(Number(e && e.ps) || 0)))
+        };
+        const kg = Number(e && e.kg);
+        if (Number.isFinite(kg) && kg >= 0 && kg <= 500) row.kg = kg;
+        const r = Number(e && e.r);
+        if (Number.isFinite(r) && r > 0 && r <= 50) row.r = r;
+        return row;
+      }).filter(function (e) { return e.n && e.ps > 0; });
+    }
     return out;
   }
 

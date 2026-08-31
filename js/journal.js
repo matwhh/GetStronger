@@ -27,7 +27,7 @@
     daysTarget: 0,   // скільки днів на тиждень у обраному плані; 0 — план не обрано
     goal: null,      // ціль харчування — для коридора прогнозу на графіку
     period: 90,      // вибраний період графіка ваги, днів; 0 = весь час
-    volPeriod: 30,   // період графіка тренувального обʼєму, днів
+    adhPeriod: 7,    // період карток «виконання плану», днів
     view: 'overview',// 'overview' | 'history'
     hcalY: 0,        // рік/місяць календаря історії
     hcalM: 0,
@@ -906,138 +906,113 @@
   const WEEKDAYS = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
 
   /* ------------------------------------------------------------------ */
-  /* Тренувальний обʼєм: стовпчики + план проти факту + тренд            */
+  /* Виконання плану: тренування і харчування, у відсотках               */
   /* ------------------------------------------------------------------ */
   /*
-   * Джерело — знімки сесій (sessionLog.vol/sets/t0/t1), зняті в момент
-   * тренування. Старі сесії знімків не мають — графік це чесно каже
-   * замість вигаданих стовпчиків. Тоннаж — оцінка за схемою дня, тому
-   * всюди підписаний «≈».
+   * Замість графіка тоннажу (вирізаний: сирі кілограми за тиждень нічого
+   * не кажуть про дисципліну). Два числа, які відповідають на справжнє
+   * питання «чи тримаюсь я плану»:
+   *
+   *   тренування — Σ часток виконаних сесій / заплановані тренування
+   *     періоду (пропуск = нуль, частка = закриті/планові підходи);
+   *   харчування — середня якість закритих днів проти цілі дня, тими
+   *     самими tolerance-зонами, якими сервер рахує ELO.
+   *
+   * Математика — js/adherence-core.js (чисте ядро з тестами). Журнали
+   * беруться ПОВНІ (state.*), не сезонний зріз: періоди до року довші за
+   * сезон, а дисципліна — не сезонний рейтинг.
    */
 
-  const VOL_PERIODS = [
-    { days: 7,   label: '7д' },
-    { days: 30,  label: '30д' },
-    { days: 90,  label: '90д' },
-    { days: 365, label: 'рік' }
-  ];
-
-  function volChartSvg(vb) {
-    const bs = vb.buckets;
-    if (!bs.some(function (b) { return b.hasVol; })) return '';
-
-    const W = 640, H = 190, PAD = { l: 52, r: 8, t: 10, b: 24 };
-    const max = Math.max.apply(null, bs.map(function (b) { return b.vol; }).concat([1]));
-    const bw = (W - PAD.l - PAD.r) / bs.length;
-    const py = function (v) { return PAD.t + (H - PAD.t - PAD.b) * (1 - v / max); };
-
-    // Дві горизонталі шкали: середина і максимум. Нуль — це вісь.
-    const ticks = [max / 2, max].map(function (v) {
-      const y = Math.round(py(v) * 10) / 10;
-      return '<line x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y +
-             '" stroke="rgba(var(--tint-rgb), 0.08)"/>' +
-             '<text x="' + (PAD.l - 6) + '" y="' + (y + 4) + '" text-anchor="end" ' +
-             'font-size="11" fill="var(--muted)">' + thou(v) + '</text>';
-    }).join('');
-
-    // Підписи низу: коли кошиків багато, підписуємо через один — інакше
-    // вони злипаються в нечитабельний рядок.
-    const every = bs.length > 8 ? 2 : 1;
-
-    const bars = bs.map(function (b, i) {
-      const x = PAD.l + i * bw + bw * 0.16;
-      const w = bw * 0.68;
-      const h = b.vol > 0 ? Math.max(2, (H - PAD.t - PAD.b) * b.vol / max) : 0;
-      const y = H - PAD.b - h;
-      const label = (i % every === 0)
-        ? '<text x="' + (PAD.l + i * bw + bw / 2) + '" y="' + (H - 8) + '" text-anchor="middle" ' +
-          'font-size="10" fill="var(--muted)">' + esc(b.label) + '</text>'
-        : '';
-      const bar = b.vol > 0
-        ? '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) +
-          '" height="' + h.toFixed(1) + '" rx="3" fill="var(--acc-bar)">' +
-          '<title>' + esc(b.label) + ': ≈' + thou(b.vol) + ' кг · ' + b.workouts + ' трен.</title></rect>'
-        : '';
-      return bar + label;
-    }).join('');
-
-    const axis = '<line x1="' + PAD.l + '" y1="' + (H - PAD.b) + '" x2="' + (W - PAD.r) +
-                 '" y2="' + (H - PAD.b) + '" stroke="rgba(var(--tint-rgb), 0.14)"/>';
-
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Тренувальний обʼєм, кг за період">' +
-             ticks + axis + bars + '</svg>';
+  /** Живий конфіг зон із сервера, або вбудоване дзеркало (офлайн/локально) */
+  function adhCfg() {
+    const st = window.EloApi && window.EloApi.cached && window.EloApi.cached();
+    return (st && st.config) || (window.AdherenceCore && window.AdherenceCore.DEFAULT_CFG);
   }
 
-  function renderVolume() {
-    const host = $('#jr-volume');
-    const PC = window.ProgressCore;
-    if (!host || !PC || !PC.volumeBuckets) return;
+  function adhBar(pct) {
+    return '<div class="vol" style="margin-top:10px"><span class="vol__bar">' +
+      '<i style="width:' + Math.max(0, Math.min(100, pct)) + '%"></i></span></div>';
+  }
 
-    const vb = PC.volumeBuckets(sn.sessionLog, state.volPeriod);
-    const svg = volChartSvg(vb);
-    const totalVol = vb.buckets.reduce(function (a, b) { return a + b.vol; }, 0);
+  /* Профіль для ядра — з того, що сторінка вже тримає: повні журнали
+     і кількість днів обраного плану (daysTarget = activePlan.days). */
+  function adhProfile() {
+    return {
+      activePlan: { days: state.daysTarget },
+      sessionLog: state.sessionLog,
+      mealLog: state.mealLog
+    };
+  }
 
-    const seg = '<div class="seg mt-2" role="radiogroup" aria-label="Період обʼєму">' +
-      VOL_PERIODS.map(function (pp) {
-        return '<label class="seg__item"><input type="radio" name="vol-period" value="' + pp.days + '"' +
-          (pp.days === state.volPeriod ? ' checked' : '') + '><span>' + pp.label + '</span></label>';
+  function adhTrainingCard(AC, period) {
+    const r = AC.trainingAdherence(adhProfile(), todayKey(), period);
+    let body;
+    if (r.state === 'noplan') {
+      body = '<p class="small muted mt-1 mb-0">План ще не обрано — оберіть програму на сторінці ' +
+        '<a href="programs.html">«Програми»</a>, і тут зʼявиться відсоток виконання.</p>';
+    } else if (r.state === 'nodata') {
+      body = '<p class="small muted mt-1 mb-0">Ще немає даних. Завершіть перше тренування на сторінці ' +
+        '<a href="workout.html">«Тренування»</a> — відсоток рахується з реальних сесій.</p>';
+    } else if (r.state === 'resttoday') {
+      body = '<p class="small muted mt-1 mb-0">Сьогодні сесії ще не було. Відсоток дня зʼявиться ' +
+        'з першим закритим підходом.</p>';
+    } else {
+      const sub = period === 1
+        ? 'Сьогоднішня сесія: закрито <b class="mono">' + r.doneSets + '</b> із <b class="mono">' +
+          r.totalSets + '</b> підходів.'
+        : 'Сесій: <b class="mono">' + r.sessions + '</b> із ~<b class="mono">' +
+          (Math.round(r.expected) || 1) + '</b> запланованих' +
+          (r.totalSets ? ' · підходів закрито: <b class="mono">' + r.doneSets + '/' + r.totalSets + '</b>' : '') +
+          (r.effDays < period ? ' · дані ведуться ' + r.effDays + ' дн.' : '') + '.';
+      body = '<div class="adh__pct mono">' + r.pct + '%</div>' + adhBar(r.pct) +
+        '<p class="small muted mt-1 mb-0">' + sub + ' Пропущене тренування важить нуль, ' +
+        'часткове — свою частку підходів.</p>';
+    }
+    return '<div class="card" id="adh-training">' +
+      '<h2 style="margin:0">План тренувань</h2>' +
+      '<p class="small muted" style="margin:4px 0 0">Наскільки добре ви виконуєте свій план тренувань</p>' +
+      body + '</div>';
+  }
+
+  function adhNutritionCard(AC, period) {
+    const r = AC.nutritionAdherence(adhProfile(), todayKey(), period, adhCfg());
+    let body;
+    if (r.state === 'nodata') {
+      body = '<p class="small muted mt-1 mb-0">Ще немає даних. Закрийте перший день на сторінці ' +
+        '<a href="meals.html">«Раціон»</a> — відсоток рахується проти цілі дня.</p>';
+    } else if (r.state === 'openday') {
+      body = '<p class="small muted mt-1 mb-0">Сьогоднішній день ще не закрито. Закрийте його в ' +
+        '<a href="meals.html">«Раціоні»</a> — і тут буде відсоток попадання в ціль.</p>';
+    } else {
+      const sub = period === 1
+        ? 'Сьогоднішній день закрито проти цілі, записаної в момент закриття.'
+        : 'Закрито днів: <b class="mono">' + r.closed + '</b> із <b class="mono">' + r.counted +
+          '</b> · незакритий день важить нуль, відкритий сьогоднішній не рахується.';
+      body = '<div class="adh__pct mono">' + r.pct + '%</div>' + adhBar(r.pct) +
+        '<p class="small muted mt-1 mb-0">' + sub + ' Перебір карається так само, як недобір: ' +
+        '4000 ккал при цілі 2500 — це не 160%.</p>';
+    }
+    return '<div class="card" id="adh-nutrition">' +
+      '<h2 style="margin:0">План харчування</h2>' +
+      '<p class="small muted" style="margin:4px 0 0">Наскільки добре ви виконуєте свій план харчування</p>' +
+      body + '</div>';
+  }
+
+  function renderAdherence() {
+    const host = $('#jr-adherence');
+    const AC = window.AdherenceCore;
+    if (!host || !AC) return;
+
+    const seg = '<div class="seg" role="radiogroup" aria-label="Період виконання плану">' +
+      AC.PERIODS.map(function (pp) {
+        return '<label class="seg__item"><input type="radio" name="adh-period" value="' + pp.days + '"' +
+          (pp.days === state.adhPeriod ? ' checked' : '') + '><span>' + pp.label + '</span></label>';
       }).join('') + '</div>';
 
-    // План проти факту: не голий відсоток, а обидва числа поруч —
-    // «94%» без «із чого» не каже нічого.
-    const tr = PC.trainingStats(sn.workLog, sn.sessionLog, state.daysTarget);
-    const adh = tr.adherence
-      ? '<p class="small mt-1" style="margin-bottom:0">План проти факту за ' + tr.adherence.weeks +
-        ' тиж: заплановано <b class="mono">' + tr.adherence.planned + '</b>, виконано <b class="mono">' +
-        tr.adherence.done + '</b> — <b class="mono">' + tr.adherence.pct + '%</b>.</p>'
-      : '';
-
-    // Час тренувань — зі знімків t0/t1
-    const ts = PC.timeStats(sn.sessionLog, state.volPeriod);
-    const time = ts
-      ? '<p class="small mt-1" style="margin-bottom:0">Середнє тренування: <b class="mono">' + durTxt(ts.avgMin) +
-        '</b> · разом <b class="mono">' + durTxt(ts.totalMin) + '</b> за ' + ts.count + ' ' +
-        window.App.plural(ts.count, 'сесію', 'сесії', 'сесій') + '.</p>'
-      : '';
-
-    // Тренд сили: 30 або 90 днів — залежно від обраного періоду
-    const trendDays = state.volPeriod >= 90 ? 90 : 30;
-    const pt = PC.perfTrend(sn.weightLog, trendDays);
-    const TREND = { up: 'Росте', down: 'Знижується', flat: 'Стабільно' };
-    const trend = pt && pt.n >= 2
-      ? '<p class="small mt-1" style="margin-bottom:0">Тренд сили за ' + trendDays + ' днів: <b>' +
-        TREND[pt.verdict] + '</b> (' + pt.up + ' ↑ · ' + pt.down + ' ↓ · ' + pt.flat + ' →).</p>'
-      : '';
-
-    // Стійкий спад: три зниження ваги поспіль в одній вправі.
-    // Один поганий день сюди не потрапляє навмисно — це шум, не регрес.
-    const drops = PC.perfDrops(sn.weightLog);
-    const dropCard = drops.length
-      ? '<div class="notice mt-2">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
-          '<div class="small">Стійкий спад: ' +
-            drops.map(function (x) {
-              return '<b>' + esc(x.name) + '</b> (' + fmtNum.kg(x.from) + ' → ' + fmtNum.kg(x.to) + ' кг)';
-            }).join(', ') +
-            ' — три зниження поспіль. Один важкий день — не регрес, але три поспіль — привід глянути на сон, калорії й відновлення.' +
-          '</div>' +
-        '</div>'
-      : '';
-
-    host.innerHTML =
-      '<div class="card">' +
-        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
-          '<h2 style="margin:0">Тренувальний обʼєм</h2>' +
-          (totalVol > 0 ? '<span class="chip mono">≈' + thou(totalVol) + ' кг</span>' : '') +
-        '</div>' +
-        seg +
-        (svg
-          ? '<div class="wchart mt-2">' + svg + '</div>' +
-            '<p class="small muted mt-1">Тоннаж — оцінка: підходи × середні повторення × робоча вага дня. ' +
-            'Знімається в момент тренування і заднім числом не переписується.</p>'
-          : '<p class="small muted mt-2">Ще замало даних. Тоннаж знімається з нових тренувань: ' +
-            'позначте вправи на сторінці <a href="workout.html">«Тренування»</a> — і стовпчики зʼявляться.</p>') +
-        adh + time + trend + dropCard +
+    host.innerHTML = seg +
+      '<div class="grid grid-2 mt-2">' +
+        adhTrainingCard(AC, state.adhPeriod) +
+        adhNutritionCard(AC, state.adhPeriod) +
       '</div>';
   }
 
@@ -1462,7 +1437,7 @@
     seasonize();
     wire();
     renderOverview();
-    renderVolume();
+    renderAdherence();
     renderSummary();
     keepFocus(renderWeight);
     keepFocus(renderTrain);
@@ -1484,8 +1459,8 @@
       const pp = e.target.closest('input[name="w-period"]');
       if (pp) { state.period = Number(pp.value); keepFocus(renderWeight); return; }
 
-      const vp = e.target.closest('input[name="vol-period"]');
-      if (vp) { state.volPeriod = Number(vp.value); renderVolume(); return; }
+      const vp = e.target.closest('input[name="adh-period"]');
+      if (vp) { state.adhPeriod = Number(vp.value); renderAdherence(); return; }
 
       const vw = e.target.closest('input[name="jr-view"]');
       if (vw) setView(vw.value);
@@ -1546,13 +1521,13 @@
       if (profile.workLog && profile.workLog !== state.workLog) {
         state.workLog = profile.workLog;
         seasonize();
-        keepFocus(renderTrain); renderVolume(); renderSummary();
+        keepFocus(renderTrain); renderAdherence(); renderSummary();
         if (state.view === 'history') { renderHcal(); renderDay(); }
       }
       if (profile.sessionLog && profile.sessionLog !== state.sessionLog) {
         state.sessionLog = profile.sessionLog;
         seasonize();
-        keepFocus(renderTrain); renderOverview(); renderVolume(); renderSummary();
+        keepFocus(renderTrain); renderOverview(); renderAdherence(); renderSummary();
         if (state.view === 'history') { renderHcal(); renderDay(); }
       }
       if (profile.bodyLog && profile.bodyLog !== state.bodyLog) {
@@ -1562,7 +1537,7 @@
       if (profile.weightLog && profile.weightLog !== state.weightLog) {
         state.weightLog = profile.weightLog;
         seasonize();
-        renderLifts(); renderPrs(); renderVolume(); renderSummary();
+        renderLifts(); renderPrs(); renderAdherence(); renderSummary();
         if (state.view === 'history') renderDay();
       }
       if (profile.mealLog && profile.mealLog !== state.mealLog) {

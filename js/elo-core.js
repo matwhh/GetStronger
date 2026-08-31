@@ -98,19 +98,36 @@
    * план і активний grace week.
    */
 
+  /*
+   * Тренування — ЛІНІЙНА пропорція, а не драбина: earned = base × done/total
+   * (етап «завершення тренування»). Закрив половину підходів — отримав
+   * половину вартості дня; драбини лишаються іншим категоріям. Якщо запис
+   * має підходи (doneSets/totalSets) — частка рахується по них, це точніше;
+   * старі записи без підходів рахуються по вправах, як раніше.
+   * Дзеркало серверної elo_action_delta (db/elo-proportional.sql).
+   */
   function workoutDelta(payload, cfg, ctx) {
     if (ctx && ctx.grace) return { quality: 0, mult: 0, delta: 0 };
-    const total = Math.max(1, Number(payload.total) || 0);
-    const q = clamp((Number(payload.done) || 0) / total, 0, 1);
-    const mult = ladder(cfg.tolerance.training, q);
+    const bySets = Number(payload.totalSets) > 0;
+    const total = Math.max(1, Number(bySets ? payload.totalSets : payload.total) || 0);
+    const done = Number(bySets ? payload.doneSets : payload.done) || 0;
+    const q = clamp(done / total, 0, 1);
     const per = weeklyBudget('training', cfg) / Math.max(1, Number(ctx && ctx.plannedDays) || 3);
-    return { quality: q, mult: mult, delta: Math.round(per * mult) };
+    return { quality: q, mult: q, delta: Math.round(per * q) };
   }
 
   function mealDelta(payload, cfg) {
     const target = Number(payload.target) || 0;
     const pTarget = Number(payload.proteinTarget) || 0;
     const day = dailyBudget('nutrition', cfg);
+    /*
+     * Без цільового білка (старі записи до етапу authoritative) калорії
+     * беруть УСЮ вагу категорії — як на сервері (db/elo-authoritative.sql,
+     * M5): інакше той самий день коштував би тут 55% від серверної оцінки,
+     * і оптимістична дельта з adherence розходилися б із рейтингом.
+     */
+    let kSh = cfg.nutritionSplit.kcal, pSh = cfg.nutritionSplit.protein;
+    if (pTarget <= 0) { kSh = 1; pSh = 0; }
     let qK = 0, qP = 0;
     if (target > 0) {
       const dev = Math.abs((Number(payload.kcal) || 0) - target) / target;
@@ -125,7 +142,7 @@
     if (pTarget > 0) {
       qP = ladder(cfg.tolerance.protein, clamp((Number(payload.protein) || 0) / pTarget, 0, 1));
     }
-    const mult = qK * cfg.nutritionSplit.kcal + qP * cfg.nutritionSplit.protein;
+    const mult = qK * kSh + qP * pSh;
     return { quality: mult, mult: mult, delta: Math.round(day * mult) };
   }
 

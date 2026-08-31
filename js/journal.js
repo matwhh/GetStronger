@@ -406,7 +406,6 @@
   /* Тренування: теплокарта                                              */
   /* ------------------------------------------------------------------ */
 
-  const WEEKS = 12;
 
   /**
    * День або тренувальний, або ні. Раніше клітинка мала рівні «1–3 за день»,
@@ -451,24 +450,44 @@
   }
 
   /**
-   * Сітка: колонки — останні WEEKS тижнів, рядки — Пн…Нд з підписами.
-   * Кожна минула клітинка — кнопка: клік ставить або знімає позначку.
-   * Майбутні дні поточного тижня — порожні заглушки, їх клацати нема чого.
+   * Вікно календаря — РІВНО три календарні місяці: поточний і два
+   * попередні, з першого числа. Не «N тижнів назад»: людина думає
+   * місяцями, і «чер · лип · сер» мають бути в сітці цілими.
+   */
+  function hmFirstDay() {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth() - 2, 1);
+  }
+
+  /** Кількість тижневих колонок вікна: від понеділка тижня з 1-м числом
+      стартового місяця до поточного тижня включно */
+  function hmWeeks() {
+    const from = mondayOf(hmFirstDay());
+    const to = mondayOf(new Date());
+    return Math.round((to - from) / (7 * 86400000)) + 1;
+  }
+
+  /**
+   * Сітка: колонки — тижні трьох місяців, рядки — Пн…Нд з підписами.
+   * Кожна клітинка вікна — кнопка: клік ставить або знімає позначку.
+   * Дні ПОЗА вікном — хвіст попереднього місяця в першому тижні й
+   * майбутнє поточного — порожні заглушки, їх клацати нема чого.
    */
   function heatmapHtml() {
-    const start = mondayOf(new Date());
-    start.setDate(start.getDate() - (WEEKS - 1) * 7);
+    const weeks = hmWeeks();
+    const start = mondayOf(hmFirstDay());
+    const firstK = keyOf(hmFirstDay());
     const todayK = todayKey();
 
     let cols = '';
-    for (let w = 0; w < WEEKS; w++) {
+    for (let w = 0; w < weeks; w++) {
       let cells = '';
       for (let d = 0; d < 7; d++) {
         const day = new Date(start);
         day.setDate(start.getDate() + w * 7 + d);
         const k = keyOf(day);
         const num = day.getDate();
-        if (k > todayK) {
+        if (k > todayK || k < firstK) {
           cells += '<i class="heatmap__cell heatmap__cell--future">' + num + '</i>';
           continue;
         }
@@ -483,21 +502,27 @@
       cols += '<div class="heatmap__col">' + cells + '</div>';
     }
 
-    /* Ряд місяців над колонками: підпис зʼявляється там, де понеділок
-       колонки належить іншому місяцю, ніж у попередньої (або на першій). */
+    /* Ряд місяців над колонками. Місяць колонки визначає її ЧЕТВЕР,
+       ЗАТИСНУТИЙ у вікно: перший тиждень може починатись хвостом
+       попереднього місяця (підпис за понеділком дав би «тра» над
+       червнем), а четвер останнього — вилазити в наступний місяць,
+       якого в сітці ще немає. */
     let months = '<span class="heatmap__months-pad" aria-hidden="true"></span>';
     let prevMon = -1;
-    for (let w = 0; w < WEEKS; w++) {
-      const mon = new Date(start);
-      mon.setDate(start.getDate() + w * 7);
-      const m = mon.getMonth();
+    for (let w = 0; w < weeks; w++) {
+      const thu = new Date(start);
+      thu.setDate(start.getDate() + w * 7 + 3);
+      let k = keyOf(thu);
+      if (k > todayK) k = todayK;
+      if (k < firstK) k = firstK;
+      const m = Number(k.slice(5, 7)) - 1;
       const show = (w === 0 || m !== prevMon);
       prevMon = m;
       months += '<span class="heatmap__month">' + (show ? MON[m] : '') + '</span>';
     }
 
     const days = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
-    return '<div class="heatmap" role="group" aria-label="Календар тренувань за ' + WEEKS + ' тижнів">' +
+    return '<div class="heatmap" role="group" aria-label="Календар тренувань за 3 місяці">' +
              '<div class="heatmap__months" aria-hidden="true">' + months + '</div>' +
              '<div class="heatmap__grid">' +
                '<div class="heatmap__days" aria-hidden="true">' + days + '</div>' + cols +
@@ -524,10 +549,8 @@
     const host = $('#jr-train');
     if (!host) return;
 
-    // Позначки за видимі WEEKS тижнів — та сама рамка, що й сітка
-    const gridStart = mondayOf(new Date());
-    gridStart.setDate(gridStart.getDate() - (WEEKS - 1) * 7);
-    const startK = keyOf(gridStart);
+    // Позначки за видимі 3 місяці — та сама рамка, що й сітка
+    const startK = keyOf(hmFirstDay());
     const total = Object.keys(state.workLog).filter(function (k) {
       return k >= startK && trained(k);
     }).length;
@@ -551,7 +574,7 @@
         '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
           '<h2 style="margin:0">Тренування</h2>' +
           '<span class="chip mono' + (done ? ' chip--acc' : '') + '">' +
-            weekText + ' · ' + total + ' за ' + WEEKS + ' тижнів</span>' +
+            weekText + ' · ' + total + ' за 3 місяці</span>' +
         '</div>' +
 
         '<div class="mt-2">' + heatmapHtml() + '</div>' +

@@ -563,14 +563,18 @@
   }
 
   /** Дні з тренуванням: обʼєднання workLog і sessionLog, явний 0 у
-      workLog перекриває сесію (як у «Прогресі»). */
+      workLog перекриває сесію (як у «Прогресі»). Ознака «сесія була» —
+      спільна з ProgressCore: підходи рахуються нарівні з вправами. */
   function trainedDatesOf(workLog, sessionLog) {
+    const PC = window.ProgressCore;
+    const counts = (PC && PC.sessionCounts)
+      ? PC.sessionCounts
+      : function (s) { return Boolean(s) && (Number(s.done) > 0 || Number(s.doneSets) > 0); };
     const set = {};
     const wl = workLog || {};
     Object.keys(wl).forEach(function (k) { if (Number(wl[k]) > 0) set[k] = true; });
     Object.keys(sessionLog || {}).forEach(function (k) {
-      const x = sessionLog[k];
-      if (!x || !(Number(x.done) > 0)) return;
+      if (!counts(sessionLog[k])) return;
       if (Number(wl[k]) === 0 && Object.prototype.hasOwnProperty.call(wl, k)) return;
       set[k] = true;
     });

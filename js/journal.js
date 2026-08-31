@@ -427,16 +427,25 @@
        */
       return v > 0;
     }
-    // Сесія з «Сьогодні» — теж тренування: галочки вправ і таймер — два
+    // Сесія з «Тренування» — теж тренування: підходи й таймер — два
     // способи сказати одне й те саме, і клітинка має світитись від обох.
-    const s = state.sessionLog[key];
-    return Boolean(s && Number(s.done) > 0);
+    return sessionCounts(state.sessionLog[key]);
   }
 
-  /** Чи є під днем сесія з «Сьогодні» (тоді зняття треба записати явним 0) */
+  /*
+   * Чи є в записі сесії робота. done — це закриті ВПРАВИ, і відколи
+   * виконання відмічається по підходах, день із чотирма закритими
+   * підходами, але жодною добитою вправою, мав done === 0: людина
+   * тренувалась, а календар лишався порожнім. Тому дивимось і на підходи.
+   */
+  function sessionCounts(s) {
+    if (!s || typeof s !== 'object') return false;
+    return Number(s.done) > 0 || Number(s.doneSets) > 0;
+  }
+
+  /** Чи є під днем сесія з «Тренування» (тоді зняття треба записати явним 0) */
   function hasSession(key) {
-    const s = state.sessionLog[key];
-    return Boolean(s && Number(s.done) > 0);
+    return sessionCounts(state.sessionLog[key]);
   }
 
   const DOW = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
@@ -450,13 +459,15 @@
   }
 
   /**
-   * Вікно календаря — РІВНО три календарні місяці: поточний і два
-   * попередні, з першого числа. Не «N тижнів назад»: людина думає
-   * місяцями, і «чер · лип · сер» мають бути в сітці цілими.
+   * Вікно календаря — РІВНО шість календарних місяців: поточний і пʼять
+   * попередніх, з першого числа. Не «N тижнів назад»: людина думає
+   * місяцями, і кожен місяць має стояти в сітці цілим.
    */
+  const HM_MONTHS = 6;
+
   function hmFirstDay() {
     const n = new Date();
-    return new Date(n.getFullYear(), n.getMonth() - 2, 1);
+    return new Date(n.getFullYear(), n.getMonth() - (HM_MONTHS - 1), 1);
   }
 
   /** Кількість тижневих колонок вікна: від понеділка тижня з 1-м числом
@@ -468,7 +479,7 @@
   }
 
   /**
-   * Сітка: колонки — тижні трьох місяців, рядки — Пн…Нд з підписами.
+   * Сітка: колонки — тижні вікна, рядки — Пн…Нд з підписами.
    * Кожна клітинка вікна — кнопка: клік ставить або знімає позначку.
    * Дні ПОЗА вікном — хвіст попереднього місяця в першому тижні й
    * майбутнє поточного — порожні заглушки, їх клацати нема чого.
@@ -522,7 +533,7 @@
     }
 
     const days = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
-    return '<div class="heatmap" role="group" aria-label="Календар тренувань за 3 місяці">' +
+    return '<div class="heatmap" role="group" aria-label="Календар тренувань за ' + HM_MONTHS + ' місяців">' +
              '<div class="heatmap__months" aria-hidden="true">' + months + '</div>' +
              '<div class="heatmap__grid">' +
                '<div class="heatmap__days" aria-hidden="true">' + days + '</div>' + cols +
@@ -549,11 +560,25 @@
     const host = $('#jr-train');
     if (!host) return;
 
-    // Позначки за видимі 3 місяці — та сама рамка, що й сітка
+    /*
+     * Позначки за видиме вікно — та сама рамка, що й сітка.
+     *
+     * Ключі беруться з ОБОХ журналів. Раніше тут стояв самий workLog, і
+     * чіп рахував лише дні, позначені руками: тренування, закриті на
+     * «Тренуванні», лежать у sessionLog — клітинки в сітці світились, а
+     * чіп над ними писав «0». Саме та підсвічена клітинка, яку видно
+     * поруч, не потрапляла в підсумок.
+     */
     const startK = keyOf(hmFirstDay());
-    const total = Object.keys(state.workLog).filter(function (k) {
-      return k >= startK && trained(k);
-    }).length;
+    const seen = Object.create(null);
+    let total = 0;
+    [state.workLog, state.sessionLog].forEach(function (log) {
+      Object.keys(log || {}).forEach(function (k) {
+        if (seen[k] || k < startK || k > todayKey()) return;
+        seen[k] = 1;
+        if (trained(k)) total++;
+      });
+    });
 
     const monday = mondayOf(new Date());
     let thisWeek = 0;
@@ -574,7 +599,7 @@
         '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
           '<h2 style="margin:0">Тренування</h2>' +
           '<span class="chip mono' + (done ? ' chip--acc' : '') + '">' +
-            weekText + ' · ' + total + ' за 3 місяці</span>' +
+            weekText + ' · ' + total + ' за ' + HM_MONTHS + ' місяців</span>' +
         '</div>' +
 
         '<div class="mt-2">' + heatmapHtml() + '</div>' +
@@ -1204,7 +1229,7 @@
     const s = state.sessionLog[k];
     const manual = Number(state.workLog[k]) > 0;
 
-    if (s && Number(s.done) > 0 && !(Number(state.workLog[k]) === 0 && Object.prototype.hasOwnProperty.call(state.workLog, k))) {
+    if (sessionCounts(s) && !(Number(state.workLog[k]) === 0 && Object.prototype.hasOwnProperty.call(state.workLog, k))) {
       const min = window.ProgressCore.sessionMinutes(s);
       const timeRow = (s.t0 && s.t1)
         ? '<span class="small">Час: <b class="mono">' + hhmm(s.t0) + ' → ' + hhmm(s.t1) + '</b>' +
@@ -1217,7 +1242,13 @@
 
       return '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">' +
           '<h3 style="margin:0">' + esc(s.title || 'Тренування') + '</h3>' +
-          '<span class="chip chip--acc mono">' + s.done + ' з ' + s.total + ' вправ</span>' +
+          /* Підходи точніші за вправи: 4 з 20 підходів і «0 з 14 вправ» —
+             це один і той самий день, але друге читається як «нічого». */
+          '<span class="chip chip--acc mono">' +
+            (Number(s.totalSets) > 0
+              ? (Number(s.doneSets) || 0) + ' з ' + s.totalSets + ' підходів'
+              : s.done + ' з ' + s.total + ' вправ') +
+          '</span>' +
         '</div>' +
         '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
           timeRow +

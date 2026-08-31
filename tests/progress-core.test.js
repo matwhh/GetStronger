@@ -158,3 +158,26 @@ describe('харчування', () => {
     assert.equal(P.foodStats({}, 30, NOW), null);
   });
 });
+
+/* =========================================================================
+   Сесія без добитої вправи, але з підходами (етап відмітки по підходах).
+   ========================================================================= */
+describe('progress-core: сесія рахується за підходами', () => {
+  it('sessionCounts: done=0, але doneSets>0 — тренування було', () => {
+    assert.equal(P.sessionCounts({ done: 0, total: 14, doneSets: 4, totalSets: 34 }), true);
+    assert.equal(P.sessionCounts({ done: 2, total: 14 }), true);          // стара форма
+    assert.equal(P.sessionCounts({ done: 0, total: 14, doneSets: 0, totalSets: 34 }), false);
+    assert.equal(P.sessionCounts(null), false);
+    assert.equal(P.sessionCounts({}), false);
+  });
+
+  it('trainedDates бачить день, де закриті лише підходи', () => {
+    const sess = { '2026-08-31': { done: 0, total: 14, doneSets: 4, totalSets: 34, end: 1 } };
+    assert.deepEqual(P.trainedDates({}, sess), ['2026-08-31']);
+  });
+
+  it('явний 0 у workLog і далі перекриває таку сесію', () => {
+    const sess = { '2026-08-31': { done: 0, total: 14, doneSets: 4, totalSets: 34 } };
+    assert.deepEqual(P.trainedDates({ '2026-08-31': 0 }, sess), []);
+  });
+});

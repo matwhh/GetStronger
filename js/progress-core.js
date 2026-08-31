@@ -231,6 +231,19 @@
   /* Тренування                                                          */
   /* ------------------------------------------------------------------ */
 
+  /*
+   * Чи є в записі сесії робота.
+   *
+   * done — це закриті ВПРАВИ, і відколи виконання відмічається по
+   * підходах, день із чотирма закритими підходами, але жодною добитою
+   * вправою, мав done === 0: людина тренувалась, а статистика його не
+   * бачила. Дзеркало journal.js → sessionCounts().
+   */
+  function sessionCounts(s) {
+    if (!s || typeof s !== 'object') return false;
+    return Number(s.done) > 0 || Number(s.doneSets) > 0;
+  }
+
   /** День тренувальний, якщо є позначка АБО сесія з прогресом */
   function trainedDates(workLog, sessionLog) {
     const set = {};
@@ -240,7 +253,7 @@
     });
     Object.keys(sessionLog || {}).forEach(function (k) {
       const s = sessionLog[k];
-      if (!DATE_KEY.test(k) || !s || !(Number(s.done) > 0)) return;
+      if (!DATE_KEY.test(k) || !sessionCounts(s)) return;
       /*
        * Явний 0 у workLog — це «знято руками в теплокарті» і має
        * перекривати сесію. Інакше день, знятий у «Прогресі», однаково
@@ -339,8 +352,7 @@
     if (!sessionLog || typeof sessionLog !== 'object') return [];
     return Object.keys(sessionLog)
       .filter(function (k) {
-        const s = sessionLog[k];
-        return DATE_KEY.test(k) && s && Number(s.done) > 0 &&
+        return DATE_KEY.test(k) && sessionCounts(sessionLog[k]) &&
                (!fromKey || k >= fromKey) && (!toKey || k <= toKey);
       })
       .sort()
@@ -556,6 +568,7 @@
     GOAL_RATES: GOAL_RATES,
     liftStats: liftStats,
     bestLift: bestLift,
+    sessionCounts: sessionCounts,
     trainedDates: trainedDates,
     trainingStats: trainingStats,
     foodStats: foodStats,

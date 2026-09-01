@@ -65,11 +65,7 @@
     { id: 'graphite-crimson', name: 'Багрянець',  dark: '#db302a', light: '#c7231d' },
     { id: 'graphite-moss',    name: 'Мох',        dark: '#50802e', light: '#3a7410' },
     { id: 'graphite-emerald', name: 'Смарагд',    dark: '#1f835e', light: '#1e7455' },
-    { id: 'graphite-ocean',   name: 'Океан',      dark: '#0d7e9a', light: '#296f81' },
-    /* Ліс несе власні поверхні, тож і плашка показує їх, а не графіт:
-       інакше свотч обіцяв би зелень на чорному, а тема світла. */
-    { id: 'forest',           name: 'Ліс',        dark: '#263d2b', light: '#263d2b',
-      surface: '#a7aaa8' }
+    { id: 'graphite-ocean',   name: 'Океан',      dark: '#0d7e9a', light: '#296f81' }
   ];
 
   /*
@@ -98,7 +94,7 @@
       const active = (t.id || null) === cur;
       return '<button class="theme-btn' + (active ? ' is-active' : '') + '" type="button" ' +
                'data-theme-pick="' + (t.id || '') + '" aria-pressed="' + active + '">' +
-               '<i style="background:' + (t.surface || SURFACE[scheme]) + '"></i>' +
+               '<i style="background:' + SURFACE[scheme] + '"></i>' +
                '<i style="background:' + t[scheme] + '"></i>' +
                '<span>' + esc(t.name) + '</span>' +
              '</button>';

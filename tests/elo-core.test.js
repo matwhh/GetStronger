@@ -181,3 +181,36 @@ describe('ELO: пропорційне тренування', () => {
     assert.equal(g.delta, 0);
   });
 });
+
+/* =========================================================================
+   День сезону: рахується по КАЛЕНДАРНИХ днях.
+   Було Math.round((now - start)/доба)+1 — після полудня першого дня
+   пів доби округлялось до цілої і показувалось «2/91» у перший же день.
+   ========================================================================= */
+describe('ELO: день сезону', () => {
+  it('перший день сезону — 1, о будь-якій годині', () => {
+    for (const h of [0, 9, 12, 13, 18, 23]) {
+      const d = E.seasonDay('AUTUMN-2026', new Date(2026, 8, 1, h, 30));
+      assert.equal(d.passed, 1, 'о ' + h + ':30 → ' + d.passed);
+    }
+  });
+
+  it('осінь має 91 день (вер 30 + жов 31 + лис 30)', () => {
+    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 8, 1)).total, 91);
+  });
+
+  it('другий день — рівно 2, останній — total', () => {
+    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 8, 2, 23, 59)).passed, 2);
+    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 10, 30, 1)).passed, 91);
+  });
+
+  it('поза межами сезону значення затиснуті, а не відʼємні', () => {
+    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 7, 20)).passed, 1);
+    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 11, 25)).passed, 91);
+  });
+
+  it('зима переходить через рік і рахується так само', () => {
+    assert.equal(E.seasonDay('WINTER-2026', new Date(2026, 11, 1, 15)).passed, 1);
+    assert.equal(E.seasonDay('WINTER-2026', new Date(2027, 0, 1, 15)).passed, 32);
+  });
+});

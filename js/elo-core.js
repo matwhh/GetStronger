@@ -46,6 +46,24 @@
     }
   }
 
+  /**
+   * Який сьогодні день сезону: {passed, total}, обидва з одиниці.
+   *
+   * Рахується по КАЛЕНДАРНИХ днях, а не по мілісекундах. Було
+   * Math.round((now - start) / доба) + 1, і після полудня першого дня
+   * округлення давало «2/91»: пів доби округлялось до цілої. Той самий
+   * клас помилки, що вже виправлений у js/periodization-core.js —
+   * межа доби там, де її бачить людина, а не де вона в таймстемпі.
+   */
+  function seasonDay(code, now) {
+    const range = seasonRange(code);
+    const base = now instanceof Date ? now : new Date();
+    const today = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+    const total = Math.round((range[1] - range[0]) / 86400000) + 1;
+    const passed = Math.round((today - range[0]) / 86400000) + 1;
+    return { passed: Math.min(total, Math.max(1, passed)), total: total };
+  }
+
   function seasonLabel(code) {
     const p = String(code).split('-');
     const n = { SPRING: 'Весна', SUMMER: 'Літо', AUTUMN: 'Осінь', WINTER: 'Зима' };
@@ -221,6 +239,7 @@
   window.EloCore = {
     seasonOf: seasonOf,
     seasonRange: seasonRange,
+    seasonDay: seasonDay,
     seasonLabel: seasonLabel,
     levelFor: levelFor,
     weeklyBudget: weeklyBudget,

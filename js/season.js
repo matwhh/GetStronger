@@ -85,10 +85,11 @@
     const name = approved || (p.displayName || '').trim();
 
     const lvl = EC.levelFor(st.elo, st.config);
-    const range = EC.seasonRange(st.season);
-    const now = new Date();
-    const total = Math.round((range[1] - range[0]) / 86400000) + 1;
-    const passed = Math.min(total, Math.max(1, Math.round((now - range[0]) / 86400000) + 1));
+    /* День сезону рахує ядро: по календарних днях, а не по мілісекундах
+       (див. EloCore.seasonDay — інакше після полудня 1-го числа виходило «2»). */
+    const sd = EC.seasonDay(st.season);
+    const total = sd.total;
+    const passed = sd.passed;
 
     host.innerHTML = card(
       '<div class="row row--split" style="align-items:baseline;gap:10px;flex-wrap:wrap">' +

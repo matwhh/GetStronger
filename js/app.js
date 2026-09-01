@@ -1400,10 +1400,7 @@
    */
   const THEMES = [
     'graphite', 'graphite-navy', 'graphite-pink', 'graphite-violet',
-    'graphite-crimson', 'graphite-moss', 'graphite-emerald', 'graphite-ocean',
-    /* «Ліс» — єдина тема з власними ПОВЕРХНЯМИ (срібло замість графіту),
-       тому її id без префікса graphite: вона не варіант графіту. */
-    'forest'
+    'graphite-crimson', 'graphite-moss', 'graphite-emerald', 'graphite-ocean'
   ];
 
   /* Бурштин прибраний: обидва його id (короткий і повний) свідомо НЕ
@@ -1429,22 +1426,10 @@
    * між сторінками. Профіль — щоб вибір переїхав у хмару, якщо вона є.
    * null означає монохром: атрибут знімається, змінні повертаються з :root.
    */
-  /** Колір системної смуги під поточні тему й схему */
-  function barColor(scheme) {
-    if (document.documentElement.dataset.theme === 'forest') return '#a7aaa8';
-    return scheme === 'light' ? '#e7e7e7' : '#0b0b0b';
-  }
-
   function setTheme(id, opts) {
     const t = normTheme(id);
     if (t) document.documentElement.dataset.theme = t;
     else delete document.documentElement.dataset.theme;
-
-    /* Смуга браузера залежить і від теми: «Ліс» срібний у будь-якій схемі */
-    try {
-      const bar = document.querySelector('meta[name="theme-color"]');
-      if (bar) bar.setAttribute('content', barColor(currentScheme()));
-    } catch (_) {}
     try {
       if (t) localStorage.setItem('forge.theme', t);
       else localStorage.removeItem('forge.theme');
@@ -1510,9 +1495,7 @@
      */
     try {
       const m = document.querySelector('meta[name="theme-color"]');
-      /* «Ліс» несе власні поверхні, тож смуга браузера має бути срібною в
-         обох положеннях перемикача — інакше над сріблом висіла б чорна. */
-      if (m) m.setAttribute('content', barColor(v));
+      if (m) m.setAttribute('content', v === 'light' ? '#e7e7e7' : '#0b0b0b');
     } catch (_) {}
 
     try {

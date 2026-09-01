@@ -361,7 +361,7 @@
       '<div class="card" id="wk-mood">' +
         '<div class="row row--split" style="align-items:baseline;gap:10px">' +
           '<h2 style="margin:0">Настрій</h2>' +
-          '<a class="small" href="trackers.html">Вимкнути</a>' +
+          '<a class="small" href="trackers-settings.html">Вимкнути</a>' +
         '</div>' +
         '<p class="small muted" style="margin:6px 0 0">Необовʼязково. Позначайте, коли хочеться — ' +
           'запис привʼязується до цього тренування.</p>' +

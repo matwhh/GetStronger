@@ -1262,7 +1262,7 @@
              *   h" onfocus="…" autofocus x="
              * вивалювався з лапок і виконував код у походженні сайту — а
              * там же лежить ib.session із refresh_token. Перевірено: цей
-             * файл проходив офіційний імпорт і спрацьовував на trackers.html
+             * файл проходив офіційний імпорт і спрацьовував на trackers-settings.html
              * і today.html.
              *
              * Формат збігається з тим, що видає TrackerCore.addCustom

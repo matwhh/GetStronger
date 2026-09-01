@@ -29,7 +29,7 @@
  *   boolean (supplement/habit)      → true (відсутність запису = ні)
  *
  * Новий тип трекера — це новий рядок у TRACKER_DEFS плюс, за потреби,
- * власний kind. Сторінки (trackers.js/today.js/journal.js) читають
+ * власний kind. Сторінки (trackers-day.js/trackers-settings.js/journal.js) читають
  * каталог і дані через цей модуль — жодна з них не знає формату
  * напряму, тому додавання типу не чіпає жодної з них.
  */
@@ -409,7 +409,9 @@
     if (!def || def.kind !== 'cumulative') return src;
     const d = DATE_KEY.test(date) ? date : todayKey();
     const cur = Number((src[id] || {})[d]) || 0;
-    const next = clamp(r1(cur + Number(delta)), def.min, def.max);
+    /* Два знаки, а не один: кнопка каже «+0,25 л», і записати 0,3 —
+       означає збрехати на першому ж тапі (а на другому — 0,55 → 0,6). */
+    const next = clamp(Math.round((cur + Number(delta)) * 100) / 100, def.min, def.max);
     if (next === null) return src;
     return setEntry(src, id, next, d);
   }

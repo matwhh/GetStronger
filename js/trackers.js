@@ -110,12 +110,21 @@
     }
 
     if (def.kind === 'duration') {
-      return '<div class="qi-row">' +
-        def.presets.map(function (m) {
-          const on = today === m;
-          return '<button class="btn btn--sm ' + (on ? 'btn--primary' : 'btn--ghost') + '" type="button" ' +
-            'data-duration="' + esc(t.id) + '" data-min="' + m + '">' + T.formatDuration(m) + '</button>';
-        }).join('') +
+      /* Довільний час двома полями. Готова сітка «6 год / 6 год 30 хв /…»
+         прибрана свідомо: вона мовчки округляла реальні 6:47 до кнопки,
+         і трекер показував не те, що було. */
+      const sp = T.splitDuration(today);
+      return '<div class="qi-dur">' +
+        '<input class="input input--sm num mono" type="text" inputmode="numeric" ' +
+          'data-durh="' + esc(t.id) + '" placeholder="0" ' +
+          'value="' + (sp.h == null ? '' : sp.h) + '" ' +
+          'aria-label="' + esc(def.name) + ', годин">' +
+        '<span class="qi-dur__u">год</span>' +
+        '<input class="input input--sm num mono" type="text" inputmode="numeric" ' +
+          'data-durm="' + esc(t.id) + '" placeholder="0" ' +
+          'value="' + (sp.m == null ? '' : sp.m) + '" ' +
+          'aria-label="' + esc(def.name) + ', хвилин">' +
+        '<span class="qi-dur__u">хв</span>' +
       '</div>';
     }
 
@@ -352,6 +361,42 @@
         renderBuiltins();
         return;
       }
+      /* Тривалість: два поля, одна величина — читаємо обидва, щоб зміна
+         годин не скидала хвилини. */
+      const dh = e.target.closest('[data-durh]');
+      const dm = e.target.closest('[data-durm]');
+      if (dh || dm) {
+        const el = dh || dm;
+        const id = el.dataset.durh || el.dataset.durm;
+        const box = el.closest('.qi-dur');
+        const hEl = box && box.querySelector('[data-durh]');
+        const mEl = box && box.querySelector('[data-durm]');
+        const hv = hEl && hEl.value;
+        const mv = mEl && mEl.value;
+        /*
+         * УСЕ — після поточної події. change у текстовому полі приходить
+         * усередині зміни фокуса, а збереження тягне за собою перемальовку
+         * списку: заміна innerHTML прямо тут валила DOM-помилкою «node to
+         * be removed is no longer a child». Значення знімаємо синхронно,
+         * діємо — наступним тактом.
+         */
+        setTimeout(function () {
+          const trk = T.list(state.trackers).find(function (x) { return x.id === id; });
+          const def = trk ? T.defFor(trk) : null;
+          const mins = T.joinDuration(hv, mv, def || { min: 0, max: 1440 });
+          if (mins === false) {
+            window.App.toast('Не схоже на час: перевірте години й хвилини', 'err');
+            renderBuiltins();
+            return;
+          }
+          saveLog(mins === null
+            ? T.removeEntry(state.log, id, todayKey())
+            : T.logValue(state.trackers, state.log, id, mins, todayKey()));
+          renderBuiltins();
+        }, 0);
+        return;
+      }
+
       const mark = e.target.closest('[data-custom-mark]');
       if (mark) {
         saveLog(T.logValue(state.trackers, state.log, mark.dataset.customMark, mark.checked, todayKey()));
@@ -371,13 +416,6 @@
       const add = e.target.closest('[data-add]');
       if (add) {
         saveLog(T.addDelta(state.trackers, state.log, add.dataset.add, Number(add.dataset.amount), todayKey()));
-        renderBuiltins();
-        return;
-      }
-
-      const dur = e.target.closest('[data-duration]');
-      if (dur) {
-        saveLog(T.logValue(state.trackers, state.log, dur.dataset.duration, Number(dur.dataset.min), todayKey()));
         renderBuiltins();
         return;
       }

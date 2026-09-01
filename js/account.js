@@ -236,6 +236,17 @@
             '<input class="input" id="a-pass" type="password" autocomplete="current-password" required minlength="8" placeholder="мінімум 8 символів">' +
             '<span class="field__hint">Не використовуйте пароль з інших сайтів.</span>' +
           '</div>' +
+          /*
+           * «Запамʼятати мене» типово УВІМКНЕНО: Forge відкривають у залі
+           * з телефона між підходами, і вводити пароль щоразу — гарантія,
+           * що тренування просто не запишуть. Знята галочка тримає сесію
+           * лише поки жива вкладка — це для спільного компʼютера.
+           */
+          '<label class="check">' +
+            '<input type="checkbox" id="a-remember"' +
+              (!window.Store || window.Store.remember === undefined || window.Store.remember() ? ' checked' : '') + '>' +
+            '<span>Запамʼятати мене на цьому пристрої</span>' +
+          '</label>' +
           '<div class="row">' +
             '<button class="btn btn--primary" type="submit" data-act="in">Увійти</button>' +
             /*
@@ -310,6 +321,10 @@
       buttons.forEach(function (b) { b.disabled = true; });
 
       try {
+        /* Прапорець ставимо ДО входу: signIn одразу пише сесію, і після
+           нього переносити її між сховищами було б зайвим кроком. */
+        const rem = $('#a-remember');
+        if (rem && Store.remember) Store.remember(rem.checked);
         const res = await Store.signIn(email.value.trim(), pass.value);
         toast('Вхід виконано', 'ok');
         await handleMerge(res.merge);
@@ -1166,6 +1181,23 @@
                   if (kg !== null && kg > 0) row.kg = kg;
                   const r = finite(e.r, 0, 50);
                   if (r !== null && r > 0) row.r = r;
+                  /* s — вага й повтори кожного підходу. Довжина обрізана
+                     закритими підходами: більше, ніж зроблено, у знімку
+                     бути не може навіть у підробленому файлі. */
+                  if (Array.isArray(e.s) && row.ds > 0) {
+                    const sets = [];
+                    for (let q = 0; q < e.s.length && sets.length < row.ds; q++) {
+                      const x = e.s[q];
+                      if (!isPlain(x)) { sets.push({}); continue; }
+                      const o = {};
+                      const w = finite(x.w, 0, 500);
+                      if (w !== null) o.w = Math.round(w * 2) / 2;
+                      const rr = finite(x.r, 1, 200);
+                      if (rr !== null) o.r = Math.round(rr);
+                      sets.push(o);
+                    }
+                    if (sets.length) row.s = sets;
+                  }
                   rows.push(row);
                 }
                 if (rows.length) out[d].ex = rows;

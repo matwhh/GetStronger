@@ -154,6 +154,19 @@
     return one ? Number(one[0]) : 0;
   }
 
+  /** Робоча вага вправи з книги ваг — плановий орієнтир, або null */
+  function planWeight(name) {
+    const w = Number(state.profile.weights && state.profile.weights[name]);
+    return Number.isFinite(w) && w > 0 ? w : null;
+  }
+
+  /** Фактично виконані підходи вправи i (масив {w, r}) */
+  function perfSets(i) {
+    const ex = state.plan[state.dayIdx].exercises[i];
+    return WC.performedSets(state.done[i], WC.plannedSets(ex),
+      planWeight(ex.name), repMid(ex.reps));
+  }
+
   /**
    * Факти сесії для знімка в історію: підходи, повторення й оцінка
    * тоннажу ЗАКРИТИХ вправ. Вага — з книги ваг на момент тренування;
@@ -173,15 +186,45 @@
     day.exercises.forEach(function (e, i) {
       const ps = WC.plannedSets(e);
       if (!ps) return;
-      const ds = WC.doneSetsFor(done[i], ps);
-      const r = repMid(e.reps);
-      const w = Number(weights && weights[e.name]);
+      const planW = Number(weights && weights[e.name]);
+      const fbW = Number.isFinite(planW) && planW > 0 ? planW : null;
+      const r0 = repMid(e.reps);
+
+      /* Джерело правди — ФАКТИЧНІ підходи, зафіксовані в момент тапу.
+         Книга ваг тут лише запасне значення для легасі-днів, де масиву
+         підходів ще немає. Через це пізніша зміна робочої ваги більше
+         не переписує вже закриті підходи заднім числом. */
+      const list = WC.performedSets(done[i], ps, fbW, r0);
+      const ds = list.length;
       sets += ds;
-      reps += ds * r;
-      if (ds > 0 && Number.isFinite(w) && w > 0) vol += ds * r * w;
+
       const row = { n: e.name, ds: ds, ps: ps };
-      if (Number.isFinite(w) && w > 0) row.kg = w;
-      if (r > 0) row.r = r;
+      const s = [];
+      let sumR = 0, topKg = null;
+      list.forEach(function (p) {
+        const w = Number.isFinite(p.w) ? p.w : null;
+        const r = Number.isFinite(p.r) && p.r > 0 ? p.r : 0;
+        const rec = {};
+        if (w !== null) rec.w = w;
+        if (r > 0) rec.r = r;
+        s.push(rec);
+        sumR += r;
+        if (w !== null && w > 0) {
+          if (r > 0) vol += w * r;
+          if (topKg === null || w > topKg) topKg = w;
+        }
+      });
+      reps += sumR;
+      if (s.length) row.s = s;
+
+      /* kg і r лишаються для сумісності: старі читачі (і графіки за
+         періоди до цього релізу) знають лише «одна вага на вправу».
+         kg — найважчий фактичний підхід, r — середні фактичні повтори. */
+      if (topKg !== null) row.kg = topKg;
+      else if (fbW !== null) row.kg = fbW;
+      if (ds > 0 && sumR > 0) row.r = Math.round((sumR / ds) * 10) / 10;
+      else if (r0 > 0) row.r = r0;
+
       ex.push(row);
     });
     return { sets: sets, reps: Math.round(reps), vol: Math.round(vol), ex: ex };
@@ -343,6 +386,86 @@
    * тап по n-му закриває підходи 1..n, повторний тап по останньому
    * закритому відкочує його. Вправа «виконана», коли закриті всі.
    */
+  /**
+   * Один фактично виконаний підхід: вага і повтори САМЕ ЦЬОГО підходу.
+   *
+   * Поля опційні за задумом: тап по кружечку вже записав вагу й повтори
+   * станом на ту мить, і в 90 % випадків вони правильні. Сюди лізуть,
+   * коли підхід відрізнявся — дроп-сет, недобрані повтори, інший млинець.
+   */
+  function setRowHtml(i, k, rec, ex) {
+    const n = k + 1;
+    return '' +
+      '<div class="tdy-set">' +
+        '<span class="tdy-set__n mono">' + n + '</span>' +
+        '<input class="input input--sm num mono tdy-set__w" type="text" inputmode="decimal" ' +
+          'placeholder="—" value="' + esc(rec && rec.w != null ? fmtNum.kg(rec.w) : '') + '" ' +
+          'data-setw="' + i + '" data-setn="' + n + '" ' +
+          'aria-label="Вага підходу ' + n + ', кг: ' + esc(ex.name) + '">' +
+        '<span class="tdy-set__u">кг</span>' +
+        '<span class="tdy-set__x" aria-hidden="true">×</span>' +
+        '<input class="input input--sm num mono tdy-set__r" type="text" inputmode="numeric" ' +
+          'placeholder="—" value="' + esc(rec && rec.r != null ? String(rec.r) : '') + '" ' +
+          'data-setr="' + i + '" data-setn="' + n + '" ' +
+          'aria-label="Повтори підходу ' + n + ': ' + esc(ex.name) + '">' +
+        '<span class="tdy-set__u">повт.</span>' +
+      '</div>';
+  }
+
+  function setLogHtml(i, ex, ps) {
+    const list = WC.performedSets(state.done[i], ps, planWeight(ex.name), repMid(ex.reps));
+    return list.map(function (rec, k) { return setRowHtml(i, k, rec, ex); }).join('');
+  }
+
+  /**
+   * Дописати/прибрати рядки підходів після тапу, НЕ чіпаючи вже наявні:
+   * повна перемальовка забирала б фокус із поля, яке зараз редагують.
+   */
+  function syncSetLog(rowEl, i) {
+    const box = rowEl.querySelector('[data-set-log]');
+    if (!box) return;
+    const ex = state.plan[state.dayIdx].exercises[i];
+    const ps = WC.plannedSets(ex);
+    const list = perfSets(i);
+    const kids = box.querySelectorAll('.tdy-set');
+    for (let k = list.length; k < kids.length; k++) kids[k].remove();
+    let html = '';
+    for (let k = kids.length; k < list.length; k++) html += setRowHtml(i, k, list[k], ex);
+    if (html) box.insertAdjacentHTML('beforeend', html);
+
+    const tgl = rowEl.querySelector('[data-log-tgl]');
+    if (tgl) {
+      tgl.disabled = !list.length;
+      if (!list.length) { box.hidden = true; tgl.setAttribute('aria-expanded', 'false'); }
+    }
+  }
+
+  /** Правка ваги/повторів одного підходу з поля */
+  function editSetField(i, k, patch, el) {
+    if (locked()) return;
+    const ex = state.plan[state.dayIdx].exercises[i];
+    const ps = WC.plannedSets(ex);
+    const fbW = planWeight(ex.name);
+    const fbR = repMid(ex.reps);
+    const raw = String(patch.w != null ? patch.w : patch.r);
+
+    state.done[i] = WC.editSet(state.done[i], k, patch, ps, fbW, fbR);
+    saveDayState();
+    refreshProgress();
+
+    /* Показуємо назад те, що реально записалось: поза межами значення
+       не приймається і підхід повертається до робочої ваги — мовчазне
+       «нічого не сталось» тут гірше за видиму відкотку поля. */
+    const shown = WC.performedSets(state.done[i], ps, fbW, fbR)[k] || {};
+    if ('w' in patch) {
+      el.value = shown.w == null ? '' : fmtNum.kg(shown.w);
+      if (raw !== '' && WC.normWeight(raw) === null) toast('Вага підходу: 0–500 кг', 'err');
+    } else {
+      el.value = shown.r == null ? '' : String(shown.r);
+      if (raw !== '' && WC.normReps(raw) === null) toast('Повтори: 1–200', 'err');
+    }
+  }
+
   function exerciseRow(ex, i) {
     const w = state.profile.weights && state.profile.weights[ex.name];
     const ps = WC.plannedSets(ex);
@@ -378,6 +501,12 @@
         '<div class="tdy-ex__sets" role="group" aria-label="Підходи: ' + esc(ex.name) + '">' +
           pips +
           '<span class="tdy-ex__sets-num mono" data-sets-num="' + i + '">' + ds + '/' + ps + '</span>' +
+          '<button class="tdy-ex__log-tgl" type="button" data-log-tgl="' + i + '" ' +
+            'aria-expanded="false" aria-controls="wk-log-' + i + '"' +
+            (ds ? '' : ' disabled') + '>Ваги підходів</button>' +
+        '</div>' +
+        '<div class="tdy-ex__log" id="wk-log-' + i + '" data-set-log="' + i + '" hidden>' +
+          setLogHtml(i, ex, ps) +
         '</div>' +
         '<div class="tdy-ex__wt">' +
           '<label class="tdy-ex__wt-lbl" for="wk-w-' + i + '">Робоча вага</label>' +
@@ -638,6 +767,19 @@
         return;
       }
 
+      const sw = e.target.closest('[data-setw]');
+      if (sw) {
+        editSetField(Number(sw.dataset.setw), Number(sw.dataset.setn) - 1,
+          { w: String(sw.value || '').replace(',', '.').trim() }, sw);
+        return;
+      }
+      const sr = e.target.closest('[data-setr]');
+      if (sr) {
+        editSetField(Number(sr.dataset.setr), Number(sr.dataset.setn) - 1,
+          { r: String(sr.value || '').trim() }, sr);
+        return;
+      }
+
       const wt = e.target.closest('[data-wt]');
       if (wt) { saveWeight(wt.dataset.wt, wt.value); }
     });
@@ -651,7 +793,10 @@
         const ps = WC.plannedSets(ex);
         const cur = WC.doneSetsFor(state.done[i], ps);
         const next = (n === cur) ? n - 1 : n;   // тап по останньому закритому — відкат
-        state.done[i] = next;
+        /* Тап ФІКСУЄ вагу й повтори станом на цю мить. Пізніша правка
+           робочої ваги вже не переписує цей підхід заднім числом. */
+        state.done[i] = WC.setDoneSets(state.done[i], next, ps,
+          planWeight(ex.name), repMid(ex.reps));
 
         /* Точкове оновлення рядка — без перемальовки списку під пальцем */
         const row = pip.closest('.tdy-ex');
@@ -663,9 +808,20 @@
         row.classList.toggle('is-done', ps > 0 && next >= ps);
         const num = row.querySelector('[data-sets-num]');
         if (num) num.textContent = next + '/' + ps;
+        syncSetLog(row, i);
 
         saveDayState();
         refreshProgress();
+        return;
+      }
+
+      const tgl = e.target.closest('[data-log-tgl]');
+      if (tgl && !tgl.disabled) {
+        const box = tgl.closest('.tdy-ex').querySelector('[data-set-log]');
+        if (box) {
+          box.hidden = !box.hidden;
+          tgl.setAttribute('aria-expanded', String(!box.hidden));
+        }
         return;
       }
 

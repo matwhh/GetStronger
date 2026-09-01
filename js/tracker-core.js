@@ -89,8 +89,7 @@
     },
     sleep: {
       type: 'sleep', name: 'Сон', kind: 'duration', unit: 'хв',
-      min: 0, max: 960, defaultGoal: 480,
-      presets: [360, 390, 420, 450, 480, 510, 540, 570, 600], hasSource: true
+      min: 0, max: 960, defaultGoal: 480, hasSource: true
     },
     mood: {
       type: 'mood', name: 'Настрій', kind: 'scale', unit: '', min: 1, max: 10
@@ -521,6 +520,50 @@
   }
 
   /** Хвилини → «7 год 42 хв» (або «8 год», якщо рівно). */
+  /**
+   * Хвилини → {h, m} для двох полів вводу. Готових кнопок «7 год 30 хв»
+   * більше немає: люди сплять 6:47, а не по сітці з кроком у пів години,
+   * і округлення до найближчої кнопки псувало саме той показник, заради
+   * якого трекер увімкнули.
+   */
+  function splitDuration(min) {
+    /* null / '' — це «запису немає», а не нуль хвилин: Number(null) дає 0,
+       і без цієї перевірки порожній день показував би «0 год 0 хв». */
+    if (min === null || min === undefined || min === '') return { h: null, m: null };
+    const n = Number(min);
+    if (!Number.isFinite(n) || n < 0) return { h: null, m: null };
+    const t = Math.round(n);
+    return { h: Math.floor(t / 60), m: t % 60 };
+  }
+
+  /**
+   * Години + хвилини → хвилини.
+   *
+   * Порожні поля — і нульовий підсумок теж — це «стерти запис» (null),
+   * а не нуль годин сну. Так само важливо, що стерти можна з БУДЬ-ЯКОГО
+   * поля: після запису 6:47 поле годин показує «0», і без цього правила
+   * очищення хвилин лишало б у журналі безглузді «0 хв сну».
+   *
+   * Хвилини понад 59 приймаються й переносяться в години: «90» у полі
+   * хвилин означає півтори години, а не помилку.
+   *
+   * @returns {number|null|false} хвилини, null = очистити, false = сміття
+   */
+  function joinDuration(h, m, def) {
+    const hs = String(h == null ? '' : h).trim().replace(',', '.');
+    const ms = String(m == null ? '' : m).trim().replace(',', '.');
+    if (hs === '' && ms === '') return null;
+    if ((hs && !/^\d+(\.\d+)?$/.test(hs)) || (ms && !/^\d+(\.\d+)?$/.test(ms))) return false;
+    const hn = hs === '' ? 0 : Number(hs);
+    const mn = ms === '' ? 0 : Number(ms);
+    if (!Number.isFinite(hn) || !Number.isFinite(mn)) return false;
+    const total = Math.round(hn * 60 + mn);
+    const lo = def && Number.isFinite(def.min) ? def.min : 0;
+    const hi = def && Number.isFinite(def.max) ? def.max : 1440;
+    if (total < lo || total > hi) return false;
+    return total === 0 ? null : total;
+  }
+
   function formatDuration(min) {
     const m = Math.round(Number(min));
     if (!Number.isFinite(m) || m < 0) return '';
@@ -556,6 +599,8 @@
     pairSummary: pairSummary,
     goalAdherence: goalAdherence,
     boolSummary: boolSummary,
-    formatDuration: formatDuration
+    formatDuration: formatDuration,
+    splitDuration: splitDuration,
+    joinDuration: joinDuration
   };
 })();

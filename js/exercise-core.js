@@ -51,10 +51,60 @@
    * Точка серії з рядка знімка. null, якщо в цій сесії вправу не робили
    * (ds = 0) — «був у залі й пропустив жим» не є точкою прогресу жиму.
    */
-  function pointOf(date, row) {
+  function pointOf(date, row, setNo) {
     if (!row || typeof row !== 'object') return null;
     const sets = Math.max(0, Math.round(Number(row.ds) || 0));
     if (!sets) return null;
+
+    /*
+     * ФАКТ ПОВЕРХ ПЛАНУ. row.s — вага й повтори кожного виконаного
+     * підходу, зафіксовані в момент тапу. Якщо він є, рахуємо з нього:
+     * дроп-сет 100/90/80 дає чесний тоннаж, а не «три по 80», як було,
+     * коли знімок збирався з поточної книги ваг.
+     *
+     * kg точки — НАЙВАЖЧИЙ фактичний підхід (топ-сет). Саме його людина
+     * називає «своєю вагою», і саме він має рухати графік і рекорд.
+     *
+     * setNo (1-based) звужує точку до одного підходу — перемикач
+     * «Підхід 1 / 2 / 3» на сторінці прогресу. Немає такого підходу в
+     * цій сесії — немає й точки: домальовувати її нічим.
+     */
+    const src = Array.isArray(row.s) ? row.s.slice(0, sets) : null;
+    const pick = Math.round(Number(setNo) || 0);
+
+    if (src && src.length) {
+      const list = pick > 0 ? (src[pick - 1] ? [src[pick - 1]] : []) : src;
+      if (!list.length) return null;
+
+      let n = 0, reps = 0, vol = 0, kg = null, best = null, wr = 0;
+      list.forEach(function (x) {
+        n += 1;
+        const w = Number(x && x.w);
+        const r = Number(x && x.r);
+        const hasW = Number.isFinite(w) && w > 0;
+        const hasR = Number.isFinite(r) && r > 0;
+        if (hasR) { reps += r; wr += 1; }
+        if (hasW && (kg === null || w > kg)) kg = w;
+        if (hasW && hasR) {
+          vol += w * r;
+          const e = e1rmOf(w, r);
+          if (e !== null && (best === null || e > best)) best = e;
+        }
+      });
+      return {
+        d: date,
+        kg: kg,
+        sets: n,
+        perSet: wr ? Math.round((reps / wr) * 10) / 10 : null,
+        reps: Math.round(reps),
+        vol: Math.round(vol),
+        e1rm: best
+      };
+    }
+
+    /* Легасі-знімок: одна вага й середина діапазону на всю вправу.
+       Точку по конкретному підходу з нього чесно зібрати неможливо. */
+    if (pick > 0) return null;
 
     const kg = Number(row.kg);
     const hasKg = Number.isFinite(kg) && kg > 0;
@@ -73,6 +123,26 @@
       vol: vol,
       e1rm: (hasKg && hasReps) ? e1rmOf(kg, per) : null
     };
+  }
+
+  /** Скільки підходів вправи є в знімках — стеля перемикача «Підхід N» */
+  function maxSetNo(sessionLog, name, fromKey, toKey) {
+    if (!sessionLog || typeof sessionLog !== 'object' || !name) return 0;
+    let max = 0;
+    Object.keys(sessionLog).forEach(function (d) {
+      if (!DATE_KEY.test(d)) return;
+      if (fromKey && d < fromKey) return;
+      if (toKey && d > toKey) return;
+      const s = sessionLog[d];
+      if (!s || !Array.isArray(s.ex)) return;
+      s.ex.forEach(function (row) {
+        if (!row || row.n !== name || !Array.isArray(row.s)) return;
+        const ds = Math.max(0, Math.round(Number(row.ds) || 0));
+        const n = Math.min(ds, row.s.length);
+        if (n > max) max = n;
+      });
+    });
+    return max;
   }
 
   /**
@@ -102,7 +172,7 @@
    * Серія точок вправи за вікном [fromKey..toKey], у хронології.
    * fromKey/toKey необовʼязкові — без них береться вся історія.
    */
-  function series(sessionLog, name, fromKey, toKey) {
+  function series(sessionLog, name, fromKey, toKey, setNo) {
     if (!sessionLog || typeof sessionLog !== 'object' || !name) return [];
     const out = [];
     Object.keys(sessionLog).forEach(function (d) {
@@ -117,13 +187,89 @@
       let best = null;
       s.ex.forEach(function (row) {
         if (row && row.n === name) {
-          const p = pointOf(d, row);
+          const p = pointOf(d, row, setNo);
           if (p && (!best || p.vol > best.vol || (p.vol === best.vol && p.sets > best.sets))) best = p;
         }
       });
       if (best) out.push(best);
     });
     return out.sort(function (a, b) { return a.d < b.d ? -1 : 1; });
+  }
+
+  /**
+   * Рекорди з ФАКТИЧНО виконаного: найважчий підхід кожної вправи за всю
+   * історію знімків.
+   *
+   * Чому не з книги ваг: там лежить ПЛАН. Поставити собі 140 у полі
+   * робочої ваги й не піти в зал — не рекорд, а намір; до цього релізу
+   * такий намір потрапляв на дошку рекордів нарівні зі штангою.
+   *
+   * Легасі-знімки (без масиву s) теж рахуються — там вага одна на всю
+   * вправу, але вона все одно ФАКТ того дня, а не запис у плані.
+   *
+   * @returns [{ name, kg, date, reps, isNew }] за спаданням ваги
+   */
+  function prFromSessions(sessionLog, newDays, today) {
+    if (!sessionLog || typeof sessionLog !== 'object') return [];
+    const best = Object.create(null);
+
+    Object.keys(sessionLog).forEach(function (d) {
+      if (!DATE_KEY.test(d)) return;
+      const s = sessionLog[d];
+      if (!s || !Array.isArray(s.ex)) return;
+      s.ex.forEach(function (row) {
+        const name = row && row.n;
+        if (!name) return;
+        const ds = Math.max(0, Math.round(Number(row.ds) || 0));
+        if (!ds) return;
+
+        let kg = null, reps = null;
+        if (Array.isArray(row.s) && row.s.length) {
+          row.s.slice(0, ds).forEach(function (x) {
+            const w = Number(x && x.w);
+            if (!Number.isFinite(w) || w <= 0) return;
+            if (kg === null || w > kg) {
+              kg = w;
+              const r = Number(x && x.r);
+              reps = Number.isFinite(r) && r > 0 ? Math.round(r) : null;
+            }
+          });
+        } else {
+          const w = Number(row.kg);
+          if (Number.isFinite(w) && w > 0) {
+            kg = w;
+            const r = Number(row.r);
+            reps = Number.isFinite(r) && r > 0 ? Math.round(r) : null;
+          }
+        }
+        if (kg === null) return;
+
+        const cur = best[name];
+        /* За рівної ваги лишаємо ПЕРШУ дату: рекорд ставлять один раз,
+           а не щоразу, коли його повторюють. */
+        if (!cur || kg > cur.kg) best[name] = { name: name, kg: kg, date: d, reps: reps };
+      });
+    });
+
+    const days = Math.max(0, Math.round(Number(newDays) || 0));
+    const t = DATE_KEY.test(today) ? today : null;
+    let edge = '';
+    if (days && t) {
+      const dt = new Date(t + 'T00:00:00');
+      dt.setDate(dt.getDate() - days);
+      edge = dt.getFullYear() + '-' +
+        String(dt.getMonth() + 1).padStart(2, '0') + '-' +
+        String(dt.getDate()).padStart(2, '0');
+    }
+
+    return Object.keys(best).map(function (n) {
+      const x = best[n];
+      x.isNew = Boolean(edge && x.date >= edge);
+      return x;
+    }).sort(function (a, b) {
+      if (a.kg !== b.kg) return b.kg - a.kg;
+      return a.name < b.name ? -1 : 1;
+    });
   }
 
   /** Значення метрики точки; null — метрика для цієї точки невідома */
@@ -195,6 +341,8 @@
     pointOf: pointOf,
     exerciseNames: exerciseNames,
     series: series,
+    maxSetNo: maxSetNo,
+    prFromSessions: prFromSessions,
     valueOf: valueOf,
     stats: stats,
     trend: trend

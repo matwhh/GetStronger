@@ -801,6 +801,44 @@ a.card > .btn {
 .tdy-ex__set:disabled { opacity: 0.55; cursor: default; }
 .tdy-ex__sets-num { font-size: 0.85rem; color: var(--muted); margin-left: 2px; }
 
+/* Розкривний журнал підходів.
+   Вага в книзі — це ПЛАН («хочу жати 100»), а тут лежить ФАКТ кожного
+   підходу («перший 100, третій 80»). Згорнутий за замовчуванням: тап по
+   кружечку вже записав вагу й повтори тієї миті, і лізти сюди треба
+   лише тоді, коли підхід відрізнявся від плану. */
+.tdy-ex__log-tgl {
+  margin-left: auto;
+  min-height: 44px;                 /* палець у залі, а не курсор */
+  display: inline-flex; align-items: center;
+  border: 0; background: none; padding: 0 2px;
+  color: var(--muted); font-size: 0.8rem; text-decoration: underline;
+  text-underline-offset: 3px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tdy-ex__log-tgl:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
+.tdy-ex__log-tgl:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; border-radius: 6px; }
+.tdy-ex__log {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 2px 0 12px;
+}
+/* display:flex переважає типове [hidden]{display:none} браузера —
+   без цього рядка згорнутий журнал лишався б видимим. */
+.tdy-ex__log[hidden] { display: none; }
+
+/* Тривалість двома полями (сон): «год» і «хв» замість сітки кнопок. */
+.qi-dur { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.qi-dur .input { width: 72px; }
+.qi-dur__u { font-size: 0.85rem; color: var(--muted); margin-right: 4px; }
+.tdy-set { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tdy-set__n {
+  flex: 0 0 auto; width: 22px;
+  font-size: 0.8rem; color: var(--muted); text-align: right;
+}
+.tdy-set__u { font-size: 0.8rem; color: var(--muted); }
+.tdy-set__x { font-size: 0.8rem; color: var(--muted); margin: 0 2px; }
+.tdy-set .input { width: 78px; }
+.tdy-ex.is-done .tdy-ex__log { opacity: 0.55; }
+
 /* Великий відсоток виконання плану на «Прогресі» — головне число картки */
 .adh__pct {
   font-size: 2.8rem;

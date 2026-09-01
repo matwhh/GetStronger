@@ -293,10 +293,22 @@
       }).join('');
     } else if (def.kind === 'duration') {
       val = today != null ? window.TrackerCore.formatDuration(today) : '—';
-      action = '<div class="qi-row">' + def.presets.map(function (m) {
-        return '<button class="btn btn--sm ' + (today === m ? 'btn--primary' : 'btn--ghost') + '" type="button" ' +
-          'data-trk-duration="' + esc(t.id) + '" data-min="' + m + '">' + window.TrackerCore.formatDuration(m) + '</button>';
-      }).join('') + '</div>';
+      /* Два поля замість сітки готових кнопок: сон буває 6:47, і
+         округлення до найближчої кнопки псувало саме те число, заради
+         якого трекер вмикають. Порожні поля = стерти запис. */
+      const sp = window.TrackerCore.splitDuration(today);
+      action = '<div class="qi-dur">' +
+        '<input class="input input--sm num mono" type="text" inputmode="numeric" ' +
+          'data-trk-durh="' + esc(t.id) + '" placeholder="0" ' +
+          'value="' + (sp.h == null ? '' : sp.h) + '" ' +
+          'aria-label="' + esc(t.name) + ', годин">' +
+        '<span class="qi-dur__u">год</span>' +
+        '<input class="input input--sm num mono" type="text" inputmode="numeric" ' +
+          'data-trk-durm="' + esc(t.id) + '" placeholder="0" ' +
+          'value="' + (sp.m == null ? '' : sp.m) + '" ' +
+          'aria-label="' + esc(t.name) + ', хвилин">' +
+        '<span class="qi-dur__u">хв</span>' +
+      '</div>';
     } else if (def.kind === 'value') {
       val = today != null ? String(today) : '—';
       action = '<input class="input input--sm mono" type="text" inputmode="decimal" data-trk-value="' + esc(t.id) + '" ' +
@@ -814,6 +826,38 @@
       const TC = window.TrackerCore;
       if (!TC) return;
 
+      /* Тривалість: два поля, одна величина. Читаємо ОБИДВА, бо зміна
+         годин без хвилин не має скидати хвилини — і навпаки. */
+      const dh = e.target.closest('[data-trk-durh]');
+      const dm = e.target.closest('[data-trk-durm]');
+      if (dh || dm) {
+        const id = (dh || dm).dataset.trkDurh || (dh || dm).dataset.trkDurm;
+        const box = (dh || dm).closest('.qi-dur');
+        const hEl = box && box.querySelector('[data-trk-durh]');
+        const mEl = box && box.querySelector('[data-trk-durm]');
+        const hv = hEl && hEl.value;
+        const mv = mEl && mEl.value;
+        /*
+         * УСЕ — наступним тактом. change у текстовому полі приходить
+         * усередині зміни фокуса, а saveTrackerLog перемальовує картку:
+         * заміна innerHTML прямо тут валить DOM-помилкою.
+         */
+        setTimeout(function () {
+          const trk = TC.list(state.trackers).find(function (x) { return x.id === id; });
+          const def = trk ? TC.defFor(trk) : null;
+          const mins = TC.joinDuration(hv, mv, def || { min: 0, max: 1440 });
+          if (mins === false) {
+            toast('Не схоже на час: перевірте години й хвилини', 'err');
+            render();
+            return;
+          }
+          saveTrackerLog(mins === null
+            ? TC.removeEntry(state.trackerLog, id, state.todayKey)
+            : TC.logValue(state.trackers, state.trackerLog, id, mins, state.todayKey));
+        }, 0);
+        return;
+      }
+
       const val = e.target.closest('[data-trk-value]');
       if (val) {
         // Порожнє поле прибирає запис дня, а не пише нуль: Number('') === 0
@@ -840,8 +884,7 @@
       const add = e.target.closest('[data-trk-add]');
       if (add) { saveTrackerLog(TC.addDelta(state.trackers, state.trackerLog, add.dataset.trkAdd, Number(add.dataset.amount), state.todayKey)); return; }
 
-      const dur = e.target.closest('[data-trk-duration]');
-      if (dur) { saveTrackerLog(TC.logValue(state.trackers, state.trackerLog, dur.dataset.trkDuration, Number(dur.dataset.min), state.todayKey)); return; }
+
 
       const sc = e.target.closest('[data-trk-scale]');
       if (sc) { saveTrackerLog(TC.logValue(state.trackers, state.trackerLog, sc.dataset.trkScale, Number(sc.dataset.val), state.todayKey)); return; }

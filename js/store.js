@@ -56,6 +56,7 @@
   try { localStorage.setItem('ib.cloud', CLOUD ? '1' : '0'); } catch (_) {}
 
   const LS_SESSION = 'ib.session';
+  const LS_REMEMBER = 'ib.remember';   // '0' = не тримати сесію між сеансами
   const LS_PROFILE = 'ib.profile';
   const LS_BACKUP  = 'ib.profile.backup';         // копія ПЕРЕД імпортом
   /*
@@ -626,6 +627,22 @@
        *       з правильним паролем бачила «Не вдалося увійти» одразу
        *       після успішного входу.
        */
+      /*
+       * ОДНА СПРОБА ОНОВИТИ, і лише потім вихід.
+       *
+       * Це й був головний спосіб «мовчки вилетіти з акаунта»: локальний
+       * expires_at ще не минув (годинник пристрою відстає, вкладка спала,
+       * інша вкладка вже прокрутила токен), сервер віддає 401 — і сесія
+       * стиралась НАЗАВЖДИ, хоч refresh_token був цілком робочий.
+       */
+      if (res.status === 401 && opts.auth !== false && !opts.noRetry &&
+          session && session.refresh_token) {
+        const revived = await doRefresh();
+        if (revived) {
+          return req(path, Object.assign({}, opts, { noRetry: true }));
+        }
+      }
+
       if (res.status === 401 && opts.auth !== false) {
         err.authExpired = true;
         clearSession();
@@ -638,16 +655,66 @@
     return data;
   }
 
+  /* ------------------------------------------------------------------ */
+  /* «Запамʼятати мене»                                                  */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Сесія лежить у localStorage (переживає закриття браузера) або в
+   * sessionStorage (живе рівно стільки, скільки вкладка). Вибір робить
+   * людина галочкою на вході; типово — запамʼятовуємо, бо телефон у залі
+   * не місце для повторного вводу пароля між підходами.
+   *
+   * Прапорець зберігається ОКРЕМО від сесії: після виходу він має
+   * пережити стирання сесії, інакше галочка щоразу поверталась би в
+   * типовий стан і «не запамʼятовувати» на спільному компʼютері
+   * доводилось би ставити при кожному вході.
+   */
+  function rememberOn() {
+    try { return localStorage.getItem(LS_REMEMBER) !== '0'; } catch (_) { return true; }
+  }
+
+  function sessionStore() {
+    try { return rememberOn() ? localStorage : sessionStorage; }
+    catch (_) { return localStorage; }
+  }
+
+  function readSavedSession() {
+    /* Читаємо ОБИДВА сховища: людина могла зняти галочку, а вкладка з
+       попередньою сесією ще жива — і навпаки. */
+    for (const box of [localStorage, sessionStorage]) {
+      try {
+        const raw = box.getItem(LS_SESSION);
+        if (!raw) continue;
+        const v = JSON.parse(raw);
+        if (v && v.access_token) return v;
+      } catch (_) { /* наступне сховище */ }
+    }
+    return null;
+  }
+
+  function writeSavedSession(v) {
+    const keep = sessionStore();
+    const drop = keep === localStorage ? sessionStorage : localStorage;
+    try { drop.removeItem(LS_SESSION); } catch (_) {}
+    try { keep.setItem(LS_SESSION, JSON.stringify(v)); return true; }
+    catch (_) { return false; }
+  }
+
   function storeSession(s) {
     if (!s || !s.access_token) return;
     session = {
       access_token:  s.access_token,
-      refresh_token: s.refresh_token,
+      /* Ротація: сервер видає новий refresh_token при кожному оновленні,
+         але у відповіді на деякі виклики його немає — тоді лишаємо той,
+         що вже маємо, інакше наступне оновлення нічим було б робити і
+         людину викидало б рівно через годину. */
+      refresh_token: s.refresh_token || (session && session.refresh_token) || '',
       // expires_in приходить у секундах
       expires_at:    Date.now() + (Number(s.expires_in || 3600) * 1000),
-      user:          s.user ? { id: s.user.id, email: s.user.email } : null
+      user:          s.user ? { id: s.user.id, email: s.user.email }
+                            : (session && session.user) || null
     };
-    lsSet(LS_SESSION, session);
+    writeSavedSession(session);
   }
 
   /*
@@ -700,6 +767,7 @@
     session = null;
     cache = null;
     try { localStorage.removeItem(LS_SESSION); } catch (_) {}
+    try { sessionStorage.removeItem(LS_SESSION); } catch (_) {}
   }
 
   /**
@@ -748,11 +816,9 @@
    */
   let refreshing = null;
 
-  async function ensureFresh() {
-    if (!session) return false;
-    if (Date.now() < session.expires_at - 60000) return true;
-    if (!session.refresh_token) { clearSession(); emit(); return false; }
-
+  /** Безумовне оновлення токена (одна обіцянка на всіх викликів) */
+  function doRefresh() {
+    if (!session || !session.refresh_token) return Promise.resolve(false);
     if (refreshing) return refreshing;
 
     refreshing = (async function () {
@@ -778,6 +844,13 @@
     })();
 
     return refreshing;
+  }
+
+  async function ensureFresh() {
+    if (!session) return false;
+    if (Date.now() < session.expires_at - 60000) return true;
+    if (!session.refresh_token) { clearSession(); emit(); return false; }
+    return doRefresh();
   }
 
   /* ------------------------------------------------------------------ */
@@ -929,6 +1002,20 @@
     onChange: function (fn) {
       listeners.add(fn);
       return function () { listeners.delete(fn); };
+    },
+
+    /**
+     * «Запамʼятати мене»: чи тримати сесію між сеансами браузера.
+     *
+     * Без аргументу — читає стан (типово true). З аргументом — ставить і
+     * ОДРАЗУ переносить поточну сесію в потрібне сховище: людина знімає
+     * галочку вже після входу, і без переносу вона б нічого не зробила.
+     */
+    remember: function (on) {
+      if (on === undefined) return rememberOn();
+      try { localStorage.setItem(LS_REMEMBER, on ? '1' : '0'); } catch (_) {}
+      if (session) writeSavedSession(session);
+      return rememberOn();
     },
 
     pendingCount: function () { return pendingGet().length; },
@@ -1524,13 +1611,37 @@
    * зовсім — у вкладці A додав рецепт, у вкладці B зберіг вагу, рецепт зник.
    */
   window.addEventListener('storage', function (e) {
+    /*
+     * Сесія теж їздить між вкладками. Supabase РОТУЄ refresh-токени:
+     * якщо вкладка A оновила токен, у вкладки B в памʼяті лишається вже
+     * витрачений — і перше ж її збереження отримувало 401 і викидало
+     * людину з акаунта в обох вкладках. Тепер B просто підхоплює те, що
+     * записала A; стерта сесія так само розʼїжджається як вихід.
+     */
+    if (e.key === LS_SESSION) {
+      if (e.newValue == null) {
+        if (session) { session = null; cache = null; emit(); }
+        return;
+      }
+      try {
+        const next = JSON.parse(e.newValue);
+        if (next && next.access_token &&
+            (!session || Number(next.expires_at) > Number(session.expires_at))) {
+          session = next;
+          cache = null;
+          emit();
+        }
+      } catch (_) { /* чужий запис — ігноруємо */ }
+      return;
+    }
+
     if (e.key !== LS_PROFILE) return;
     cache = null;
     api.getProfile().then(emit, function () {});
   });
 
   if (CLOUD) {
-    const saved = lsGet(LS_SESSION, null);
+    const saved = readSavedSession();
     if (saved && saved.access_token) {
       session = saved;
       /* Та сама звірка власника, що й при вході: сесія могла відновитись

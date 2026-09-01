@@ -31,6 +31,7 @@
     exName: '',      // обрана вправа в «Прогресі вправи»; '' — ще не обрано
     exMetric: 'kg',  // метрика її графіка: kg | vol | reps | e1rm
     exPeriod: 90,    // період графіка вправи, днів; 0 = весь час
+    exSet: 0,        // підхід у графіку вправи: 0 = усі разом, 1..N — один
     view: 'overview',// 'overview' | 'history'
     hcalY: 0,        // рік/місяць календаря історії
     hcalM: 0,
@@ -462,11 +463,11 @@
   }
 
   /**
-   * Вікно календаря — РІВНО шість календарних місяців: поточний і пʼять
+   * Вікно календаря — РІВНО сім календарних місяців: поточний і шість
    * попередніх, з першого числа. Не «N тижнів назад»: людина думає
    * місяцями, і кожен місяць має стояти в сітці цілим.
    */
-  const HM_MONTHS = 6;
+  const HM_MONTHS = 7;
 
   function hmFirstDay() {
     const n = new Date();
@@ -865,7 +866,14 @@
     const from = state.exPeriod
       ? window.AdherenceCore.addDays(todayKey(), -(state.exPeriod - 1))
       : '';
-    const pts = EC.series(state.sessionLog, name, from, todayKey());
+    /* Перемикач «Підхід N» зʼявляється лише там, де є дані по підходах:
+       у легасі-знімках вага одна на всю вправу, і розкласти її назад на
+       підходи неможливо. Обраний підхід міг зникнути (вправу скоротили
+       з 4 підходів до 3) — тоді чесно повертаємось до «Усі». */
+    const maxSet = EC.maxSetNo ? EC.maxSetNo(state.sessionLog, name, from, todayKey()) : 0;
+    const setNo = (state.exSet > 0 && state.exSet <= maxSet) ? state.exSet : 0;
+
+    const pts = EC.series(state.sessionLog, name, from, todayKey(), setNo);
     const st = EC.stats(pts, metric);
 
     const picker =
@@ -887,6 +895,17 @@
           (pp.days === state.exPeriod ? ' checked' : '') + '><span>' + pp.label + '</span></label>';
       }).join('') + '</div>';
 
+    let setTabs = '';
+    if (maxSet > 1) {
+      let items = '<label class="seg__item"><input type="radio" name="ex-set" value="0"' +
+        (setNo === 0 ? ' checked' : '') + '><span>Усі</span></label>';
+      for (let k = 1; k <= maxSet; k++) {
+        items += '<label class="seg__item"><input type="radio" name="ex-set" value="' + k + '"' +
+          (setNo === k ? ' checked' : '') + '><span>' + k + '</span></label>';
+      }
+      setTabs = '<div class="seg" role="radiogroup" aria-label="Підхід">' + items + '</div>';
+    }
+
     let body;
     if (!st) {
       /* Метрика незастосовна (планка не має ваги) або в періоді порожньо —
@@ -896,7 +915,10 @@
         (any
           ? 'Для цієї вправи показник «' + esc(m.label) + '» не рахується: ' +
             'у ній не задано робочої ваги. Подивіться «Повтори».'
-          : 'За цей період тренувань із цією вправою не було. Візьміть ширший період.') +
+          : (setNo
+              ? 'За цей період підхід ' + setNo + ' у цій вправі не траплявся. ' +
+                'Візьміть ширший період або «Усі».'
+              : 'За цей період тренувань із цією вправою не було. Візьміть ширший період.')) +
         '</p>';
     } else {
       const trend = EC.trend(pts, metric);
@@ -943,7 +965,12 @@
         '</div>' +
         '<p class="small muted mt-1 mb-0">' + st.count + ' ' +
           window.App.plural(st.count, 'тренування', 'тренування', 'тренувань') +
-          ' за період. Обʼєм і 1ПМ рахуються з ЗАКРИТИХ підходів і робочої ваги того дня.</p>';
+          ' за період. ' +
+          (setNo
+            ? 'Показано лише підхід ' + setNo + '.'
+            : 'Вага — найважчий фактичний підхід дня, обʼєм — сума «вага × повтори» ' +
+              'по кожному підходу. Тренування до появи ваг по підходах рахуються ' +
+              'за робочою вагою того дня.') + '</p>';
     }
 
     host.innerHTML =
@@ -955,6 +982,8 @@
         '<div class="row mt-2" style="gap:10px;flex-wrap:wrap;align-items:center">' +
           picker + tabs +
         '</div>' +
+        (setTabs ? '<div class="row mt-1" style="gap:10px;flex-wrap:wrap;align-items:center">' +
+          '<span class="small muted">Підхід</span>' + setTabs + '</div>' : '') +
         body +
       '</div>';
   }
@@ -1299,22 +1328,44 @@
     const PC = window.ProgressCore;
     if (!host || !PC || !PC.prList) return;
 
-    const list = PC.prList(sn.weightLog, 14);
+    /*
+     * Рекорд — це ПІДНЯТА вага, а не записана в план. Основа — знімки
+     * сесій (найважчий фактично виконаний підхід), і лише для вправ,
+     * яких у знімках ще немає, беремо максимум із книги ваг: історія
+     * книги довша за історію знімків, і обірвати її датою релізу було б
+     * гірше, ніж чесно підписати рядок «за журналом ваг».
+     */
+    const EC = window.ExerciseCore;
+    const real = EC && EC.prFromSessions ? EC.prFromSessions(sn.sessionLog, 14, todayKey()) : [];
+    const seen = Object.create(null);
+    real.forEach(function (x) { seen[x.name] = 1; });
+
+    const book = PC.prList(sn.weightLog, 14).filter(function (x) { return !seen[x.name]; })
+      .map(function (x) { x.book = true; return x; });
+
+    const list = real.concat(book).sort(function (a, b) {
+      if (a.kg !== b.kg) return b.kg - a.kg;
+      return a.name < b.name ? -1 : 1;
+    });
+
     if (!list.length) {
       host.innerHTML =
         '<div class="card">' +
           '<h2 style="margin:0">Особисті рекорди</h2>' +
-          '<p class="small mt-1 mb-0">Рекорд зʼявляється, коли робоча вага вправи перевищує ' +
-          'свій попередній максимум. Поки що перевищувати нічого — все попереду.</p>' +
+          '<p class="small mt-1 mb-0">Рекорд зʼявляється, коли фактично виконаний підхід ' +
+          'важчий за всі попередні. Поки що перевищувати нічого — все попереду.</p>' +
         '</div>';
       return;
     }
 
+    const hasBook = book.length > 0;
     const rows = list.slice(0, 10).map(function (x) {
       return '<div class="wlog-row">' +
         '<span class="small">' + esc(x.name) +
-          (x.isNew ? ' <span class="chip chip--sm chip--acc">Новий PR</span>' : '') + '</span>' +
-        '<span class="muted small">' + esc(dateLabel(dateOf(x.date))) + '</span>' +
+          (x.isNew ? ' <span class="chip chip--sm chip--acc">Новий PR</span>' : '') +
+          (x.book ? ' <span class="chip chip--sm">план</span>' : '') + '</span>' +
+        '<span class="muted small">' + esc(dateLabel(dateOf(x.date))) +
+          (x.reps ? ' · ' + x.reps + ' повт.' : '') + '</span>' +
         '<b class="mono">' + fmtNum.kg(x.kg) + ' кг</b>' +
       '</div>';
     }).join('');
@@ -1326,8 +1377,10 @@
           '<span class="small muted">' + list.length + ' ' + window.App.plural(list.length, 'вправа', 'вправи', 'вправ') + '</span>' +
         '</div>' +
         '<div class="mt-2">' + rows + '</div>' +
-        '<p class="small muted mb-0" style="margin-top:10px">Максимальна робоча вага з журналу. ' +
-        '«Новий PR» — поставлений за останні два тижні.</p>' +
+        '<p class="small muted mb-0" style="margin-top:10px">Найважчий фактично виконаний підхід. ' +
+        '«Новий PR» — поставлений за останні два тижні.' +
+        (hasBook ? ' Позначка «план» — вправи, яких ще немає у знімках тренувань: ' +
+          'для них показано максимум із журналу робочих ваг.' : '') + '</p>' +
       '</div>';
   }
 
@@ -1698,6 +1751,8 @@
       if (em) { state.exMetric = em.value; renderExercise(); return; }
       const ep = e.target.closest('input[name="ex-period"]');
       if (ep) { state.exPeriod = Number(ep.value); renderExercise(); return; }
+      const es = e.target.closest('input[name="ex-set"]');
+      if (es) { state.exSet = Number(es.value) || 0; renderExercise(); return; }
       if (e.target.id === 'ex-pick') { state.exName = e.target.value; renderExercise(); return; }
 
       const vw = e.target.closest('input[name="jr-view"]');

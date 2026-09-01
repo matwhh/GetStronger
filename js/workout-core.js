@@ -113,9 +113,159 @@
 
   /** Закриті підходи з запису денного стану, обрізані до плану */
   function doneSetsFor(entry, planned) {
+    if (Array.isArray(entry)) return Math.min(planned, entry.length);
     if (entry === true) return planned;
     const n = Math.round(Number(entry) || 0);
     return Math.min(planned, Math.max(0, n));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Фактично виконані підходи                                           */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ПЛАНОВА ВАГА ≠ ФАКТИЧНА. Робоча вага у книзі (profile.weights) — це
+   * те, що людина СОБІ ЗАПЛАНУВАЛА, і вона одна на вправу. Реальний
+   * підхід має власну вагу: перший на 100, третій на 80 — це нормальне
+   * тренування, а не помилка вводу.
+   *
+   * Тому денний стан тримає МАСИВ виконаних підходів, а не лічильник:
+   *
+   *   done[i] = [ {w:100, r:8}, {w:90, r:8} ]   ← нова форма
+   *   done[i] = 2                                ← легасі: два підходи
+   *   done[i] = true                             ← ще старіше: всі підходи
+   *
+   * Кожен запис створюється В МОМЕНТ тапу і фіксує вагу та повтори станом
+   * на цю мить. Пізніша зміна робочої ваги його НЕ переписує — саме через
+   * це раніше дроп-сет («перший на 100, далі на 90») лягав в історію як
+   * «усі на 90»: знімок збирався з поточної книги ваг на кожен дотик.
+   */
+
+  /**
+   * Вага підходу: скінченна, 0..500. Ті самі межі, що в книзі ваг.
+   *
+   * null, '' і порожній масив — це «ваги немає» (планка, прес), а НЕ
+   * нуль: Number(null) дає 0, і без цієї перевірки вправа без ваги
+   * діставала б чесний на вигляд 0 кг у кожному підході.
+   */
+  function normWeight(v) {
+    if (typeof v !== 'number' && typeof v !== 'string') return null;
+    if (typeof v === 'string' && v.trim() === '') return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 500) return null;
+    return Math.round(n * 2) / 2;   // крок 0,5 кг, як усюди
+  }
+
+  /** Повтори підходу: ціле 1..200; поза межами — «не задано». */
+  function normReps(v) {
+    if (typeof v !== 'number' && typeof v !== 'string') return null;
+    if (typeof v === 'string' && v.trim() === '') return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 1 || n > 200) return null;
+    return Math.round(n);
+  }
+
+  /**
+   * Виконані підходи вправи як масив {w, r}.
+   * Легасі-форми (число, true) розгортаються у стільки ж підходів із
+   * підставленими значеннями — історія від зміни формату не втрачається.
+   *
+   * @param entry    done[i] у будь-якій формі
+   * @param planned  скільки підходів заплановано (стеля)
+   * @param fbW      вага для підстановки (робоча вага вправи)
+   * @param fbR      повтори для підстановки (середина діапазону плану)
+   */
+  function performedSets(entry, planned, fbW, fbR) {
+    const cap = Math.max(0, Math.round(Number(planned) || 0));
+    const w0 = normWeight(fbW);
+    const r0 = normReps(fbR);
+    const fill = function () {
+      const o = {};
+      if (w0 !== null) o.w = w0;
+      if (r0 !== null) o.r = r0;
+      return o;
+    };
+
+    if (Array.isArray(entry)) {
+      return entry.slice(0, cap).map(function (e) {
+        if (!e || typeof e !== 'object') return fill();
+        const o = {};
+        const w = normWeight(e.w);
+        const r = normReps(e.r);
+        /* null означає «успадковано»: у підході, який не редагували,
+           лишається значення, підставлене в момент тапу. */
+        if (w !== null) o.w = w; else if (w0 !== null) o.w = w0;
+        if (r !== null) o.r = r; else if (r0 !== null) o.r = r0;
+        return o;
+      });
+    }
+
+    const n = (entry === true) ? cap
+      : Math.min(cap, Math.max(0, Math.round(Number(entry) || 0)));
+    const out = [];
+    for (let k = 0; k < n; k++) out.push(fill());
+    return out;
+  }
+
+  /**
+   * Виставити КІЛЬКІСТЬ закритих підходів, зберігши вже зафіксовані.
+   *
+   * Це єдина точка, через яку тап по кружечку міняє денний стан. Ріст —
+   * дописує нові записи з поточною робочою вагою й повторами плану;
+   * відкат — відрізає хвіст. Уже наявні записи НЕ переписуються: у цьому
+   * весь сенс — вага підходу належить підходу, а не вправі.
+   *
+   * @returns масив {w, r} довжини n (нова форма done[i])
+   */
+  function setDoneSets(entry, n, planned, fbW, fbR) {
+    const cap = Math.max(0, Math.round(Number(planned) || 0));
+    const want = Math.min(cap, Math.max(0, Math.round(Number(n) || 0)));
+    const cur = performedSets(entry, cap, fbW, fbR);
+    if (want <= cur.length) return cur.slice(0, want);
+
+    const w0 = normWeight(fbW);
+    const r0 = normReps(fbR);
+    const out = cur.slice();
+    while (out.length < want) {
+      const o = {};
+      if (w0 !== null) o.w = w0;
+      if (r0 !== null) o.r = r0;
+      out.push(o);
+    }
+    return out;
+  }
+
+  /**
+   * Правка одного підходу: вага і/або повтори. Порожній рядок ('' чи
+   * null) означає «прибрати значення», а не «нуль», інакше очищене поле
+   * ваги перетворювало б підхід на 0 кг у тоннажі.
+   *
+   * @returns новий масив done[i]; поза межами — повертає вхід без змін
+   */
+  function editSet(entry, idx, patch, planned, fbW, fbR) {
+    const cur = performedSets(entry, planned, fbW, fbR);
+    const k = Math.round(Number(idx) || 0);
+    if (!(k >= 0 && k < cur.length)) return cur;
+    const rec = Object.assign({}, cur[k]);
+    /* Порожнє чи неприйнятне значення повертає підхід до робочої ваги,
+       а не лишає дірку: дірку все одно заповнив би performedSets при
+       наступному читанні, і поле показувало б не те, що записано. */
+    if (patch && 'w' in patch) {
+      const w = normWeight(patch.w);
+      const fb = normWeight(fbW);
+      if (w !== null) rec.w = w;
+      else if (fb !== null) rec.w = fb;
+      else delete rec.w;
+    }
+    if (patch && 'r' in patch) {
+      const r = normReps(patch.r);
+      const fb = normReps(fbR);
+      if (r !== null) rec.r = r;
+      else if (fb !== null) rec.r = fb;
+      else delete rec.r;
+    }
+    const out = cur.slice();
+    out[k] = rec;
+    return out;
   }
 
   /**
@@ -292,6 +442,11 @@
     writeDay: writeDay,
     plannedSets: plannedSets,
     doneSetsFor: doneSetsFor,
+    normWeight: normWeight,
+    normReps: normReps,
+    performedSets: performedSets,
+    setDoneSets: setDoneSets,
+    editSet: editSet,
     dayStats: dayStats,
     dayMinutes: dayMinutes,
     addDaysKey: addDaysKey,

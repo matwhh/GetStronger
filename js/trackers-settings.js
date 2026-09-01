@@ -39,6 +39,7 @@
   function fmtValue(def, v) {
     if (v === true) return '✓';
     if (def.kind === 'duration') return T.formatDuration(v);
+    if (def.kind === 'dose') return fmtNum.n(v, 1) + ' г';
     if (def.kind === 'cumulative' || def.kind === 'value' || def.kind === 'scale') {
       return fmtNum.n(v, 1) + (def.unit ? ' ' + def.unit : '');
     }
@@ -271,8 +272,19 @@
   /* ------------------------------------------------------------------ */
 
   function customRow(t, kind) {
-    const today = (state.log[t.id] || {})[todayKey()] === true;
+    const today = T.taken((state.log[t.id] || {})[todayKey()]);
     const st = T.boolSummary(state.log, t.id, 30, t.createdAt);
+    /* Типова доза добавки: галочка на «Трекерах» пише саме її. Порожнє
+       поле — добавка без дози, проста позначка так/ні. */
+    const doseField = kind === 'supplement'
+      ? '<span class="qi-dose">' +
+          '<input class="input input--sm num mono" type="text" inputmode="decimal" ' +
+            'data-dose-set="' + esc(t.id) + '" placeholder="—" ' +
+            'value="' + esc(T.isDosed(t) ? String(T.doseOf(t)) : '') + '" ' +
+            'aria-label="Типова доза, г: ' + esc(t.name) + '">' +
+          '<span class="qi-dose__u">г</span>' +
+        '</span>'
+      : '';
     const streakChip = kind === 'habit' && st.streak > 0
       ? '<span class="chip chip--sm chip--acc">' + st.streak + ' ' + plural(st.streak, 'день', 'дні', 'днів') + ' поспіль</span>'
       : '';
@@ -283,11 +295,19 @@
         '<span class="tdy-ex__check" aria-hidden="true"></span>' +
         '<span class="tr-custom-row__name">' + esc(t.name) + '</span>' +
       '</label>' +
+      doseField +
       streakChip +
       '<span class="small muted">' + st.done + ' із ' + st.total + ' за 30д</span>' +
-      '<button class="icon-btn icon-btn--danger" type="button" data-custom-del="' + esc(t.id) + '" aria-label="Видалити: ' + esc(t.name) + '">' +
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
-      '</button>' +
+      (T.isDefaultSupplement(t.id)
+        /* Добавка з коробки: вимикається, а не видаляється (інакше
+           засіялась би знову). Вимкнена не показується на «Трекерах». */
+        ? '<label class="check" style="padding:6px 10px;font-size:0.8rem" title="Показувати на «Трекерах»">' +
+            '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') + '>' +
+            '<span>' + (t.enabled ? 'увімкнено' : 'вимкнено') + '</span>' +
+          '</label>'
+        : '<button class="icon-btn icon-btn--danger" type="button" data-custom-del="' + esc(t.id) + '" aria-label="Видалити: ' + esc(t.name) + '">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
+          '</button>') +
     '</li>';
   }
 
@@ -309,6 +329,13 @@
              літерою, і читалка називала поле безіменним. */
           '<input class="input" type="text" id="add-' + type + '" style="max-width:220px" ' +
             'aria-label="' + esc(placeholder) + '" placeholder="' + esc(placeholder) + '" maxlength="60">' +
+          (type === 'supplement'
+            ? '<span class="qi-dose">' +
+                '<input class="input num mono" type="text" inputmode="decimal" id="add-supplement-dose" ' +
+                  'style="width:80px" placeholder="г" aria-label="Типова доза, г (необовʼязково)">' +
+                '<span class="qi-dose__u">г</span>' +
+              '</span>'
+            : '') +
           '<button class="btn btn--ghost btn--sm" type="button" data-add-custom="' + type + '">' + esc(addLabel) + '</button>' +
         '</div>' +
       '</div>';
@@ -316,8 +343,9 @@
 
   function renderSupplements() {
     customGroup('#tr-supplements', 'supplement', 'Добавки',
-      'Прийнято чи ні — без дозувань і графіків, просто щоденна позначка.',
-      '+ Додати добавку', 'Наприклад, креатин');
+      'Щоденна позначка «прийняв». Добавка з дозою (г) дає ще й вписати, скільки саме — ' +
+      'галочка без числа пише типову дозу.',
+      '+ Додати добавку', 'Наприклад, омега-3');
   }
 
   function renderHabits() {
@@ -361,6 +389,7 @@
         saveTrackers(T.setEnabled(state.trackers, tog.dataset.toggle, tog.checked));
         if (!tog.checked && state.openId === tog.dataset.toggle) state.openId = null;
         renderBuiltins();
+        renderSupplements();
         return;
       }
       /* Тривалість: два поля, одна величина — читаємо обидва, щоб зміна
@@ -396,6 +425,19 @@
             : T.logValue(state.trackers, state.log, id, mins, todayKey()));
           renderBuiltins();
         }, 0);
+        return;
+      }
+
+      const ds = e.target.closest('[data-dose-set]');
+      if (ds) {
+        const raw = String(ds.value || '').trim();
+        if (raw !== '' && T.normDose(raw) === null) {
+          window.App.toast('Доза: від 0,1 до 500 г', 'err');
+          setTimeout(renderSupplements, 0);
+          return;
+        }
+        saveTrackers(T.setDose(state.trackers, ds.dataset.doseSet, raw === '' ? null : raw));
+        setTimeout(renderSupplements, 0);
         return;
       }
 
@@ -494,7 +536,10 @@
       if (ac) {
         const type = ac.dataset.addCustom;
         const input = $('#add-' + type);
-        const r = T.addCustom(state.trackers, type, input && input.value);
+        const doseEl = type === 'supplement' ? $('#add-supplement-dose') : null;
+        const doseRaw = doseEl ? String(doseEl.value || '').trim() : '';
+        if (doseRaw && T.normDose(doseRaw) === null) { toast('Доза: від 0,1 до 500 г', 'err'); return; }
+        const r = T.addCustom(state.trackers, type, input && input.value, doseRaw || null);
         if (!r) { toast('Введіть назву', 'err'); return; }
         state.trackers = r.trackers;
         persist({ trackers: r.trackers });
@@ -521,10 +566,10 @@
 
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter') return;
-      const input = e.target.closest('#add-supplement, #add-habit');
+      const input = e.target.closest('#add-supplement, #add-habit, #add-supplement-dose');
       if (!input) return;
       e.preventDefault();
-      const btn = input.parentElement.querySelector('[data-add-custom]');
+      const btn = input.closest('.row').querySelector('[data-add-custom]');
       if (btn) btn.click();
     });
   }

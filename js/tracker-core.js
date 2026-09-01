@@ -121,6 +121,19 @@
      трекери одразу — це той самий набір, лише перелічений явно тут. */
   const DEFAULT_ENABLED = { water: true, sleep: true, mood: true, recovery: true };
 
+  /*
+   * Добавки «з коробки». Це ті самі користувацькі трекери типу supplement —
+   * просто засіяні наперед, бо їх приймає майже кожен у залі. Людина може
+   * вимкнути чи видалити їх так само, як і власні.
+   *
+   * dose — типова доза в грамах: галочка «прийняв» без вводу числа пише
+   * саме її. Добавка без dose лишається простою позначкою так/ні.
+   */
+  const DEFAULT_SUPPLEMENTS = [
+    { id: 'creatine', name: 'Креатин моногідрат', dose: 5, unit: 'г' }
+  ];
+  const DOSE_MAX = 500;
+
   /* ------------------------------------------------------------------ */
   /* Реєстр: profile.trackers                                            */
   /* ------------------------------------------------------------------ */
@@ -152,12 +165,74 @@
       };
       changed = true;
     });
+    DEFAULT_SUPPLEMENTS.forEach(function (d, i) {
+      if (out[d.id]) return;
+      out[d.id] = {
+        id: d.id, type: 'supplement', name: d.name, enabled: true,
+        settings: { dose: d.dose, unit: d.unit },
+        goal: null, source: null,
+        order: 500 + i,
+        createdAt: null
+      };
+      changed = true;
+    });
     return changed ? out : src;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Дози добавок                                                        */
+  /* ------------------------------------------------------------------ */
+
+  /** Доза в грамах: скінченна, 0,1..500, крок 0,1 г; інакше null */
+  function normDose(v) {
+    if (typeof v !== 'number' && typeof v !== 'string') return null;
+    if (typeof v === 'string' && v.trim() === '') return null;
+    const n = Number(String(v).replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0 || n > DOSE_MAX) return null;
+    return Math.round(n * 10) / 10;
+  }
+
+  /** Добавка з дозою (грами), а не проста позначка так/ні */
+  function isDosed(t) {
+    return Boolean(t && t.type === 'supplement' && isPlain(t.settings) && normDose(t.settings.dose) !== null);
+  }
+
+  /** Типова доза добавки, г (null — добавка без дози) */
+  function doseOf(t) {
+    return isDosed(t) ? normDose(t.settings.dose) : null;
+  }
+
+  /** Задати типову дозу; null/сміття — прибрати дозу (стане позначкою) */
+  function setDose(trackers, id, grams) {
+    const src = isPlain(trackers) ? trackers : {};
+    const t = src[id];
+    if (!t || t.type !== 'supplement') return src;
+    const dose = normDose(grams);
+    const settings = Object.assign({}, isPlain(t.settings) ? t.settings : {});
+    if (dose === null) { delete settings.dose; delete settings.unit; }
+    else { settings.dose = dose; settings.unit = 'г'; }
+    const out = Object.assign({}, src);
+    out[id] = Object.assign({}, t, { settings: settings });
+    return out;
+  }
+
+  /**
+   * Чи «зроблено» запис булевого трекера. Позначка — true; добавка з
+   * дозою пише число грамів, і будь-яке додатне число теж означає
+   * «прийнято». Старі записи (true) читаються без міграції.
+   */
+  function taken(v) {
+    return v === true || (typeof v === 'number' && v > 0);
+  }
+
+  /** Грами з запису дня (null для простої позначки чи порожнього дня) */
+  function gramsOf(v) {
+    return (typeof v === 'number' && v > 0) ? v : null;
   }
 
   /** Створити власний екземпляр (добавка або звичка). Повертає null, якщо
       назва порожня — порожніх пунктів списку не буває. */
-  function addCustom(trackers, type, name) {
+  function addCustom(trackers, type, name, dose) {
     if (type !== 'supplement' && type !== 'habit') return null;
     const nm = String(name || '').trim().slice(0, 60);
     if (!nm) return null;
@@ -165,8 +240,10 @@
     const src = isPlain(trackers) ? trackers : {};
     const id = type + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const out = Object.assign({}, src);
+    const d = type === 'supplement' ? normDose(dose) : null;
     out[id] = {
-      id: id, type: type, name: nm, enabled: true, settings: {},
+      id: id, type: type, name: nm, enabled: true,
+      settings: d !== null ? { dose: d, unit: 'г' } : {},
       goal: null, source: null,
       order: 1000 + Object.keys(src).length,
       createdAt: todayKey()
@@ -182,8 +259,19 @@
     const t = src[id];
     if (!t || (t.type !== 'supplement' && t.type !== 'habit')) return src;
     const out = Object.assign({}, src);
+    /* Добавка «з коробки» не видаляється, а вимикається: інакше
+       ensureBuiltins засіяв би її знову при наступному відкритті, і
+       «видалив» перетворювалось на «воскрес через хвилину». */
+    if (isDefaultSupplement(id)) {
+      out[id] = Object.assign({}, t, { enabled: false });
+      return out;
+    }
     delete out[id];
     return out;
+  }
+
+  function isDefaultSupplement(id) {
+    return DEFAULT_SUPPLEMENTS.some(function (d) { return d.id === id; });
   }
 
   function setEnabled(trackers, id, enabled) {
@@ -321,6 +409,7 @@
   function defFor(tracker) {
     if (!tracker) return null;
     if (TRACKER_DEFS[tracker.type]) return TRACKER_DEFS[tracker.type];
+    if (isDosed(tracker)) return { type: 'supplement', kind: 'dose', unit: 'г', min: 0, max: DOSE_MAX };
     if (tracker.type === 'supplement' || tracker.type === 'habit') {
       return { type: tracker.type, kind: 'boolean', unit: '' };
     }
@@ -364,6 +453,13 @@
     if (!t) return src;
     const d = DATE_KEY.test(date) ? date : todayKey();
 
+    if (isDosed(t)) {
+      /* true = «прийняв типову дозу»; число = стільки грамів; решта —
+         зняти позначку. Нуль грамів — це «не приймав», а не запис. */
+      if (value === true) return setEntry(src, id, doseOf(t), d);
+      const g = normDose(value);
+      return g !== null ? setEntry(src, id, g, d) : removeEntry(src, id, d);
+    }
     if (t.type === 'supplement' || t.type === 'habit') {
       return value ? setEntry(src, id, true, d) : removeEntry(src, id, d);
     }
@@ -436,7 +532,7 @@
     const cursor = now instanceof Date ? new Date(now) : new Date();
     if (!day[todayKey(cursor)]) cursor.setDate(cursor.getDate() - 1);
     let n = 0;
-    while (day[todayKey(cursor)] === true) {
+    while (taken(day[todayKey(cursor)])) {
       n++;
       cursor.setDate(cursor.getDate() - 1);
     }
@@ -515,7 +611,7 @@
     const day = (isPlain(log) && isPlain(log[id])) ? log[id] : {};
     let done = 0;
     Object.keys(day).forEach(function (k) {
-      if (DATE_KEY.test(k) && k >= start && day[k] === true) done++;
+      if (DATE_KEY.test(k) && k >= start && taken(day[k])) done++;
     });
 
     return { done: done, total: totalDays, pct: Math.round(done / totalDays * 100), streak: streak(log, id, base) };
@@ -582,6 +678,13 @@
     addCustom: addCustom,
     removeCustom: removeCustom,
     setEnabled: setEnabled,
+    isDefaultSupplement: isDefaultSupplement,
+    normDose: normDose,
+    isDosed: isDosed,
+    doseOf: doseOf,
+    setDose: setDose,
+    taken: taken,
+    gramsOf: gramsOf,
     setGoal: setGoal,
     setSource: setSource,
     ingest: ingest,

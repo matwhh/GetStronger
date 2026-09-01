@@ -131,14 +131,30 @@
   function customChecklist(type, title) {
     const items = window.TrackerCore.byType(state.trackers, type).filter(function (t) { return t.enabled; });
     if (!items.length) return '';
+    const TC = window.TrackerCore;
     const rows = items.map(function (t) {
-      const done = (state.trackerLog[t.id] || {})[state.todayKey] === true;
+      const raw = (state.trackerLog[t.id] || {})[state.todayKey];
+      const done = TC.taken(raw);
+      /* Добавка з дозою: галочка пише типову дозу, а поле поруч дає
+         вписати скільки реально випив — 3, 5, 7,5 г. Порожнє поле = не
+         приймав. Простий чекбокс лишається для добавок без дози. */
+      const dosed = TC.isDosed(t);
+      const grams = dosed ? (TC.gramsOf(raw) != null ? TC.gramsOf(raw) : '') : null;
       return '<li class="tr-custom-row">' +
         '<label class="tdy-ex__main" style="flex:1;padding:9px 0">' +
           '<input type="checkbox" data-trk-mark="' + esc(t.id) + '"' + (done ? ' checked' : '') + '>' +
           '<span class="tdy-ex__check" aria-hidden="true"></span>' +
           '<span class="tr-custom-row__name">' + esc(t.name) + '</span>' +
         '</label>' +
+        (dosed
+          ? '<span class="qi-dose">' +
+              '<input class="input input--sm num mono" type="text" inputmode="decimal" ' +
+                'data-trk-dose="' + esc(t.id) + '" placeholder="' + esc(String(TC.doseOf(t))) + '" ' +
+                'value="' + esc(grams === '' ? '' : String(grams)) + '" ' +
+                'aria-label="' + esc(t.name) + ', грамів">' +
+              '<span class="qi-dose__u">г</span>' +
+            '</span>'
+          : '') +
       '</li>';
     }).join('');
     return '<p class="small muted mt-2" style="margin-bottom:2px">' + esc(title) + '</p>' +
@@ -228,6 +244,25 @@
         }
         const n = Number(raw.replace(',', '.'));
         if (Number.isFinite(n)) saveTrackerLog(TC.logValue(state.trackers, state.trackerLog, val.dataset.trkValue, n, state.todayKey));
+        return;
+      }
+
+      /* Грами добавки. Порожнє поле = не приймав; сміття або поза межами
+         (0,1..500 г) — поле повертається до записаного, з підказкою. */
+      const dose = e.target.closest('[data-trk-dose]');
+      if (dose) {
+        const id = dose.dataset.trkDose;
+        const raw = String(dose.value || '').trim();
+        if (raw !== '' && TC.normDose(raw) === null) {
+          toast('Доза: від 0,1 до 500 г', 'err');
+          setTimeout(render, 0);
+          return;
+        }
+        setTimeout(function () {
+          saveTrackerLog(raw === ''
+            ? TC.removeEntry(state.trackerLog, id, state.todayKey)
+            : TC.logValue(state.trackers, state.trackerLog, id, raw, state.todayKey));
+        }, 0);
         return;
       }
 

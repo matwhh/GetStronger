@@ -1076,7 +1076,9 @@
     const def = TC.defFor(t);
     const arrow = { up: '↑', down: '↓', flat: '→' };
 
-    if (def.kind === 'boolean') {
+    /* dose (добавка в грамах) для підсумку — та сама позначка «прийнято/ні»:
+       середні грами тут нічого не кажуть, важлива регулярність. */
+    if (def.kind === 'boolean' || def.kind === 'dose') {
       const st = TC.boolSummary(state.trackerLog, t.id, 30, t.createdAt);
       return { name: t.name, val: st.pct + '%', trend: st.done + ' із ' + st.total + ' днів' + (st.streak ? ' · ' + st.streak + ' поспіль зараз' : '') };
     }
@@ -1551,7 +1553,7 @@
         if (v == null) return null;
         const def = TC.defFor(t);
         let txt = '';
-        if (def.kind === 'boolean') txt = v ? '✓' : '—';
+        if (def.kind === 'boolean' || v === true) txt = v ? '✓' : '—';
         else if (def.kind === 'pair') {
           txt = def.fields.map(function (f) {
             return v[f] != null ? (f === 'before' ? 'до ' : f === 'after' ? 'після ' : f === 'pain' ? 'біль ' : 'втома ') + v[f] : null;

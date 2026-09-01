@@ -829,6 +829,11 @@ a.card > .btn {
 .qi-dur { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .qi-dur .input { width: 72px; }
 .qi-dur__u { font-size: 0.85rem; color: var(--muted); margin-right: 4px; }
+
+/* Доза добавки в грамах — поруч із назвою, не замість галочки */
+.qi-dose { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.qi-dose .input--sm { width: 64px; }
+.qi-dose__u { font-size: 0.85rem; color: var(--muted); }
 .tdy-set { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .tdy-set__n {
   flex: 0 0 auto; width: 22px;

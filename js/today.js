@@ -202,7 +202,7 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Рендер: харчування й субота                                         */
+  /* Рендер: харчування                                                  */
   /* ------------------------------------------------------------------ */
 
   function nutritionCard() {
@@ -542,24 +542,6 @@
     return '<div class="tiles tiles--wide">' + inner + '</div>';
   }
 
-
-  function boxingCard() {
-    // Субота — день мішка. В інші дні картка не потрібна: сесія одна.
-    if (new Date().getDay() !== 6) return '';
-    return '' +
-      '<div class="card">' +
-        '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
-          '<div>' +
-            '<h2 style="margin:0">Бокс</h2>' +
-            '<p class="small muted" style="margin:4px 0 0">Сьогодні субота — день мішка: 60–70 хв, 3/1.</p>' +
-          '</div>' +
-          '<a class="btn btn--primary" href="boxing.html">Відкрити</a>' +
-        '</div>' +
-      '</div>';
-  }
-
-  /* ------------------------------------------------------------------ */
-
   /* ------------------------------------------------------------------ */
   /* Прогрес: куди це веде                                               */
   /* ------------------------------------------------------------------ */
@@ -645,7 +627,6 @@
       nutritionCard() +
       tilesStrip() +
       seasonCard() +
-      boxingCard() +
       trackersCard() +
       progressCard();
   }

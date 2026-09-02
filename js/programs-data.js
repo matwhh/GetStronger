@@ -286,6 +286,29 @@ const W_PULL = {
   ]
 };
 
+/*
+   FULL BODY (жінки, 3 дні) — один і той самий день тричі на тиждень.
+
+   9 вправ · 22 робочі підходи за сесію · 66 за тиждень. Кожна група
+   працює 3×: квадрицепс 12, спина 9, груди 9, середня дельта 9,
+   біцепс 9, сідниці 6, біцепс стегна 6, передня дельта 6 — усе в межах
+   стелі 14/12. Ваги в шаблоні порожні: їх вписує людина, як і в решті схем.
+*/
+const W_FULL = {
+  title: 'Усе тіло', focus: 'Ноги, сідниці, груди, спина, плечі, біцепс',
+  exercises: [
+    { pattern: 'Розгинання гомілки',    name: 'Розгинання ніг',                        muscles: ['quads'],      sets: 2, reps: '8–10',  weight: null, rir: '2', rest: '2 хв', note: '' },
+    { pattern: 'Присідальний рух',      name: 'Жим ногами',                            muscles: ['quads'],      sets: 2, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
+    { pattern: 'Згинання гомілки',      name: 'Згинання ніг сидячи',                   muscles: ['hamstrings'], sets: 2, reps: '8–10',  weight: null, rir: '1', rest: '2 хв', note: '' },
+    { pattern: 'Горизонтальний жим',    name: 'Жим у тренажері',                       muscles: ['chest'],      sets: 3, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
+    { pattern: 'Вертикальна тяга',      name: 'Тяга верхнього блоку звичайним хватом', muscles: ['back'],       sets: 3, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
+    { pattern: 'Односторонній рух ніг', name: 'Випади у Сміті на сідниці',             muscles: ['glutes'],     sets: 2, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
+    { pattern: 'Вертикальний жим',      name: 'Жим на плечі в тренажері',              muscles: ['frontDelts'], sets: 2, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },
+    { pattern: 'Бічна дельта',          name: 'Відведення рук у кросовері',            muscles: ['sideDelts'],  sets: 3, reps: '10–12', weight: null, rir: '1', rest: '2 хв', note: '' },
+    { pattern: 'Біцепс',                name: 'Біцепс у тренажері',                    muscles: ['biceps'],     sets: 3, reps: '10–12', weight: null, rir: '1', rest: '2 хв', note: '' }
+  ]
+};
+
 /* ========================================================================== */
 
 window.PROGRAMS = [
@@ -713,6 +736,34 @@ window.PROGRAMS = [
 
     days: {
       4: [W_PUSH, W_PULL, W_PUSH, W_PULL]
+    }
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* 6. FULL BODY — жінки, 3 дні                                          */
+  /* ------------------------------------------------------------------ */
+  {
+    id: 'women3',
+    sex: 'female',
+    family: 'Full Body',
+    name: 'Full Body',
+    daysSupported: [3],
+    goals: ['muscle', 'recomp', 'fatloss'],
+    schedule: {
+      3: [0, 'rest', 1, 'rest', 2, 'rest', 'rest']
+    },
+    frequency: {
+      3: { min: 3, max: 3, note: 'усі групи 3×' }
+    },
+    progression: PROGRESSION_DOUBLE,
+    notes: COMMON_NOTES.concat([
+      'Усі три тренування повністю ідентичні: 9 вправ, 22 робочі підходи.',
+      'Тижневий обʼєм — 22 × 3 = 66 робочих підходів.',
+      'Порядок тижня: тренування / відпочинок / тренування / відпочинок / тренування / два дні відпочинку.'
+    ]),
+
+    days: {
+      3: [W_FULL, W_FULL, W_FULL]
     }
   }
 

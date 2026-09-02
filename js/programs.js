@@ -2000,6 +2000,33 @@
       const el = $$('input[name="days"]').find(function (r) { return r.checked; });
       return el ? Number(el.value) : 3;
     };
+
+    /*
+     * Показуємо лише ті кількості днів, для яких у ЦІЄЇ статі є хоч одна
+     * схема. Раніше жінка бачила 3/4/5/6, а план був лише на 4 — вибір
+     * 3, 5 чи 6 давав порожній список «Доступна при 4 дн.» і глухий кут
+     * в онбордингу. Зайві варіанти ховаємо, а не вимикаємо: вимкнена
+     * кнопка виглядає як зламана.
+     */
+    const syncDayOptions = function () {
+      const allowed = {};
+      PROGRAMS_FOR_ME().forEach(function (p) {
+        (p.daysSupported || []).forEach(function (d) { allowed[d] = true; });
+      });
+      let checked = null;
+      $$('input[name="days"]').forEach(function (el) {
+        const ok = Boolean(allowed[Number(el.value)]);
+        const item = el.closest('label') || el;
+        item.hidden = !ok;
+        if (!ok && el.checked) el.checked = false;
+        if (ok && el.checked) checked = el;
+      });
+      if (!checked) {
+        const first = $$('input[name="days"]').find(function (el) { return allowed[Number(el.value)]; });
+        if (first) first.checked = true;
+      }
+    };
+    syncDayOptions();
     state.days = readDays();
 
     $$('input[name="days"]').forEach(function (el) {

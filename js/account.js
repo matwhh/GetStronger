@@ -412,8 +412,17 @@
 
   function numberInput(key, value, opts) {
     const o = opts || {};
+    /* Дробові поля (вага, жир) — text, а не number: number у Chromium з
+       англійською локаллю викидає кому, і «58,5» ставало 585. Межі й кома
+       обробляються в coerce(), браузерні min/max тут і так не барʼєр. */
+    if (o.decimal) {
+      return '<input class="input" id="' + fieldId(key) + '" ' +
+             'type="text" inputmode="decimal" autocomplete="off" ' +
+             'placeholder="' + esc(o.placeholder || '—') + '" ' +
+             'value="' + esc(num(value)) + '" data-p="' + key + '">';
+    }
     return '<input class="input" id="' + fieldId(key) + '" ' +
-           'type="number" inputmode="' + (o.decimal ? 'decimal' : 'numeric') + '" ' +
+           'type="number" inputmode="numeric" ' +
            'min="' + o.min + '" max="' + o.max + '" step="' + (o.step || 1) + '" ' +
            'placeholder="' + esc(o.placeholder || '—') + '" ' +
            'value="' + esc(num(value)) + '" data-p="' + key + '">';
@@ -1704,7 +1713,12 @@
         if (!el) return;
         if (evt === 'input' && el.tagName !== 'INPUT') return;
         if (evt === 'input' && el.type === 'radio') return;
-        queueSave(el.dataset.p, coerce(el.dataset.p, el.value));
+        const v = coerce(el.dataset.p, el.value);
+        /* Текстові дробові поля (вага, жир) пропускають будь-які символи:
+           «abc» не має стирати збережене число (порожня вага = крок
+           онбордингу «тіло» для сторожа). Порожнє поле — свідоме очищення. */
+        if (v === null && String(el.value).trim() !== '') return;
+        queueSave(el.dataset.p, v);
       });
     });
   }

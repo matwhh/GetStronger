@@ -74,6 +74,12 @@
       return v && typeof v === 'object' ? v : null;
     } catch (_) { return null; }
   }
+  function ssJson(key) {
+    try {
+      const v = JSON.parse(sessionStorage.getItem(key));
+      return v && typeof v === 'object' ? v : null;
+    } catch (_) { return null; }
+  }
 
   /* ------------------------------------------------------------------
    * Хмарний режим: спершу автентифікація і статус акаунта.
@@ -91,7 +97,12 @@
    * ------------------------------------------------------------------ */
   if (localStorage.getItem('ib.cloud') === '1') {
     const here0 = currentPage();
-    const sess = lsJson('ib.session');
+    /* Сесія лежить у localStorage («запамʼятати мене») АБО в sessionStorage
+       (галочку знято — живе до закриття вкладки). Сторож мусить бачити
+       обидва сховища, інакше знята галочка кидала кожен перехід на
+       welcome, а welcome (який бачить сесію) — назад: пінг-понг до
+       спрацювання лімітера. */
+    const sess = lsJson('ib.session') || ssJson('ib.session');
     if (!sess || !sess.access_token) {
       if (here0 !== 'welcome.html') { go('welcome.html'); }
       return;

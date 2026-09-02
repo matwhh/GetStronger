@@ -222,6 +222,10 @@
     const got = window.DayCore.dayTotals(state.profile.day, state.profile.recipes);
     const left = Math.max(0, Math.round(t.kcal - got.kcal));
     const over = got.kcal > t.kcal * 1.05;
+    /* Відкритий день раціону несе дату першого продукту (js/meals.js). Якщо
+       вона не сьогоднішня — ці числа не про сьогодні, і мовчати тут не можна. */
+    const d = state.profile.day;
+    const staleDay = (d && d.date && d.date !== state.todayKey && got.kcal > 0) ? d.date : null;
 
     return '' +
       '<div class="card">' +
@@ -236,6 +240,10 @@
             '<p class="kpi__lbl">' + (over ? 'понад ціль' : 'залишок') + '</p></div>' +
           '<div class="kpi"><div class="kpi__val mono">' + Math.round(got.p) + '/' + Math.round(t.protein) + '</div><p class="kpi__lbl">білок, г</p></div>' +
         '</div>' +
+        (staleDay
+          ? '<p class="small muted" style="margin:8px 0 0">Це день за <b>' + esc(staleDay) + '</b> — він ще не закритий. ' +
+            'Закрийте його в «Раціоні», щоб почати сьогоднішній.</p>'
+          : '') +
         '<div class="row mt-2">' +
           '<a class="btn btn--primary btn--sm" href="meals.html">Додати їжу</a>' +
           '<a class="btn btn--ghost btn--sm" href="nutrition.html">План харчування</a>' +

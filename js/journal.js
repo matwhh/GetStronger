@@ -1243,6 +1243,17 @@
     };
   }
 
+  /* B7 (презентація): «5 із 3 запланованих» плутає. Розрахунок не чіпаємо —
+     відсоток і надалі рахує ядро; змінюється лише текст, коли сесій більше
+     за план (наприклад, після зміни програми з 3 на 5 днів). */
+  function adhSessionsLabel(sessions, expected) {
+    if (sessions > expected) {
+      return 'Сесій: <b class="mono">' + sessions + '</b>, за планом на період: <b class="mono">' +
+        expected + '</b> (більше плану)';
+    }
+    return 'Сесій: <b class="mono">' + sessions + '</b> із <b class="mono">' + expected + '</b> запланованих';
+  }
+
   function adhTrainingCard(AC, period) {
     const r = AC.trainingAdherence(adhProfile(), todayKey(), period);
     let body;
@@ -1259,8 +1270,7 @@
       const sub = period === 1
         ? 'Сьогоднішня сесія: закрито <b class="mono">' + r.doneSets + '</b> із <b class="mono">' +
           r.totalSets + '</b> підходів.'
-        : 'Сесій: <b class="mono">' + r.sessions + '</b> із <b class="mono">' +
-          (Math.round(r.expected) || 1) + '</b> запланованих' +
+        : adhSessionsLabel(r.sessions, Math.round(r.expected) || 1) +
           (r.totalSets ? ' · підходів закрито: <b class="mono">' + r.doneSets + '/' + r.totalSets + '</b>' : '') +
           (r.effDays < period ? ' · дані ведуться ' + r.effDays + ' дн.' : '') + '.';
       body = '<div class="adh__pct mono">' + r.pct + '%</div>' + adhBar(r.pct) +

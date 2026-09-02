@@ -176,12 +176,15 @@
    * Дросель — раз на добу: новий тиждень закривається лише в понеділок,
    * тож частіше кликати нема сенсу, а щоденний виклик ловить свіжозакритий.
    */
+  function dayStamp(d) {
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+
   async function evaluateWeeks() {
     if (!available()) return;
-    const today = new Date();
-    const stamp = today.getFullYear() + '-' +
-      String(today.getMonth() + 1).padStart(2, '0') + '-' +
-      String(today.getDate()).padStart(2, '0');
+    const stamp = dayStamp(new Date());
     /* ib.eloWeeks лишається тим самим ключем (його вже чистить вихід із
        акаунта), але тепер тримає дату останнього прогону, а не мапу тижнів. */
     if (lsGet('ib.eloWeeks', null) === stamp) return;
@@ -215,6 +218,17 @@
 
     const done = lsGet('ib.eloClosed', {});
     if (done[code]) return null;
+
+    /*
+     * B8 (вартість): неостаточна відповідь (season_running, no_data,
+     * помилка мережі) не може змінитись протягом дня — сезон закривається
+     * лише з першого дня наступного (і тоді code вже інший). Тож після
+     * неостаточної відповіді повторна спроба для того самого коду — не
+     * раніше наступного дня, а не на кожному завантаженні сторінки.
+     * Ключ ib.eloClosed чиститься виходом із акаунта разом з ib.eloWeeks.
+     */
+    const stamp = dayStamp(new Date());
+    if (done['try:' + code] === stamp) return null;
     try {
       const res = await window.Store.rpc('elo_close_season', { p_season: code });
       /*
@@ -222,9 +236,15 @@
        * ставилась безумовно, тож тимчасова відповідь (season_running,
        * no_data) назавжди блокувала закриття сезону.
        */
-      if (res && (res.ok === true)) { done[code] = true; lsSet('ib.eloClosed', done); }
+      if (res && (res.ok === true)) { done[code] = true; delete done['try:' + code]; }
+      else done['try:' + code] = stamp;
+      lsSet('ib.eloClosed', done);
       return res && res.ok && !res.duplicate ? res : null;
-    } catch (_) { return null; }
+    } catch (_) {
+      done['try:' + code] = stamp;
+      lsSet('ib.eloClosed', done);
+      return null;
+    }
   }
 
   window.EloApi = {

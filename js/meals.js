@@ -25,9 +25,33 @@
    * а калорії рахувались від 100 000 (foods.js мовчки ріже до MAX_GRAMS).
    * Розбіжність у десять разів без жодного сигналу.
    */
-  const GRAMS_MIN = 0, GRAMS_MAX = 10000;
+  /*
+   * Одна ПОЗИЦІЯ в дні — до 5 кг: більше в одному прийомі не їдять, а
+   * саме так виглядала помилка «зайвий нуль» (99999 г → день на
+   * 38 000 ккал, і він назавжди в історії). Та сама стеля стоїть у
+   * валідаторі імпорту (js/account.js) і в атрибуті max поля. Інгредієнт
+   * РЕЦЕПТА — до 10 кг: рецепт готують каструлею на кілька днів.
+   */
+  const GRAMS_MIN = 0, GRAMS_MAX = 5000;
+  const RECIPE_GRAMS_MAX = 10000;
   const PORTIONS_MIN = 0, PORTIONS_MAX = 20;
   const CONTAINERS_MIN = 1, CONTAINERS_MAX = 20;
+
+  /**
+   * Грами з поля вводу → число в межах, або null.
+   *
+   * null означає «не приймаємо» — не «нуль»: раніше сміття мовчки ставало
+   * 0, а 99999 мовчки обрізалось до стелі, і людина не бачила, що ввела
+   * не те. Кома приймається як десятковий роздільник, «1e9», «∞», NaN,
+   * відʼємне і понад max — ні.
+   */
+  function parseGrams(raw, max) {
+    const str = String(raw == null ? '' : raw).trim().replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(str)) return null;
+    const n = Number(str);
+    if (!Number.isFinite(n) || n < GRAMS_MIN || n > (max || GRAMS_MAX)) return null;
+    return Math.round(n * 10) / 10;
+  }
 
   /*
    * СХЕМА ПРИЙОМІВ ЇЖІ ЗАДАЄТЬСЯ НЕ ТУТ.
@@ -847,10 +871,18 @@
         '</div>';
     }).join('');
 
+    /* День несе дату першого продукту й не міняє її, поки відкритий (див.
+       stampDay). Якщо ця дата вже не сьогодні — кажемо це в заголовку, а не
+       лише в діалозі закриття: інакше пʼятничний обід мовчки лягав у
+       понеділок, бо людина не бачила, що день досі понеділковий. */
+    const todayK = window.HistoryCore ? window.HistoryCore.todayKey() : null;
+    const staleKey = (state.day && state.day.date && todayK && state.day.date !== todayK &&
+      state.day.meals.some(function (m) { return m.items && m.items.length; })) ? state.day.date : null;
+
     host.innerHTML =
       '<div class="card">' +
         '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
-          '<h2 style="margin:0">День</h2>' +
+          '<h2 style="margin:0">День' + (staleKey ? ' <span class="chip chip--sm" id="d-stale">за ' + esc(staleKey) + '</span>' : '') + '</h2>' +
           '<div class="row" style="gap:8px">' +
             /* «Закрити день» — головна дія дня: підсумок із датою і ціллю
                лягає в історію (mealLog), день очищається під наступний.
@@ -860,6 +892,13 @@
           '</div>' +
         '</div>' +
 
+        (staleKey
+          ? '<div class="notice mt-2" id="d-stale-note">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>' +
+              '<div>Цей день ще за <b>' + esc(staleKey) + '</b>: усе, що додасте, піде в ту дату. ' +
+              'Натисніть «Закрити день», щоб записати його в історію й почати сьогоднішній.</div>' +
+            '</div>'
+          : '') +
         (t
           ? '<div class="vol-list mt-2">' +
               progressRow('Калорії',   got.kcal,  t.kcal,    'ккал') +
@@ -999,7 +1038,8 @@
       return r ? scale(perContainer(r), Number(m.portions) || 0) : ZERO();
     }
     const f = Foods.byId(m.foodId);
-    return f ? Foods.amount(f, m.grams, Boolean(m.cooked)) : ZERO();
+    const g = parseGrams(m.grams);
+    return f ? Foods.amount(f, g === null ? 0 : g, Boolean(m.cooked)) : ZERO();
   }
 
   function modalPreview() {
@@ -1066,8 +1106,8 @@
 
       '<div class="field">' +
         '<label class="field__label" for="m-grams">Скільки грамів</label>' +
-        '<input class="input" id="m-grams" type="number" min="1" max="5000" step="1" ' +
-               'inputmode="numeric" value="' + esc(m.grams) + '">' +
+        '<input class="input" id="m-grams" type="text" inputmode="decimal" autocomplete="off" ' +
+               'value="' + esc(m.grams) + '">' +
         (other ? '<span class="field__hint" id="m-other">' + esc(other) + '</span>' : '') +
       '</div>' +
 
@@ -1181,7 +1221,13 @@
     } else {
       // GRAMS_MIN, а не 1: нуль грамів — це чинний ввід («поки не додаю»),
       // і мовчки перетворювати його на 1 г неправильно.
-      meal.items.push({ kind: 'food', foodId: m.foodId, grams: clamp(Number(m.grams) || 0, GRAMS_MIN, GRAMS_MAX), cooked: Boolean(m.cooked) });
+      const g = parseGrams(m.grams);
+      if (g === null) {
+        toast('Грами: від 0 до ' + GRAMS_MAX, 'err');
+        const inp = $('#m-grams'); if (inp) { inp.focus(); inp.select(); }
+        return;
+      }
+      meal.items.push({ kind: 'food', foodId: m.foodId, grams: g, cooked: Boolean(m.cooked) });
     }
 
     persist();
@@ -1464,7 +1510,7 @@
 
       const el = e.target.closest('[data-rf="grams"]');
       if (el) {
-        d.items[Number(el.dataset.ri)].grams = clamp(Number(el.value) || 0, GRAMS_MIN, GRAMS_MAX);
+        d.items[Number(el.dataset.ri)].grams = clamp(Number(el.value) || 0, GRAMS_MIN, RECIPE_GRAMS_MAX);
         // Перемальовуємо тільки підсумок: інакше поле втратило б фокус на кожній цифрі
         const per = perContainer(d);
         const kpis = rHost.querySelectorAll('.kpi__val');
@@ -1507,8 +1553,13 @@
     mHost.addEventListener('input', function (e) {
       if (!state.modal) return;
       if (e.target.id === 'm-grams') {
-        const v = Math.max(0, Number(e.target.value) || 0);
-        if (state.modal.kind === 'recipe') state.modal.portions = v; else state.modal.grams = v;
+        if (state.modal.kind === 'recipe') {
+          state.modal.portions = Math.max(0, Number(e.target.value) || 0);
+        } else {
+          /* Сирий рядок: перевіряє commitModal, а превʼю рахує лише
+             чинне значення (сміття/понад стелю показує нулі). */
+          state.modal.grams = e.target.value;
+        }
         refreshModalNumbers();
       }
     });
@@ -1578,14 +1629,20 @@
         const it = state.day.meals[Number(el.dataset.di)].items[Number(el.dataset.dj)];
         // Верхня межа тут раніше була відсутня зовсім, і показане число
         // розходилось із порахованим у десять разів.
-        const raw = Number(el.value) || 0;
         if (it.kind === 'recipe') {
+          const raw = Number(el.value) || 0;
           it.portions = clamp(raw, PORTIONS_MIN, PORTIONS_MAX);
+          if (String(raw) !== String(it.portions)) el.value = it.portions;
         } else {
-          it.grams = clamp(raw, GRAMS_MIN, GRAMS_MAX);
-        }
-        if (String(raw) !== String(it.kind === 'recipe' ? it.portions : it.grams)) {
-          el.value = it.kind === 'recipe' ? it.portions : it.grams;
+          const g = parseGrams(el.value);
+          if (g === null) {
+            /* Поза межами — не пишемо і повертаємо в поле те, що записано */
+            toast('Грами: від 0 до ' + GRAMS_MAX, 'err');
+            el.value = it.grams;
+            return;
+          }
+          it.grams = g;
+          if (String(el.value).trim() !== String(g)) el.value = g;
         }
         persist();
         // Оновлюємо тільки підсумки зверху, щоб не збити фокус із поля

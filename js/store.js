@@ -1159,7 +1159,7 @@
         const me = await req('/auth/v1/user', { method: 'GET' });
         if (me && me.id) {
           session.user = { id: me.id, email: me.email };
-          lsSet(LS_SESSION, session);
+          writeSavedSession(session);   // те саме сховище, що й решта входів
         }
       } catch (e) {
         // Прострочене або вже використане посилання з листа.

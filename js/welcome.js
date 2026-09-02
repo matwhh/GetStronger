@@ -212,6 +212,7 @@
       '<div id="gate-msg"></div>' +
 
       '<button class="btn btn--primary btn--wide mt-2" type="button" id="gate-go">Продовжити</button>' +
+      signOutBtn() +
 
       '<p class="small muted gate__note" id="gate-note"></p>';
 
@@ -279,9 +280,21 @@
   /* Крок 2: тіло                                                        */
   /* ------------------------------------------------------------------ */
 
+  /*
+   * Число з поля. Кома — десятковий роздільник: люди пишуть «58,5», і в
+   * Chromium з англійською локаллю type=number мовчки викидав кому —
+   * виходило 585 кг. Тому поля текстові (inputmode=decimal), а
+   * перетворення одне на весь крок.
+   */
+  function toNum(v) {
+    const str = String(v == null ? '' : v).trim().replace(',', '.');
+    if (str === '' || !/^-?\d+(\.\d+)?$/.test(str)) return NaN;
+    return Number(str);
+  }
+
   function draftProfile() {
     const b = state.body;
-    const num = function (v) { return v === '' ? null : Number(v); };
+    const num = function (v) { return String(v).trim() === '' ? null : toNum(v); };
     return {
       sex: b.sex,
       weight: num(b.weight),
@@ -295,8 +308,8 @@
      значення мусить бути справжнім пульсом, інакше воно мовчки не
      збереглося б і людина думала б, що ввела. */
   function hrOk(v, lo, hi) {
-    if (v === '') return true;
-    const n = Number(v);
+    if (String(v).trim() === '') return true;
+    const n = toNum(v);
     return Number.isFinite(n) && n >= lo && n <= hi;
   }
 
@@ -307,8 +320,8 @@
   }
 
   function numIn(v, lim) {
-    const n = Number(v);
-    return v !== '' && Number.isFinite(n) && n >= lim[0] && n <= lim[1];
+    const n = toNum(v);
+    return String(v).trim() !== '' && Number.isFinite(n) && n >= lim[0] && n <= lim[1];
   }
 
   /*
@@ -354,9 +367,11 @@
   function numField(id, key, label, hint, opts) {
     return '<div class="field mt-2">' +
       '<label class="field__label" for="' + id + '">' + label + '</label>' +
-      '<input class="input" id="' + id + '" data-b="' + key + '" type="number" ' +
-        'inputmode="decimal" min="' + opts.min + '" max="' + opts.max + '" ' +
-        'step="' + (opts.step || 1) + '"' +
+      /* type=text, а не number: number у Chromium з en-локаллю викидає кому
+         («58,5» → 585). Межі перевіряє bodyReady(), не браузер. */
+      '<input class="input" id="' + id + '" data-b="' + key + '" type="text" ' +
+        'inputmode="decimal" autocomplete="off" ' +
+        'data-min="' + opts.min + '" data-max="' + opts.max + '"' +
         (opts.ph ? ' placeholder="' + opts.ph + '"' : '') +
         ' value="' + esc(String(state.body[key])) + '">' +
       (hint ? '<p class="small muted" style="margin:6px 0 0">' + hint + '</p>' : '') +
@@ -429,6 +444,7 @@
 
       '<button class="btn btn--primary btn--wide mt-2" type="button" id="body-go"' +
         (canGo ? '' : ' disabled') + '>Далі — обрати програму</button>' +
+      signOutBtn() +
 
       '<p class="small gate__note' + (canGo ? ' muted' : '') + '" id="body-note">' +
         esc(bodyNote()) +
@@ -471,7 +487,7 @@
     const el = $('#b-bmi');
     const BC = window.BmiCore;
     if (!el || !BC) return;
-    const b = BC.bmi(state.body.weight, state.body.height);
+    const b = BC.bmi(toNum(state.body.weight), toNum(state.body.height));
     if (b === null) { el.innerHTML = ''; return; }
     const cat = BC.category(b);
     el.innerHTML = 'BMI: <b class="mono">' + String(b).replace('.', ',') + '</b> — ' +
@@ -501,7 +517,7 @@
   function bmiWarnModal() {
     const BC = window.BmiCore;
     if (!BC) return Promise.resolve(true);
-    const b = BC.bmi(state.body.weight, state.body.height);
+    const b = BC.bmi(toNum(state.body.weight), toNum(state.body.height));
     const ack = (window.Store.localProfile() || {}).bmiAck;
     if (!BC.shouldWarn(b, ack)) return Promise.resolve(true);
 
@@ -527,15 +543,15 @@
     const b = state.body;
     const patch = {
       sex: b.sex,
-      weight: Number(b.weight),
-      height: Number(b.height),
+      weight: toNum(b.weight),
+      height: toNum(b.height),
       activity: Number(b.activity),
       trainingAge: b.trainingAge
     };
     /* Пульси — опційні: пишемо лише вписані валідні значення. */
-    const hrR = Number(b.hrRest), hrM = Number(b.hrMax);
-    if (b.hrRest !== '' && hrR >= 30 && hrR <= 120) patch.hrRest = hrR;
-    if (b.hrMax !== '' && hrM >= 120 && hrM <= 230) patch.hrMax = hrM;
+    const hrR = toNum(b.hrRest), hrM = toNum(b.hrMax);
+    if (String(b.hrRest).trim() !== '' && hrR >= 30 && hrR <= 120) patch.hrRest = hrR;
+    if (String(b.hrMax).trim() !== '' && hrM >= 120 && hrM <= 230) patch.hrMax = hrM;
 
     try {
       await window.Store.saveProfile(patch);
@@ -892,6 +908,15 @@
     } else {
       nav('age');
     }
+  }
+
+  /* B6 (shared device): на кроках віку/тіла залогінений користувач раніше
+     не мав жодного виходу з акаунта — «Вийти» існувало лише на екранах
+     pending/blocked. Кнопка не змінює security-модель онбордингу: вона
+     просто викликає той самий doSignOut (Store.signOut + clearDraft). */
+  function signOutBtn() {
+    if (!CLOUD || !window.Store.user()) return '';
+    return '<button class="btn btn--ghost btn--wide mt-2" type="button" id="au-out">Вийти з акаунта</button>';
   }
 
   async function doSignOut() {

@@ -834,6 +834,43 @@ a.card > .btn {
 .qi-dose { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 .qi-dose .input--sm { width: 64px; }
 .qi-dose__u { font-size: 0.85rem; color: var(--muted); }
+
+/* Плитки-галочки для добавок і звичок на «Трекерах»: великий квадрат
+   під палець, уся плитка клікабельна, стан — акцентом теми. */
+.qi-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.qi-check {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--field, var(--surface-2));
+  box-shadow: var(--neo-inset, none);
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.qi-check.is-on { border-color: var(--acc-line, var(--acc)); }
+.qi-check__main {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 44px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.qi-check__main input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.qi-check__box {
+  flex: 0 0 auto; width: 28px; height: 28px;
+  border-radius: 8px;
+  border: 2px solid var(--line-2);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--on-acc, #fff);
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.qi-check__box svg { width: 16px; height: 16px; opacity: 0; transform: scale(0.6); transition: opacity var(--t-fast), transform var(--t-fast); }
+.qi-check__main input:checked + .qi-check__box { background: var(--acc); border-color: transparent; box-shadow: var(--acc-raised-xs, none); }
+.qi-check__main input:checked + .qi-check__box svg { opacity: 1; transform: scale(1); }
+.qi-check__main input:focus-visible + .qi-check__box { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
+.qi-check__name { font-weight: 600; line-height: 1.3; }
+.qi-check.is-on .qi-check__name { color: var(--text); }
+.qi-check .qi-dose .input--sm { width: 72px; }
 .tdy-set { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .tdy-set__n {
   flex: 0 0 auto; width: 22px;

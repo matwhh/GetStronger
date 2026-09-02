@@ -128,37 +128,42 @@
     '</div>';
   }
 
+  /*
+   * Добавки й звички — великі плитки-галочки, одна на позицію. Тап по
+   * всій плитці = «зробив»; у добавки з дозою поруч поле грамів.
+   */
   function customChecklist(type, title) {
-    const items = window.TrackerCore.byType(state.trackers, type).filter(function (t) { return t.enabled; });
-    if (!items.length) return '';
     const TC = window.TrackerCore;
+    const items = TC.byType(state.trackers, type).filter(function (t) { return t.enabled; });
+    if (!items.length) return '';
     const rows = items.map(function (t) {
       const raw = (state.trackerLog[t.id] || {})[state.todayKey];
       const done = TC.taken(raw);
-      /* Добавка з дозою: галочка пише типову дозу, а поле поруч дає
-         вписати скільки реально випив — 3, 5, 7,5 г. Порожнє поле = не
-         приймав. Простий чекбокс лишається для добавок без дози. */
       const dosed = TC.isDosed(t);
-      const grams = dosed ? (TC.gramsOf(raw) != null ? TC.gramsOf(raw) : '') : null;
-      return '<li class="tr-custom-row">' +
-        '<label class="tdy-ex__main" style="flex:1;padding:9px 0">' +
+      const grams = dosed ? TC.gramsOf(raw) : null;
+      return '<li class="qi-check' + (done ? ' is-on' : '') + '">' +
+        '<label class="qi-check__main">' +
           '<input type="checkbox" data-trk-mark="' + esc(t.id) + '"' + (done ? ' checked' : '') + '>' +
-          '<span class="tdy-ex__check" aria-hidden="true"></span>' +
-          '<span class="tr-custom-row__name">' + esc(t.name) + '</span>' +
+          '<span class="qi-check__box" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+          '</span>' +
+          '<span class="qi-check__name">' + esc(t.name) + '</span>' +
         '</label>' +
         (dosed
           ? '<span class="qi-dose">' +
               '<input class="input input--sm num mono" type="text" inputmode="decimal" ' +
                 'data-trk-dose="' + esc(t.id) + '" placeholder="' + esc(String(TC.doseOf(t))) + '" ' +
-                'value="' + esc(grams === '' ? '' : String(grams)) + '" ' +
+                'value="' + esc(grams == null ? '' : String(grams)) + '" ' +
                 'aria-label="' + esc(t.name) + ', грамів">' +
               '<span class="qi-dose__u">г</span>' +
             '</span>'
           : '') +
       '</li>';
     }).join('');
-    return '<p class="small muted mt-2" style="margin-bottom:2px">' + esc(title) + '</p>' +
-      '<ul class="tr-custom-list">' + rows + '</ul>';
+    return '<div class="tdy-trk__row">' +
+        '<span class="tdy-trk__name">' + esc(title) + '</span>' +
+        '<ul class="qi-checks mt-1">' + rows + '</ul>' +
+      '</div>';
   }
 
   function pageHtml() {
@@ -178,10 +183,12 @@
         '</div>';
     }
 
+    /* Добавки й звички — нагорі: це «зробив/не зробив» одним тапом, і
+       їх закривають першими, ще до того, як знати сон чи настрій. */
     return '' +
       '<div class="card">' +
-        active.map(function (t) { return trackerRow(t, TC.defFor(t)); }).join('') +
         supplements + habits +
+        active.map(function (t) { return trackerRow(t, TC.defFor(t)); }).join('') +
       '</div>';
   }
 

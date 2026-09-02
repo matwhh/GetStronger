@@ -1259,7 +1259,7 @@
       const sub = period === 1
         ? 'Сьогоднішня сесія: закрито <b class="mono">' + r.doneSets + '</b> із <b class="mono">' +
           r.totalSets + '</b> підходів.'
-        : 'Сесій: <b class="mono">' + r.sessions + '</b> із ~<b class="mono">' +
+        : 'Сесій: <b class="mono">' + r.sessions + '</b> із <b class="mono">' +
           (Math.round(r.expected) || 1) + '</b> запланованих' +
           (r.totalSets ? ' · підходів закрито: <b class="mono">' + r.doneSets + '/' + r.totalSets + '</b>' : '') +
           (r.effDays < period ? ' · дані ведуться ' + r.effDays + ' дн.' : '') + '.';

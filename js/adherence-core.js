@@ -138,7 +138,17 @@
       return winStart > first ? winStart : first;
     })();
     const effDays = diffDays(start, todayK) + 1;
-    const expected = planned * effDays / 7;
+    /*
+     * Очікувані сесії — ЦІЛЕ число, не дріб.
+     *
+     * Було planned × днів / 7 без округлення: два дні даних при плані
+     * 5/тиж давали «очікувано 1,43 сесії», і одне повне тренування
+     * оцінювалось у 70 % — за «недороблені 0,43 сесії», яких у два дні
+     * фізично не буває. Ціле очікування + мінімум 1: перший тиждень
+     * ведення показує чесний відсоток від того, що реально можна було
+     * зробити, а на повному тижні число те саме, що й було.
+     */
+    const expected = Math.max(1, Math.round(planned * effDays / 7));
 
     let sum = 0, n = 0, ds = 0, ts = 0;
     Object.keys(log).forEach(function (d) {
@@ -155,7 +165,7 @@
     const pct = expected > 0 ? Math.min(100, Math.round(sum / expected * 100)) : 0;
     return {
       state: 'ok', pct: pct, sessions: n,
-      expected: Math.round(expected * 10) / 10,
+      expected: expected,
       doneSets: ds, totalSets: ts, effDays: effDays
     };
   }

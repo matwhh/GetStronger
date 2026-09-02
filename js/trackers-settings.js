@@ -271,11 +271,17 @@
   /* Добавки та звички: власні позиції користувача                       */
   /* ------------------------------------------------------------------ */
 
+  /*
+   * Рядок добавки/звички в НАЛАШТУВАННЯХ: перемикач, назва, доза (для
+   * добавок), підсумок за 30 днів, видалення. Щоденної галочки тут
+   * НЕМАЄ навмисно — відмічають на сторінці «Трекери», а тут лише
+   * редагують. Вигляд той самий, що в убудованих трекерів вище.
+   */
   function customRow(t, kind) {
-    const today = T.taken((state.log[t.id] || {})[todayKey()]);
     const st = T.boolSummary(state.log, t.id, 30, t.createdAt);
-    /* Типова доза добавки: галочка на «Трекерах» пише саме її. Порожнє
-       поле — добавка без дози, проста позначка так/ні. */
+    const streakTxt = kind === 'habit' && st.streak > 0
+      ? ' · ' + st.streak + ' ' + plural(st.streak, 'день', 'дні', 'днів') + ' поспіль'
+      : '';
     const doseField = kind === 'supplement'
       ? '<span class="qi-dose">' +
           '<input class="input input--sm num mono" type="text" inputmode="decimal" ' +
@@ -285,29 +291,25 @@
           '<span class="qi-dose__u">г</span>' +
         '</span>'
       : '';
-    const streakChip = kind === 'habit' && st.streak > 0
-      ? '<span class="chip chip--sm chip--acc">' + st.streak + ' ' + plural(st.streak, 'день', 'дні', 'днів') + ' поспіль</span>'
-      : '';
+    const del = T.isDefaultSupplement(t.id)
+      ? ''
+      : '<button class="icon-btn icon-btn--danger" type="button" data-custom-del="' + esc(t.id) + '" aria-label="Видалити: ' + esc(t.name) + '">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
+        '</button>';
 
-    return '<li class="tr-custom-row">' +
-      '<label class="tdy-ex__main" style="flex:1;padding:9px 0">' +
-        '<input type="checkbox" data-custom-mark="' + esc(t.id) + '"' + (today ? ' checked' : '') + '>' +
-        '<span class="tdy-ex__check" aria-hidden="true"></span>' +
-        '<span class="tr-custom-row__name">' + esc(t.name) + '</span>' +
-      '</label>' +
-      doseField +
-      streakChip +
-      '<span class="small muted">' + st.done + ' із ' + st.total + ' за 30д</span>' +
-      (T.isDefaultSupplement(t.id)
-        /* Добавка з коробки: вимикається, а не видаляється (інакше
-           засіялась би знову). Вимкнена не показується на «Трекерах». */
-        ? '<label class="check" style="padding:6px 10px;font-size:0.8rem" title="Показувати на «Трекерах»">' +
-            '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') + '>' +
-            '<span>' + (t.enabled ? 'увімкнено' : 'вимкнено') + '</span>' +
-          '</label>'
-        : '<button class="icon-btn icon-btn--danger" type="button" data-custom-del="' + esc(t.id) + '" aria-label="Видалити: ' + esc(t.name) + '">' +
-            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
-          '</button>') +
+    return '<li class="tr-row' + (t.enabled ? '' : ' tr-row--off') + '">' +
+      '<div class="tr-row__top">' +
+        '<label class="switch" aria-label="Увімкнути: ' + esc(t.name) + '">' +
+          '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') + '>' +
+          '<span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>' +
+        '</label>' +
+        '<div class="tr-row__btn" style="cursor:default">' +
+          '<span class="tr-row__name">' + esc(t.name) + '</span>' +
+          '<span class="tr-row__meta small muted">' + st.done + ' із ' + st.total + ' за 30 днів' + esc(streakTxt) + '</span>' +
+        '</div>' +
+        doseField +
+        del +
+      '</div>' +
     '</li>';
   }
 
@@ -321,7 +323,7 @@
         '<h2 style="margin:0">' + esc(title) + '</h2>' +
         '<p class="small mt-1">' + esc(hint) + '</p>' +
         (items.length
-          ? '<ul class="tr-custom-list mt-2">' + items.map(function (t) { return customRow(t, type); }).join('') + '</ul>'
+          ? '<ul class="tr-list mt-2">' + items.map(function (t) { return customRow(t, type); }).join('') + '</ul>'
           : '<p class="small muted mt-2 mb-0">Список порожній. Додайте першу позицію нижче — ' +
             'вона зʼявиться на сторінці «Трекери» щоденною позначкою.</p>') +
         '<div class="row mt-2" style="gap:8px;flex-wrap:wrap">' +
@@ -343,8 +345,8 @@
 
   function renderSupplements() {
     customGroup('#tr-supplements', 'supplement', 'Добавки',
-      'Щоденна позначка «прийняв». Добавка з дозою (г) дає ще й вписати, скільки саме — ' +
-      'галочка без числа пише типову дозу.',
+      'Відмічають на сторінці «Трекери». Тут — типова доза в грамах: галочка там ' +
+      'пише саме її, а поле поруч дає вписати, скільки випив насправді.',
       '+ Додати добавку', 'Наприклад, омега-3');
   }
 
@@ -390,6 +392,7 @@
         if (!tog.checked && state.openId === tog.dataset.toggle) state.openId = null;
         renderBuiltins();
         renderSupplements();
+        renderHabits();
         return;
       }
       /* Тривалість: два поля, одна величина — читаємо обидва, щоб зміна
@@ -441,12 +444,6 @@
         return;
       }
 
-      const mark = e.target.closest('[data-custom-mark]');
-      if (mark) {
-        saveLog(T.logValue(state.trackers, state.log, mark.dataset.customMark, mark.checked, todayKey()));
-        renderSupplements();
-        renderHabits();
-      }
     });
 
     document.addEventListener('click', function (e) {

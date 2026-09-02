@@ -289,23 +289,24 @@ const W_PULL = {
 /*
    FULL BODY (жінки, 3 дні) — один і той самий день тричі на тиждень.
 
-   9 вправ · 22 робочі підходи за сесію · 66 за тиждень. Кожна група
-   працює 3×: квадрицепс 12, спина 9, груди 9, середня дельта 9,
-   біцепс 9, сідниці 6, біцепс стегна 6, передня дельта 6 — усе в межах
-   стелі 14/12. Ваги в шаблоні порожні: їх вписує людина, як і в решті схем.
+   10 вправ · 24 робочі підходи за сесію · 72 за тиждень. Кожна група
+   працює 3×: квадрицепс 12, біцепс стегна 12, сідниці 9, спина 9,
+   груди 6, передня дельта 6, середня дельта 6, біцепс 6, трицепс 6 —
+   усе в межах стелі 14/12. Ваги в шаблоні порожні: їх вписує людина.
 */
 const W_FULL = {
-  title: 'Усе тіло', focus: 'Ноги, сідниці, груди, спина, плечі, біцепс',
+  title: 'Усе тіло', focus: 'Ноги, сідниці, груди, спина, плечі, руки',
   exercises: [
     { pattern: 'Розгинання гомілки',    name: 'Розгинання ніг',                        muscles: ['quads'],      sets: 2, reps: '8–10',  weight: null, rir: '2', rest: '2 хв', note: '' },
     { pattern: 'Присідальний рух',      name: 'Жим ногами',                            muscles: ['quads'],      sets: 2, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
-    { pattern: 'Згинання гомілки',      name: 'Згинання ніг сидячи',                   muscles: ['hamstrings'], sets: 2, reps: '8–10',  weight: null, rir: '1', rest: '2 хв', note: '' },
-    { pattern: 'Горизонтальний жим',    name: 'Жим у тренажері',                       muscles: ['chest'],      sets: 3, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
+    { pattern: 'Згинання гомілки',      name: 'Згинання ніг сидячи',                   muscles: ['hamstrings'], sets: 4, reps: '8–10',  weight: null, rir: '1', rest: '2 хв', note: '' },
+    { pattern: 'Односторонній рух ніг', name: 'Випади у Сміті на сідниці',             muscles: ['glutes'],     sets: 3, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
+    { pattern: 'Горизонтальний жим',    name: 'Жим у тренажері',                       muscles: ['chest'],      sets: 2, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
     { pattern: 'Вертикальна тяга',      name: 'Тяга верхнього блоку звичайним хватом', muscles: ['back'],       sets: 3, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
-    { pattern: 'Односторонній рух ніг', name: 'Випади у Сміті на сідниці',             muscles: ['glutes'],     sets: 2, reps: '8–10',  weight: null, rir: '2', rest: '3 хв', note: '' },
     { pattern: 'Вертикальний жим',      name: 'Жим на плечі в тренажері',              muscles: ['frontDelts'], sets: 2, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },
-    { pattern: 'Бічна дельта',          name: 'Відведення рук у кросовері',            muscles: ['sideDelts'],  sets: 3, reps: '10–12', weight: null, rir: '1', rest: '2 хв', note: '' },
-    { pattern: 'Біцепс',                name: 'Біцепс у тренажері',                    muscles: ['biceps'],     sets: 3, reps: '10–12', weight: null, rir: '1', rest: '2 хв', note: '' }
+    { pattern: 'Бічна дельта',          name: 'Відведення рук у кросовері',            muscles: ['sideDelts'],  sets: 2, reps: '10–12', weight: null, rir: '1', rest: '2 хв', note: '' },
+    { pattern: 'Біцепс',                name: 'Біцепс у тренажері',                    muscles: ['biceps'],     sets: 2, reps: '10–12', weight: null, rir: '1', rest: '2 хв', note: '' },
+    { pattern: 'Трицепс',               name: 'Розгинання в кросовері',                muscles: ['triceps'],    sets: 2, reps: '10–12', weight: null, rir: '1', rest: '2 хв', note: '' }
   ]
 };
 
@@ -757,8 +758,8 @@ window.PROGRAMS = [
     },
     progression: PROGRESSION_DOUBLE,
     notes: COMMON_NOTES.concat([
-      'Усі три тренування повністю ідентичні: 9 вправ, 22 робочі підходи.',
-      'Тижневий обʼєм — 22 × 3 = 66 робочих підходів.',
+      'Усі три тренування повністю ідентичні: 10 вправ, 24 робочі підходи.',
+      'Тижневий обʼєм — 24 × 3 = 72 робочі підходи; акцент на ноги й сідниці.',
       'Порядок тижня: тренування / відпочинок / тренування / відпочинок / тренування / два дні відпочинку.'
     ]),
 

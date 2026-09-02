@@ -634,6 +634,16 @@
     return r ? Math.min(r[1], Math.max(r[0], n)) : n;
   }
 
+  /* Чи число в межах поля. Значення поза межами НЕ клампиться мовчки
+     («1,5» кг ставало 30 без жодного знаку) — воно не зберігається, а на
+     виході з поля людина бачить підказку з межами. */
+  function outOfRange(key, raw) {
+    const r = FIELD_RANGE[key];
+    if (!r) return false;
+    const n = Number(String(raw == null ? '' : raw).trim().replace(',', '.'));
+    return Number.isFinite(n) && (n < r[0] || n > r[1]);
+  }
+
   /* Пишемо не на кожну натиснуту клавішу: інакше при вводі «180» профіль
      збережеться тричі, останній раз — уже правильно, але перед тим
      встигне побувати «1» і «18». */
@@ -1713,6 +1723,13 @@
         if (!el) return;
         if (evt === 'input' && el.tagName !== 'INPUT') return;
         if (evt === 'input' && el.type === 'radio') return;
+        if (outOfRange(el.dataset.p, el.value)) {
+          if (evt === 'change') {
+            const r = FIELD_RANGE[el.dataset.p];
+            toast('Допустимо від ' + r[0] + ' до ' + r[1] + ' — значення не збережено', 'err');
+          }
+          return;
+        }
         const v = coerce(el.dataset.p, el.value);
         /* Текстові дробові поля (вага, жир) пропускають будь-які символи:
            «abc» не має стирати збережене число (порожня вага = крок

@@ -269,6 +269,11 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   line-height: 1;
   color: var(--text);
   text-transform: uppercase;
+  /* Ціль дотику: сам напис 31–36px заввишки, а WCAG 2.5.8 хоче ≥ 24px із
+     запасом і сенсорні гайдлайни — ≥ 44px. Розширюємо зону кліку, не
+     зрушуючи розкладку (мінусовий margin компенсує padding). */
+  padding: 8px 0;
+  margin: -8px 0;
 }
 .logo:hover { color: var(--text); }
 

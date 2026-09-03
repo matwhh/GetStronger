@@ -6,7 +6,7 @@
 #  збирає й викладає сайт. Нічого вводити не треба.
 #
 #  Репозиторій, куди все їде. Якщо колись переїде — міняти тільки цей рядок.
-REPO_URL="https://github.com/matwhh/forge.git"
+REPO_URL="https://github.com/matwhh/Forge.git"
 BRANCH="main"
 
 cd "$(dirname "$0")" || exit 1

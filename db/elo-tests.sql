@@ -17,7 +17,7 @@ declare
   ua uuid := '00000000-0000-4000-8000-00000000f001';
   ub uuid := '00000000-0000-4000-8000-00000000f002';
   y date := current_date - 1; wk date := date_trunc('week', current_date)::date;
-  r jsonb; out text := E'\n'; okn int := 0; alln int := 0; st record; c boolean;
+  r jsonb; out text := E'\n'; okn int := 0; alln int := 0; st record; c boolean; w1 int := 0;
   -- Payload, у якому підроблено ВСЕ, що колись впливало на розрахунок.
   forged jsonb := jsonb_build_object('minutes',480,'goal',1,'steps',20000,'kcal',2500,
     'target',2500,'protein',300,'proteinTarget',1,'done',999999,'total',1,'value',10);
@@ -106,25 +106,33 @@ begin
      from generate_series(0,2) k))
     where user_id = ua;
   delete from public.elo_events where user_id = ua;
+  -- Знімок плану тижня (db/elo-integrity.sql) зафіксувався як 6 у попередньому
+  -- блоці; для сценарію «план=1» емулюємо новий тиждень, скидаючи фікстуру.
+  delete from public.elo_week_plan where user_id = ua;
   insert into public.season_state (user_id, season) values (ua, season_of(current_date)) on conflict do nothing;
   update public.season_state set elo = 0 where user_id = ua;
 
   perform set_config('request.jwt.claims', json_build_object('sub', ua)::text, true);
   set local role authenticated;
   r := public.elo_submit('workout','wb1',current_date - 2,'{}');
-  c := (r->>'delta')::int = 45; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'план=1: перше тренування = 45 (денна стеля)' || E'\n';
+  -- На 1–2 день сезону «позавчора» належить минулому сезону → out_of_window;
+  -- це не регресія, тому день просто не рахується в тижневу суму.
+  c := coalesce((r->>'delta')::int = 17, r->>'error' = 'out_of_window', false); alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'план=1 у профілі: сервер бере план ≥ 3 → 17 (db/elo-integrity.sql)' ||
+         case when r->>'error' = 'out_of_window' then ' [позавчора — минулий сезон, пропущено]' else '' end || E'\n';
+  w1 := coalesce((r->>'delta')::int, 0);
   r := public.elo_submit('workout','wb2',current_date - 1,'{}');
-  c := (r->>'delta')::int = 6; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'план=1: друге = 6 (залишок тижня)' || E'\n';
+  c := (r->>'delta')::int = 17; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'друге тренування = 17' || E'\n';
   r := public.elo_submit('workout','wb3',current_date,'{}');
-  c := (r->>'delta')::int = 0; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'план=1: третє = 0' || E'\n';
+  c := (r->>'delta')::int = 17; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'третє = 17 (тижневий бюджет тренувань 51 вичерпано)' || E'\n';
   reset role;
   select coalesce(sum(delta),0) as s into st from public.elo_events
     where user_id = ua and category='training' and day between wk and wk + 6;
-  c := st.s = 51; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'тижневий бюджет тренувань = 51 незалежно від плану' || E'\n';
+  -- У понеділок «учора/позавчора» — інший ISO-тиждень, у сумі лише сьогоднішнє.
+  c := st.s = case when date_trunc('week', current_date - 1)::date = wk then 34 + w1 else 17 end; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'тижневий бюджет тренувань = 51 незалежно від плану (факт ' || st.s || ' при ' || (2 + (w1 > 0)::int) || ' тренуваннях у вікні)' || E'\n';
 
   raise exception E'ELO-ТЕСТИ: % з % пройдено\n%', okn, alln, out;
 end $$;

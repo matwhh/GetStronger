@@ -1,10 +1,23 @@
 # Те, що не має лежати на бойовому сайті: воно потрібне для розробки,
 # а не браузеру. Сам сайт — це html/css/js/icons у корені.
+#
+# Vercel не викладає ці шляхи навіть при деплої з git — перевірено:
+# https://forge-mold1.vercel.app/db/schema.sql віддає 404.
+# tools/ci-hygiene.mjs стежить, щоб рядки db/, tools/, tests/ і docs/
+# звідси не зникли.
 db/
 tools/
 tests/
+docs/
 node_modules/
 README.md
 RELEASE.md
 package.json
 *.command
+.github/
+
+# Ніколи не публікувати: експорти акаунтів (пошта + історія тренувань),
+# службові файли macOS, архіви.
+backup-*.json
+.DS_Store
+*.zip

@@ -5,7 +5,7 @@
  */
 window.LEGAL_VERSIONS = {
   privacy_policy:     '1.1',
-  terms_of_use:       '1.0',
+  terms_of_use:       '1.1',
   medical_disclaimer: '1.0',
   updated:            '3 вересня 2026'
 };

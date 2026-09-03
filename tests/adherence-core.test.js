@@ -155,3 +155,24 @@ describe('adherence: дати', () => {
     assert.equal(A.firstDate({}), null);
   });
 });
+
+describe('adherence: перші дні ведення', () => {
+  it('2 дні даних, план 5/тиж, одне повне тренування = 100 %, а не 70', () => {
+    const p = prof({ '2026-09-20': sess(29, 29) }, {}, 5);
+    p.sessionLog['2026-09-19'] = { programId: 'p', days: 5, dayIdx: 0, done: 0, total: 5, doneSets: 0, totalSets: 29 };
+    const r = A.trainingAdherence(p, T, 30);
+    assert.equal(r.effDays, 2);
+    assert.equal(r.expected, 1);
+    assert.equal(r.pct, 100);
+  });
+  it('очікувані сесії — ціле число і не менше однієї', () => {
+    const p = prof({ '2026-09-20': sess(10, 10) }, {}, 3);
+    const r = A.trainingAdherence(p, T, 90);
+    assert.equal(r.expected, 1);
+    assert.equal(r.pct, 100);
+  });
+  it('повний тиждень — знаменник той самий, що й раніше', () => {
+    const p = prof({ '2026-09-14': sess(10, 10) });
+    assert.equal(A.trainingAdherence(p, T, 7).expected, 3);
+  });
+});

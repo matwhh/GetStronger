@@ -15,7 +15,8 @@ const NOW = new Date(2026, 7, 17); // понеділок, 17 серпня 2026, 
 describe('реєстр: ensureBuiltins', () => {
   it('засіває всі убудовані типи з дефолтним увімкненням', () => {
     const trackers = T.ensureBuiltins({});
-    assert.equal(Object.keys(trackers).length, T.BUILTIN_ORDER.length);
+    // + креатин — добавка «з коробки»
+    assert.equal(Object.keys(trackers).length, T.BUILTIN_ORDER.length + 1);
     assert.equal(trackers.water.enabled, true);
     assert.equal(trackers.sleep.enabled, true);
     assert.equal(trackers.mood.enabled, true);
@@ -84,9 +85,9 @@ describe('увімкнення й ціль', () => {
     // not reference-equal» навіть за однакового вмісту.
     const trackers = T.ensureBuiltins({});
     const names = T.list(trackers).map((t) => t.id);
-    assert.equal(names.join(','), T.BUILTIN_ORDER.join(','));
+    assert.equal(names.join(','), T.BUILTIN_ORDER.join(',') + ',creatine');
     const act = T.active(trackers).map((t) => t.id);
-    assert.equal(act.join(','), 'water,sleep,mood,recovery');
+    assert.equal(act.join(','), 'water,sleep,mood,recovery,creatine');
   });
 });
 
@@ -248,5 +249,157 @@ describe('formatDuration', () => {
     assert.equal(T.formatDuration(462), '7 год 42 хв');
     assert.equal(T.formatDuration(480), '8 год');
     assert.equal(T.formatDuration(-5), '');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Тривалість довільним числом (замість готових кнопок)                */
+/* ------------------------------------------------------------------ */
+describe('tracker-core: години й хвилини', () => {
+  const DEF = { min: 0, max: 960 };
+
+  it('розкладає хвилини на два поля', () => {
+    assert.equal(T.splitDuration(407).h, 6);
+    assert.equal(T.splitDuration(407).m, 47);
+    assert.equal(T.splitDuration(480).m, 0);
+    assert.equal(T.splitDuration(null).h, null);
+    assert.equal(T.splitDuration(-5).h, null);
+  });
+
+  it('складає назад', () => {
+    assert.equal(T.joinDuration('6', '47', DEF), 407);
+    assert.equal(T.joinDuration('7', '', DEF), 420);
+    assert.equal(T.joinDuration('', '45', DEF), 45);
+  });
+
+  it('хвилини понад 59 переносяться в години, а не відкидаються', () => {
+    assert.equal(T.joinDuration('', '90', DEF), 90);
+    assert.equal(T.joinDuration('6', '90', DEF), 450);
+  });
+
+  it('порожні поля й нульовий підсумок = стерти запис, а не нуль годин сну', () => {
+    assert.equal(T.joinDuration('', '', DEF), null);
+    assert.equal(T.joinDuration(null, null, DEF), null);
+    assert.equal(T.joinDuration('0', '', DEF), null);
+    assert.equal(T.joinDuration('0', '0', DEF), null);
+  });
+
+  it('сміття не проходить', () => {
+    ['abc', '-3', '1e5', '7:30', '--'].forEach(function (v) {
+      assert.equal(T.joinDuration(v, '', DEF), false, v);
+    });
+  });
+
+  it('поза межами трекера — відмова, а не мовчазне обрізання', () => {
+    assert.equal(T.joinDuration('20', '', DEF), false);   // 1200 хв > 960
+    assert.equal(T.joinDuration('16', '', DEF), 960);     // рівно межа
+  });
+
+  it('кома як роздільник приймається', () => {
+    assert.equal(T.joinDuration('7,5', '', DEF), 450);
+  });
+
+  it('у сна більше немає готових кнопок', () => {
+    assert.equal(T.TRACKER_DEFS.sleep.presets, undefined);
+  });
+});
+
+describe('tracker-core: накопичення без брехні в округленні', () => {
+  it('+0.25 записує 0.25, а не 0.3', () => {
+    const trackers = T.ensureBuiltins({});
+    let log = T.addDelta(trackers, {}, 'water', 0.25, '2026-09-01');
+    assert.equal(log.water['2026-09-01'], 0.25);
+    log = T.addDelta(trackers, log, 'water', 0.25, '2026-09-01');
+    assert.equal(log.water['2026-09-01'], 0.5);
+  });
+});
+
+
+/* ------------------------------------------------------------------ */
+/* Добавки з дозою (грами)                                             */
+/* ------------------------------------------------------------------ */
+describe('tracker-core: креатин і дози', () => {
+  const trackers = T.ensureBuiltins({});
+
+  it('креатин моногідрат є з коробки: увімкнений, 5 г', () => {
+    const c = trackers.creatine;
+    assert.equal(c.type, 'supplement');
+    assert.equal(c.enabled, true);
+    assert.equal(T.isDosed(c), true);
+    assert.equal(T.doseOf(c), 5);
+    assert.equal(T.defFor(c).kind, 'dose');
+  });
+
+  it('галочка пише типову дозу, число — стільки грамів', () => {
+    let log = T.logValue(trackers, {}, 'creatine', true, '2026-09-01');
+    assert.equal(log.creatine['2026-09-01'], 5);
+    log = T.logValue(trackers, log, 'creatine', '7,5', '2026-09-01');
+    assert.equal(log.creatine['2026-09-01'], 7.5);
+    assert.equal(T.gramsOf(log.creatine['2026-09-01']), 7.5);
+  });
+
+  it('нуль, сміття і false знімають позначку', () => {
+    const base = T.logValue(trackers, {}, 'creatine', true, '2026-09-01');
+    [0, false, null, '', 'abc', -3, 900, Infinity].forEach(function (v) {
+      const log = T.logValue(trackers, base, 'creatine', v, '2026-09-01');
+      assert.equal(log.creatine && log.creatine['2026-09-01'], undefined, String(v));
+    });
+  });
+
+  it('старі булеві записи рахуються як «прийнято»', () => {
+    const log = { creatine: { '2026-08-30': true, '2026-08-31': 5, '2026-09-01': 3 } };
+    const st = T.boolSummary(log, 'creatine', 30, null, new Date(2026, 8, 1));
+    assert.equal(st.done, 3);
+    assert.equal(T.taken(true), true);
+    assert.equal(T.taken(5), true);
+    assert.equal(T.taken(0), false);
+    assert.equal(T.taken(undefined), false);
+  });
+
+  it('серія днів поспіль бачить і грами, і галочки', () => {
+    const log = { creatine: { '2026-08-30': true, '2026-08-31': 5, '2026-09-01': 3 } };
+    assert.equal(T.boolSummary(log, 'creatine', 30, null, new Date(2026, 8, 1)).streak, 3);
+  });
+
+  it('дозу можна змінити чи прибрати', () => {
+    let t = T.setDose(trackers, 'creatine', 3);
+    assert.equal(T.doseOf(t.creatine), 3);
+    t = T.setDose(t, 'creatine', '');
+    assert.equal(T.isDosed(t.creatine), false);
+    assert.equal(T.defFor(t.creatine).kind, 'boolean');
+    // звичка дози не має
+    assert.equal(T.setDose(trackers, 'water', 3), trackers);
+  });
+
+  it('власна добавка з дозою і без', () => {
+    const a = T.addCustom(trackers, 'supplement', 'Омега-3', 2);
+    assert.equal(T.doseOf(a.trackers[a.id]), 2);
+    const b = T.addCustom(trackers, 'supplement', 'Вітамін D');
+    assert.equal(T.isDosed(b.trackers[b.id]), false);
+    const h = T.addCustom(trackers, 'habit', 'Читати', 5);   // звичка ігнорує дозу
+    assert.equal(T.isDosed(h.trackers[h.id]), false);
+  });
+
+  it('уже наявний креатин людини не переписується', () => {
+    const mine = { creatine: { id: 'creatine', type: 'supplement', name: 'Креатин',
+      enabled: false, settings: { dose: 3, unit: 'г' }, goal: null, source: null, order: 7, createdAt: null } };
+    const out = T.ensureBuiltins(mine);
+    assert.equal(out.creatine.enabled, false);
+    assert.equal(T.doseOf(out.creatine), 3);
+  });
+});
+
+describe('tracker-core: креатин з коробки не воскресає', () => {
+  it('«видалити» для дефолтної добавки = вимкнути, і ensureBuiltins її не повертає', () => {
+    let t = T.ensureBuiltins({});
+    t = T.removeCustom(t, 'creatine');
+    assert.equal(t.creatine.enabled, false);
+    const again = T.ensureBuiltins(t);
+    assert.equal(again.creatine.enabled, false);
+    assert.equal(T.active(again).some((x) => x.id === 'creatine'), false);
+  });
+  it('власна добавка видаляється по-справжньому', () => {
+    const a = T.addCustom(T.ensureBuiltins({}), 'supplement', 'Омега-3', 2);
+    assert.equal(T.removeCustom(a.trackers, a.id)[a.id], undefined);
   });
 });

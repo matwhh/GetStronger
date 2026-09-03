@@ -79,7 +79,7 @@ for (const [label, payload] of CORRUPT) {
 /* ---- 3. Швидкі кліки по трекеру: значення не подвоюється понад межу ---- */
 {
   const {ctx,p,errs}=await page();
-  await p.goto(U('trackers.html')); await p.waitForTimeout(900);
+  await p.goto(U('trackers-settings.html')); await p.waitForTimeout(900);
   const row=p.locator('.tr-row', {hasText:'Вода'}).first();
   await tap(row.locator('[data-expand]')).catch(()=>{}); await p.waitForTimeout(300);
   const add=row.locator('[data-add]').first();

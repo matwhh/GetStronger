@@ -103,7 +103,7 @@ describe('мішок — основна частина', () => {
 describe('текст для буфера обміну', () => {
   it('починається з шапки, яку чекає Apple Notes', () => {
     const lines = TEXT.split('\n');
-    assert.equal(lines[0], 'БОКС — СУБОТНЄ ТРЕНУВАННЯ');
+    assert.equal(lines[0], 'БОКС — ТРЕНУВАННЯ НА МІШКУ');
     assert.equal(lines[1], 'Тривалість: 60–70 хв');
     assert.equal(lines[2], 'Формат: 3 хв робота / 1 хв відпочинок');
   });

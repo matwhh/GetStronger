@@ -48,7 +48,8 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(Object.assign({},s,{trackers:{
    mood:{id:'mood',type:'mood',name:'Настрій',enabled:true,settings:{},goal:null,source:null,order:2,createdAt:null}}}));},SEED);
- await p.reload(); await p.waitForTimeout(900);
+ /* Шкали 1..10 тепер живуть на сторінці «Трекери», а не на «Сьогодні» */
+ await p.goto('file:///root/work/forgesite/trackers.html'); await p.waitForTimeout(1100);
  const noName=await p.evaluate(()=>{
    const out=[];
    document.querySelectorAll('button, input, select, a[href]').forEach(el=>{

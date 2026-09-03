@@ -40,7 +40,8 @@ for(const vp of VP){
           if(!sc) out.escapes.push(el.tagName+'.'+String(el.className||'').slice(0,32)+' →'+Math.round(b.right));
         }
         // обрізаний текст: контент ширший за бокс, без переносу і без скролу
-        if(el.children.length===0 && el.scrollWidth>el.clientWidth+2 && cs.overflowX==='hidden')
+        // .sr-only навмисно 1×1 з overflow:hidden — це не обрізаний текст, а текст для читачів екрана
+        if(el.children.length===0 && el.scrollWidth>el.clientWidth+2 && cs.overflowX==='hidden' && !el.classList.contains('sr-only'))
           out.clipped.push(el.tagName+'.'+String(el.className||'').slice(0,28));
         /* Цілі дотику — лише на сенсорних ширинах і лише для СПРАВЖНІХ
            цілей. Не рахуємо: приховані чекбокси (їх ціль — label),

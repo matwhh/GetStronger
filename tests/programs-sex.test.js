@@ -35,8 +35,8 @@ describe('доступ до схем за статтю', () => {
     }
   });
 
-  it('жінка бачить рівно один жіночий план', () => {
-    assert.equal(idsOf(w.programsForSex('female')), 'women4');
+  it('жінка бачить рівно два жіночі плани', () => {
+    assert.equal(idsOf(w.programsForSex('female')), 'women3, women4');
   });
 
   it('чоловік бачить усі наявні чоловічі схеми й жодної жіночої', () => {
@@ -85,6 +85,7 @@ describe('збережений план чужої статі не відкри�
   it('жінка зі збереженим чоловічим планом не дістає його', () => {
     assert.equal(w.WorkoutCore.resolvePlan(withPlan('female', 'ppl', 6)), null);
     assert.equal(w.WorkoutCore.resolvePlan(withPlan('female', 'fullbody', 3)), null);
+    assert.ok(w.WorkoutCore.resolvePlan(withPlan('female', 'women3', 3)), 'жіночий Full Body на 3 дні є');
   });
 
   it('чоловік зі збереженим жіночим планом не дістає його', () => {
@@ -243,5 +244,35 @@ describe('жіночий план: дані', () => {
     const first = (r) => r.plan[0].exercises.find((e) => w.primaryMuscle(e) === 'quads');
     assert.equal(first(novice).reps, '8–10');
     assert.equal(first(adv).reps, '6–8');
+  });
+});
+
+
+describe('women3: Full Body для жінок на 3 дні', () => {
+  const p = w.PROGRAMS.find((x) => x.id === 'women3');
+  it('є, жіноча, лише 3 дні', () => {
+    assert.ok(p); assert.equal(p.sex, 'female'); assert.equal(p.daysSupported.join(','), '3');
+  });
+  it('три ідентичні дні по 12 вправ і 28 підходів; 84 за тиждень', () => {
+    const days = p.days[3];
+    assert.equal(days.length, 3);
+    const sets = (d) => d.exercises.reduce((a, e) => a + e.sets, 0);
+    assert.equal(days[0].exercises.length, 12);
+    assert.equal(sets(days[0]), 28);
+    assert.equal(days.reduce((a, d) => a + sets(d), 0), 84);
+    assert.equal(JSON.stringify(days[0]), JSON.stringify(days[2]));
+  });
+  it('тижневий обʼєм по групах: ноги 12/12, спина 12, сідниці 9, ікри 9, решта 6', () => {
+    const vol = {};
+    p.days[3].forEach((d) => d.exercises.forEach((e) => e.muscles.forEach((m) => { vol[m] = (vol[m] || 0) + e.sets; })));
+    assert.deepEqual(JSON.parse(JSON.stringify(vol)), { quads: 12, hamstrings: 12, glutes: 9, chest: 6, back: 12, frontDelts: 6, sideDelts: 6, biceps: 6, triceps: 6, calves: 9 });
+  });
+  it('усі вправи є в каталозі', () => {
+    const names = new Set(w.EXERCISES.map((e) => e.name));
+    p.days[3][0].exercises.forEach((e) => assert.ok(names.has(e.name), e.name));
+  });
+  it('чоловік цей план не бачить', () => {
+    assert.equal(w.programAllowedFor(p, 'male'), false);
+    assert.equal(w.WorkoutCore.resolvePlan({ sex: 'male', activePlan: { programId: 'women3', days: 3 } }), null);
   });
 });

@@ -1,0 +1,43 @@
+# FORGE — перевірки на кожен пуш.
+#
+# Досі тести ганялись руками, і тільки коли хтось про них згадував.
+# Тепер кожен пуш у main проходить два кроки, і зламаний коміт видно
+# одразу — до того, як Vercel викладе його на сайт.
+#
+# Залежностей немає навмисне: package.json без dependencies, тести —
+# на вбудованому node:test. Тому ні npm ci, ні кешу тут не треба.
+#
+# Браузерні перевірки (tools/verify*.mjs на Playwright) сюди НЕ входять:
+# Playwright не оголошений у package.json, а package-lock.json свідомо
+# в .gitignore — відтворюваного npm ci не буде. Хочеш їх у CI — спершу
+# треба додати Playwright у devDependencies й повернути lock-файл.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Тести і гігієна
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Юніт-тести
+        run: npm test
+
+      - name: Гігієна репозиторію
+        run: node tools/ci-hygiene.mjs

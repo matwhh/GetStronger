@@ -1090,12 +1090,10 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
    екран має бути станом, а не порожнечею. */
 .section--dash { padding: clamp(24px, 5vw, 48px) 0 clamp(40px, 7vw, 72px); }
 
-.dash__eyebrow {
-  margin: 0 0 4px;
-  font-family: var(--font-display);
-  font-size: 0.85rem; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--muted);
-}
+/* .dash__eyebrow прибрано разом із написом «Forge» над датою: слово вже
+   стоїть у шапці на два сантиметри вище, і другий раз воно з'їдало
+   найкраще місце екрана. Замість нього розділ називає знак будинку в
+   самому заголовку — правило для нього лежить у h1 > .h1-ico. */
 .dash__h1 {
   margin: 0;
   font-size: clamp(1.7rem, 5.5vw, 2.6rem);

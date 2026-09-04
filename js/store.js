@@ -527,6 +527,46 @@
   /* HTTP до Supabase                                                    */
   /* ------------------------------------------------------------------ */
 
+  /*
+   * КУДИ ПОВЕРТАЄ ЛИСТ.
+   *
+   * GoTrue кладе в лист адресу з параметра redirect_to; якщо його не
+   * передати — бере Site URL із налаштувань проєкту. Поки там стояв
+   * http://localhost:3000, КОЖЕН лист підтвердження вів людину на мертву
+   * сторінку: сервер пошту підтверджував (303 і email_confirmed_at у базі),
+   * а людина бачила «не вдається відкрити сторінку» й вважала, що
+   * реєстрація не пройшла. Саме так і загубився перший сторонній
+   * користувач.
+   *
+   * Ціль — welcome.html, а не корінь: токени приходять у ФРАГМЕНТІ
+   * (#access_token=…), а фрагмент не переживає редиректу сторожа
+   * (js/agegate.js) з index.html. Приймає їх лише welcome.js.
+   *
+   * Порожньо для file:// — там origin дорівнює 'null', і такий
+   * redirect_to GoTrue відкине.
+   *
+   * Адресу все одно має бути дозволено в Supabase → Authentication →
+   * URL Configuration → Redirect URLs, інакше сервер мовчки підставить
+   * Site URL. Тобто це половина полагодження, друга половина — там.
+   */
+  function emailRedirect() {
+    try {
+      if (typeof location === 'undefined') return '';
+      if (!/^https?:$/.test(location.protocol || '')) return '';
+      const origin = location.origin;
+      if (!origin || origin === 'null') return '';
+      return origin + '/welcome.html';
+    } catch (_) { return ''; }
+  }
+
+  /** Додати redirect_to до шляху auth-запиту, якщо адресу вдалось скласти. */
+  function withRedirect(path) {
+    const to = emailRedirect();
+    if (!to) return path;
+    return path + (path.indexOf('?') === -1 ? '?' : '&') +
+           'redirect_to=' + encodeURIComponent(to);
+  }
+
   function authHeaders(useSession) {
     const h = { 'apikey': KEY, 'Content-Type': 'application/json' };
     h['Authorization'] = (useSession !== false && session && session.access_token)
@@ -1079,7 +1119,7 @@
     signUp: async function (email, password) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено. Заповніть ключі Supabase у js/config.js.');
       const local = readLocalProfile();
-      const data = await req('/auth/v1/signup', {
+      const data = await req(withRedirect('/auth/v1/signup'), {
         method: 'POST', auth: false,
         body: { email: email, password: password }
       });
@@ -1132,7 +1172,28 @@
       if (!CLOUD) return null;
       let h = '';
       try { h = String(location.hash || '').replace(/^#/, ''); } catch (_) { return null; }
-      if (!h || h.indexOf('access_token=') === -1) return null;
+      if (!h) return null;
+
+      /*
+       * Помилка замість токенів. Supabase повертає її тим самим фрагментом
+       * (#error=access_denied&error_code=otp_expired) — це найчастіший
+       * фінал листа, який пролежав добу або який уже відкривали. Без цієї
+       * гілки фрагмент мовчки ігнорувався: людина приходила на стартовий
+       * екран без жодного пояснення, чому підтвердження не спрацювало.
+       */
+      if (h.indexOf('error=') !== -1 && h.indexOf('access_token=') === -1) {
+        const eq = new URLSearchParams(h);
+        const code = eq.get('error_code') || eq.get('error') || '';
+        try { history.replaceState(null, '', location.pathname + location.search); }
+        catch (_) { try { location.hash = ''; } catch (_2) {} }
+        const err = new Error(/expired/i.test(code)
+          ? 'Посилання з листа застаріло. Надішліть новий лист і відкрийте його одразу.'
+          : 'Посилання з листа не спрацювало. Надішліть новий лист.');
+        err.code = 'link_error';
+        throw err;
+      }
+
+      if (h.indexOf('access_token=') === -1) return null;
 
       const q = new URLSearchParams(h);
       const at = q.get('access_token');
@@ -1177,7 +1238,7 @@
     /** Лист для відновлення пароля. */
     requestPasswordReset: async function (email) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
-      return req('/auth/v1/recover', {
+      return req(withRedirect('/auth/v1/recover'), {
         method: 'POST', auth: false,
         body: { email: email }
       });
@@ -1201,7 +1262,7 @@
      */
     resendConfirmation: async function (email) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
-      return req('/auth/v1/resend', {
+      return req(withRedirect('/auth/v1/resend'), {
         method: 'POST', auth: false,
         body: { type: 'signup', email: email }
       });

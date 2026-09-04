@@ -63,9 +63,25 @@
     } catch (_) { return true; }
   }
 
+  /*
+   * Редирект сторожа НЕ МАЄ губити фрагмент із листа.
+   *
+   * Supabase повертає людину з токенами у фрагменті (#access_token=… або
+   * #error=…), а приймає їх лише welcome.js. Якщо лист привів на іншу
+   * сторінку (Site URL вказує на корінь, стара закладка, ручний перехід),
+   * сторож відсилає на welcome.html — і при звичайному location.replace
+   * фрагмент відпадає разом із токеном: людина приходить не ввійденою,
+   * а підтвердження вже витрачене. Тому фрагмент їде далі.
+   *
+   * Переносимо тільки те, що справді від Supabase: інакше сюди можна було б
+   * підкласти будь-який фрагмент і протягти його на іншу сторінку.
+   */
   function go(page) {
     if (!redirectAllowed()) return;
-    location.replace(page);
+    let hash = '';
+    try { hash = String(location.hash || ''); } catch (_) {}
+    const carry = /(^|[#&])(access_token=|error=|error_code=)/.test(hash) ? hash : '';
+    location.replace(page + carry);
   }
 
   function lsJson(key) {

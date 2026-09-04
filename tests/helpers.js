@@ -130,7 +130,15 @@ export function loadStore(opts) {
     Boolean, Error, Promise, setTimeout, clearTimeout, setInterval, clearInterval,
     CustomEvent: class { constructor(t, i) { this.type = t; Object.assign(this, i || {}); } },
     Blob: class { constructor(parts) { this.size = parts.join('').length; } },
-    navigator: { onLine: true }
+    navigator: { onLine: true },
+    /* Store складає redirect_to для листів з location — без нього
+       пісочниця мовчки давала б інший результат, ніж браузер. */
+    location: Object.assign({
+      origin: 'https://forge.test', protocol: 'https:',
+      pathname: '/welcome.html', search: '', hash: ''
+    }, o.location || {}),
+    URLSearchParams,
+    history: { replaceState() {} }
   };
   sandbox.globalThis = sandbox;
   sandbox.self = sandbox;

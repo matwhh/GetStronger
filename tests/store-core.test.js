@@ -285,3 +285,68 @@ describe('clearLocal', () => {
       assert.equal(ls.getItem(k), null, k + ' мусить зникнути'));
   });
 });
+
+/* ==========================================================================
+   Куди повертає лист із пошти
+   ==========================================================================
+   Реальний збій: Site URL у проєкті лишався http://localhost:3000, тож
+   посилання підтвердження вело сторонню людину на мертву сторінку. Сервер
+   пошту підтверджував, а людина бачила «не вдається відкрити сторінку» й
+   вважала, що реєстрація не пройшла. Тепер клієнт називає адресу сам.
+   ========================================================================== */
+describe('Auth: redirect_to у листах', () => {
+  /** Мережа, яка приймає будь-який auth-запит і запамʼятовує адресу. */
+  function authNet() {
+    const f = makeNet();
+    f.route((u) => u.includes('/auth/v1/'), () => ({ status: 200, body: { user: { id: UID_A, identities: [{}] } } }));
+    return f;
+  }
+  const urlOf = (fetchImpl, part) =>
+    (fetchImpl.calls.find((c) => c.url.includes(part)) || {}).url || '';
+
+  test('signup несе redirect_to на welcome.html', async () => {
+    const f = authNet();
+    const { Store } = loadStore({ fetch: f });
+    await Store.signUp('a@test.com', 'Ab1!xyzq');
+    const u = urlOf(f, '/auth/v1/signup');
+    assert.match(u, /redirect_to=https%3A%2F%2Fforge\.test%2Fwelcome\.html/);
+  });
+
+  test('recover і resend несуть ту саму адресу', async () => {
+    const f = authNet();
+    const { Store } = loadStore({ fetch: f });
+    await Store.requestPasswordReset('a@test.com');
+    await Store.resendConfirmation('a@test.com');
+    for (const p of ['/auth/v1/recover', '/auth/v1/resend']) {
+      assert.match(urlOf(f, p), /redirect_to=https%3A%2F%2Fforge\.test%2Fwelcome\.html/, p);
+    }
+  });
+
+  test('file:// — redirect_to не додається (GoTrue відкине origin "null")', async () => {
+    const f = authNet();
+    const { Store } = loadStore({
+      fetch: f,
+      location: { origin: 'null', protocol: 'file:', pathname: '/welcome.html' }
+    });
+    await Store.signUp('a@test.com', 'Ab1!xyzq');
+    assert.equal(urlOf(f, '/auth/v1/signup').includes('redirect_to'), false);
+  });
+
+  test('фрагмент з помилкою пояснюється, а не ігнорується', async () => {
+    const f = authNet();
+    const { Store } = loadStore({
+      fetch: f,
+      location: {
+        origin: 'https://forge.test', protocol: 'https:', pathname: '/welcome.html',
+        search: '', hash: '#error=access_denied&error_code=otp_expired'
+      }
+    });
+    await assert.rejects(() => Store.adoptUrlSession(), /застаріло/);
+  });
+
+  test('чистий фрагмент — не помилка, а «нічого не сталось»', async () => {
+    const f = authNet();
+    const { Store } = loadStore({ fetch: f, location: { hash: '#anchor' } });
+    assert.equal(await Store.adoptUrlSession(), null);
+  });
+});

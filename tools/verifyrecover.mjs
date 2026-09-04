@@ -107,6 +107,39 @@ const title = p => p.locator('#gate-card h1').innerText().then(t => t.trim());
   await ctx.close();
 }
 
+/* ---- 5. Лист привів не на ту сторінку: фрагмент має доїхати ----
+   Site URL у проєкті може вказувати на корінь сайту, а токени приймає
+   лише welcome.js. Сторож (js/agegate.js) відсилає таку людину на
+   welcome.html — і до цієї правки губив фрагмент разом із токеном:
+   підтвердження витрачалось, а людина приходила не ввійденою. */
+{
+  const ctx = await ctxWith(async c => {
+    await c.route(/\/auth\/v1\/user/, r => r.fulfill({ status:200, contentType:'application/json',
+      body: JSON.stringify({ id:'u-1', email:'friend@example.com' }) }));
+  });
+  const p = await ctx.newPage(); const errs=[]; p.on('pageerror', e=>errs.push(e.message));
+  await p.goto('file://'+ROOT+'/today.html#access_token=AT&refresh_token=RT&expires_in=3600&type=recovery',
+               { waitUntil:'load' });
+  await p.waitForTimeout(1400);
+  ok('17. сторож привів на welcome.html', /welcome\.html/.test(p.url()), p.url());
+  ok('18. фрагмент доїхав: показано зміну пароля',
+     /Новий пароль/.test(await p.locator('#gate-card').innerText()),
+     (await p.locator('#gate-card').innerText()).split('\n').filter(Boolean)[0]);
+  ok('19. токен не лишився в адресі', !/access_token/.test(p.url()), p.url());
+  ok('20. без JS-помилок', errs.length===0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 6. Звичайний якір сторож не тягне за собою ---- */
+{
+  const ctx = await ctxWith(async () => {});
+  const p = await ctx.newPage();
+  await p.goto('file://'+ROOT+'/today.html#nutrition', { waitUntil:'load' });
+  await p.waitForTimeout(900);
+  ok('21. чужий фрагмент не переноситься', !/#nutrition/.test(p.url()), p.url());
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter(r => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок відновлення пройшло.');

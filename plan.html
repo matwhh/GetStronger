@@ -9,16 +9,23 @@
      js/app.js, коли в config.js заповнено siteUrl: без домену
      абсолютне посилання все одно було б неправильним. -->
 <!-- og:image статично, а не з JS: краулери превʼю в месенджерах
-     (Telegram, Slack, WhatsApp) JavaScript не виконують. -->
-<meta property="og:image" content="og-image.png">
+     (Telegram, Slack, WhatsApp) JavaScript не виконують.
+     Адреса АБСОЛЮТНА: відносний og:image Telegram ще розбирає, а
+     Facebook, LinkedIn, X і Slack — ні, і в них картки лишались без
+     картинки. Домен той самий, що siteUrl у js/config.js.
+     og:title і og:description тут навмисно короткі й однакові на всіх
+     сторінках: у картці месенджера потрібне імʼя, а не SEO-заголовок.
+     Довгі варіанти лишаються в <title> і meta description для пошуку.
+     og:site_name прибрано — з ним «FORGE» стояло в картці двічі. -->
+<meta property="og:image" content="https://forge-mold1.vercel.app/og-image.png">
+<meta property="og:image:secure_url" content="https://forge-mold1.vercel.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="FORGE">
 <meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="Мій план тренувань і прогноз ваг — FORGE">
-<meta property="og:description" content="Обрана програма тренувань: робочі ваги, заміна вправ, тижневий обʼєм і модель приросту ваг на 6–24 місяці.">
+<meta property="og:title" content="FORGE">
+<meta property="og:description" content="Тренування · Харчування · Прогрес">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0b0b0b">
 <link rel="manifest" href="manifest.webmanifest">

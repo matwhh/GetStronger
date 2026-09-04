@@ -98,6 +98,32 @@ if (existsSync('js/config.js')) {
   }
 }
 
+/* ---- 6. Картка для месенджерів ---------------------------------------
+ *
+ * og:image мусить бути АБСОЛЮТНОЮ адресою. Відносний шлях Telegram ще
+ * розбирає, а Facebook, LinkedIn, X і Slack — ні: там посилання лишалось
+ * без картинки, і це не видно нізвідки, крім самої картки.
+ * Домен звіряється з siteUrl у js/config.js — щоб при переїзді на свій
+ * домен картинка не показувала старий.
+ */
+{
+  const cfg = existsSync('js/config.js') ? readFileSync('js/config.js', 'utf8') : '';
+  const m = cfg.match(/siteUrl:\s*'([^']*)'/);
+  const site = m ? m[1].replace(/\/+$/, '') : '';
+  for (const f of tracked.filter((x) => x.endsWith('.html'))) {
+    const html = readFileSync(f, 'utf8');
+    const img = html.match(/<meta property="og:image" content="([^"]*)"/);
+    if (!img) continue;
+    if (!/^https:\/\//.test(img[1])) {
+      fail(`${f}: og:image "${img[1]}" — потрібна абсолютна адреса, інакше картка без картинки`);
+    } else if (site && !img[1].startsWith(site + '/')) {
+      fail(`${f}: og:image веде на ${img[1]}, а siteUrl у config.js — ${site}`);
+    }
+    const title = html.match(/<meta property="og:title" content="([^"]*)"/);
+    if (!title || !title[1].trim()) fail(`${f}: порожній або відсутній og:title`);
+  }
+}
+
 /* ---- підсумок -------------------------------------------------------- */
 if (problems.length) {
   console.error('Гігієна репозиторію — знайдено проблеми:\n');

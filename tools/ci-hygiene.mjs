@@ -121,6 +121,18 @@ if (existsSync('js/config.js')) {
     }
     const title = html.match(/<meta property="og:title" content="([^"]*)"/);
     if (!title || !title[1].trim()) fail(`${f}: порожній або відсутній og:title`);
+
+    /*
+     * Telegram завжди друкує в картці два рядки: синій — og:site_name,
+     * жирний — og:title. Без site_name у синьому рядку стоїть голий
+     * домен, а якщо обидва однакові — слово стоїть двічі поспіль.
+     */
+    const site_ = html.match(/<meta property="og:site_name" content="([^"]*)"/);
+    if (!site_ || !site_[1].trim()) {
+      fail(`${f}: немає og:site_name — у картці месенджера буде голий домен`);
+    } else if (title && site_[1].trim() === title[1].trim()) {
+      fail(`${f}: og:site_name і og:title однакові ("${title[1]}") — у картці слово стоятиме двічі`);
+    }
   }
 }
 

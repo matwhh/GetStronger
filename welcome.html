@@ -13,19 +13,22 @@
      Адреса АБСОЛЮТНА: відносний og:image Telegram ще розбирає, а
      Facebook, LinkedIn, X і Slack — ні, і в них картки лишались без
      картинки. Домен той самий, що siteUrl у js/config.js.
-     og:title і og:description тут навмисно короткі й однакові на всіх
-     сторінках: у картці месенджера потрібне імʼя, а не SEO-заголовок.
-     Довгі варіанти лишаються в <title> і meta description для пошуку.
-     og:site_name прибрано — з ним «FORGE» стояло в картці двічі. -->
+     og:title тут — коротка назва розділу, а не SEO-заголовок: у картці
+     месенджера потрібне «де я опинюсь», а не ключові слова. Довгі
+     варіанти лишаються в <title> і meta description — їх читає пошук.
+     og:site_name лишається: без нього Telegram друкує в синьому рядку
+     голий домен. Тому site_name = FORGE, а title = назва розділу —
+     разом вони не дублюють одне одного. -->
 <meta property="og:image" content="https://forge-mold1.vercel.app/og-image.png">
 <meta property="og:image:secure_url" content="https://forge-mold1.vercel.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="FORGE — тренування, харчування, разовий максимум">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
 <meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="FORGE">
-<meta property="og:description" content="Тренування · Харчування · Прогрес">
+<meta property="og:title" content="Тренування · Харчування · Прогрес">
+<meta property="og:description" content="Сезонний рейтинг, плани тренувань, розрахунок калорій.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0b0b0b">
 <meta name="robots" content="noindex">

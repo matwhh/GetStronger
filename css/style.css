@@ -3551,21 +3551,23 @@ button.heatmap__cell::after {
   }
 
   .tabbar__item {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 3px;
+    display: flex; align-items: center; justify-content: center;
     /* 56px + безпечна зона — стандартна висота панелі розділів і водночас
-       ціль дотику з великим запасом понад 44px. */
+       ціль дотику з великим запасом понад 44px. Підпису під іконкою
+       більше немає, тому вся висота лишається малюнку. */
     min-height: 56px;
-    padding: 7px 4px 8px;
+    padding: 8px 4px;
     color: var(--muted);
     text-decoration: none;
-    font-size: 0.66rem; font-weight: 600; letter-spacing: 0.01em;
-    line-height: 1.1; text-align: center;
     transition: color var(--t-fast);
     -webkit-tap-highlight-color: transparent;
   }
-  .tabbar__ico { width: 22px; height: 22px; flex: none; }
-  .tabbar__lbl { display: block; }
+  /* Без підпису іконка лишається єдиним розпізнавальним знаком, тож вона
+     більша, ніж коли під нею стояло слово. */
+  .tabbar__ico { width: 26px; height: 26px; flex: none; }
+  /* Підпис не зникає, а стає невидимим: .sr-only лишає його читалкам
+     екрана й дає посиланню доступну назву. Прибрати текст зовсім —
+     означало б чотири посилання без назви. */
 
   .tabbar__item.is-active { color: var(--acc-ink); }
   .tabbar__item:active { color: var(--text); }

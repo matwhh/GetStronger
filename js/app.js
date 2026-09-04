@@ -477,8 +477,8 @@
       d: '<path fill="currentColor" fill-rule="evenodd" d="M122 10 L234 122 L234 264 L157 264 L157 172 L87 172 L87 264 L10 264 L10 122 Z"/>' },
     train: { vb: '1.66 5.03 20.68 20.68',
       d: '<path d="M1.8 9.2h2.2v5.6H1.8z"/><path d="M4.8 5.4H8v13.2H4.8z"/><path d="M8 10.6h8v2.8H8z"/><path d="M16 5.4h3.2v13.2H16z"/><path d="M20 9.2h2.2v5.6H20z"/>' },
-    food: { vb: '1.3 1.25 21.39 21.39',
-      d: '<path d="M2.5 10.5h19c0 5-3.4 8.6-7.7 9.2v1.8h-3.6v-1.8c-4.3-.6-7.7-4.2-7.7-9.2z"/><path d="M7.6 3.2h1.8v5H7.6z"/><path d="M11.1 2.4h1.8v5.8h-1.8z"/><path d="M14.6 3.2h1.8v5h-1.8z"/>' },
+    food: { vb: '1.66 1.36 21.28 21.28',
+      d: '<path d="M5 2.5h1.6v6h1.1v-6h1.6v6h1.1v-6H12V10a2.6 2.6 0 0 1-1.9 2.5V21.5H7.9V12.5A2.6 2.6 0 0 1 6 10V2.5z"/><path d="M19.6 2.5v19h-1.8v-9.3h-1.6c0-5 1.2-8.5 3.4-9.7z"/>' },
     progress: { vb: '7.27 5.52 283.36 283.36',
       d: '<g fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"><path d="M24.01 166.98 A126.5 126.5 0 1 1 46.94 222.00 L90.7 165.6 L144.9 202.2 L201.4 111.5"/><path d="M152 122.1 L201.4 111.5 L216 157.8"/></g>' }
   };
@@ -514,7 +514,7 @@
       return '<a class="tabbar__item' + (active ? ' is-active' : '') + '" href="' + g.href + '"' +
              (active ? ' aria-current="page"' : '') + '>' +
                tabIcon(g.icon) +
-               '<span class="tabbar__lbl">' + esc(g.label) + '</span>' +
+               '<span class="tabbar__lbl sr-only">' + esc(g.label) + '</span>' +
              '</a>';
     }).join('');
 

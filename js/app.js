@@ -461,18 +461,33 @@
    * десктопі розділи стоять у шапці, і другий ряд тих самих посилань
    * унизу вікна був би просто дублем.
    */
+  /*
+   * Кожна іконка несе власний viewBox: малюнки прийшли з різних полотен,
+   * і зводити їх до спільної сітки перерахунком координат — зайвий шанс
+   * помилитись. Квадрат обчислено по межах фігури з однаковим оптичним
+   * полем, тому в панелі всі виглядають однакового розміру.
+   *
+   * today/train/food суцільні: заливка бере currentColor, тож активний
+   * розділ підсвічується так само, як і раніше. progress лишився
+   * обведенням (він так намальований), але з важчою лінією — поруч із
+   * суцільними тонкий контур читався б блідим.
+   */
   const TAB_ICONS = {
-    today:    '<path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M8 3v4M16 3v4"/>',
-    train:    '<path d="M3 12h2M19 12h2"/><path d="M6 8v8M18 8v8"/><path d="M9 6v12M15 6v12"/><path d="M9 12h6"/>',
-    food:     '<path d="M6 3v8a3 3 0 0 0 6 0V3"/><path d="M9 11v10"/><path d="M17 3c-1.5 2-2 4-2 6v3h3V3z"/><path d="M18 12v9"/>',
-    recovery: '<path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9z"/>',
-    progress: '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/>'
+    today: { vb: '-20.24 -5.24 284.48 284.48',
+      d: '<path fill="currentColor" fill-rule="evenodd" d="M122 10 L234 122 L234 264 L157 264 L157 172 L87 172 L87 264 L10 264 L10 122 Z"/>' },
+    train: { vb: '1.66 5.03 20.68 20.68',
+      d: '<path d="M1.8 9.2h2.2v5.6H1.8z"/><path d="M4.8 5.4H8v13.2H4.8z"/><path d="M8 10.6h8v2.8H8z"/><path d="M16 5.4h3.2v13.2H16z"/><path d="M20 9.2h2.2v5.6H20z"/>' },
+    food: { vb: '1.3 1.25 21.39 21.39',
+      d: '<path d="M2.5 10.5h19c0 5-3.4 8.6-7.7 9.2v1.8h-3.6v-1.8c-4.3-.6-7.7-4.2-7.7-9.2z"/><path d="M7.6 3.2h1.8v5H7.6z"/><path d="M11.1 2.4h1.8v5.8h-1.8z"/><path d="M14.6 3.2h1.8v5h-1.8z"/>' },
+    progress: { vb: '7.27 5.52 283.36 283.36',
+      d: '<g fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"><path d="M24.01 166.98 A126.5 126.5 0 1 1 46.94 222.00 L90.7 165.6 L144.9 202.2 L201.4 111.5"/><path d="M152 122.1 L201.4 111.5 L216 157.8"/></g>' }
   };
 
   function tabIcon(name) {
-    return '<svg class="tabbar__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      (TAB_ICONS[name] || '') + '</svg>';
+    const ico = TAB_ICONS[name];
+    if (!ico) return '';
+    return '<svg class="tabbar__ico" viewBox="' + ico.vb +
+      '" fill="currentColor" aria-hidden="true">' + ico.d + '</svg>';
   }
 
   /** Чи належить сторінка розділу — сам розділ або будь-яка його дитина */

@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+import { CHROME, ROOT } from './pw.mjs';
+const b=await chromium.launch({executablePath:CHROME});
 const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(x?' :: '+x:''));};
 const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,activity:1.55,goal:'cut',meals:4,daysPerWeek:3,
   activePlan:{programId:'fullbody',days:3}};
@@ -8,7 +9,7 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
 // A. Модалка раціону: focus trap, Escape, повернення фокуса, aria
 {
  const ctx=await adultContext(b, {viewport:{width:1100,height:900}}); const p=await ctx.newPage();
- await p.goto('file:///root/work/forgesite/meals.html');
+ await p.goto(`file://${ROOT}/meals.html`);
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(s);},SEED);
  await p.reload(); await p.waitForTimeout(900);
@@ -32,7 +33,7 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
 // B. Мобільне меню
 {
  const ctx=await adultContext(b, {viewport:{width:390,height:844}}); const p=await ctx.newPage();
- await p.goto('file:///root/work/forgesite/index.html'); await p.waitForTimeout(700);
+ await p.goto(`file://${ROOT}/index.html`); await p.waitForTimeout(700);
  await p.locator('.nav__burger').click(); await p.waitForTimeout(300);
  ok('меню: aria-expanded=true після відкриття', await p.locator('.nav__burger').getAttribute('aria-expanded')==='true');
  await p.keyboard.press('Escape'); await p.waitForTimeout(300);
@@ -44,12 +45,12 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
 // C. Доступні назви інтерактивних елементів + aria-pressed на шкалах
 {
  const ctx=await adultContext(b, {viewport:{width:1100,height:900}}); const p=await ctx.newPage();
- await p.goto('file:///root/work/forgesite/index.html');
+ await p.goto(`file://${ROOT}/index.html`);
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(Object.assign({},s,{trackers:{
    mood:{id:'mood',type:'mood',name:'Настрій',enabled:true,settings:{},goal:null,source:null,order:2,createdAt:null}}}));},SEED);
  /* Шкали 1..10 тепер живуть на сторінці «Трекери», а не на «Сьогодні» */
- await p.goto('file:///root/work/forgesite/trackers.html'); await p.waitForTimeout(1100);
+ await p.goto(`file://${ROOT}/trackers.html`); await p.waitForTimeout(1100);
  const noName=await p.evaluate(()=>{
    const out=[];
    document.querySelectorAll('button, input, select, a[href]').forEach(el=>{
@@ -74,7 +75,7 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
 // D. Тости оголошуються
 {
  const ctx=await adultContext(b); const p=await ctx.newPage();
- await p.goto('file:///root/work/forgesite/index.html'); await p.waitForTimeout(700);
+ await p.goto(`file://${ROOT}/index.html`); await p.waitForTimeout(700);
  await p.evaluate(()=>window.App.toast('тест','ok')); await p.waitForTimeout(200);
  const t=p.locator('.toasts');
  ok('контейнер тостів має role=status + aria-live', await t.getAttribute('role')==='status' && await t.getAttribute('aria-live')==='polite');
@@ -87,13 +88,13 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
    тап по кнопці внизу «Раціону» відкривав калькулятор 1ПМ. */
 {
  const ctx=await adultContext(b, {viewport:{width:390,height:844}}); const p=await ctx.newPage();
- await p.goto('file:///root/work/forgesite/meals.html'); await p.waitForTimeout(900);
+ await p.goto(`file://${ROOT}/meals.html`); await p.waitForTimeout(900);
  const before=p.url();
  await p.mouse.click(195, 780);
  await p.waitForTimeout(600);
  ok('закрите меню не перехоплює дотик по сторінці', p.url()===before, p.url().split('/').pop());
 
- await p.goto('file:///root/work/forgesite/meals.html'); await p.waitForTimeout(800);
+ await p.goto(`file://${ROOT}/meals.html`); await p.waitForTimeout(800);
  let inMenu=0;
  for(let i=0;i<8;i++){ await p.keyboard.press('Tab');
    if(await p.evaluate(()=>{const a=document.activeElement;return !!(a.closest&&a.closest('.nav__links'));})) inMenu++; }
@@ -109,7 +110,7 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
 }
 {
  const ctx=await adultContext(b, {viewport:{width:1280,height:900}}); const p=await ctx.newPage();
- await p.goto('file:///root/work/forgesite/index.html'); await p.waitForTimeout(800);
+ await p.goto(`file://${ROOT}/index.html`); await p.waitForTimeout(800);
  /* Групу знаходимо за вмістом, а не за позицією: «Бокс» переїхав із
     групи-кнопки «Інше» під «Тренування», у якої є власна сторінка, тому
     перемикачем там служить стрілка, а не сам заголовок. */

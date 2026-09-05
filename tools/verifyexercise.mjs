@@ -6,9 +6,10 @@
  * отримує вигаданий тоннаж, а порожнеча підписана поясненням, а не нулем.
  */
 import { chromium } from 'playwright';
+import { CHROME } from './pw.mjs';
 const ROOT = process.cwd();
 const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(x?' :: '+x:''));};
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 const sess = (ex) => ({ programId:'ppl', days:3, dayIdx:0, done:2, total:3, doneSets:8, totalSets:12, end:1, ex });
 const B = (kg, ds, r) => ({ n:'Жим лежачи', ds, ps:4, kg, r });
 const PROFILE = {

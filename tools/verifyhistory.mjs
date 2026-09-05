@@ -14,11 +14,11 @@
  */
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
-const ROOT = '/root/work/forgesite';
+import { CHROME, ROOT } from './pw.mjs';
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 
 /* Дати рахуємо від «сьогодні», щоб перевірка не протухла через місяць. */
 const now = new Date();

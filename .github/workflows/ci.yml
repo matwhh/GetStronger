@@ -1,16 +1,20 @@
 # FORGE — перевірки на кожен пуш.
 #
-# Досі тести ганялись руками, і тільки коли хтось про них згадував.
-# Тепер кожен пуш у main проходить два кроки, і зламаний коміт видно
-# одразу — до того, як Vercel викладе його на сайт.
+# Відколи публікація автоматична (tools/auto-publish.sh на Mac комітить
+# і пушить сам), CI — єдине місце, де зміни бачить хтось, крім автора.
+# Тому тут не тільки юніти: браузерні перевірки теж ганяються самі.
 #
-# Залежностей немає навмисне: package.json без dependencies, тести —
-# на вбудованому node:test. Тому ні npm ci, ні кешу тут не треба.
+# Три рівні, від дешевого до дорогого:
+#   test           — юніти + гігієна. Секунди. На кожен пуш і PR.
+#   browser        — ядро браузерних перевірок. ~5 хв. На кожен пуш і PR.
+#   browser-full   — усе інше. ~40 хв. Раз на добу і на вимогу.
 #
-# Браузерні перевірки (tools/verify*.mjs на Playwright) сюди НЕ входять:
-# Playwright не оголошений у package.json, а package-lock.json свідомо
-# в .gitignore — відтворюваного npm ci не буде. Хочеш їх у CI — спершу
-# треба додати Playwright у devDependencies й повернути lock-файл.
+# ЧОМУ ХОСТИ ГЛУШАТЬСЯ. Перевірки ходять по file:// і працюють із
+# посадженим у сховище профілем — хмара їм не потрібна. Але сторінка
+# усе одно смикне Supabase, а на раннері GitHub інтернет справжній:
+# тести або залежать від стану бойової бази, або (гірше) щось у ній
+# створюють. Тому домен проєкту й Sentry вішаються на 127.0.0.1 —
+# CI фізично не може дотягтись до продакшену.
 
 name: CI
 
@@ -19,25 +23,91 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Playwright прибитий цвяхами: package-lock.json свідомо в .gitignore,
+  # тож відтворюваність дає саме ця версія, а не lock-файл.
+  PW_VERSION: '1.56.0'
 
 jobs:
   test:
     name: Тести і гігієна
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Юніт-тести
+        run: npm test
+      - name: Гігієна репозиторію
+        run: node tools/ci-hygiene.mjs
 
+  browser:
+    name: Браузер — ядро
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Юніт-тести
-        run: npm test
+      - name: Відрізати хмару
+        run: bash tools/ci-offline.sh
 
-      - name: Гігієна репозиторію
-        run: node tools/ci-hygiene.mjs
+      - name: Playwright
+        run: |
+          npm i --no-save --no-audit --no-fund "playwright@${PW_VERSION}"
+          npx playwright install --with-deps chromium
+
+      - name: Перевірки
+        run: bash tools/ci-browser.sh core
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-core-log
+          path: .ci-browser/
+          retention-days: 7
+
+  browser-full:
+    name: Браузер — усе
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Відрізати хмару
+        run: bash tools/ci-offline.sh
+
+      - name: Playwright
+        run: |
+          npm i --no-save --no-audit --no-fund "playwright@${PW_VERSION}"
+          npx playwright install --with-deps chromium
+
+      - name: Перевірки
+        run: bash tools/ci-browser.sh full
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-full-log
+          path: .ci-browser/
+          retention-days: 7

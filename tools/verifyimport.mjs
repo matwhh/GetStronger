@@ -5,7 +5,8 @@
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 import fs from 'node:fs';
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+import { CHROME, ROOT } from './pw.mjs';
+const b=await chromium.launch({executablePath:CHROME});
 const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(x?' :: '+x:''));};
 const SEED={
   sex:'female', age:29, height:168, weight:61.4, bodyfat:22, activity:1.375, goal:'cut', meals:4,
@@ -33,14 +34,14 @@ const SEED={
 };
 
 const ctx=await adultContext(b); const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
-await p.goto('file:///root/work/forgesite/account.html'); await p.waitForTimeout(800);
+await p.goto(`file://${ROOT}/account.html`); await p.waitForTimeout(800);
 await p.evaluate(async s=>{await window.Store.saveProfile(s);},SEED);
 const dump=await p.evaluate(async()=>JSON.stringify(await window.Store.getProfile()));
 const tmp='/tmp/rt.json'; fs.writeFileSync(tmp,dump);
 
 const ctx2=await adultContext(b); const p2=await ctx2.newPage(); p2.on('dialog',d=>d.accept());
 const errs=[]; p2.on('pageerror',e=>errs.push(e.message));
-await p2.goto('file:///root/work/forgesite/account.html'); await p2.waitForTimeout(800);
+await p2.goto(`file://${ROOT}/account.html`); await p2.waitForTimeout(800);
 await p2.setInputFiles('#p-import-file',tmp); await p2.waitForTimeout(1100);
 const B=await p2.evaluate(async()=>await window.Store.getProfile());
 

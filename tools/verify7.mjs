@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-const ROOT='/root/work/forgesite';
+import { CHROME, ROOT } from './pw.mjs';
 const url=f=>'file://'+join(ROOT,f);
 const PAGES=readdirSync(ROOT).filter(f=>f.endsWith('.html')).sort();
 const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82.4,bodyfat:18,activity:1.55,goal:'cut',meals:4,
@@ -12,7 +12,7 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82.4,bo
   workLog:{'2026-08-17':1},hrRest:58,hrMax:190,
   records:{squat:140},
   ratingLog:{'2026-08-18':{rating:3120,delta:25,quality:'ok',reasons:[]}},ratingAlgorithmVersion:1};
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:CHROME});
 let fails=0;
 for(const vp of [{w:390,h:844,n:'mobile'},{w:1280,h:900,n:'desktop'}]){
   const ctx=await adultContext(b, {viewport:{width:vp.w,height:vp.h}});

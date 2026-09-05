@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+import { CHROME, ROOT } from './pw.mjs';
+const b=await chromium.launch({executablePath:CHROME});
 const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(x?' :: '+x:''));};
 const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82.4,activity:1.55,goal:'cut',meals:4,
   daysPerWeek:3,activePlan:{programId:'fullbody',days:3},trainingAge:'inter'};
@@ -12,7 +13,7 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
 // 1. Головна = «Сьогодні»: живий стан і дія на одному екрані
 {
  const {ctx,p,errs}=await page();
- await p.goto('file:///root/work/forgesite/index.html');
+ await p.goto(`file://${ROOT}/index.html`);
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(s);},SEED);
  await p.reload(); await p.waitForTimeout(1200);
@@ -40,7 +41,7 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
 // 1б. today.html перенаправляє на головну — старі посилання не ламаються
 {
  const {ctx,p}=await page();
- await p.goto('file:///root/work/forgesite/today.html');
+ await p.goto(`file://${ROOT}/today.html`);
  await p.waitForTimeout(900);
  ok('today.html веде на головну', p.url().endsWith('index.html'), p.url().split('/').pop());
  await ctx.close();
@@ -49,11 +50,11 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
 // 2. Тренування (окрема сторінка): галочка + вага + таймер
 {
  const {ctx,p,errs}=await page();
- await p.goto('file:///root/work/forgesite/index.html');
+ await p.goto(`file://${ROOT}/index.html`);
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(s);},SEED);
  await p.waitForTimeout(400);
- await p.goto('file:///root/work/forgesite/workout.html'); await p.waitForTimeout(1100);
+ await p.goto(`file://${ROOT}/workout.html`); await p.waitForTimeout(1100);
  await p.locator('.tdy-ex [data-set-n="1"]').first().click(); await p.waitForTimeout(2200);
  const sl=await p.evaluate(async()=>{const pr=await window.Store.getProfile();return pr.sessionLog;});
  ok('Тренування: галочка пише сесію в історію', Object.keys(sl||{}).length>0, JSON.stringify(sl));
@@ -71,7 +72,7 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
 // 3. Та сама вага видима на «Моєму плані» — одна книга, не дві системи
 {
  const {ctx,p}=await page();
- await p.goto('file:///root/work/forgesite/plan.html');
+ await p.goto(`file://${ROOT}/plan.html`);
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(Object.assign({},s,{weights:{'Жим у тренажері':77.5}}));},SEED);
  await p.reload(); await p.waitForTimeout(900);
@@ -87,7 +88,7 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
 // 4. Раціон: додавання в конкретний прийом + закриття дня
 {
  const {ctx,p,errs}=await page();
- await p.goto('file:///root/work/forgesite/meals.html');
+ await p.goto(`file://${ROOT}/meals.html`);
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(s);},SEED);
  await p.reload(); await p.waitForTimeout(900);
@@ -106,7 +107,7 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
 // 5. Друк: інтерфейс прихований, вміст розгорнутий
 {
  const {ctx,p}=await page({width:1100,height:900});
- await p.goto('file:///root/work/forgesite/plan.html');
+ await p.goto(`file://${ROOT}/plan.html`);
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(s);},SEED);
  await p.reload(); await p.waitForTimeout(900);

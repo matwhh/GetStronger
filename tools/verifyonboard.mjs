@@ -2,8 +2,8 @@
 import { chromium } from 'playwright';
 import { fillBirth } from './dob.mjs';
 import { localMode } from './adult.mjs';
-const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const U=f=>'file:///root/work/forgesite/'+f;
+import { CHROME, ROOT } from './pw.mjs';
+const U=f=>`file://${ROOT}/`+f;
 const b=await chromium.launch({executablePath:CHROME});
 const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(x?' :: '+x:''));};
 /* Тут НЕ adultContext: це шлях новачка, і починатись він має рівно з

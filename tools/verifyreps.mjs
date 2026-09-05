@@ -5,11 +5,12 @@
  */
 import { chromium } from 'playwright';
 import { adultContext, adultProfile } from './adult.mjs';
+import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 
 const PROGRAMS = [
   { id: 'fullbody',   days: 3, name: 'Full Body' },

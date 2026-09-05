@@ -13,6 +13,7 @@
  */
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
+import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const WOMEN = 'PUSH/PULL';
@@ -20,7 +21,7 @@ const MEN = ['Full Body', 'UL', 'Push / Pull / Legs', 'UL/PPL'];
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 
 /** Контекст із профілем заданої статі (і, за потреби, з обраним планом). */
 async function open(profile) {
@@ -64,9 +65,11 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(1200);
   const names = await listedPlans(p);
-  ok('2. жінка бачить рівно один план', names.length === 1, names.join(' | '));
-  ok('2. і це «PUSH/PULL»', names[0] === WOMEN, String(names[0]));
-  ok('2. жодної чоловічої схеми', !names.some((n) => MEN.includes(n)), names.join(' | '));
+  /* Два жіночі плани: PUSH/PULL (4 дні) і Full Body (3 дні). «Full Body»
+     як назва є і в чоловіків, тож звіряємо не назвою, а id обраної схеми. */
+  ok('2. жінка бачить рівно два плани', names.length === 2, names.join(' | '));
+  ok('2. серед них «PUSH/PULL»', names.includes(WOMEN), names.join(' | '));
+  ok('2. жодної чоловічої схеми (крім однойменного Full Body)', !names.some((n) => MEN.includes(n) && n !== 'Full Body'), names.join(' | '));
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

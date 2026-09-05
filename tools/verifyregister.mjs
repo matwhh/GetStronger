@@ -2,6 +2,7 @@
    Supabase: підтвердження пошти увімкнене, RLS не пускає profiles до
    схвалення, account_state віддає 'none' до заявки. */
 import { chromium } from 'playwright';
+import { CHROME } from './pw.mjs';
 const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
@@ -13,7 +14,7 @@ const server = {
   profileWrites: 0
 };
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 const ctx = await b.newContext({ viewport: { width: 420, height: 900 } });
 await ctx.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, r => r.abort());
 

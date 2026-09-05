@@ -15,6 +15,7 @@
  */
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
+import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const R = [];
@@ -36,7 +37,7 @@ const LEGACY = { pink: 'graphite-pink', wood: 'graphite', violet: 'graphite-viol
                  crimson: 'graphite-crimson', moss: 'graphite-moss',
                  emerald: 'graphite-emerald', ocean: 'graphite-ocean' };
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 const ctx = await adultContext(b, { viewport: { width: 1280, height: 900 } });
 /* Мережа не потрібна: перевіряємо обчислені стилі, а не дані. Без цього
    кожна сторінка чекає на шрифти й Supabase, і прогін не встигає. */

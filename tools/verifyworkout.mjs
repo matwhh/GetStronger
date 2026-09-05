@@ -8,12 +8,13 @@
  */
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
+import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 
 const SEED = {
   birthDate: '1990-06-15', sex: 'male', age: 31, height: 181, weight: 81.4, activity: 1.55, goal: 'cut', meals: 4,
@@ -319,7 +320,7 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await p.waitForTimeout(1300);
   ok('9. вимкнений трекер — блоку немає взагалі', await p.locator('#wk-mood').count() === 0);
 
-  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
+  await p.goto('file://' + ROOT + '/trackers-settings.html', { waitUntil: 'load' });
   await p.waitForTimeout(1200);
   const row = p.locator('.tr-row', { hasText: 'Настрій до/після' }).first();
   ok('9. трекер є у списку «Трекери»', await row.count() === 1);

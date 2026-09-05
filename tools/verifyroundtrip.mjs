@@ -9,6 +9,7 @@
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const R = [];
@@ -21,7 +22,7 @@ const stable = (v) => JSON.stringify(v, (k, val) =>
     : val);
 const same = (a, b) => stable(a) === stable(b);
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 const ctx = await adultContext(b, { acceptDownloads: true });
 const p = await ctx.newPage();
 const errs = [];

@@ -2,8 +2,7 @@
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 import { readdirSync, statSync } from 'node:fs';
-const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const ROOT='/root/work/forgesite';
+import { CHROME, ROOT } from './pw.mjs';
 const PAGES=readdirSync(ROOT).filter(f=>f.endsWith('.html')).sort();
 const b=await chromium.launch({executablePath:CHROME});
 const rows=[];

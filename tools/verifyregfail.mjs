@@ -3,11 +3,12 @@
    B. повторна реєстрація на вже зайняту пошту (200 з порожнім identities);
    C. «Я підтвердив» із НЕ тим паролем → invalid_credentials. */
 import { chromium } from 'playwright';
+import { CHROME } from './pw.mjs';
 const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 
 async function scenario(name, wire) {
   const ctx = await b.newContext({ viewport: { width: 420, height: 900 } });

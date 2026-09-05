@@ -1,14 +1,15 @@
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+import { CHROME, ROOT } from './pw.mjs';
+const b=await chromium.launch({executablePath:CHROME});
 const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(x?' :: '+x:''));};
 
 // 1. Старий профіль з «Обраним» не ламає завантаження, поле знімається
 {
  const ctx=await adultContext(b); const p=await ctx.newPage(); const errs=[];
  p.on('pageerror',e=>errs.push(e.message));
- await p.goto('file:///root/work/forgesite/account.html');
+ await p.goto(`file://${ROOT}/account.html`);
  await p.waitForTimeout(500);
  await p.evaluate(()=>{localStorage.setItem('ib.profile',JSON.stringify({
    version:5, birthDate:'1990-06-15', weight:80, favorites:{exercise:['Присідання'],page:['today.html']},
@@ -30,7 +31,7 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
  fs.writeFileSync(tmp,JSON.stringify({version:5,birthDate:'1990-06-15', weight:77,age:31,
    favorites:{program:['ppl'],exercise:['Тяга']},
    trackerLog:{sleep:{'2026-08-17':{value:420,source:'manual',date:'2026-08-17'}}}}));
- await p.goto('file:///root/work/forgesite/account.html'); await p.waitForTimeout(800);
+ await p.goto(`file://${ROOT}/account.html`); await p.waitForTimeout(800);
  await p.setInputFiles('#p-import-file',tmp); await p.waitForTimeout(900);
  const pr=await p.evaluate(async()=>await window.Store.getProfile());
  ok('імпорт старого файлу не впав', pr.weight===77 && pr.age===31);
@@ -44,7 +45,7 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
 {
  const ctx=await adultContext(b); const p=await ctx.newPage();
  p.on('dialog',d=>d.accept());
- await p.goto('file:///root/work/forgesite/account.html');
+ await p.goto(`file://${ROOT}/account.html`);
  const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82.4,activity:1.55,goal:'cut',meals:4,
   daysPerWeek:3,activePlan:{programId:'fullbody',days:3},weights:{'Жим лежачи':92.5},
   weightLog:{'Жим лежачи':[{d:'2026-08-17',kg:92.5}]},bodyLog:{'2026-08-17':82.4},
@@ -56,7 +57,7 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
  const tmp=path.join(os.tmpdir(),'rt.json'); fs.writeFileSync(tmp,dump);
  // чистий контекст → імпорт
  const ctx2=await adultContext(b); const p2=await ctx2.newPage(); p2.on('dialog',d=>d.accept());
- await p2.goto('file:///root/work/forgesite/account.html'); await p2.waitForTimeout(800);
+ await p2.goto(`file://${ROOT}/account.html`); await p2.waitForTimeout(800);
  await p2.setInputFiles('#p-import-file',tmp); await p2.waitForTimeout(900);
  const back=await p2.evaluate(async()=>await window.Store.getProfile());
  ok('round-trip: ваги', back.weights['Жим лежачи']===92.5);
@@ -72,7 +73,7 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
 {
  const ctx=await adultContext(b); const p=await ctx.newPage(); const errs=[];
  p.on('pageerror',e=>errs.push(e.message));
- await p.goto('file:///root/work/forgesite/index.html'); await p.waitForTimeout(700);
+ await p.goto(`file://${ROOT}/index.html`); await p.waitForTimeout(700);
  await ctx.setOffline(true);
  await p.evaluate(async()=>{await window.Store.saveProfile({weight:79.9});});
  await p.waitForTimeout(400);
@@ -89,7 +90,7 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
 {
  const ctx=await adultContext(b); const p=await ctx.newPage(); const errs=[];
  p.on('pageerror',e=>errs.push(e.message));
- await p.goto('file:///root/work/forgesite/account.html');
+ await p.goto(`file://${ROOT}/account.html`);
  await p.waitForTimeout(500);
  /* Поточну версію схеми беремо з самого застосунку, а не числом у тесті:
     захардкоджена 6 протрималась до SCHEMA_VERSION=9 і почала брехати. */

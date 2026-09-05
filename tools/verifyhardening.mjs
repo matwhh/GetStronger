@@ -5,8 +5,8 @@
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const U=f=>'file:///root/work/forgesite/'+f;
+import { CHROME, ROOT } from './pw.mjs';
+const U=f=>`file://${ROOT}/`+f;
 const b=await chromium.launch({executablePath:CHROME});
 const T=2500;   // максимум очікування локатора — щоб зависання було видно як FAIL, а не як тиша
 
@@ -28,7 +28,7 @@ async function page(vp){
   p.on('console',m=>{const t=m.text(); if(m.type()==='error'&&!t.includes('ERR_TUNNEL')&&!t.includes('Failed to load resource'))errs.push('CONSOLE '+t);});
   return {ctx,p,errs};
 }
-const PAGES=fs.readdirSync('/root/work/forgesite').filter(f=>f.endsWith('.html')).sort();
+const PAGES=fs.readdirSync(ROOT).filter(f=>f.endsWith('.html')).sort();
 
 /* ---- 1. Пошкоджений localStorage: жодна сторінка не має падати ---- */
 const CORRUPT = [

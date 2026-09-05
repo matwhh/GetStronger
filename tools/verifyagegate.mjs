@@ -9,16 +9,17 @@ import { chromium } from 'playwright';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import { adultProfile, localMode } from './adult.mjs';
 import { fillBirth } from './dob.mjs';
+import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 const page = (u) => String(u).split('/').pop().split('#')[0];
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 
 const PAGES = ['index.html', 'workout.html', 'plan.html', 'programs.html', 'nutrition.html',
-               'meals.html', 'journal.html', 'trackers.html', 'rating.html', 'periodization.html',
+               'meals.html', 'journal.html', 'trackers.html', 'trackers-settings.html', 'rating.html', 'periodization.html',
                'boxing.html', 'cardio.html', 'calculator.html', 'supplements.html',
                'research.html', 'account.html', 'today.html'];
 

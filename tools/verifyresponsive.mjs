@@ -2,8 +2,7 @@
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 import { readdirSync } from 'node:fs';
-const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const ROOT='/root/work/forgesite';
+import { CHROME, ROOT } from './pw.mjs';
 const PAGES=readdirSync(ROOT).filter(f=>f.endsWith('.html')).sort();
 const VP=[{w:320,h:568,n:'320 (iPhone SE1)'},{w:375,h:667,n:'375'},{w:430,h:932,n:'430'},
           {w:768,h:1024,n:'768 планшет'},{w:1024,h:768,n:'1024 планшет ланд.'},

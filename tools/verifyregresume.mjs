@@ -12,6 +12,7 @@
  *   2. що вимкнена кнопка завжди має підпис із причиною.
  */
 import { chromium } from 'playwright';
+import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const R = [];
@@ -19,7 +20,7 @@ const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + 
 
 const server = { confirmed: false, status: 'none', registerCalls: [] };
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
 await ctx.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, r => r.abort());
 await ctx.route(/\/rest\/v1\/rpc\//, r => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));

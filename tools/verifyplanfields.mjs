@@ -10,12 +10,13 @@
  */
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
+import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: CHROME });
 
 async function seeded(page, url) {
   await page.goto('file://' + ROOT + '/' + url, { waitUntil: 'load' });

@@ -1,0 +1,138 @@
+/**
+ * Історія тренувань: календар, підсумок дня, час сесії.
+ *
+ * ЧОМУ ЦЕЙ ФАЙЛ ІСНУЄ. Журнал показував «Час: 17:27 → 17:27» на кожній
+ * сесії: history-core перетирав t0 поточним часом при кожній галочці, бо
+ * умова `session.t0 || prev.t0` ніколи не доходила до prev. Юніт-тестів на
+ * t0/t1 не було, браузерних перевірок історії — теж, тому баг дожив до
+ * продакшену й убив усю статистику тривалості (sessionMinutes вимагає
+ * t1 > t0 і повертав null для КОЖНОЇ сесії).
+ *
+ * Тут перевіряється те, що юніт не бачить: що журнал справді малює
+ * календар, що клік по дню відкриває підсумок, і що в підсумку стоять
+ * саме ті числа, які лежать у профілі.
+ */
+import { chromium } from 'playwright';
+import { adultContext } from './adult.mjs';
+const ROOT = '/root/work/forgesite';
+const R = [];
+const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
+
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+
+/* Дати рахуємо від «сьогодні», щоб перевірка не протухла через місяць. */
+const now = new Date();
+const key = (d) => d.toISOString().slice(0, 10);
+const at = (d, h, m) => { const x = new Date(d); x.setHours(h, m, 0, 0); return x.getTime(); };
+
+const dGood = new Date(now); dGood.setDate(dGood.getDate() - 2);   // нормальна сесія
+const dLegacy = new Date(now); dLegacy.setDate(dLegacy.getDate() - 3); // стара, t0 === t1
+const dOld = new Date(now); dOld.setDate(dOld.getDate() - 4);      // зовсім стара, без часу
+
+const K_GOOD = key(dGood), K_LEG = key(dLegacy), K_OLD = key(dOld);
+
+const SEED = {
+  birthDate: '1990-06-15', sex: 'male', age: 36, height: 180, weight: 82,
+  activity: 1.55, trainingAge: 'inter', hrRest: 58,
+  programId: 'fullbody', daysPerWeek: 3,
+  activePlan: { programId: 'fullbody', days: 3 },
+  weights: { 'Присідання зі штангою': 100 },
+  sessionLog: {
+    [K_GOOD]: { programId: 'fullbody', days: 3, dayIdx: 0, title: 'Lower',
+      done: 6, total: 6, doneSets: 18, totalSets: 18, end: 1,
+      t0: at(dGood, 17, 27), t1: at(dGood, 18, 39),
+      sets: 18, reps: 180, vol: 7305 },
+    [K_LEG]: { programId: 'fullbody', days: 3, dayIdx: 1, title: 'Upper',
+      done: 5, total: 6, doneSets: 15, totalSets: 18,
+      t0: at(dLegacy, 17, 27), t1: at(dLegacy, 17, 27),
+      sets: 15, reps: 150, vol: 5200 },
+    [K_OLD]: { programId: 'fullbody', days: 3, dayIdx: 2, title: 'Full',
+      done: 4, total: 6 }
+  }
+};
+
+const ctx = await adultContext(b, { viewport: { width: 420, height: 900 } });
+const p = await ctx.newPage();
+const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+
+await p.goto('file://' + ROOT + '/index.html');
+await p.evaluate(async (s) => { await window.Store.saveProfile(s); }, SEED);
+
+await p.goto('file://' + ROOT + '/journal.html#history');
+await p.waitForTimeout(1200);
+
+ok('1. історія відкрилась одразу з #history', (await p.locator('.mcal').count()) === 1);
+ok('2. календар намальовано', (await p.locator('.mcal__cell').count()) > 27,
+   String(await p.locator('.mcal__cell').count()) + ' клітинок');
+
+const onCells = await p.locator('.mcal__cell--on').count();
+ok('3. дні з тренуванням зафарбовані', onCells === 3, onCells + ' з 3');
+
+for (const [k, name] of [[K_GOOD, 'нормальна сесія'], [K_LEG, 'стара з t0=t1'], [K_OLD, 'без часу']]) {
+  ok('4. день ' + k + ' клікабельний (' + name + ')',
+     (await p.locator('[data-hday="' + k + '"]').count()) === 1);
+}
+
+/* ---- нормальна сесія: час, тривалість, факти ---- */
+await p.locator('[data-hday="' + K_GOOD + '"]').click();
+await p.waitForTimeout(500);
+let txt = (await p.locator('main').innerText()).replace(/\s+/g, ' ');
+ok('5. показано назву дня', /Lower/.test(txt));
+ok('6. час зі стрілкою', /17:27\s*→\s*18:39/.test(txt), txt.match(/Час:[^·]*/)?.[0] || '—');
+ok('7. тривалість порахована', /1 год 12 хв/.test(txt),
+   txt.match(/1 год[^ ]* ?\d* ?х?в?/)?.[0] || 'НЕМАЄ');
+ok('8. підходи й повторення', /18 підходів/.test(txt) && /180 повторень/.test(txt));
+ok('9. тоннаж', /7\s?305/.test(txt), txt.match(/≈[^к]*кг/)?.[0] || '—');
+ok('10. чіп «18 з 18 підходів»', /18 з 18 підходів/.test(txt));
+
+/* ---- стара сесія t0 === t1: стрілки в саму себе бути не має ---- */
+await p.locator('[data-hday="' + K_LEG + '"]').click();
+await p.waitForTimeout(500);
+txt = (await p.locator('main').innerText()).replace(/\s+/g, ' ');
+ok('11. стара сесія: без стрілки в саму себе', !/17:27\s*→\s*17:27/.test(txt),
+   txt.match(/Час:[^·]*/)?.[0] || 'рядка «Час» немає');
+ok('12. стара сесія: одна позначка часу', /Записано о 17:27/.test(txt),
+   txt.match(/Записано о \d\d:\d\d/)?.[0] || 'НЕМАЄ');
+ok('13. стара сесія: факти на місці', /15 підходів/.test(txt) && /5\s?200/.test(txt));
+
+/* ---- зовсім стара, без знімка часу ---- */
+await p.locator('[data-hday="' + K_OLD + '"]').click();
+await p.waitForTimeout(500);
+txt = (await p.locator('main').innerText()).replace(/\s+/g, ' ');
+ok('14. без часу: сесія показана, а не «нічого не записано»',
+   /Full/.test(txt) && !/тренування не записано/.test(txt));
+ok('15. без часу: чесно сказано, чому немає цифр',
+   /Стара сесія — без знімка часу/.test(txt),
+   txt.match(/Стара сесія[^.]*\./)?.[0] || 'фрази немає');
+ok('16. без часу: показано «4 з 6 вправ»', /4 з 6 вправ/.test(txt));
+
+/* ---- перемикання місяців ---- */
+const monthBefore = await p.locator('.mcal').locator('xpath=../..').locator('b.mono').first().innerText();
+await p.locator('[data-hnav="-1"]').click();
+await p.waitForTimeout(400);
+const monthAfter = await p.locator('.mcal').locator('xpath=../..').locator('b.mono').first().innerText();
+ok('17. попередній місяць перемикається', monthBefore !== monthAfter, monthBefore + ' → ' + monthAfter);
+await p.locator('[data-hnav="1"]').click();
+await p.waitForTimeout(400);
+ok('18. кнопка «наступний» вимкнена на поточному місяці',
+   await p.locator('[data-hnav="1"]').isDisabled());
+
+/* ---- статистика тривалості на сторінці прогресу ---- */
+await p.goto('file://' + ROOT + '/journal.html');
+await p.waitForTimeout(1000);
+const st = await p.evaluate(() => {
+  const log = (window.Store.localProfile() || {}).sessionLog || {};
+  return {
+    minutes: window.ProgressCore.sessionMinutes(log[Object.keys(log).sort().pop()]),
+    stats: window.ProgressCore.timeStats(log, 30, Date.now())
+  };
+});
+ok('19. sessionMinutes рахує, а не віддає null', st.minutes !== null, String(st.minutes));
+ok('20. timeStats більше не «замало даних»', st.stats !== null, JSON.stringify(st.stats));
+
+ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
+
+await b.close();
+const bad = R.filter((r) => !r[1]).length;
+console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок історії пройшло.');
+process.exit(bad ? 1 : 0);

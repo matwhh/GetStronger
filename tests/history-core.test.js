@@ -181,3 +181,72 @@ describe('history-core: сесія з підходами і завершення
     assert.equal(s.doneSets, undefined);
   });
 });
+
+/* ==========================================================================
+   Час сесії: t0 — початок, t1 — остання дія
+   ==========================================================================
+   Реальний баг. js/workout.js кладе t0 = Date.now() у КОЖЕН запис сесії, а
+   їх за тренування десятки — по одному на галочку. Умова
+   `Number(session.t0) || Number(prev.t0)` виглядала як «новий, інакше
+   старий», але перший операнд ніколи не був порожній: prev.t0 не читався
+   жодного разу, і початок сесії щоразу переписувався поточним часом.
+
+   Наслідок був не косметичний. t0 завжди дорівнював t1, тому
+   ProgressCore.sessionMinutes (він вимагає t1 > t0) повертав null для всіх
+   сесій — уся статистика тривалості тренувань показувала «замало даних»
+   назавжди, а в журналі стояло «Час: 17:27 → 17:27».
+
+   Тестів на t0/t1 у цьому файлі не було жодного — тому баг і дожив до
+   продакшену.
+   ========================================================================== */
+describe('Сесія: час початку й кінця', () => {
+  const D = '2026-09-05';
+  const T = Date.UTC(2026, 8, 5, 15, 0, 0);
+  const rec = (t, done) => ({
+    programId: 'fullbody', days: 3, dayIdx: 0, title: 'Lower',
+    done: done, total: 6, doneSets: done * 3, totalSets: 18,
+    t0: t, t1: t, sets: done * 3, reps: done * 30, vol: done * 800
+  });
+
+  it('початок сесії не перетирається наступними галочками', () => {
+    let log = {};
+    log = H.upsertSession(log, D, rec(T, 1));
+    log = H.upsertSession(log, D, rec(T + 15 * 60000, 3));
+    log = H.upsertSession(log, D, rec(T + 60 * 60000, 6));
+    assert.equal(log[D].t0, T, 't0 має лишитись часом ПЕРШОГО запису');
+    assert.equal(log[D].t1, T + 60 * 60000, 't1 має бути часом ОСТАННЬОГО');
+    assert.equal((log[D].t1 - log[D].t0) / 60000, 60, 'тривалість — 60 хв');
+  });
+
+  it('запис, що прийшов не по порядку, не зсуває початок уперед', () => {
+    // Черга збережень може доставити ранній запис пізніше за пізній.
+    let log = H.upsertSession({}, D, rec(T + 30 * 60000, 4));
+    log = H.upsertSession(log, D, rec(T, 1));
+    assert.equal(log[D].t0, T, 'беремо найраніший, а не «prev виграє»');
+    assert.equal(log[D].t1, T + 30 * 60000, 't1 не відкочується назад');
+  });
+
+  it('t1 ніколи не менший за t0', () => {
+    const log = H.upsertSession({}, D, Object.assign(rec(T, 2), { t1: T - 99999 }));
+    assert.ok(log[D].t1 >= log[D].t0, 'кінець не може бути раніше за початок');
+  });
+
+  it('перша сесія без попередньої пише свій час як є', () => {
+    const log = H.upsertSession({}, D, rec(T, 1));
+    assert.equal(log[D].t0, T);
+    assert.equal(log[D].t1, T);
+  });
+
+  it('старий запис без часу не отримує вигаданого', () => {
+    const bare = { programId: 'fullbody', days: 3, dayIdx: 0, title: 'Lower', done: 2, total: 6 };
+    const log = H.upsertSession({}, D, bare);
+    assert.equal('t0' in log[D], false, 'поля часу немає — і не вигадуємо');
+    assert.equal('t1' in log[D], false);
+  });
+
+  it('дописування до старого запису без часу заводить час із нового', () => {
+    let log = H.upsertSession({}, D, { programId: 'f', days: 3, dayIdx: 0, title: 'Lower', done: 1, total: 6 });
+    log = H.upsertSession(log, D, rec(T, 2));
+    assert.equal(log[D].t0, T);
+  });
+});

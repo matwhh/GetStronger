@@ -1473,10 +1473,21 @@
 
     if (sessionCounts(s) && !(Number(state.workLog[k]) === 0 && Object.prototype.hasOwnProperty.call(state.workLog, k))) {
       const min = window.ProgressCore.sessionMinutes(s);
-      const timeRow = (s.t0 && s.t1)
-        ? '<span class="small">Час: <b class="mono">' + hhmm(s.t0) + ' → ' + hhmm(s.t1) + '</b>' +
-          (min !== null ? ' · <b class="mono">' + durTxt(min) + '</b>' : '') + '</span>'
-        : '';
+      /*
+       * Стрілка «початок → кінець» має сенс лише коли між ними є час.
+       * Записи, зроблені до виправлення t0 у history-core, мають t0 = t1
+       * і давали рядок «Час: 17:27 → 17:27» — він виглядає як помилка й
+       * нею і був. Полагодити ті дані вже не можна: справжній початок не
+       * зберігся ніде. Тому для них чесніше показати одну позначку часу,
+       * а не стрілку в саму себе.
+       */
+      const t0 = Number(s.t0) || 0;
+      const t1 = Number(s.t1) || 0;
+      const timeRow = !t0 ? ''
+        : (t1 > t0)
+          ? '<span class="small">Час: <b class="mono">' + hhmm(t0) + ' → ' + hhmm(t1) + '</b>' +
+            (min !== null ? ' · <b class="mono">' + durTxt(min) + '</b>' : '') + '</span>'
+          : '<span class="small">Записано о <b class="mono">' + hhmm(t0) + '</b></span>';
       const facts = [];
       if (Number.isFinite(Number(s.sets)) && s.sets > 0) facts.push('<b class="mono">' + s.sets + '</b> підходів');
       if (Number.isFinite(Number(s.reps)) && s.reps > 0) facts.push('<b class="mono">' + s.reps + '</b> повторень');

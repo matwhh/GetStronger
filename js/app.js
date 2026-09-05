@@ -483,10 +483,17 @@
       d: '<g fill="none" stroke="currentColor" stroke-width="22.0" stroke-linecap="round" stroke-linejoin="round"><path d="M24.01 166.98 A126.5 126.5 0 1 1 46.94 222.00 L90.7 165.6 L144.9 202.2 L201.4 111.5"/><path d="M152 122.1 L201.4 111.5 L216 157.8"/></g>' }
   };
 
-  function tabIcon(name) {
+  function tabIcon(name) { return navIcon(name, 'tabbar__ico'); }
+
+  /**
+   * Той самий малюнок для шапки. Таблиця одна: якби знак у шапці й знак у
+   * нижній панелі жили окремими копіями, вони б із часом розійшлися —
+   * а це рівно ті два місця, де людина порівнює їх поглядом.
+   */
+  function navIcon(name, cls) {
     const ico = TAB_ICONS[name];
     if (!ico) return '';
-    return '<svg class="tabbar__ico" viewBox="' + ico.vb +
+    return '<svg class="' + cls + '" viewBox="' + ico.vb +
       '" fill="currentColor" aria-hidden="true">' + ico.d + '</svg>';
   }
 
@@ -810,10 +817,25 @@
     const links = NAV_GROUPS.map(function (g) {
       const children = Array.isArray(g.children) ? g.children : [];
 
-      // Звичайний пункт без вкладень — просто посилання
+      /*
+       * Звичайний пункт без вкладень — просто посилання. Виняток —
+       * «Сьогодні»: у шапці це знак будинку без підпису.
+       *
+       * Підпис НЕ видаляється, а ховається класом на вузькі екрани: у
+       * бургері меню вертикальне, там знак замість слова читався б гірше
+       * за слово. І доступна назва лишається в aria-label, тож на
+       * десктопі посилання не перетворюється на «посилання index.html».
+       */
       if (!children.length) {
-        return '<a class="nav__link' + (g.href === page ? ' is-active' : '') +
-               '" href="' + g.href + '">' + esc(g.label) + '</a>';
+        const act = (g.href === page ? ' is-active' : '');
+        if (g.icon) {
+          return '<a class="nav__link nav__link--icon' + act + '" href="' + g.href +
+                 '" aria-label="' + esc(g.label) + '">' +
+                   navIcon(g.icon, 'nav__ico') +
+                   '<span class="nav__lbl">' + esc(g.label) + '</span>' +
+                 '</a>';
+        }
+        return '<a class="nav__link' + act + '" href="' + g.href + '">' + esc(g.label) + '</a>';
       }
 
       const childActive = children.some(function (c) { return c.href === page; });

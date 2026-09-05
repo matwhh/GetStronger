@@ -338,6 +338,20 @@ p  { margin: 0 0 1em; color: var(--text-2); }
 .nav__link.is-active { color: var(--text); }
 .nav__link.is-active::after { transform: scaleX(1); }
 
+/*
+ * «Сьогодні» в шапці — знак без підпису.
+ *
+ * Слово стояло першим у ряду з дев'яти пунктів і несло найменше змісту:
+ * будинок упізнається швидше, ніж читається. Підпис не видалено, а
+ * прихований — у бургері (див. блок max-width:1060px) він повертається,
+ * бо у вертикальному списку знак замість слова читався б гірше.
+ * Доступна назва живе в aria-label, тож для читалки екрана нічого не
+ * змінилось у жодному з двох станів.
+ */
+.nav__link--icon { display: inline-flex; align-items: center; }
+.nav__ico { width: 20px; height: 20px; display: block; flex: none; }
+.nav__link--icon .nav__lbl { display: none; }
+
 /* ---------- Групи з випадними меню ---------- */
 /* Батько + стрілка + випадний список. Наведення обробляє CSS
    (:hover і :focus-within — друге дає клавіатурі той самий доступ),
@@ -623,6 +637,9 @@ html[data-scheme="light"] .lvl-ico {
   }
   .nav__link { padding: 13px 14px; font-size: 1rem; }
   .nav__link::after { display: none; }
+  /* У вертикальному списку слово читається краще за знак — міняємось. */
+  .nav__link--icon .nav__ico { display: none; }
+  .nav__link--icon .nav__lbl { display: inline; }
 
   /* Акаунт у колонці стає звичайним пунктом: авто-відступ, що на
      десктопі тисне його праворуч, тут зсував би його вбік списку */

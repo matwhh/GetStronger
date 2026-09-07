@@ -259,8 +259,10 @@ describe('Одночасні записи', () => {
     await s.Store.signIn('a@test', 'password');
     await s.Store.saveProfile({ weight: 70 });
 
-    // У черзі лежить патч, і одночасно йде звичайне збереження
-    ls.setItem('ib.pending', JSON.stringify([{ patch: { height: 180 }, t: Date.now() }]));
+    // У черзі лежить патч, і одночасно йде звичайне збереження.
+    // uid обовʼязковий: відколи чергу підписано власником (SYN-010),
+    // патч без підпису не належить нікому і не відправляється.
+    ls.setItem('ib.pending', JSON.stringify([{ patch: { height: 180 }, t: Date.now(), uid: UID_A }]));
     await Promise.all([
       s.Store.saveProfile({ weight: 71 }),
       s.Store.flushPending()
@@ -269,6 +271,51 @@ describe('Одночасні записи', () => {
     assert.equal(prof.weight, 71, 'нове значення не відкочене чергою');
     assert.equal(prof.height, 180, 'патч із черги накладено');
     assert.equal(f.state.row.weight, 71, 'у хмарі теж свіже значення');
+  });
+});
+
+/*
+ * Чому непідписаний патч можна викидати без вагань.
+ *
+ * doSave пише ПОВНИЙ профіль у ib.profile ще до того, як покласти патч у
+ * чергу, а pushToCloud відправляє профіль цілком. Тобто черга — це не
+ * єдина копія змін, а лише спроба доштовхнути їх у хмару раніше. Якщо
+ * патч викинуто, дані лишаються в локальному профілі й поїдуть у хмару
+ * з наступним успішним збереженням.
+ *
+ * Саме тому правило «немає підпису — не відправляємо» безпечне: воно
+ * закриває шлях, яким чужий патч потрапляв у чужий акаунт, і при цьому
+ * нічого не втрачає у власника.
+ */
+describe('Черга без підпису (SYN-010)', () => {
+  test('непідписаний патч не їде в хмару', async () => {
+    const ls = makeStorage();
+    const f = net(null);
+    const s = loadStore({ fetch: f, storage: ls });
+    await s.Store.signIn('a@test', 'password');
+    await s.Store.saveProfile({ weight: 70 });
+
+    ls.setItem('ib.pending', JSON.stringify([{ patch: { height: 180 }, t: Date.now() }]));
+    await s.Store.flushPending();
+
+    assert.notEqual(f.state.row.height, 180, 'чужого/безхазяйного патча в хмарі бути не має');
+    assert.deepEqual(JSON.parse(ls.getItem('ib.pending') || '[]'), [], 'і в черзі він не лишається');
+  });
+
+  test('патч із чужим uid не їде в хмару', async () => {
+    const ls = makeStorage();
+    const f = net(null);
+    const s = loadStore({ fetch: f, storage: ls });
+    await s.Store.signIn('a@test', 'password');
+    await s.Store.saveProfile({ weight: 70 });
+
+    ls.setItem('ib.pending', JSON.stringify([
+      { patch: { height: 180 }, t: Date.now(), uid: 'bbbbbbbb-0000-4000-8000-000000000002' }
+    ]));
+    await s.Store.flushPending();
+
+    assert.notEqual(f.state.row.height, 180);
+    assert.equal(f.state.row.weight, 70, 'власні дані не зачеплені');
   });
 });
 

@@ -54,6 +54,15 @@ jobs:
       - name: Гігієна репозиторію
         run: node tools/ci-hygiene.mjs
 
+      # Бекап, з якого не відновлювались, — не бекап (OPS-001). Тут ганяється
+      # повний цикл на синтетичній фікстурі: файл → tools/restore-backup.mjs →
+      # тимчасовий локальний Postgres → db/backup-export.sql → порівняння.
+      # Мережі й бойової бази не потребує; postgresql на ubuntu-latest уже є.
+      # Код 3 («перевірено не все» — немає Postgres) тут теж провал: мовчазний
+      # пропуск цієї перевірки й був причиною знахідки.
+      - name: Відновлення з резервної копії
+        run: node tools/verify-backup-roundtrip.mjs
+
   browser:
     name: Браузер — ядро
     if: github.event_name == 'push' || github.event_name == 'pull_request'

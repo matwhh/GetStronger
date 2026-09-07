@@ -283,33 +283,15 @@
      *   'conflict' — непорожні обидва, і вибір робить людина, а не код.
      * У будь-якому разі локальна копія вже лежить у резервній (ib.profile.backup).
      */
-    async function handleMerge(merge) {
-      if (!merge) return;
-
-      if (merge === 'adopted') {
-        toast('Дані з цього браузера перенесено в акаунт', 'ok');
-        return;
-      }
-
-      const keepLocal = confirm(
-        'В акаунті вже є збережені дані, і в цьому браузері теж.\n\n' +
-        'OK — взяти дані З ЦЬОГО БРАУЗЕРА (те, що в акаунті, буде замінено).\n' +
-        'Скасувати — лишити дані АКАУНТА.\n\n' +
-        'Хай там як, копія локальних даних лишається на випадок помилки: ' +
-        'її видно в експорті резервної копії.'
-      );
-
-      try {
-        if (keepLocal) {
-          await Store.adoptLocalProfile();
-          toast('Перенесено дані з цього браузера', 'ok');
-        } else {
-          Store.discardLocalProfile();
-          toast('Лишили дані акаунта', 'ok');
-        }
-      } catch (err) {
-        toast('Не вдалося обʼєднати: ' + err.message, 'err');
-      }
+    /*
+     * Правило злиття живе в Store.resolveMerge — воно однакове й тут, і на
+     * welcome.html. Сторінка дає лише свої способи спитати й сказати.
+     */
+    function handleMerge(merge) {
+      return Store.resolveMerge(merge, {
+        ask: function (text) { return confirm(text); },
+        notify: function (text, kind) { toast(text, kind); }
+      });
     }
 
     async function submit() {

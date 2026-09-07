@@ -97,6 +97,33 @@
   const LS_ACCOUNT = 'ib.account';   // кеш статусу акаунта (UX; барʼєр — RLS)
 
   /*
+   * ОДИН ПЕРЕЛІК КЛЮЧІВ НА ВЕСЬ ФАЙЛ.
+   *
+   * Раніше їх було три — в enforceOwner, clearIdentityData і clearLocal — і
+   * вони розʼїхались. Найдорожче розʼїхався ib.profile.backup: доімпортна
+   * копія ПОВНОГО профілю не прибиралась ні при виході, ні при зміні
+   * власника, а кнопка «Відкотити імпорт» в акаунті просто пише її вміст у
+   * хмарний рядок того, хто зараз увійшов. Тобто наступний користувач цього
+   * компʼютера одним натисканням заливав собі чужий профіль (SYN-006).
+   *
+   * PERSONAL — дані самої людини. Прибираються скрізь, де людина
+   * змінюється: і при виході, і коли в браузер увійшов інший акаунт.
+   * Службові позначки (власник, кеш статусу, слот попереднього користувача)
+   * до цього переліку не входять навмисно: enforceOwner саме їх і пише.
+   */
+  const PERSONAL_KEYS = [LS_PROFILE, LS_BACKUP, LS_PENDING, DIRTY_KEY,
+    'forge.today', 'ib.meals.fold',
+    /* стара назва: meals.js колись писав з «s». Тримаємо, щоб прибрати
+       за минулими версіями. */
+    'ib.meals.folds'];
+
+  function dropKeys(keys) {
+    keys.forEach(function (k) {
+      try { localStorage.removeItem(k); } catch (_) {}
+    });
+  }
+
+  /*
    * Підказка синхронному сторожу (js/agegate.js): він виконується в <head>
    * до config.js і не може знати, чи сайт у хмарному режимі. Пишемо
    * прапорець один раз тут — сторож читає його на НАСТУПНІЙ навігації.
@@ -549,6 +576,55 @@
    * URL Configuration → Redirect URLs, інакше сервер мовчки підставить
    * Site URL. Тобто це половина полагодження, друга половина — там.
    */
+  /*
+   * ПОЗНАЧКА «ЛИСТ ЗАМОВЛЯЛИ САМЕ З ЦЬОГО БРАУЗЕРА, І САМЕ НА ЦЮ ПОШТУ».
+   *
+   * Токени з листа приходять у фрагменті адреси, і до цього фіксу
+   * adoptUrlSession приймав будь-який чинний токен: єдиною перевіркою було
+   * «сервер каже, що токен живий», а не «токен наш». Тобто посилання
+   * forge/#access_token=<токен зловмисника> тихо садило жертву в чужий
+   * акаунт — далі вся її робота синхронізувалась туди (WEB-001).
+   *
+   * Позначка кладеться в цьому браузері перед відправкою листа і містить
+   * пошту та час. Вхід автоматичний лише тоді, коли пошта з токена
+   * збігається з тією, на яку ми самі просили лист, і минуло менше доби.
+   *
+   * ЧОМУ НЕ ЧЕРЕЗ redirect_to. Одноразовий код у самій адресі був би
+   * строгішим, але redirect_to має точно збігатися з дозволеним списком у
+   * Supabase — доданий ?n= або відкидається, або мовчки замінюється на
+   * Site URL. Ціна помилки тут — усі листи підтвердження ведуть у нікуди,
+   * і це вже одного разу ставалось. Позначка в localStorage дає той самий
+   * захист від чужого посилання, не чіпаючи доставку пошти.
+   *
+   * Незбіг НЕ означає атаку: лист цілком законно відкривають в іншому
+   * браузері або на іншому пристрої. Тому це не заборона, а розвилка —
+   * сесія приймається після явного підтвердження людиною, якій показують,
+   * у ЧИЙ акаунт вона входить.
+   */
+  const LS_AWAIT = 'ib.auth.await';
+  const AWAIT_TTL = 24 * 3600 * 1000;
+
+  /** Запамʼятати, що ми щойно замовили лист на цю пошту. */
+  function markAwaitingLink(email) {
+    try {
+      localStorage.setItem(LS_AWAIT, JSON.stringify({
+        email: String(email || '').trim().toLowerCase(),
+        at: Date.now()
+      }));
+    } catch (_) {}
+  }
+
+  /** Лист на цю пошту замовляли з цього браузера і нещодавно? Читається один раз. */
+  function takeAwaitingLink(email) {
+    let v = null;
+    try { v = JSON.parse(localStorage.getItem(LS_AWAIT)); } catch (_) {}
+    try { localStorage.removeItem(LS_AWAIT); } catch (_) {}
+    if (!v || typeof v !== 'object') return false;
+    if (!(Date.now() - Number(v.at) < AWAIT_TTL)) return false;
+    const want = String(email || '').trim().toLowerCase();
+    return Boolean(want) && v.email === want;
+  }
+
   function emailRedirect() {
     try {
       if (typeof location === 'undefined') return '';
@@ -778,9 +854,10 @@
     lsSet(LS_BACKUP_LOGIN, Object.assign(
       { savedAt: new Date().toISOString(), owner: owner },
       local || lsGet(LS_PROFILE, {})));
-    [LS_PROFILE, LS_PENDING, DIRTY_KEY].concat(ELO_KEYS).forEach(function (k) {
-      try { localStorage.removeItem(k); } catch (_) {}
-    });
+    /* LS_ACCOUNT теж: кеш статусу належав попередньому акаунту, а
+       cloudAllowed() читає саме його. Без цього новий користувач міг
+       писати в хмару під чужим «approved». */
+    dropKeys(PERSONAL_KEYS.concat(ELO_KEYS, [LS_ACCOUNT]));
     cache = null;
     lsSet(LS_OWNER, me);
     return true;
@@ -820,11 +897,7 @@
    */
   function clearIdentityData() {
     clearSession();
-    [LS_PROFILE, LS_PENDING, LS_ACCOUNT, LS_OWNER, LS_BACKUP_LOGIN]
-      .concat(ELO_KEYS).forEach(function (k) {
-        try { localStorage.removeItem(k); } catch (_) {}
-      });
-    try { localStorage.removeItem(DIRTY_KEY); } catch (_) {}
+    dropKeys(PERSONAL_KEYS.concat(ELO_KEYS, [LS_ACCOUNT, LS_OWNER, LS_BACKUP_LOGIN]));
   }
 
   /*
@@ -912,6 +985,14 @@
     return Array.isArray(q) ? q : [];
   }
 
+  /*
+   * Вікно між signOut і завершенням запитів, що були в польоті.
+   * Поки воно відкрите, у чергу не кладеться нічого: власника вже немає,
+   * а патч без власника — це патч, який дістанеться наступному
+   * користувачеві браузера.
+   */
+  let pendingBlocked = false;
+
   /**
    * @returns {boolean} чи патч РЕАЛЬНО ліг у чергу.
    *
@@ -921,9 +1002,25 @@
    * взагалі нікуди. Це саме та тиха втрата, яку коментар біля lsSet
    * оголошує закритою.
    */
-  function pendingPush(patch) {
-    const q = pendingGet();
-    q.push({ at: Date.now(), patch: patch });
+  function pendingPush(patch, uid) {
+    /*
+     * КОЖЕН ПАТЧ ПІДПИСАНИЙ ВЛАСНИКОМ. Без цього підпису чергу міг
+     * успадкувати наступний користувач того самого браузера: signOut
+     * стирає ib.pending, але запит, який був у польоті, падає ПІСЛЯ
+     * виходу і кладе патч назад — уже в порожню чергу без ознаки, чий
+     * він. flushPending спрацьовує сам (відновлення сесії, подія online)
+     * і накладав чужий патч на профіль нової людини.
+     *
+     * Джерело uid — сесія на момент запису. Другий аргумент потрібен для
+     * випадку, коли сесію відкликали ПОСЕРЕД збереження: власник патча
+     * відомий (це той, хто його зробив), і саме ним патч і підписується.
+     * Інакше чесно відкладена зміна не лягала б у чергу взагалі, а
+     * інтерфейс казав би «сховище переповнене» — неправда і втрата даних.
+     */
+    const me = uid || ((session && session.user) ? session.user.id : null);
+    if (pendingBlocked || !me) return false;
+    const q = pendingGet().filter(function (it) { return it && it.uid === me; });
+    q.push({ at: Date.now(), uid: me, patch: patch });
     // Черга не має рости нескінченно: 200 патчів — це вже кількасот КБ.
     return lsSet(LS_PENDING, q.slice(-200));
   }
@@ -955,10 +1052,23 @@
     const ok = await ensureFresh();
     if (!ok) return 0;
 
+    /*
+     * ЧУЖЕ НЕ ВІДПРАВЛЯЄМО. Патчі без підпису або з чужим uid могли
+     * лишитись від попереднього користувача (черга старої версії, або
+     * запис, що приземлився після виходу). Вони не належать цьому
+     * акаунту — прибираємо з черги, не надсилаючи.
+     */
+    const me = session.user.id;
+    const mine = q.filter(function (it) { return it && it.uid === me; });
+    if (mine.length !== q.length) {
+      lsSet(LS_PENDING, pendingGet().filter(function (it) { return it && it.uid === me; }));
+    }
+    if (!mine.length) { emit(); return 0; }
+
     // Патчі накладаються по порядку на поточний профіль, і в хмару йде
     // один запис — так само, як зробив би звичайний saveProfile.
     let merged = await api.getProfile();
-    q.forEach(function (item) {
+    mine.forEach(function (item) {
       if (item && item.patch) merged = Object.assign({}, merged, item.patch);
     });
     merged.updatedAt = new Date().toISOString();
@@ -977,8 +1087,8 @@
      * після того, як інтерфейс уже пообіцяв, що патч у черзі.
      */
     const after = pendingGet();
-    if (after.length > q.length) {
-      lsSet(LS_PENDING, after.slice(q.length));
+    if (after.length > mine.length) {
+      lsSet(LS_PENDING, after.slice(mine.length));
     } else {
       try { localStorage.removeItem(LS_PENDING); } catch (_) {}
     }
@@ -1119,6 +1229,10 @@
     signUp: async function (email, password) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено. Заповніть ключі Supabase у js/config.js.');
       const local = readLocalProfile();
+      /* Позначка «лист замовляли з цього браузера» — до відправки: якщо
+         запит упаде, зайва позначка нікому не шкодить, а якщо дійде —
+         людина повернеться за посиланням без зайвих питань (WEB-001). */
+      markAwaitingLink(email);
       const data = await req(withRedirect('/auth/v1/signup'), {
         method: 'POST', auth: false,
         body: { email: email, password: password }
@@ -1168,7 +1282,7 @@
      *
      * @returns {{type: string}|null} тип події з листа, якщо сесію взято
      */
-    adoptUrlSession: async function () {
+    adoptUrlSession: async function (opts) {
       if (!CLOUD) return null;
       let h = '';
       try { h = String(location.hash || '').replace(/^#/, ''); } catch (_) { return null; }
@@ -1201,35 +1315,67 @@
       if (!at) return null;
 
       const expIn = parseInt(q.get('expires_in') || '3600', 10);
+      const wasUser = (session && session.user) ? session.user.id : null;
+
+      /* Фрагмент прибираємо ДО мережевих викликів: якщо запит нижче впаде,
+         токен усе одно не лишиться в адресному рядку. Сесію при цьому ще
+         НЕ зберігаємо — спершу зʼясовуємо, чий це токен. */
+      try {
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (_) { try { location.hash = ''; } catch (_2) {} }
+
+      /* У фрагменті приходять лише токени, без даних користувача. Питаємо
+         сервер напряму цим токеном, не записуючи його як свою сесію:
+         інакше відмова від входу лишила б чужий токен у сховищі. */
+      let me = null;
+      try {
+        const res = await fetch(URL_ + '/auth/v1/user', {
+          method: 'GET',
+          headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + at }
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        me = await res.json();
+        if (!me || !me.id) throw new Error('no user');
+      } catch (e) {
+        const err = new Error('Посилання з листа вже використане або застаріле. Надішліть новий лист.');
+        err.code = 'link_expired';
+        throw err;
+      }
+
+      /*
+       * Розвилка WEB-001. Автоматично приймаємо лише тоді, коли лист
+       * замовляли з цього браузера І ми не заходимо поверх іншого акаунта.
+       * В усіх інших випадках рішення за людиною — і їй показують пошту,
+       * у чий акаунт вона входить.
+       */
+      const trusted = takeAwaitingLink(me.email);
+      const needsConfirm = !trusted || (wasUser && wasUser !== me.id);
+      if (needsConfirm) {
+        const ask = (opts && typeof opts.confirm === 'function') ? opts.confirm : null;
+        let okToGo = false;
+        if (ask) {
+          try { okToGo = Boolean(await ask({ email: me.email || '', type: q.get('type') || 'signup' })); }
+          catch (_) { okToGo = false; }
+        }
+        if (!okToGo) {
+          /* FAIL-CLOSED: якщо сторінка не вміє питати — не входимо. Мовчазний
+             вхід за посиланням і був дірою. */
+          const err = new Error(ask
+            ? 'Вхід за посиланням скасовано.'
+            : 'Це посилання відкрито не в тому браузері, з якого його замовляли. Увійдіть паролем або надішліть новий лист.');
+          err.code = 'link_unverified';
+          throw err;
+        }
+      }
+
       storeSession({
         access_token: at,
         refresh_token: rt || '',
         expires_in: isFinite(expIn) ? expIn : 3600,
         user: null
       });
-      /* Фрагмент прибираємо ДО мережевих викликів: якщо запит нижче впаде,
-         токен усе одно не лишиться в адресному рядку. */
-      try {
-        history.replaceState(null, '', location.pathname + location.search);
-      } catch (_) { try { location.hash = ''; } catch (_2) {} }
-
-      /* У фрагменті приходять лише токени, без даних користувача, а
-         storeSession без них лишає user: null — і Store.user() каже
-         «не ввійшов» при цілком робочій сесії. Тому питаємо сервер. */
-      try {
-        const me = await req('/auth/v1/user', { method: 'GET' });
-        if (me && me.id) {
-          session.user = { id: me.id, email: me.email };
-          writeSavedSession(session);   // те саме сховище, що й решта входів
-        }
-      } catch (e) {
-        // Прострочене або вже використане посилання з листа.
-        clearSession();
-        emit();
-        const err = new Error('Посилання з листа вже використане або застаріле. Надішліть новий лист.');
-        err.code = 'link_expired';
-        throw err;
-      }
+      session.user = { id: me.id, email: me.email };
+      writeSavedSession(session);   // те саме сховище, що й решта входів
       cache = null;
       emit();
       return { type: q.get('type') || 'signup' };
@@ -1238,6 +1384,7 @@
     /** Лист для відновлення пароля. */
     requestPasswordReset: async function (email) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
+      markAwaitingLink(email);
       return req(withRedirect('/auth/v1/recover'), {
         method: 'POST', auth: false,
         body: { email: email }
@@ -1262,6 +1409,7 @@
      */
     resendConfirmation: async function (email) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
+      markAwaitingLink(email);
       return req(withRedirect('/auth/v1/resend'), {
         method: 'POST', auth: false,
         body: { type: 'signup', email: email }
@@ -1296,12 +1444,32 @@
     },
 
     signOut: async function () {
-      if (CLOUD && session) {
-        try { await req('/auth/v1/logout', { method: 'POST' }); } catch (_) {}
+      /*
+       * ПОРЯДОК ТУТ — ЦЕ БЕЗПЕКА, А НЕ ОХАЙНІСТЬ.
+       *
+       * pendingBlocked ставиться ПЕРШИМ: далі жоден обробник помилки не
+       * покладе патч у чергу, навіть якщо його запит завершиться вже
+       * після виходу. Потім чекаємо на saveChain — усі записи, що були в
+       * польоті, доходять до свого кінця (успіх чи помилка) ще при живій
+       * сесії. І лише тоді прибираємо дані.
+       *
+       * Раніше clearIdentityData стирала ib.pending, а запит, який падав
+       * через секунду, писав патч назад — у порожню чергу вже без
+       * власника. Наступний користувач цього браузера отримував його на
+       * свій профіль без жодної дії зі свого боку.
+       */
+      pendingBlocked = true;
+      try {
+        await saveChain.catch(function () {});
+        if (CLOUD && session) {
+          try { await req('/auth/v1/logout', { method: 'POST' }); } catch (_) {}
+        }
+        // Явний вихід — єдине місце, де дані в браузері прибираються разом
+        // із токеном (див. коментар біля clearIdentityData).
+        clearIdentityData();
+      } finally {
+        pendingBlocked = false;
       }
-      // Явний вихід — єдине місце, де дані в браузері прибираються разом
-      // із токеном (див. коментар біля clearIdentityData).
-      clearIdentityData();
       emit();
     },
 
@@ -1313,13 +1481,114 @@
          конфлікту входу, і брати чужий слот означало б відкотити імпорт. */
       const local = lsGet(LS_BACKUP_LOGIN, null);
       if (!local) throw new Error('Резервної копії немає.');
-      cache = migrate(Object.assign(blankProfile(), local), local);
+
+      /*
+       * ОСТАННІЙ БАРʼЄР ПРОТИ ЗЛИТТЯ ЧУЖОГО ПРОФІЛЮ.
+       *
+       * enforceOwner кладе в цей слот дані ПОПЕРЕДНЬОГО користувача
+       * браузера й позначає їх полем owner. Якщо інтерфейс усе-таки
+       * доведе сюди (стара вкладка, прямий виклик, майбутня правка
+       * account.js) — не пишемо: інакше журнали, вага й нік однієї
+       * людини лягли б у рядок іншої, знищивши її власні.
+       */
+      const me = (session && session.user) ? session.user.id : null;
+      if (local.owner && me && local.owner !== me) {
+        throw new Error('Ці дані належать іншому акаунту — переносити не можна.');
+      }
+
+      /* owner і savedAt — службові поля слота, а не профілю. */
+      const clean = Object.assign({}, local);
+      delete clean.owner; delete clean.savedAt;
+
+      cache = migrate(Object.assign(blankProfile(), clean), clean);
       return api.saveProfile({});
     },
 
     /** Лишити хмарний, локальний викинути (він лишається в резервній копії) */
+    /*
+     * «Лишити дані АКАУНТА» — тобто викинути локальні.
+     *
+     * Раніше тут було лише cache = null, і вибір людини не просто не
+     * виконувався, а обертався на протилежний (SYN-008): getProfile() бачив
+     * непорожню чергу й позначку dirty, вважав локальну копію новішою,
+     * повертав саме її — а flushPending досилав ті самі локальні патчі в
+     * хмару й затирав там дані, які людина щойно попросила зберегти.
+     *
+     * Тому прибирається все, що робить локальну копію «новішою»: сам
+     * профіль, черга і позначка. Сесія, тема й налаштування — не наша
+     * справа: людина обрала джерело даних, а не вихід з акаунта.
+     */
+    /*
+     * РІШЕННЯ ПРО ЗЛИТТЯ — ОДНЕ НА ВЕСЬ САЙТ.
+     *
+     * signIn повертає merge, і колись його обробляв лише account.js.
+     * welcome.js — головна сторінка входу — результат signIn просто
+     * викидав, тож 'conflict' («непорожні і локальні, і хмарні дані»)
+     * ніхто не бачив: resolveFirstLogin ставив cache = null, перший же
+     * getProfile брав хмарний рядок і дзеркалив його в localStorage
+     * поверх локальної роботи (SYN-007).
+     *
+     * Тут немає ані DOM, ані текстів інтерфейсу — сторінка передає свої
+     * ask (запитати людину) і notify (сказати, що сталося). Логіка ж
+     * рішення одна: вона не має розʼїжджатись між двома екранами входу.
+     *
+     * @param {string|null} merge  що повернув signIn
+     * @param {{ask?:function, notify?:function}} ui
+     */
+    resolveMerge: async function (merge, ui) {
+      const opt = ui || {};
+      const notify = typeof opt.notify === 'function' ? opt.notify : function () {};
+      if (!merge) return 'none';
+
+      if (merge === 'adopted') {
+        notify('Дані з цього браузера перенесено в акаунт', 'ok');
+        return 'adopted';
+      }
+
+      /*
+       * Чужі дані — не привід для діалогу злиття. enforceOwner повертає
+       * 'foreign', коли в браузері лежав профіль ІНШОЇ людини. Вибору тут
+       * немає й не було: її дані лишаються відкладеними для неї.
+       */
+      if (merge === 'foreign') {
+        notify('У цьому браузері були дані іншого акаунта — вони збережені для нього', 'ok');
+        return 'foreign';
+      }
+
+      const ask = typeof opt.ask === 'function' ? opt.ask : null;
+      /* Без можливості запитати НЕ вирішуємо за людину мовчки: лишаємо
+         дані акаунта (це оборотно — локальна копія ще на місці) і кажемо,
+         що вибір за нею. */
+      if (!ask) {
+        notify('В акаунті та в цьому браузері різні дані. Виберіть, що лишити, на сторінці акаунта.', 'err');
+        return 'deferred';
+      }
+
+      const keepLocal = await ask(
+        'В акаунті вже є збережені дані, і в цьому браузері теж.\n\n' +
+        'OK — взяти дані З ЦЬОГО БРАУЗЕРА (те, що в акаунті, буде замінено).\n' +
+        'Скасувати — лишити дані АКАУНТА.\n\n' +
+        'Хай там як, копія локальних даних лишається на випадок помилки: ' +
+        'її видно в експорті резервної копії.');
+
+      try {
+        if (keepLocal) {
+          await api.adoptLocalProfile();
+          notify('Перенесено дані з цього браузера', 'ok');
+          return 'local';
+        }
+        api.discardLocalProfile();
+        notify('Лишили дані акаунта', 'ok');
+        return 'cloud';
+      } catch (err) {
+        notify('Не вдалося обʼєднати: ' + err.message, 'err');
+        return 'error';
+      }
+    },
+
     discardLocalProfile: function () {
       cache = null;
+      dropKeys([LS_PROFILE, LS_PENDING, DIRTY_KEY]);
       emit();
     },
 
@@ -1487,12 +1756,30 @@
         return okLocal;
       }
 
+      /*
+       * ПОЗНАЧКУ СТАВИМО ДО ВІДПРАВКИ, ЗНІМАЄМО ЛИШЕ ПО res.ok.
+       *
+       * fetch відхиляється тільки на мережевій помилці: 401, 403, 429 і будь-яка
+       * 5xx резолвляться нормально, і .catch не спрацьовував. Черга лишалась
+       * порожньою, dirty ніхто не ставив (beacon не ходить через pushToCloud),
+       * помилку не бачив ніхто. А getProfile віддає перевагу локальній копії
+       * лише за наявності черги або dirty — тобто наступне відкриття тихо
+       * затирало локальні дані старішим хмарним рядком (SYN-001).
+       *
+       * Сторінка в цей момент закривається, тож обробники можуть і не
+       * виконатись — саме тому позначка ставиться заздалегідь: у найгіршому
+       * випадку буде зайвий dirty, а не втрачена зміна.
+       */
+      markDirty();
       try {
         fetch(URL_ + '/rest/v1/profiles?on_conflict=user_id', {
           method: 'POST',
           headers: Object.assign(authHeaders(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
           body: body,
           keepalive: true
+        }).then(function (res) {
+          if (res && res.ok) clearDirty();
+          else pendingPush(patch || {});
         }).catch(function () { pendingPush(patch || {}); });
       } catch (_) {
         pendingPush(patch || {});
@@ -1516,11 +1803,8 @@
          s. Тобто кнопка обіцяла прибрати все, а стан тренування лишався
          видимим наступній людині за спільним компʼютером. Стару назву
          тримаємо для прибирання за минулими версіями. */
-      [LS_PROFILE, LS_SESSION, LS_BACKUP, LS_BACKUP_LOGIN, LS_PENDING, LS_OWNER,
-       LS_ACCOUNT, DIRTY_KEY, 'forge.theme', 'forge.scheme',
-       'forge.today', 'ib.meals.fold', 'ib.meals.folds'].concat(ELO_KEYS).forEach(function (k) {
-        try { localStorage.removeItem(k); } catch (_) {}
-      });
+      dropKeys(PERSONAL_KEYS.concat(ELO_KEYS, [LS_SESSION, LS_BACKUP_LOGIN,
+        LS_OWNER, LS_ACCOUNT, 'forge.theme', 'forge.scheme']));
       session = null;
       cache = null;
       emit();
@@ -1530,8 +1814,8 @@
   /** Помилка «лягло в чергу», якщо патч справді ліг; інакше — чесна
       помилка про переповнене сховище. Без цієї розвилки інтерфейс обіцяв
       відкладене збереження навіть тоді, коли записати не вдалось нікуди. */
-  function queuedError(patch, message) {
-    const stored = pendingPush(patch || {});
+  function queuedError(patch, message, uid) {
+    const stored = pendingPush(patch || {}, uid);
     emit();
     if (!stored) {
       return new Error('Сховище браузера переповнене — зміни не збереглись');
@@ -1542,6 +1826,17 @@
   }
 
   async function doSave(patch) {
+    /*
+     * ЩО МИ МАЛИ НА ВХОДІ — записуємо ДО першого мережевого виклику.
+     *
+     * getProfile нижче теж ходить у мережу, теж кличе ensureFresh і теж
+     * може отримати 400 invalid_grant на повторно використаний
+     * refresh-токен. doRefresh на це кличе clearSession(), і далі будь-яка
+     * перевірка «а сесія є?» відповідає «немає» — тобто збереження тихо
+     * перетворювалось на локальне й звітувало про успіх (SYN-014).
+     */
+    const hadSession = CLOUD && !!session && cloudAllowed();
+    const hadUid = (session && session.user) ? session.user.id : null;
     const current = await api.getProfile();
     const next = Object.assign({}, current, patch || {}, { updatedAt: new Date().toISOString() });
 
@@ -1556,16 +1851,28 @@
      * clearSession більше даних не чіпає, але правильний порядок лишається
      * правильним порядком: спершу зʼясувати, чи можемо писати.
      */
+    /*
+     * РІШЕННЯ «пишемо в хмару» ФІКСУЄТЬСЯ ДО ensureFresh, а не питається двічі.
+     *
+     * Було дві однакові умови з session усередині. Коли Supabase відповідав
+     * 400 invalid_grant на повторно використаний ротований refresh-токен,
+     * doRefresh кликав clearSession() — session ставав null, — і друга умова
+     * ставала хибною. Увесь хмарний блок разом із throw queuedError просто
+     * пропускався, doSave повертав next, а інтерфейс звітував про успішне
+     * збереження, якого не було й у черзі теж (SYN-014).
+     */
+    const wantCloud = hadSession || (CLOUD && !!session && cloudAllowed());
     let fresh = true;
-    if (CLOUD && session && cloudAllowed()) fresh = await ensureFresh();
+    if (wantCloud) fresh = await ensureFresh();
 
     cache = next;
     // Локальна копія пишеться завжди — офлайн-резерв
     const okLocal = lsSet(LS_PROFILE, next);
 
-    if (CLOUD && session && cloudAllowed()) {
-      if (!fresh) {
-        throw queuedError(patch, 'Сесія прострочена або немає звʼязку — збережеться пізніше');
+    if (wantCloud) {
+      /* !session — це саме той випадок: сесію відкликали дорогою. */
+      if (!fresh || !session) {
+        throw queuedError(patch, 'Сесія прострочена або немає звʼязку — збережеться пізніше', hadUid);
       }
       try {
         saveInFlight++;
@@ -1580,7 +1887,7 @@
         }
       } catch (e) {
         if (e && (e.offline || !e.status)) {
-          throw queuedError(patch, 'Немає звʼязку — збережеться, коли зʼявиться мережа');
+          throw queuedError(patch, 'Немає звʼязку — збережеться, коли зʼявиться мережа', hadUid);
         }
         console.warn('[store] не збереглось у хмару:', e.message);
         emit();

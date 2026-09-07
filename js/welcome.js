@@ -700,6 +700,25 @@
     saveDraft();
   }
 
+
+  /*
+   * Вхід із welcome.html теж мусить розвʼязувати конфлікт даних.
+   *
+   * Раніше результат signIn тут просто відкидався в усіх трьох місцях, і
+   * merge='conflict' не бачив ніхто: локальна робота тихо затиралась
+   * хмарним рядком (SYN-007). Правило — спільне, у Store.resolveMerge.
+   */
+  async function afterSignIn(res) {
+    try {
+      await window.Store.resolveMerge(res && res.merge, {
+        ask: function (text) { return window.confirm(text); },
+        notify: function (text, kind) {
+          if (kind === 'err') state.err = text;
+        }
+      });
+    } catch (_) { /* злиття не має ламати вхід */ }
+  }
+
   async function doLogin() {
     if (state.busy) return;
     readAccFields();
@@ -709,7 +728,7 @@
     }
     state.busy = true; state.err = ''; render();
     try {
-      await window.Store.signIn(state.acc.email.trim(), state.acc.pass);
+      await afterSignIn(await window.Store.signIn(state.acc.email.trim(), state.acc.pass));
       state.busy = false;
       await routeAfterAuth();
     } catch (e) {
@@ -760,7 +779,7 @@
       if (/already|зареєстр|registered/i.test(msg)) {
         // Продовження незавершеної реєстрації: акаунт уже є — входимо
         try {
-          await window.Store.signIn(state.acc.email.trim(), state.acc.pass);
+          await afterSignIn(await window.Store.signIn(state.acc.email.trim(), state.acc.pass));
           try { await window.Store.saveProfile({ displayName: state.acc.username.trim() }); } catch (_) {}
           await routeAfterAuth();
           return;
@@ -865,7 +884,7 @@
     }
     state.busy = true; state.err = ''; render();
     try {
-      await window.Store.signIn(state.acc.email.trim(), state.acc.pass);
+      await afterSignIn(await window.Store.signIn(state.acc.email.trim(), state.acc.pass));
       state.busy = false;
       await afterSignupChecks();
     } catch (e) {
@@ -1236,7 +1255,23 @@
        * реєстрація на ту саму пошту), то не входила вже ніколи.
        */
       let fromLink = null;
-      try { fromLink = await window.Store.adoptUrlSession(); }
+      try {
+        fromLink = await window.Store.adoptUrlSession({
+          /*
+           * Лист відкрили не в тому браузері, з якого його замовляли, або
+           * поверх уже відкритого акаунта. Це буває чесно (пошта на іншому
+           * пристрої), але саме цією дірою чуже посилання садило людину в
+           * чужий акаунт (WEB-001). Тому питаємо — і показуємо пошту, у чий
+           * саме акаунт іде вхід.
+           */
+          confirm: function (info) {
+            return window.confirm(
+              'Увійти як ' + (info.email || 'цей користувач') + '?\n\n' +
+              'Посилання відкрито не в тому браузері, з якого його замовляли. ' +
+              'Якщо ця адреса не ваша — натисніть «Скасувати».');
+          }
+        });
+      }
       catch (e) { state.err = (e && e.message) || ''; }
 
       if (fromLink && fromLink.type === 'recovery') {

@@ -80,8 +80,24 @@
     if (!redirectAllowed()) return;
     let hash = '';
     try { hash = String(location.hash || ''); } catch (_) {}
-    const carry = /(^|[#&])(access_token=|error=|error_code=)/.test(hash) ? hash : '';
+    let carry = /(^|[#&])(access_token=|error=|error_code=)/.test(hash) ? hash : '';
+    /*
+     * Токен переносимо ЛИШЕ коли сесії ще немає.
+     *
+     * Інакше достатньо було посилання на будь-яку сторінку сайту з чужим
+     * access_token у фрагменті: сторож сумлінно тягнув його на welcome.html,
+     * і той приймав чужу сесію поверх наявної (WEB-001). Повідомлення про
+     * помилку (#error=…) переносимо завжди — воно нікого нікуди не садить.
+     */
+    if (carry.indexOf('access_token=') !== -1 && hasSession()) carry = '';
     location.replace(page + carry);
+  }
+
+  /** Чи є збережена сесія — у будь-якому зі сховищ. */
+  function hasSession() {
+    try { if (localStorage.getItem('ib.session')) return true; } catch (_) {}
+    try { if (sessionStorage.getItem('ib.session')) return true; } catch (_) {}
+    return false;
   }
 
   function lsJson(key) {

@@ -9,6 +9,12 @@ sitemap.xml
 # рейтинг. Одного разу такий файл уже лежав у корені й роздавався по
 # HTTP — тому і тут, і в .vercelignore, і в tools/ci-hygiene.mjs.
 backup-*.json
+*backup-*.json
+
+# Дампи бази з db/backup-export.sql (пошта всіх користувачів, профілі,
+# історія ELO). Лежать на Mac у ~/Desktop/forge-backups/ і в git не їдуть
+# ніколи. Див. db/RESTORE.md.
+forge-backup-*.json
 
 # Службове й архіви.
 .DS_Store

@@ -19,5 +19,7 @@ package.json
 # Ніколи не публікувати: експорти акаунтів (пошта + історія тренувань),
 # службові файли macOS, архіви.
 backup-*.json
+*backup-*.json
+forge-backup-*.json
 .DS_Store
 *.zip

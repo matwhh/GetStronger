@@ -2823,6 +2823,24 @@ body {
 }
 .nav__drop-in .nav__link { box-shadow: none; }
 
+/* Знаки в шапці («Сьогодні», «Акаунт») — без плашки. Активний розділ
+   для текстових пунктів лишається піднятою акцентною плашкою, а знак
+   під квадратом читався як кнопка, якої нема; тому для нього активний
+   стан — це колір самого знака. Лише десктоп: у бургері ці пункти
+   стають текстовими рядками і живуть за правилами бургера. */
+@media (min-width: 1061px) {
+  .nav__link.nav__link--icon:hover,
+  .nav__link.nav__link--icon.is-active,
+  .nav__link.nav__link--icon.is-active:hover {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .nav__link.nav__link--icon:hover { color: var(--text); }
+  .nav__link.nav__link--icon.is-active,
+  .nav__link.nav__link--icon.is-active:hover { color: var(--acc-ink); }
+}
+
 /*
  * АДАПТИВ ШАПКИ ЖИВЕ ТУТ, А НЕ ВГОРІ ФАЙЛА.
  *

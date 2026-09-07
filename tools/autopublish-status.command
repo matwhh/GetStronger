@@ -26,8 +26,8 @@ else
 fi
 
 # --- Перепони -------------------------------------------------------------
-if [ -f "$S/blocked" ]; then
-  printf "Доступ:     ${R}macOS не пускає до теки${N}\n"
+if [ -f "$S/blocked" ] || { [ -f "$S/launchd.err" ] && tail -n 20 "$S/launchd.err" | grep -q "Operation not permitted"; }; then
+  printf "Доступ:     ${R}macOS не пускає агента до теки — він НЕ працює${N}\n"
   printf "            Системні параметри → Конфіденційність і безпека →\n"
   printf "            Повний доступ до диска → «+» → Cmd+Shift+G → /bin/bash\n"
 fi

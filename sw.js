@@ -11,13 +11,33 @@
  * ДРУГА ПРИЧИНА — кількість запитів. Це багатосторінковий сайт: кожен тап
  * по вкладці — повна навігація з 21–27 підресурсами (519–649 КБ). Імена
  * файлів без хешів, тому «вічний» кеш ставити не можна: одна публікація
- * без зміни імені — і людина рік сидить на старому JS. Тому не immutable, а
- * stale-while-revalidate: віддаємо з кешу миттєво, у фоні перевіряємо
- * оновлення, наступне відкриття вже свіже. Дисципліни версіонування не
- * потрібно взагалі — саме тому обрано цей варіант, а не ?v= суфікси.
+ * без зміни імені — і людина рік сидить на старому JS.
  *
- * HTML — network-first: свіжий деплой має бути видно ОДРАЗУ, а не після
- * другого заходу. Кеш HTML лишається як запасний варіант для офлайну.
+ * ТРИ РЕЖИМИ, А НЕ ОДИН.
+ *
+ *   HTML  — мережа перша. Свіжий деплой має бути видно одразу, кеш
+ *           лишається запасним варіантом для офлайну.
+ *   CSS і JS — мережа перша з коротким тайм-аутом (ASSET_TIMEOUT), кеш
+ *           запасним. Це КОД: стара його версія — не «трохи застарілий
+ *           вигляд», а інший застосунок під свіжою розміткою.
+ *   Решта (svg, png, ico, json, webmanifest) — stale-while-revalidate:
+ *           віддаємо з кешу миттєво, у фоні оновлюємо. Ці файли майже не
+ *           змінюються, і саме вони складають більшість байтів.
+ *
+ * ЧОМУ CSS І JS ПЕРЕВЕЛИ З SWR (PWA-014). SWR за визначенням віддає
+ * ПОПЕРЕДНЮ версію й підвозить свіжу «на потім». Нижче був захист: коли
+ * розмітка сторінки змінилась, кеш зноситься цілком, тож скрипти
+ * приїжджають із тієї самої публікації. Але спрацьовує він лише на ЗМІНУ
+ * HTML — а публікація, що чіпає тільки css/js (найчастіший випадок:
+ * правка стилю, правка графіка), жодного HTML не змінює. Наслідок,
+ * відтворений у tools/verifysw.mjs: людина відкриває сторінку після
+ * публікації і бачить СТАРИЙ код, а свіжий тихо лягає в кеш до
+ * наступного разу. Два оновлення поспіль — і вона на дві версії позаду.
+ *
+ * Ціна нового режиму невелика: fetch із worker'а йде крізь звичайний
+ * HTTP-кеш, тож повторне відкриття зазвичай коштує 304, а не
+ * перезавантаження файла. А без мережі все так само віддається з кешу —
+ * просто через ASSET_TIMEOUT, а не миттєво.
  *
  * ЧОГО ТУТ НЕМАЄ. Не кешуються чужі походження (Supabase, Google Fonts):
  * відповіді API в кеші — це прострочені дані під виглядом свіжих. Не
@@ -58,6 +78,14 @@ const SHELL = ['./index.html', './offline.html', './css/style.css', './logo-mark
 
 /* Скільки чекати на мережу, перш ніж віддати кеш (PWA-002). */
 const NET_TIMEOUT = 4000;
+
+/*
+ * Те саме для css/js, але вдвічі коротше. Навігація без HTML — це порожній
+ * екран, тому там не шкода почекати 4 секунди. Код же має запасний варіант
+ * у кеші, який майже завжди робочий, тож довге чекання тут купує менше, а
+ * коштує видимої затримки на кожному відкритті при поганому сигналі.
+ */
+const ASSET_TIMEOUT = 2000;
 
 /*
  * КЛЮЧ КЕША — БЕЗ QUERY-РЯДКА (PWA-008).
@@ -151,23 +179,66 @@ self.addEventListener('fetch', function (e) {
 
   if (!isAsset(url)) return;
 
-  /* stale-while-revalidate: віддаємо кеш, у фоні оновлюємо. */
-  const key = cacheKey(req);
-  e.respondWith(
-    caches.match(key).then(function (hit) {
-      const net = fetch(req).then(function (res) {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE)
-            .then(function (c) { return c.put(key, copy); })
-            .catch(function (err) { swWarn('запис у кеш ' + key, err); });
-        }
-        return res;
-      }).catch(function () { return hit; });
-      return hit || net;
-    })
-  );
+  /* Код — мережа перша, решта статики — stale-while-revalidate.
+     Чому саме так, докладно в шапці файла (PWA-014). */
+  e.respondWith(isCode(url) ? codeFirst(req) : swr(req));
 });
+
+/** Чи це виконуваний файл — стилі або скрипти. */
+function isCode(url) {
+  return /\.(css|js)$/.test(url.pathname);
+}
+
+/** Покласти відповідь у кеш, якщо вона того варта. Повертає саму відповідь. */
+function keep(key, res) {
+  if (res && res.ok) {
+    const copy = res.clone();
+    caches.open(CACHE)
+      .then(function (c) { return c.put(key, copy); })
+      .catch(function (err) { swWarn('запис у кеш ' + key, err); });
+  }
+  return res;
+}
+
+/** stale-while-revalidate: кеш миттєво, оновлення у фоні. */
+function swr(req) {
+  const key = cacheKey(req);
+  return caches.match(key).then(function (hit) {
+    const net = fetch(req)
+      .then(function (res) { return keep(key, res); })
+      .catch(function () { return hit; });
+    return hit || net;
+  });
+}
+
+/**
+ * Мережа перша з тайм-аутом; кеш — запасний варіант.
+ *
+ * Гонка влаштована так само, як у htmlFirst: запит у мережу НЕ
+ * скасовується після тайм-ауту — коли відповідь дійде, вона все одно
+ * оновить кеш, і наступне відкриття буде свіжим навіть при поганому
+ * зв'язку. Таймер знімаємо явно, щоб не тримати worker живим даремно.
+ */
+function codeFirst(req) {
+  const key = cacheKey(req);
+  let timer = null;
+  const net = fetch(req).then(function (res) { return keep(key, res); });
+
+  const raced = new Promise(function (resolve) {
+    timer = setTimeout(function () { resolve(null); }, ASSET_TIMEOUT);
+  });
+
+  return Promise.race([net.catch(function () { return null; }), raced])
+    .then(function (res) {
+      clearTimeout(timer);
+      if (res) return res;
+      return caches.match(key).then(function (hit) {
+        /* Нічого в кеші й мережа мовчить — лишається чекати на мережу.
+           Це той самий стан, що й узагалі без worker'а. */
+        return hit || net;
+      });
+    });
+}
 
 /**
  * Навігація: мережа першою, але з обмеженням часу — і з інвалідацією

@@ -15,11 +15,24 @@ const TYPES = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css',
   '.json':'application/json', '.webmanifest':'application/manifest+json' };
 
 const ROOT = process.cwd();
+
+/*
+ * МІТКА ПУБЛІКАЦІЇ (PWA-014).
+ *
+ * Сервер підмішує в початок js/app.js рядок window.__SWVER. Міняючи
+ * цю змінну, ми імітуємо публікацію, яка НЕ чіпає розмітку — рівно той
+ * випадок, у якому worker раніше віддавав людині попередню версію коду.
+ * Розмітка при цьому лишається байт у байт тією самою, тому захист «HTML
+ * змінився — знести кеш» не спрацьовує, і перевіряється саме поведінка
+ * для css/js.
+ */
+let swver = 'A';
 const srv = createServer(async (req, res) => {
   const p = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, '');
   const file = join(ROOT, p === '/' ? 'index.html' : p);
   try {
-    const body = await readFile(file);
+    let body = await readFile(file);
+    if (p === '/js/app.js') body = Buffer.from("window.__SWVER='" + swver + "';\n" + body.toString('utf8'));
     res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream' });
     res.end(body);
   } catch { res.writeHead(404); res.end('no'); }
@@ -55,6 +68,48 @@ const cached = await p.evaluate(async () => {
   return (await c.keys()).length;
 });
 ok('у кеші є файли', cached > 0, String(cached));
+
+/*
+ * ПУБЛІКАЦІЯ БЕЗ ЗМІНИ РОЗМІТКИ ДОЇЖДЖАЄ З ПЕРШОГО ВІДКРИТТЯ (PWA-014).
+ *
+ * Найчастіша публікація в цьому проєкті чіпає лише css/js. Поки код
+ * віддавався за stale-while-revalidate, перше відкриття після неї
+ * виконувало ПОПЕРЕДНЮ версію, а свіжа тихо лягала в кеш «на потім» —
+ * тобто людина завжди була на одну публікацію позаду, а після двох
+ * підряд на дві. Захист «розмітка змінилась — знести кеш» тут не
+ * рятував: розмітка не змінювалась.
+ *
+ * Замір бере window.__SWVER, тобто те, що сторінка СПРАВДІ виконала.
+ * Читати файл через fetch не можна: фонове оновлення встигає покласти
+ * свіжий файл у кеш, і замір показав би свіжу версію при старій
+ * виконаній — рівно та помилка, через яку баг довго був невидимим.
+ */
+/*
+ * ЧОТИРИ ВІДКРИТТЯ ПЕРЕД «ПУБЛІКАЦІЄЮ», І ЦЕ ВИМІРЯНЕ ЧИСЛО.
+ *
+ * Перші відкриття worker ще встановлюється й переустановлюється, і
+ * частина запитів іде повз нього — на старому коді баг там просто не
+ * відтворювався (перевірено: при двох і трьох відкриттях старий worker
+ * теж віддавав свіжий файл, при чотирьох — уже застарілий). Менша
+ * кількість дала б перевірку, яка проходить завжди й не ловить нічого.
+ */
+for (let i = 0; i < 4; i++) {
+  await p.goto(base + 'index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(900);
+}
+const before = await p.evaluate(() => window.__SWVER || '(немає)');
+const cachedVer = await p.evaluate(async () => {
+  const c = await caches.open('forge-v1');
+  const hit = await c.match(location.origin + '/js/app.js');
+  return hit ? (await hit.text()).slice(0, 22) : '(порожньо)';
+});
+ok('до публікації сторінка виконує версію A', before === 'A', before + ' / кеш: ' + cachedVer);
+
+swver = 'B';   /* «публікація»: змінився лише js, розмітка та сама */
+await p.goto(base + 'index.html', { waitUntil: 'load' });
+await p.waitForTimeout(1200);
+const after = await p.evaluate(() => window.__SWVER || '(немає)');
+ok('перше відкриття після публікації дає нову версію', after === 'B', after);
 
 /*
  * ОФЛАЙН ГЛУШИМО СЕРВЕРОМ, А НЕ setOffline (PWA-004).

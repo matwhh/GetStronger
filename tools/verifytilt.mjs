@@ -185,9 +185,7 @@ const vars = () => p.evaluate((sel) => {
   const st = await q.evaluate(() => {
     const el = document.querySelector('#program-list .card--glass');
     const cs = getComputedStyle(el);
-    const light = getComputedStyle(document.querySelector('.picker'), '::before');
-    return { tr: cs.transform, bf: cs.backdropFilter || cs.webkitBackdropFilter,
-             light: light.display };
+    return { tr: cs.transform, bf: cs.backdropFilter || cs.webkitBackdropFilter };
   });
   /*
    * НА ДОТИКУ ВИМИКАЄТЬСЯ НАХИЛ, А НЕ СКЛО.
@@ -201,7 +199,8 @@ const vars = () => p.evaluate((sel) => {
   ok('375px: нахилу немає', st.tr === 'none' || !/matrix3d/.test(st.tr), st.tr.slice(0, 30));
   ok('375px: розмиття лишається (скло не потребує курсора)',
      /blur\(/.test(String(st.bf)), String(st.bf));
-  ok('375px: світло під сіткою лишається', st.light !== 'none', String(st.light));
+  /* Перевірка «світло під сіткою лишається» знята: світла більше немає
+     ніде — власник прибрав бліки з-під карток. */
   ok('375px: сторінка не поїхала вбік',
      await q.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
   ok('375px: без JS-помилок', e2.length === 0, e2.slice(0, 2).join(' | '));

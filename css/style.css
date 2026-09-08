@@ -3314,14 +3314,15 @@ body {
    монохромній темі не робить нічого взагалі, крім окремого шару
    композиції під кожною такою карткою.
 
-   Смужка зліва потрібна тому, що межа по всьому периметру на темному
-   тлі читається слабо: погляд ловить контраст на КРАЮ вмісту, а не
-   рівномірний контур. Три пікселі біля тексту помітніші за рамку
-   навколо всієї картки. */
+   Смужки зліва більше немає: три білі пікселі на краю картки власник
+   прочитав як дефект, а не як позначку. Обрану картку тепер тримають
+   світліша поверхня, яскравіша межа й текст кнопки («Показана нижче»
+   замість «Показати план») — три ознаки замість чотирьох, і жодна з них
+   не виглядає випадковою рискою. */
 .card.is-selected {
-  border-color: rgba(var(--acc-ink-rgb), 0.45);
+  border-color: rgba(var(--acc-ink-rgb), 0.55);
   background: #171717;
-  box-shadow: inset 3px 0 0 var(--acc);
+  box-shadow: none;
 }
 .card--off {
   opacity: 0.42;
@@ -3357,37 +3358,14 @@ body {
    читається як надрукований, а не як відсвіт: скло видає саме те, що
    відблиск рухається разом із дивлячимся.
    -------------------------------------------------------------------- */
+/* Світла під сіткою немає навмисно.
+   Було: дві-три яскраві плями, які backdrop-filter картки мав що
+   заломлювати — без них скло на рівному чорному нічим не відрізняється
+   від матової поверхні. Власник побачив у них саме те, чим вони й були:
+   білі бліки посеред монохромного екрана. Прибрано на його вимогу; скло
+   лишається як напівпрозора поверхня з градієнтом і гранями, без
+   підсвітки позаду. */
 .picker { position: relative; }
-/* Світло під сіткою. Не декор: без нього скляна поверхня нічим не
-   відрізняється від матової. */
-.picker::before {
-  content: '';
-  position: absolute;
-  /* Тільки вертикальний виступ. Горизонтальний (-4%) додавав ширини
-     сторінці: абсолютний елемент не бере участі в розкладці, але в
-     ОБЛАСТЬ ПРОКРУТКИ входить — verifyresponsive ловив OVERFLOW 1286>1280
-     на трьох ширинах із семи. Світло від цього нічого не втрачає: воно й
-     так розмите на 6px і згасає задовго до країв. */
-  inset: -6% 0;
-  z-index: 0;
-  pointer-events: none;
-  /*
-   * ЯСКРАВІШЕ, НІЖ БУЛО (0,075 / 0,055), І ЦЕ ВИПРАВЛЕННЯ ПОМИЛКИ.
-   *
-   * backdrop-filter розмиває те, що ПОЗАДУ. Позаду тут була майже рівна
-   * чорнота, а розмите ніщо — це те саме ніщо: ефект існував у коді й не
-   * існував на екрані. Скло видно рівно настільки, наскільки є що
-   * заломлювати, тож світло під сіткою — не декор, а сам матеріал.
-   */
-  background:
-    radial-gradient(30% 46% at 18% 6%,  rgba(var(--fx-rgb), 0.44), transparent 68%),
-    radial-gradient(26% 40% at 62% 96%, rgba(var(--fx-rgb), 0.34), transparent 70%),
-    radial-gradient(22% 34% at 92% 24%, rgba(var(--fx-rgb), 0.26), transparent 70%);
-  /* Майже без попереднього розмиття: розмиває backdrop-filter самої
-     картки, і йому потрібен КРАЙ, який можна розмазати. Заздалегідь
-     розмите джерело віддає рівну сірість — тобто знову ніщо. */
-  filter: blur(2px);
-}
 .picker > * { position: relative; z-index: 1; }
 
 /* .card.card--glass, а не .card--glass: базове .card--hover:hover має ту
@@ -3396,8 +3374,8 @@ body {
 .card.card--glass {
   /* Поверхня — ГРАДІЄНТ, а не рівна заливка. Рівна давала однакову
      яскравість у кожній точці, тобто матовий пластик: скло світліше там,
-     куди падає світло, і темніше в тіні. Кут 158° збігається з напрямком
-     світла в .picker::before — верхній лівий кут яскравіший. */
+     куди падає світло, і темніше в тіні. Кут 158° — світло згори зліва,
+     як і в решті інтерфейсу (світла грань зверху, темна знизу). */
   background: linear-gradient(158deg,
     rgba(var(--fx-rgb), 0.11) 0%,
     rgba(var(--fx-rgb), 0.045) 46%,
@@ -3455,14 +3433,12 @@ body {
    карток видно, яку саме ти зараз розглядаєш. */
 .card.card--glass.is-cold { opacity: 0.5; --tilt-s: 0.975; }
 
-/* Обрана картка лишається впізнаваною й у склі. Смужку зліва доводиться
-   ПОВТОРИТИ разом зі світлою гранню: box-shadow не додається до
-   успадкованого, а замінює його цілком — правило скла вище стерло б
-   позначку обраної картки, і вона перестала б відрізнятись від решти. */
+/* Обрана картка в склі: та сама яскравіша межа, а грані лишаються ті
+   самі, що й у решти скляних карток. Повторювати їх доводиться тому, що
+   box-shadow не додається до успадкованого, а замінює його цілком. */
 .card.card--glass.is-selected {
-  border-color: rgba(var(--acc-ink-rgb), 0.42);
-  box-shadow: inset 3px 0 0 var(--acc),
-              inset 0 1px 0 rgba(var(--fx-rgb), 0.18),
+  border-color: rgba(var(--acc-ink-rgb), 0.55);
+  box-shadow: inset 0 1px 0 rgba(var(--fx-rgb), 0.18),
               inset 0 -1px 0 rgba(0, 0, 0, 0.40);
 }
 
@@ -4165,11 +4141,11 @@ button.heatmap__cell::after {
 .tdy-sub { margin: 6px 0 0; font-size: 1rem; color: var(--muted); }
 
 .tdy-week { margin-top: clamp(28px, 6vw, 44px); }
-.tdy-week__nav {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 18px;
+.tdy-week__num {
+  display: block; margin-bottom: 16px;
+  font-size: 1.05rem; font-weight: 700;
+  color: var(--text-2);
 }
-.tdy-week__num { font-size: 1.15rem; font-weight: 700; }
 
 /* Сім рівних колонок. Не flex із переносом: смуга тижня, у якій сьомий
    день з'їхав на другий рядок, перестає бути тижнем. Вузькі екрани
@@ -4179,12 +4155,25 @@ button.heatmap__cell::after {
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
 }
+/* День — кнопка: натиснутий день перекидає у віджет нижче. Скидаємо
+   вигляд кнопки повністю, лишаючи саму зону дотику. */
 .tdy-day {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 0 8px;
+  border: 0; border-radius: 10px;
+  background: transparent;
   color: var(--muted);
+  font: inherit;
   text-align: center;
   min-width: 0;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
 }
+.tdy-day:hover { background: rgba(var(--tint-rgb), 0.05); color: var(--text-2); }
+.tdy-day:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
+/* Обраний день — той, що показаний у віджеті. Поточний день окремо
+   позначає крапка: це різні речі, і в неділю вони розходяться. */
+.tdy-day.is-sel { background: rgba(var(--tint-rgb), 0.09); color: var(--text); }
 /* Крапка над днем — позначка «ти тут». Місце під неї зайняте ЗАВЖДИ,
    навіть коли її не видно: інакше поточний день був би на кілька
    пікселів нижчий за сусідів і смуга смикалася б через тиждень. */
@@ -4196,14 +4185,15 @@ button.heatmap__cell::after {
 .tdy-day.is-now { color: var(--text); }
 .tdy-day.is-now .tdy-day__dot { background: var(--acc-bar); }
 /* Підпис є лише в днів відпочинку, але рядок під нього тримають УСІ:
-   порожній span зберігає висоту, тож числа й місяці стоять на одній
-   лінії. Без цього тренувальні дні їхали б угору, і смуга виглядала б
-   рваною. */
+   порожній span зберігає висоту, тож усі сім стовпчиків однакові. */
 .tdy-day__lbl {
-  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em;
   line-height: 1.1;
   min-height: 1.1em;
+  color: var(--muted);
 }
+.tdy-day.is-now .tdy-day__lbl,
+.tdy-day.is-sel .tdy-day__lbl { color: var(--text-2); }
 .tdy-day__val {
   font-family: var(--font-mono);
   font-size: 1.5rem; font-weight: 700; line-height: 1.1;
@@ -4215,11 +4205,50 @@ button.heatmap__cell::after {
    самому рядку й мають важити однаково. */
 .tdy-day__moon { width: 1.5rem; height: 1.5rem; display: block; }
 
-@media (max-width: 420px) {
+/* ---- Віджет дня -------------------------------------------------------
+   Прямокутна скляна картка під смугою: назва дня з плану або REST.
+   Нахил і блик — ті самі, що в карток вибору плану (data-tilt у розмітці
+   вмикає js/app.js), тож нового компонента не з'являється. */
+.tdy-widget { margin-top: clamp(20px, 4vw, 28px); }
+.tdy-card {
+  display: flex; flex-direction: column; gap: 6px;
+  min-height: 132px;
+  padding: clamp(18px, 3vw, 24px);
+  color: var(--text);
+  text-decoration: none;
+}
+.tdy-card__kicker {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--muted);
+}
+.tdy-card__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 4.5vw, 2.2rem); line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+/* REST стоїть у рядок зі значком, а не під ним: це одна позначка. */
+.tdy-card__title--rest { display: flex; align-items: center; gap: 12px; }
+.tdy-card__title--rest .tdy-day__moon { width: 1.6rem; height: 1.6rem; }
+.tdy-card__sub { font-size: 0.92rem; color: var(--muted); }
+.tdy-card__cta { margin-top: auto; padding-top: 10px; font-weight: 700; color: var(--acc-ink); }
+/* День відпочинку нікуди не веде, тож і не світиться під курсором. */
+.tdy-card.is-rest { cursor: default; }
+
+/* Телефон — головний екран цього застосунку, тож смуга рахується саме
+   під нього: сім стовпчиків мають вміститись у 320px без перенесення й
+   без горизонтальної прокрутки. 0.55rem на «REST» — це 4 символи в
+   ~40px, що лишається читабельним; далі зменшувати немає куди, і саме
+   тому підписані ЛИШЕ дні відпочинку. */
+@media (max-width: 480px) {
   .tdy-days { gap: 2px; }
-  .tdy-day__lbl { font-size: 0.6rem; letter-spacing: 0.05em; }
-  .tdy-day__val { font-size: 1.2rem; }
-  .tdy-day__moon { width: 20px; height: 20px; }
+  .tdy-day { padding: 5px 0 6px; border-radius: 8px; }
+  .tdy-day__lbl { font-size: 0.55rem; letter-spacing: 0.04em; }
+  .tdy-day__val { font-size: 1.25rem; }
+  .tdy-day__moon { width: 1.25rem; height: 1.25rem; }
+  .tdy-day__dot { width: 6px; height: 6px; margin-bottom: 4px; }
+  .tdy-week__num { font-size: 0.95rem; margin-bottom: 12px; }
+  .tdy-title { font-size: clamp(1.7rem, 8vw, 2.1rem); }
+  .tdy-card { min-height: 118px; }
 }
 
 /* ==========================================================================

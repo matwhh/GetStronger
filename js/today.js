@@ -39,8 +39,8 @@
     program: null,
     plan: null,
     todayKey: '',
-    week: 1,      // який тиждень показано
-    weekNow: 1    // який тиждень іде насправді
+    week: 1,      // номер тижня сезону
+    slot: 0       // обраний день тижня: Пн = 0 … Нд = 6
   };
 
   /* ------------------------------------------------------------------ */
@@ -146,48 +146,107 @@
     /* Без плану смуга однаково малюється: вона показує, який сьогодні
        день тижня, і це правда незалежно від того, чи обрано програму. */
     const sch = weekSchedule();
-    const isNow = state.week === state.weekNow;
     const todaySlot = dowIndex(new Date());
 
     let days = '';
     for (let i = 0; i < 7; i++) {
       const rest = sch.length ? sch[i] === 'rest' : false;
-      const here = isNow && i === todaySlot;
+      const here = i === todaySlot;
+      const sel = i === state.slot;
       days +=
-        '<div class="tdy-day' + (rest ? ' is-rest' : '') + (here ? ' is-now' : '') + '"' +
+        '<button type="button" class="tdy-day' + (rest ? ' is-rest' : '') +
+            (here ? ' is-now' : '') + (sel ? ' is-sel' : '') + '"' +
+            ' data-slot="' + i + '" aria-pressed="' + sel + '"' +
             (here ? ' aria-current="date"' : '') + '>' +
           '<span class="tdy-day__dot" aria-hidden="true"></span>' +
-          /* Підписаний ЛИШЕ відпочинок. Решта днів — самі числа: слово
-             «ДЕНЬ» сім разів поспіль нічого не розрізняє, а місце під
-             підпис забирає в цифри, які й є змістом смуги. */
-          '<span class="tdy-day__lbl">' + (rest ? 'REST' : '') + '</span>' +
+          /*
+           * ЗНАЧЕННЯ ЗВЕРХУ, ПІДПИС ПІД НИМ — І ЦЕ НЕ СМАК.
+           *
+           * Було навпаки, і на телефоні смуга розсипалась: підписаний
+           * лише відпочинок, тож у тренувальних днів верхній рядок
+           * порожній. Виходило, що REST стоїть високо, число — низько, і
+           * сім клітинок читались як випадково розкидані значки.
+           * Тепер верхній рядок ЗАВЖДИ зайнятий (число або місяць), а
+           * підпис іде під ним — сім однакових стовпчиків.
+           */
           '<span class="tdy-day__val">' + (rest ? MOON : (i + 1)) + '</span>' +
-        '</div>';
+          '<span class="tdy-day__lbl">' + (rest ? 'REST' : '') + '</span>' +
+        '</button>';
     }
 
+    /* Стрілок перемикання тижнів немає навмисно: гортати сезон уперед і
+       назад тут нема куди — минулі тижні живуть в «Історії», майбутніх ще
+       не було. Номер тижня лишається як позначка, де ти в сезоні. */
     return '' +
       '<div class="tdy-week">' +
-        '<div class="tdy-week__nav">' +
-          '<button class="icon-btn" type="button" data-wk="-1" aria-label="Попередній тиждень"' +
-            (state.week <= 1 ? ' disabled' : '') + '>' +
-            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-              'stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>' +
-          '</button>' +
-          '<b class="tdy-week__num">Тиждень ' + state.week + '</b>' +
-          '<button class="icon-btn" type="button" data-wk="1" aria-label="Наступний тиждень"' +
-            (state.week >= state.weekNow ? ' disabled' : '') + '>' +
-            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-              'stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>' +
-          '</button>' +
-        '</div>' +
+        '<b class="tdy-week__num">Тиждень ' + state.week + ' сезону</b>' +
         '<div class="tdy-days">' + days + '</div>' +
+      '</div>';
+  }
+
+  /**
+   * ВІДЖЕТ ДНЯ — те, що смуга робить натиснутим.
+   *
+   * Показує день ОБРАНОГО слота: назву з плану (Push, Upper, День A) або
+   * REST зі значком. Прив'язка — до дня тижня й циклу плану, а не до
+   * того, що людина реально зробила: пропущений понеділок не зсуває
+   * середу, бо цикл у всіх планів рівно семиденний і йде по колу.
+   *
+   * Тренувальний день — посилання на workout.html. День відпочинку —
+   * не посилання: відкривати там нічого, і кнопка, яка нікуди не веде,
+   * гірша за її відсутність.
+   */
+  function widgetHtml() {
+    const sch = weekSchedule();
+    if (!sch.length) return '';
+
+    const idx = sch[state.slot];
+    const rest = idx === 'rest';
+    const day = rest ? null : (state.plan[idx] || null);
+    const today = state.slot === dowIndex(new Date());
+
+    /*
+     * ОЦІНКА ЧАСУ — ТА САМА ФУНКЦІЯ, ЩО НА СТОРІНЦІ ТРЕНУВАННЯ.
+     *
+     * WC.dayMinutes рахує підхід плюс відпочинок за кожен підхід (мінус
+     * відпочинок після останнього). Другим аргументом іде стан галочок —
+     * передаємо порожній, бо віджет показує, скільки день займе ЦІЛКОМ, а
+     * не скільки лишилось: смуга живе поза сьогоднішнім днем, і для
+     * четверга «лишилось» не означає нічого.
+     */
+    let mins = 0;
+    if (day && WC && WC.dayMinutes) {
+      try { mins = WC.dayMinutes(day, []) || 0; } catch (_) { mins = 0; }
+    }
+
+    const body =
+      '<span class="tdy-card__kicker">' +
+        (today ? 'Сьогодні' : 'День ' + (state.slot + 1) + ' тижня') +
+      '</span>' +
+      (rest
+        ? '<span class="tdy-card__title tdy-card__title--rest">' + MOON + 'REST</span>' +
+          '<span class="tdy-card__sub">День відпочинку</span>'
+        : '<span class="tdy-card__title">' + esc(day && day.title || '—') + '</span>' +
+          '<span class="tdy-card__sub">' +
+            (day && day.focus ? esc(day.focus) : '') +
+            (mins > 0 ? (day && day.focus ? ' · ' : '') + '≈' + mins + ' хв' : '') +
+          '</span>' +
+          '<span class="tdy-card__cta">Відкрити тренування →</span>');
+
+    return '<div class="tdy-widget" data-tilt>' +
+      (rest
+        ? '<div class="card card--glass tdy-card is-rest">' + body + '</div>'
+        : '<a class="card card--glass card--hover tdy-card" href="workout.html">' + body + '</a>') +
       '</div>';
   }
 
   function render() {
     const host = $('#today');
     if (!host) return;
-    host.innerHTML = headHtml() + weekHtml();
+    host.innerHTML = headHtml() + weekHtml() + widgetHtml();
+    /* Нахил вішається на щойно створений віджет: initTilt позначає вже
+       оброблені контейнери, тож повторний виклик безпечний. */
+    if (window.App && window.App.initTilt) window.App.initTilt(host);
   }
 
   /* ------------------------------------------------------------------ */
@@ -202,9 +261,9 @@
     const SC = window.SeasonCore;
     const season = SC && SC.current ? SC.current() : null;
     const n = weekNoOf(new Date(), season);
-    /* Сезон ще не почався — показуємо перший тиждень і нікуди не пускаємо. */
-    state.weekNow = (n && n > 0) ? n : 1;
-    state.week = state.weekNow;
+    /* Сезон ще не почався — показуємо перший тиждень. */
+    state.week = (n && n > 0) ? n : 1;
+    state.slot = dowIndex(new Date());
   }
 
   async function init() {
@@ -219,13 +278,13 @@
     readWeek();
     render();
 
-    /* Перемикання тижнів. Делегуванням: смуга перемальовується цілком. */
+    /* Вибір дня в смузі. Делегуванням: смуга перемальовується цілком. */
     host.addEventListener('click', function (e) {
-      const b = e.target.closest && e.target.closest('[data-wk]');
-      if (!b || b.disabled) return;
-      const next = state.week + Number(b.dataset.wk);
-      if (next < 1 || next > state.weekNow) return;
-      state.week = next;
+      const b = e.target.closest && e.target.closest('[data-slot]');
+      if (!b) return;
+      const n = Number(b.dataset.slot);
+      if (!(n >= 0 && n <= 6) || n === state.slot) return;
+      state.slot = n;
       render();
     });
 
@@ -233,7 +292,7 @@
     if (window.App && window.App.onDayChange) {
       window.App.onDayChange(function () {
         state.todayKey = localDateKey();
-        readWeek();
+        readWeek();   /* новий день — новий обраний слот */
         render();
       });
     }

@@ -1064,6 +1064,55 @@
       'aria-label="Робоча вага, кг">';
   }
 
+  /**
+   * Перерахувати повторення однієї вправи ПРЯМО В state.plan.
+   *
+   * Потрібне після заміни вправи: розмір цільової групи міг змінитись, а
+   * від нього залежить і діапазон за таблицею, і стеля власного числа.
+   * Без цього рядок після заміни грудей на біцепс показував би 8–10 замість
+   * 10–12 до наступного заходу на сторінку — і саме це число поїхало б у
+   * тренування.
+   */
+  function refreshReps(ex) {
+    const RC = window.RepsCore;
+    if (!RC) return;
+    const own = RC.normUserReps(ex.userReps, ex);
+    if (own === null) {
+      delete ex.userReps;
+      ex.reps = RC.repRangeFor(state.profile && state.profile.trainingAge, ex);
+    } else {
+      ex.userReps = own;          /* могло підтягнутись до нижчої стелі */
+      ex.reps = String(own);
+    }
+  }
+
+  /**
+   * Поле повторень у режимі правки.
+   *
+   * Порожнє = «за таблицею стажу»: у placeholder тоді стоїть той самий
+   * діапазон, який показує звичайний перегляд, тож людина бачить, ЩО саме
+   * буде, якщо нічого не вписувати. Вписане число замінює діапазон і
+   * доїжджає до екрана тренування як є.
+   *
+   * max стоїть у розмітці, але БЕЗ title і без підказки поруч: стрілки
+   * поля просто не піднімуться вище, а набране руками більше число
+   * підтягнеться до стелі мовчки (див. RepsCore.normUserReps). Пояснення
+   * тут було б правилом, якого людина мусить памʼятати; рамка, з якої
+   * неможливо вийти, не потребує пояснення.
+   */
+  function repsInput(ex, dayIdx, i) {
+    const RC = window.RepsCore;
+    const max = RC ? RC.maxRepsFor(ex) : 15;
+    const own = RC ? RC.normUserReps(ex.userReps, ex) : null;
+    /* Підказка — діапазон за стажем, той самий, що дала б таблиця. */
+    const hint = RC && state.profile
+      ? RC.repRangeFor(state.profile.trainingAge, ex)
+      : String(ex.reps || '');
+    return '<input class="input input--sm input--reps num mono" type="number" min="1" max="' + max + '" step="1" ' +
+      'value="' + (own === null ? '' : own) + '" placeholder="' + esc(hint) + '" ' +
+      'data-act="reps" data-day="' + dayIdx + '" data-i="' + i + '" aria-label="Повторення">';
+  }
+
   function exerciseRow(ex, i, dayIdx, total) {
     const ms = musclesOfExercise(ex);
     const filled = Boolean(ex.name && ex.name.trim());
@@ -1127,7 +1176,7 @@
             'value="' + esc(ex.sets) + '" title="Максимум за тижневою межею: ' + maxSetsFor(dayIdx, i) + '" ' +
             'data-act="sets" data-day="' + dayIdx + '" data-i="' + i + '" aria-label="Підходи">' +
         '</td>' +
-        '<td class="num mono" data-l="Повтори">' + esc(ex.reps) + '</td>' +
+        '<td data-l="Повтори">' + repsInput(ex, dayIdx, i) + '</td>' +
         '<td data-l="Вага, кг">' + weightInput(ex, dayIdx, i) + '</td>' +
         '<td class="num mono" data-l="RIR">' + esc(ex.rir) + '</td>' +
         '<td class="tbl__acts">' +
@@ -1150,7 +1199,10 @@
 
   function dayBlock(day, dayIdx) {
     const head = state.editing
-      ? '<th style="width:90px">Підх.</th><th style="width:70px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:60px">RIR</th><th style="width:120px">Дії</th>'
+      /* «Повт.» у правці ширша за перегляд: там просто число, а тут поле
+         з лічильником і підказкою на пʼять знаків («10–12»). На 70px
+         підказка обрізалась до «10–1» — тобто показувала неправду. */
+      ? '<th style="width:90px">Підх.</th><th style="width:104px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:60px">RIR</th><th style="width:120px">Дії</th>'
       : '<th style="width:70px">Підх.</th><th style="width:70px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:60px">RIR</th><th style="width:90px">Відпоч.</th>';
 
     // 5 колонок у head + «#» і «Вправа»
@@ -1589,6 +1641,30 @@
       list[i].sets = Math.min(want, max);
       return true;
     }
+    if (act === 'reps') {
+      /*
+       * Порожнє поле знімає власне число — вправа повертається до
+       * діапазону за стажем. Саме тому тут delete, а не запис нуля:
+       * нуль був би «нуль повторень», а не «як у таблиці».
+       *
+       * reps проставляємо тут же, а не чекаємо наступного завантаження:
+       * renderPlan() малює з state.plan, і без цього рядка колонка
+       * показувала б старе значення до перезаходу на сторінку.
+       */
+      const RC = window.RepsCore;
+      const ex = list[i];
+      const own = RC ? RC.normUserReps(value, ex) : null;
+      if (own === null) {
+        delete ex.userReps;
+        ex.reps = RC && state.profile
+          ? RC.repRangeFor(state.profile.trainingAge, ex)
+          : ex.reps;
+      } else {
+        ex.userReps = own;
+        ex.reps = String(own);
+      }
+      return true;
+    }
     if (act === 'swap' && value) {
       const found = (window.EXERCISES || []).find(function (e) { return e.name === value; });
       if (!found) return false;
@@ -1609,6 +1685,9 @@
       list[i].name = found.name;
       // Групи беремо з бібліотеки: інакше обʼєм рахувався б на стару групу
       list[i].muscles = found.muscles.slice();
+      // …а від групи залежать повторення: і діапазон за таблицею, і стеля
+      // власного числа. Нова вправа може бути малою там, де стояла велика.
+      refreshReps(list[i]);
 
       // Перевіряємо ПІСЛЯ підстановки: нова вправа може мати іншу головну
       // групу, і саме її стеля тепер має значення.
@@ -2026,7 +2105,7 @@
     });
 
     if (state.mode === 'mine') {
-      // Сторінка «Мій план» показує рівно те, що обрано. Немає вибору —
+      // Сторінка «Мій план тренувань» показує рівно те, що обрано. Немає вибору —
       // немає й плану: далі все віддає порожній стан у розмітці сторінки.
       if (!state.active) { renderEmpty(); return; }
       state.programId = state.active.programId;
@@ -2101,7 +2180,7 @@
     refresh();
   }
 
-  /** Порожній стан сторінки «Мій план» */
+  /** Порожній стан сторінки «Мій план тренувань» */
   function renderEmpty() {
     const host = $('#my-plan');
     if (host) host.dataset.state = 'empty';
@@ -2109,7 +2188,7 @@
   }
 
   /* Таймер відпочинку тепер спільний — window.App.restTimer (js/app.js):
-     ним користуються «Мій план» і «Сьогодні». Тут лишився тільки виклик. */
+     ним користуються «Мій план тренувань» і «Сьогодні». Тут лишився тільки виклик. */
 
   /** Спільна для обох сторінок обробка кліків і правок усередині плану */
   function wirePlanHost() {

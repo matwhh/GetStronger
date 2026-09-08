@@ -37,7 +37,7 @@ async function seeded(page, url) {
 const openCount = (page) => page.evaluate(() =>
   document.querySelectorAll('#plan .acc.is-open').length);
 
-/* ---- 1. «Мій план»: клік із поля в поле ---- */
+/* ---- 1. «Мій план тренувань»: клік із поля в поле ---- */
 for (const url of ['plan.html', 'programs.html']) {
   const ctx = await adultContext(b, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const p = await ctx.newPage();

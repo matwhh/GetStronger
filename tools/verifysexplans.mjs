@@ -183,7 +183,7 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.goto('file://' + ROOT + '/plan.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
   const mine = await p.locator('#my-plan').innerText();
-  ok('6. «Мій план» не відкриває чужу схему',
+  ok('6. «Мій план тренувань» не відкриває чужу схему',
      /План ще не обрано/.test(mine) || !/Жіночий/.test(mine), mine.split('\n')[0]);
 
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
@@ -208,7 +208,7 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.goto('file://' + ROOT + '/plan.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
   const mine = await p.locator('#my-plan').innerText();
-  ok('7. «Мій план» не відкриває чоловічу схему жінці',
+  ok('7. «Мій план тренувань» не відкриває чоловічу схему жінці',
      /План ще не обрано/.test(mine) || !MEN.some((n) => mine.includes(n)), mine.split('\n')[0]);
   ok('7. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();

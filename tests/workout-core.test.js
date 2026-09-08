@@ -280,3 +280,64 @@ describe('resolvePlan: битий день не валить сторінку (W
     assert.equal(r.plan[0].title, 'A');
   });
 });
+
+describe('resolvePlan: власне число повторень доїжджає до тренування', () => {
+  /*
+   * Це і є весь сенс userReps. «Тренування» бере схему саме звідси, а
+   * поле повторень підходу заповнює з ex.reps: доки там стояв діапазон,
+   * у підхід підставлялась його СЕРЕДИНА («8–10» → 9) — число, якого
+   * людина ніде не задавала й ніде не бачила.
+   *
+   * reps-core потрібен окремо: resolvePlan викликає RepsCore.applyPlan,
+   * і без нього ця гілка мовчки віддала б план як є.
+   */
+  const R = loadModules(['js/exercises.js', 'js/reps-core.js', 'js/workout-core.js']);
+  const RWC = R.WorkoutCore;
+
+  const PROGRAMS = [{
+    id: 'test', name: 'Тест',
+    days: { '3': [{ title: 'A', exercises: [
+      { name: 'Жим лежачи', muscles: ['chest'], sets: 3, reps: '8–10' },
+      { name: 'Підйом на біцепс', muscles: ['biceps'], sets: 3, reps: '10–12' }
+    ] }] }
+  }];
+  const base = { activePlan: { programId: 'test', days: 3 }, sex: 'male', trainingAge: 'inter' };
+
+  const withCustom = (exs) => Object.assign({}, base, {
+    customPlans: { 'test:3': [{ title: 'A', exercises: exs }] }
+  });
+
+  it('без власного числа лишається діапазон за стажем', () => {
+    const r = RWC.resolvePlan(base, PROGRAMS);
+    assert.equal(r.plan[0].exercises[0].reps, '8–10');
+    assert.equal(r.plan[0].exercises[1].reps, '10–12');
+  });
+
+  it('власне число з «Мого плану» приходить у тренування точним', () => {
+    const r = RWC.resolvePlan(withCustom([
+      { name: 'Жим лежачи', muscles: ['chest'], sets: 3, reps: '8–10', userReps: 7 }
+    ]), PROGRAMS);
+    assert.equal(r.plan[0].exercises[0].reps, '7');
+  });
+
+  it('стеля тримається й тут: 12 на велику групу, 15 на малу', () => {
+    /* Профіль міг приїхати з іншого пристрою або з правленого руками
+       JSON — редактор такого значення не бачив. */
+    const r = RWC.resolvePlan(withCustom([
+      { name: 'Жим лежачи', muscles: ['chest'], sets: 3, reps: '8–10', userReps: 30 },
+      { name: 'Підйом на біцепс', muscles: ['biceps'], sets: 3, reps: '10–12', userReps: 30 }
+    ]), PROGRAMS);
+    assert.equal(r.plan[0].exercises[0].reps, '12');
+    assert.equal(r.plan[0].exercises[1].reps, '15');
+  });
+
+  it('reps у збережених правках ігнорується, як і раніше', () => {
+    /* customPlans зберігає й reps, але воно похідне: стаж міг змінитись
+       після того, як план заморозили. Джерело правди — таблиця або
+       userReps, не збережений рядок. */
+    const r = RWC.resolvePlan(withCustom([
+      { name: 'Жим лежачи', muscles: ['chest'], sets: 3, reps: '3–5' }
+    ]), PROGRAMS);
+    assert.equal(r.plan[0].exercises[0].reps, '8–10');
+  });
+});

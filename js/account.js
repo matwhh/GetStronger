@@ -411,7 +411,7 @@
                 'Керує швидкістю кривої в прогнозі робочих ваг.', fieldId('trainingAge')) +
         '</div>' +
         '<p class="small muted">' +
-          'План тренувань редагується на сторінці <a href="plan.html">Мій план</a>.' +
+          'План тренувань редагується на сторінці <a href="plan.html">Мій план тренувань</a>.' +
           (p.activePlan
             ? ' Зараз обрано: <b>' + esc((PROGRAM_NAMES[p.activePlan.programId] || p.activePlan.programId)) +
               ', ' + esc(p.activePlan.days) + ' дн.</b>'
@@ -789,6 +789,13 @@
       if (str(ex.lift, 40)) out.lift = str(ex.lift, 40);
       const circuit = finite(ex.circuit, 1, 20);
       if (circuit !== null) out.circuit = Math.round(circuit);
+      /* Власне число повторень із «Мого плану». Верхня межа тут — найвища
+         зі стель RepsCore.MAX; точну стелю саме цієї вправи (вона залежить
+         від розміру групи) ставить RepsCore.applyPlan на читанні, і зробити
+         це можна тільки там: тут ще немає ні MUSCLES, ні гарантії, що
+         muscles у файлі взагалі чинні. */
+      const userReps = finite(ex.userReps, 1, 15);
+      if (userReps !== null) out.userReps = Math.round(userReps);
       if (Array.isArray(ex.muscles)) {
         out.muscles = ex.muscles.filter(function (m) { return str(m, 40); }).slice(0, 6);
       }

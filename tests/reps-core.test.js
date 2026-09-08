@@ -124,3 +124,119 @@ describe('Повторення: усі 4 програми проходять ч�
     assert.ok(seen.size >= 3, 'усі три діапазони мають зустрітись, а зустрілось ' + seen.size);
   });
 });
+
+describe('Повторення: власне число людини (userReps)', () => {
+  /*
+   * Діапазон — орієнтир, і його можна замінити точним числом у «Моєму
+   * плані». Сенс саме в тому, що це число доїжджає до тренування як є:
+   * до появи userReps екран тренування підставляв у підхід СЕРЕДИНУ
+   * діапазону («8–10» → 9) — число, якого людина ніде не бачила й ніде
+   * не задавала.
+   */
+  it('стеля залежить від розміру групи, а не від стажу', () => {
+    assert.equal(RC.maxRepsFor(ex('chest')), 12);
+    assert.equal(RC.maxRepsFor(ex('quads')), 12);
+    assert.equal(RC.maxRepsFor(ex('biceps')), 15);
+    assert.equal(RC.maxRepsFor(ex('abs')), 15);
+    /* Невідома група вважається малою — отже, і стеля її. */
+    assert.equal(RC.maxRepsFor(ex('казна-що')), 15);
+  });
+
+  it('стеля не звужує таблицю діапазонів', () => {
+    /* Найвище число, яке взагалі буває в таблиці, — 12. Якби стеля
+       великих груп стала меншою, діапазон 10–12 перестав би вміщатись
+       у власне поле, і людина не змогла б вписати те, що їй і так
+       пропонує програма. */
+    const all = Object.keys(RC.RANGES).reduce((acc, tier) => {
+      Object.keys(RC.RANGES[tier]).forEach((size) => {
+        String(RC.RANGES[tier][size]).match(/\d+/g).forEach((n) => acc.push(Number(n)));
+      });
+      return acc;
+    }, []);
+    assert.ok(Math.max(...all) <= Math.min(RC.MAX.large, RC.MAX.small),
+      'у таблиці є число вище за стелю: ' + Math.max(...all));
+  });
+
+  it('порожнє поле і сміття — це «числа немає»', () => {
+    ['', null, undefined, '   ', 'десять', '0', '-3', 'NaN'].forEach((v) => {
+      assert.equal(RC.normUserReps(v, ex('chest')), null, JSON.stringify(v));
+    });
+  });
+
+  it('число в межах беремо як є, дробове округлюємо', () => {
+    assert.equal(RC.normUserReps(8, ex('chest')), 8);
+    assert.equal(RC.normUserReps('8', ex('chest')), 8);
+    assert.equal(RC.normUserReps(' 12 ', ex('chest')), 12);
+    assert.equal(RC.normUserReps('10.6', ex('chest')), 11);
+  });
+
+  it('завелике підтягується до стелі, а не відкидається', () => {
+    /* Відкинути означало б мовчки лишити старе значення — людина
+       побачила б, що поле «не працює». Підтягнуте видно одразу. */
+    assert.equal(RC.normUserReps(99, ex('chest')), 12);
+    assert.equal(RC.normUserReps(13, ex('back')), 12);
+    assert.equal(RC.normUserReps(99, ex('biceps')), 15);
+    assert.equal(RC.normUserReps(16, ex('calves')), 15);
+  });
+
+  it('applyPlan ставить власне число замість діапазону', () => {
+    const plan = [{ title: 'A', exercises: [
+      Object.assign(ex('chest'), { userReps: 10 }),
+      ex('biceps')
+    ] }];
+    const out = RC.applyPlan(plan, 'novice');
+    assert.equal(out[0].exercises[0].reps, '10');
+    assert.equal(out[0].exercises[0].userReps, 10);
+    /* Сусідня вправа без свого числа лишається на таблиці. */
+    assert.equal(out[0].exercises[1].reps, '10–12');
+    assert.ok(!('userReps' in out[0].exercises[1]));
+  });
+
+  it('власне число переживає зміну стажу, а діапазон — ні', () => {
+    /* Саме тому userReps зберігається в customPlans, а reps — ні:
+       перше факт (людина обрала), друге похідне. */
+    const plan = [{ title: 'A', exercises: [
+      Object.assign(ex('chest'), { userReps: 9 }),
+      ex('back')
+    ] }];
+    ['novice', 'inter', 'adv', 'elite'].forEach((t) => {
+      assert.equal(RC.applyPlan(plan, t)[0].exercises[0].reps, '9', t);
+    });
+    assert.equal(RC.applyPlan(plan, 'novice')[0].exercises[1].reps, '8–10');
+    assert.equal(RC.applyPlan(plan, 'elite')[0].exercises[1].reps, '6–8');
+  });
+
+  it('стеля діє й на ЧИТАННІ, а не лише в редакторі', () => {
+    /* Значення могло приїхати з іншого пристрою або з експортованого
+       JSON, відредагованого руками. Редактор його не бачив — отже,
+       перевірка мусить стояти тут. */
+    const plan = [{ title: 'A', exercises: [
+      Object.assign(ex('chest'), { userReps: 40 }),
+      Object.assign(ex('biceps'), { userReps: 40 })
+    ] }];
+    const out = RC.applyPlan(plan, 'novice');
+    assert.equal(out[0].exercises[0].reps, '12');
+    assert.equal(out[0].exercises[0].userReps, 12);
+    assert.equal(out[0].exercises[1].reps, '15');
+    assert.equal(out[0].exercises[1].userReps, 15);
+  });
+
+  it('сміття в userReps знімає його й повертає діапазон', () => {
+    const plan = [{ title: 'A', exercises: [
+      Object.assign(ex('chest'), { userReps: 'десять' }),
+      Object.assign(ex('back'), { userReps: 0 })
+    ] }];
+    const out = RC.applyPlan(plan, 'novice');
+    assert.equal(out[0].exercises[0].reps, '8–10');
+    assert.ok(!('userReps' in out[0].exercises[0]));
+    assert.equal(out[0].exercises[1].reps, '8–10');
+    assert.ok(!('userReps' in out[0].exercises[1]));
+  });
+
+  it('applyPlan із власним числом теж НЕ мутує вхідний план', () => {
+    const plan = [{ title: 'A', exercises: [Object.assign(ex('chest'), { userReps: 40 })] }];
+    const before = JSON.stringify(plan);
+    RC.applyPlan(plan, 'adv');
+    assert.equal(JSON.stringify(plan), before);
+  });
+});

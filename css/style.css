@@ -3276,6 +3276,87 @@ body {
   .card--glass::after { display: none; }
 }
 
+/* ---- Кільця очікування -------------------------------------------------
+   Два кільця, що обертаються в різні боки з різною швидкістю. Кожне —
+   conic-gradient, з якого маска вирізає середину: суцільний круг стає
+   кільцем, а градієнт дає хвіст, по якому видно напрямок обертання.
+
+   ЧОМУ НЕ БОРДЮР-СПІНЕР. Класичний прийом (border із трьома прозорими
+   сторонами) дає кільце з РІЗКИМ обривом і однаковою товщиною — на 56px
+   він читається як зламане коло. Маска по конічному градієнту дає той
+   самий хвіст, що згасає, і кільце лишається кільцем.
+
+   ЧОМУ БЕЗ КОЛЬОРУ. Тема монохромна; «градієнтні кільця» тут — градієнт
+   ПРОЗОРОСТІ того самого білого, а не перехід між тонами.
+
+   ЧОМУ ПОВІЛЬНО. 1,6 с на оберт — не спіш­ний спінер, а спокійне
+   очікування. Швидке обертання обіцяє, що відповідь ось-ось; заявку
+   розглядає людина, і швидкий спінер тут просто збрехав би темпом.
+   -------------------------------------------------------------------- */
+.loader {
+  --ldr: 56px;
+  position: relative;
+  width: var(--ldr); height: var(--ldr);
+  flex: 0 0 auto;
+}
+.loader--sm { --ldr: 30px; }
+.loader--lg { --ldr: 76px; }
+
+.loader__ring {
+  --w: 3px;                       /* товщина кільця */
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0turn,
+    rgba(var(--tint-rgb), 0) 0turn,
+    rgba(var(--tint-rgb), 0.10) 0.35turn,
+    rgba(var(--tint-rgb), 0.85) 0.92turn,
+    rgba(var(--tint-rgb), 0) 1turn);
+  /* Маска робить із круга кільце. farthest-side, а не відсотки: інакше
+     товщина «пливла» б разом із розміром. */
+  -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - var(--w)), #000 0);
+          mask: radial-gradient(farthest-side, #0000 calc(100% - var(--w)), #000 0);
+  animation: ldr-spin 1.6s linear infinite;
+}
+/* Внутрішнє кільце: тонше, тьмяніше, повільніше й ПРОТИ годинникової.
+   Зустрічний рух — єдине, що відрізняє два кільця від одного товстого. */
+.loader__ring--in {
+  inset: 26%;
+  --w: 2px;
+  opacity: 0.5;
+  animation-duration: 2.6s;
+  animation-direction: reverse;
+}
+@keyframes ldr-spin { to { transform: rotate(1turn); } }
+
+/*
+ * Спокійний рух: обертання зупиняється, але знак лишається.
+ *
+ * Просто animation: none лишило б кільце обірваним на випадковому кадрі —
+ * тобто зламаним. Тому в спокої це рівне тонке кільце: воно так само
+ * каже «чекайте», просто мовчки.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .loader__ring {
+    animation: none;
+    background: none;
+    border: var(--w) solid rgba(var(--tint-rgb), 0.30);
+    -webkit-mask: none; mask: none;
+  }
+  .loader__ring--in { border-color: rgba(var(--tint-rgb), 0.16); }
+}
+
+/* Рядок «кільця + пояснення» на екрані очікування. На вузькому екрані
+   складається в стовпчик: 56px кільця плюс два рядки тексту в 320px не
+   вміщаються, а переносити текст під кільце краще, ніж різати його. */
+.gate__wait {
+  display: flex; align-items: center; gap: 16px;
+  margin-top: 18px;
+}
+.gate__wait b { display: block; }
+@media (max-width: 380px) {
+  .gate__wait { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
+
 /* ---- Оверлеї: єдине, що справді висить над сторінкою ------------------ */
 .modal__box,
 .rest-timer,

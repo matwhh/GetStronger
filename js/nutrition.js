@@ -287,15 +287,22 @@
         '<hr class="divider">' +
 
         '<h3>Макронутрієнти</h3>' +
+        // Клітковина — ЧЕТВЕРТИЙ сегмент, а не заокруглення.
+        // Її 2 ккал/г уже відняті з вуглеводів і стоять окремим рядком у
+        // таблиці нижче, тож без свого сегмента смуга не доходила до кінця
+        // рівно на її частку (≈3%) — і виглядало це як обрив, а не як
+        // «решта калорій десь там».
         '<div class="macrobar">' +
           '<span class="macrobar__p" style="width:' + pP + '%"></span>' +
           '<span class="macrobar__f" style="width:' + pF + '%"></span>' +
           '<span class="macrobar__c" style="width:' + pC + '%"></span>' +
+          '<span class="macrobar__fib" style="width:' + pFib + '%"></span>' +
         '</div>' +
         '<div class="legend">' +
           '<span><i class="macrobar__p"></i>Білок ' + round(pP, 0) + '%</span>' +
           '<span><i class="macrobar__f"></i>Жири ' + round(pF, 0) + '%</span>' +
           '<span><i class="macrobar__c"></i>Вуглеводи ' + round(pC, 0) + '%</span>' +
+          '<span><i class="macrobar__fib"></i>Клітковина ' + round(pFib, 0) + '%</span>' +
         '</div>' +
 
         '<div class="table-wrap mt-2">' +
@@ -312,7 +319,7 @@
               // Клітковина стоїть у тій самій таблиці, бо тепер вона й
               // рахується в тому самому балансі: її 2 ккал/г уже відняті
               // з вуглеводів, а не оплачені двічі.
-              macroRow('Клітковина', m.fiber, window.NutritionCalc.KCAL_FIBER, target, 'macrobar__c') +
+              macroRow('Клітковина', m.fiber, window.NutritionCalc.KCAL_FIBER, target, 'macrobar__fib') +
             '</tbody>' +
           '</table>' +
         '</div>' +

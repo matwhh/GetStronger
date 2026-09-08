@@ -1104,8 +1104,21 @@
   }
 
   /**
-   * Лінія з точками. Осі підписані, кожна точка має <title> із датою й
-   * повним розкладом підходів — це те, що замінює тултип без JS.
+   * СКЛАДЕНИЙ ГРАФІК: стовпчики обʼєму + лінія обраної метрики.
+   *
+   * Дві шкали, і це не прикраса. Обʼєм живе в тоннах (3 200 кг), вага
+   * снаряда — в десятках (30 кг). На спільній осі лінія прилипає до нуля
+   * і не показує нічого. Тому обʼєм має власну, праву шкалу, підписану
+   * максимумом: масштаб видно, а не вгадується.
+   *
+   * Коли обрана метрика — САМЕ обʼєм, стовпчики не малюються: це була б
+   * та сама серія двічі, і друга шкала збрехала б про незалежність.
+   *
+   * Точки стоять по центрах смуг (band scale), а не від краю до краю:
+   * інакше перший і останній стовпчики наполовину виїжджають за поле.
+   *
+   * <title> у кожній колонці лишається — це те, що читають скрінрідери й
+   * що працює, коли JS-підказка не піднялась.
    */
   function exChartSvg(pts, metric) {
     const EC = window.ExerciseCore;
@@ -1113,62 +1126,136 @@
     const vals = pts.map(function (p) { return EC.valueOf(p, metric); });
     if (!vals.length) return '';
 
-    const W = 640, H = 200, PAD = { l: 54, r: 10, t: 12, b: 26 };
+    const vols = pts.map(function (p) { return Number(p.vol) || 0; });
+    const maxVol = Math.max.apply(null, vols);
+    const withBars = metric !== 'vol' && maxVol > 0;
+
+    /*
+     * ШИРИНА ПОЛОТНА ЗАЛЕЖИТЬ ВІД ЕКРАНА, І ЦЕ НЕ КОСМЕТИКА.
+     *
+     * SVG із viewBox стискається цілком, разом із текстом. Полотно 640
+     * на екрані 375 px віддає графіку ~330 px — коефіцієнт 0,52, і підпис
+     * у 11 одиниць стає 5–6 фізичними пікселями. Його не прочитати ні з
+     * якого приводу. Вужче полотно означає коефіцієнт близько одиниці,
+     * тобто ті самі 11 одиниць лишаються приблизно 11 пікселями.
+     *
+     * Перемальовки на поворот екрана немає навмисно: після повороту
+     * графік лишається читабельним (просто з іншим кроком), а слухач
+     * resize на кожну картку — це ціна, якої ця користь не варта.
+     */
+    const narrow = (window.innerWidth || 1024) < 560;
+    const W = narrow ? 380 : 640, H = narrow ? 200 : 220;
+    const PAD = {
+      l: narrow ? 44 : 54,
+      r: withBars ? (narrow ? 40 : 48) : 12,
+      t: narrow ? 12 : 16,
+      b: narrow ? 26 : 30
+    };
+    const innerW = W - PAD.l - PAD.r;
+    const innerH = H - PAD.t - PAD.b;
+    const y0 = H - PAD.b;
+    const n = pts.length;
+    const slot = innerW / n;
+    const px = function (i) { return PAD.l + slot * (i + 0.5); };
+
     const lo = Math.min.apply(null, vals);
     const hi = Math.max.apply(null, vals);
     /* Плаский ряд (усі значення однакові) не має нульової висоти:
        малюємо його посередині, інакше лінія злипається з віссю. */
-    const span = (hi - lo) || Math.max(1, hi * 0.1);
-    const base = (hi === lo) ? lo - span / 2 : lo;
-    const px = function (i) {
-      return pts.length === 1
-        ? (PAD.l + (W - PAD.l - PAD.r) / 2)
-        : PAD.l + (W - PAD.l - PAD.r) * i / (pts.length - 1);
-    };
-    const py = function (v) {
-      return PAD.t + (H - PAD.t - PAD.b) * (1 - (v - base) / span);
-    };
+    const spread = (hi - lo) || Math.max(1, hi * 0.1);
+    /* 12% повітря згори й знизу: лінія не притискається до рамки, і
+       найвища точка не зрізається кружком удвічі більшим за неї. */
+    const base = (hi === lo) ? lo - spread / 2 : lo - spread * 0.12;
+    const roof = (hi === lo) ? hi + spread / 2 : hi + spread * 0.12;
+    const py = function (v) { return PAD.t + innerH * (1 - (v - base) / (roof - base)); };
 
-    const ticks = [lo, hi].map(function (v, i) {
-      if (i === 1 && hi === lo) return '';
+    const fmtV = function (v) { return m.digits ? fmtNum.n(v, m.digits) : thou(v); };
+
+    /* ---- сітка й ліва шкала ---- */
+    const rows = hi === lo ? [lo] : [lo, (lo + hi) / 2, hi];
+    const grid = rows.map(function (v) {
       const y = Math.round(py(v) * 10) / 10;
-      return '<line x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y +
-             '" stroke="rgba(var(--tint-rgb), 0.08)"/>' +
-             '<text x="' + (PAD.l - 6) + '" y="' + (y + 4) + '" text-anchor="end" ' +
-             'font-size="11" fill="var(--muted)">' + (m.digits ? fmtNum.n(v, m.digits) : thou(v)) + '</text>';
+      return '<line class="exc__grid" x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y + '"/>' +
+             '<text class="exc__ylab" x="' + (PAD.l - 8) + '" y="' + (y + 4) + '" text-anchor="end">' +
+             esc(fmtV(v)) + '</text>';
     }).join('');
 
-    const line = pts.length > 1
-      ? '<path d="' + pts.map(function (p, i) {
-          return (i ? 'L' : 'M') + px(i).toFixed(1) + ' ' + py(EC.valueOf(p, metric)).toFixed(1);
-        }).join('') + '" fill="none" stroke="var(--acc-bar)" stroke-width="2.5" ' +
-        'stroke-linejoin="round" stroke-linecap="round"/>'
-      : '';
+    /* ---- стовпчики обʼєму (права шкала) ---- */
+    let bars = '', rightAxis = '';
+    if (withBars) {
+      const bw = Math.max(3, Math.min(16, slot * 0.55));
+      /* 0.78 висоти поля — стеля для стовпчиків. Верхня п'ята лишається
+         лінії: інакше найвищий стовпчик і пік лінії налазять один на
+         одного саме там, де обидва найцікавіші. */
+      const bh = function (v) { return innerH * 0.78 * (v / maxVol); };
+      bars = pts.map(function (p, i) {
+        const h = bh(vols[i]);
+        if (h <= 0) return '';
+        return '<rect class="exc__bar" x="' + (px(i) - bw / 2).toFixed(1) + '" y="' + (y0 - h).toFixed(1) +
+               '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, bw / 2).toFixed(1) +
+               '" style="animation-delay:' + Math.min(i * 16, 320) + 'ms"/>';
+      }).join('');
+      rightAxis =
+        '<text class="exc__ylab exc__ylab--r" x="' + (W - PAD.r + 8) + '" y="' + (PAD.t + innerH * 0.22 + 4).toFixed(1) + '">' +
+          esc(thou(maxVol)) + '</text>' +
+        '<text class="exc__ylab exc__ylab--r" x="' + (W - PAD.r + 8) + '" y="' + (y0 + 4) + '">0</text>';
+    }
 
-    const dots = pts.map(function (p, i) {
-      const v = EC.valueOf(p, metric);
-      const parts = [dateLabel(dateOf(p.d)) + ': ' + exVal(v, m)];
-      parts.push(p.sets + ' × ' + (p.perSet ? fmtNum.n(p.perSet, 0) : '?') +
-                 (p.kg ? ' × ' + fmtNum.kg(p.kg) + ' кг' : ''));
-      return '<circle cx="' + px(i).toFixed(1) + '" cy="' + py(v).toFixed(1) + '" r="4" ' +
-             'fill="var(--acc-bar)"><title>' + esc(parts.join(' · ')) + '</title></circle>';
+    /* ---- заливка під лінією + сама лінія ---- */
+    const dPts = pts.map(function (p, i) {
+      return px(i).toFixed(1) + ' ' + py(vals[i]).toFixed(1);
+    });
+    let area = '', line = '';
+    if (n > 1) {
+      line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '" />';
+      area = '<path class="exc__area" d="M' + px(0).toFixed(1) + ' ' + y0 +
+             'L' + dPts.join('L') + 'L' + px(n - 1).toFixed(1) + ' ' + y0 + 'Z"/>';
+    }
+
+    /* ---- колонки: кружок, перехрестя, зона наведення ---- */
+    const cols = pts.map(function (p, i) {
+      const v = vals[i];
+      const cx = px(i), cy = py(v);
+      const sub = p.sets + '×' + (p.perSet ? fmtNum.n(p.perSet, 0) : '?') +
+                  (p.kg ? ' × ' + fmtNum.kg(p.kg) + ' кг' : '');
+      const ttl = dateLabel(dateOf(p.d)) + ': ' + exVal(v, m) + ' · ' + sub +
+                  (vols[i] ? ' · обʼєм ' + thou(vols[i]) + ' кг' : '');
+      /* Без tabindex: 90 колонок дали б 90 зупинок Tab перед таблицею,
+         яка й так дублює ті самі числа рядками. Для читалок екрана
+         працює aria-label усього графіка плюс <title> кожної колонки —
+         рівно те, що було тут і до перебудови. */
+      return '<g class="exc__col"' +
+               ' data-d="' + esc(dateLabel(dateOf(p.d))) + '"' +
+               ' data-v="' + esc(exVal(v, m)) + '"' +
+               ' data-sub="' + esc(sub) + '"' +
+               ' data-vol="' + (vols[i] ? esc(thou(vols[i]) + ' кг') : '') + '">' +
+               '<title>' + esc(ttl) + '</title>' +
+               '<line class="exc__cross" x1="' + cx.toFixed(1) + '" y1="' + PAD.t + '" x2="' + cx.toFixed(1) + '" y2="' + y0 + '"/>' +
+               '<circle class="exc__dot" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="3.5"' +
+                 ' style="animation-delay:' + Math.min(240 + i * 14, 520) + 'ms"/>' +
+               '<rect class="exc__hit" x="' + (cx - slot / 2).toFixed(1) + '" y="' + PAD.t +
+                 '" width="' + slot.toFixed(1) + '" height="' + innerH + '"/>' +
+             '</g>';
     }).join('');
 
-    /* Підписи дат: перша, остання і, якщо влазить, середня. Більше на
-       640px злипається в кашу. */
-    const idx = pts.length > 2 ? [0, Math.floor((pts.length - 1) / 2), pts.length - 1] : [0, pts.length - 1];
+    /* ---- підписи дат: перша, середня, остання ---- */
+    const idx = n > 2 ? [0, Math.floor((n - 1) / 2), n - 1] : (n > 1 ? [0, n - 1] : [0]);
     const xlab = idx.filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (i) {
-      const anchor = i === 0 ? 'start' : (i === pts.length - 1 ? 'end' : 'middle');
-      return '<text x="' + px(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '" ' +
-             'font-size="10" fill="var(--muted)">' + esc(shortDate(pts[i].d)) + '</text>';
+      const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
+      const x = i === 0 ? PAD.l : (i === n - 1 ? W - PAD.r : px(i));
+      return '<text class="exc__xlab" x="' + x.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '">' +
+             esc(shortDate(pts[i].d)) + '</text>';
     }).join('');
 
-    const axis = '<line x1="' + PAD.l + '" y1="' + (H - PAD.b) + '" x2="' + (W - PAD.r) +
-                 '" y2="' + (H - PAD.b) + '" stroke="rgba(var(--tint-rgb), 0.14)"/>';
+    const axis = '<line class="exc__axis" x1="' + PAD.l + '" y1="' + y0 + '" x2="' + (W - PAD.r) + '" y2="' + y0 + '"/>';
 
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
-             'aria-label="Прогрес: ' + esc(m.label) + ', ' + pts.length + ' тренувань">' +
-             ticks + axis + line + dots + xlab +
+    return '<svg class="exc" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+             'aria-label="Прогрес: ' + esc(m.label) + ', ' + n + ' тренувань">' +
+             '<defs><linearGradient id="exc-fill" x1="0" y1="0" x2="0" y2="1">' +
+               '<stop offset="0" stop-color="rgb(var(--acc-rgb))" stop-opacity="0.30"/>' +
+               '<stop offset="1" stop-color="rgb(var(--acc-rgb))" stop-opacity="0"/>' +
+             '</linearGradient></defs>' +
+             grid + bars + rightAxis + area + line + cols + axis + xlab +
            '</svg>';
   }
 
@@ -1258,6 +1345,9 @@
         '</p>';
     } else {
       const trend = EC.trend(pts, metric);
+      /* Легенда потрібна рівно тоді, коли на полі справді дві серії:
+         умова повторює ту, за якою малюються стовпчики. */
+      const hasVol = metric !== 'vol' && st.points.some(function (p) { return Number(p.vol) > 0; });
       const TREND = { up: '↑ Росте', down: '↓ Знижується', flat: '→ Стабільно' };
       const dTxt = st.delta === null
         ? 'перший запис'
@@ -1266,7 +1356,16 @@
           (st.pct === null ? '' : ' (' + (st.pct > 0 ? '+' : '') + fmtNum.n(st.pct, 1) + '%)');
 
       body =
-        '<div class="wchart mt-2">' + exChartSvg(st.points, metric) + '</div>' +
+        '<div class="wchart wchart--live mt-2" id="ex-chart">' +
+          exChartSvg(st.points, metric) +
+          '<div class="chart-tip" id="ex-tip" hidden></div>' +
+        '</div>' +
+        (hasVol
+          ? '<div class="legend legend--chart mt-1">' +
+              '<span><i class="legend__line"></i>' + esc(m.label) + ' · ліва шкала</span>' +
+              '<span><i class="legend__bar"></i>Обʼєм за тренування · права шкала</span>' +
+            '</div>'
+          : '') +
         '<div class="kpis mt-2">' +
           '<div class="kpi"><div class="kpi__val mono">' + exVal(st.current, m) + '</div>' +
             '<p class="kpi__lbl">поточне · ' + esc(shortDate(st.currentDate)) + '</p></div>' +
@@ -1322,6 +1421,64 @@
           '<span class="small muted">Підхід</span>' + setTabs + '</div>' : '') +
         body +
       '</div>';
+
+    wireExChart();
+  }
+
+  /*
+   * Підказка графіка.
+   *
+   * <title> у кожній колонці лишається головним джерелом правди — його
+   * читає скрінрідер і показує браузер, якщо цей код чомусь не піднявся.
+   * Наведення додає до нього те, чого нативний <title> не вміє: миттєвість
+   * (без секундної паузи) і спільне перехрестя, за яким видно, до якої
+   * саме дати відноситься число.
+   *
+   * Обробники висять на #ex-chart, а він перемальовується разом з усією
+   * карткою при кожній зміні вправи чи періоду — тому вішаємо їх заново
+   * після кожного рендера, а не один раз назавжди.
+   *
+   * Клавіатури тут немає навмисно: колонки не фокусні (див. коментар у
+   * exChartSvg), а без миші ті самі числа дає таблиця нижче.
+   */
+  function wireExChart() {
+    const box = $('#ex-chart');
+    const tip = $('#ex-tip');
+    if (!box || !tip) return;
+
+    const show = function (g) {
+      const rows = [];
+      if (g.dataset.d) rows.push('<b>' + esc(g.dataset.d) + '</b>');
+      if (g.dataset.v) rows.push('<span class="chart-tip__v mono">' + esc(g.dataset.v) + '</span>');
+      if (g.dataset.sub) rows.push('<span class="muted">' + esc(g.dataset.sub) + '</span>');
+      if (g.dataset.vol) rows.push('<span class="muted">обʼєм ' + esc(g.dataset.vol) + '</span>');
+      tip.innerHTML = rows.join('');
+      tip.hidden = false;
+
+      /* Координати рахуються від обгортки, а не від вікна: картка
+         прокручується разом зі сторінкою, і абсолютні координати
+         протухли б на першому ж русі коліщатка. */
+      const dot = g.querySelector('.exc__dot');
+      const b = (dot || g).getBoundingClientRect();
+      const w = box.getBoundingClientRect();
+      const x = b.left - w.left + b.width / 2;
+      tip.style.left = x + 'px';
+      tip.style.top = (b.top - w.top) + 'px';
+      /* Зсув від краю рахується ПІСЛЯ показу: до нього підказка ще не
+         має ширини. */
+      const t = tip.getBoundingClientRect();
+      let shift = 0;
+      if (t.left < w.left + 2) shift = w.left + 2 - t.left;
+      else if (t.right > w.right - 2) shift = w.right - 2 - t.right;
+      if (shift) tip.style.left = (x + shift) + 'px';
+    };
+    const hide = function () { tip.hidden = true; };
+
+    box.addEventListener('pointerover', function (e) {
+      const g = e.target.closest('.exc__col');
+      if (g) show(g);
+    });
+    box.addEventListener('pointerleave', hide);
   }
 
   /* ------------------------------------------------------------------ */

@@ -1353,6 +1353,64 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .macrobar__p { background: var(--acc-bar); }
 .macrobar__f { background: var(--g1); }
 .macrobar__c { background: var(--g3); }
+/* Клітковина — четвертий сегмент, і він мусить читатись поруч з
+   вуглеводами. Розсунути їх по яскравості вже нікуди: #7f7f7f —
+   найтемніше, що ще дає 3:1 до тла. Тому не яскравість, а ФАКТУРА:
+   штриховка тим самим сірим. Заразом вона чесно каже, що це не
+   така сама «їжа», як решта — 2 ккал/г, і ті вже зняті з вуглеводів. */
+.macrobar__fib {
+  background: repeating-linear-gradient(45deg,
+    var(--g3) 0 3px,
+    rgba(var(--tint-rgb), 0.16) 3px 6px);
+}
+/* ---------- Смуги даних: спільна поведінка -----------------------------
+ *
+ * ЩО САМЕ АНІМУЄМО І ЧОМУ САМЕ ТАК.
+ *
+ * clip-path, а не width і не scaleX. width смикає розкладку (смуга —
+ * flex-елемент, сусіди перераховуються кожен кадр), а scaleX розчавлює
+ * заокруглені кінці в еліпс просто посеред анімації. clip-path не чіпає
+ * ані те, ані те: геометрія лишається кінцевою, змінюється лише видима
+ * частина.
+ *
+ * Складені смуги (макроси, склад приросту) підмітаються ЦІЛИМ блоком:
+ * посегментна поява читалась би як чотири незалежні шкали, а це одна.
+ * Смуги з однією заливкою підмітають саме заливку — доріжка має стояти
+ * на місці з першого кадру, інакше не видно, з чого саме росте число.
+ *
+ * Анімація йде на кожній появі елемента в DOM. Для списків, які
+ * перемальовуються цілком (обʼєм по групах, трекери), це і є поява. А
+ * прогрес тренування оновлюється НА МІСЦІ (workout.js міняє лише
+ * style.width наявного вузла), тож там анімація грає один раз на вході,
+ * а кожна нова галочка їде плавним transition — як і раніше.
+ */
+@keyframes bar-sweep { from { clip-path: inset(0 100% 0 0); } }
+
+.macrobar,
+.split { animation: bar-sweep 0.55s var(--e-out); }
+.vol__bar i,
+.qi-bar__track i { animation: bar-sweep 0.55s var(--e-out); }
+
+/* Обʼєм світла зверху: смуга перестає бути плоскою плашкою, але лишається
+   однією заливкою — це градієнт ПОВЕРХ кольору, тому стани (.vol--full,
+   .vol--over) не втрачають свою заливку, вона просто отримує той самий
+   блік. */
+/* Штрихований сегмент клітковини виключено навмисно: у нього ВЛАСНИЙ
+   background-image, і блік, поставлений тут (селектор важчий), просто
+   стер би штриховку. */
+.vol__bar i,
+.qi-bar__track i,
+.macrobar > span:not(.macrobar__fib),
+.split i {
+  background-image: linear-gradient(180deg,
+    rgba(var(--tint-rgb), 0.16) 0%,
+    rgba(var(--tint-rgb), 0) 62%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .macrobar, .split, .vol__bar i, .qi-bar__track i { animation: none; }
+}
+
 .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 0.83rem; color: var(--text-2); }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
 
@@ -2152,6 +2210,100 @@ main:focus:not(:focus-visible) { outline: none; }
   background: rgba(var(--tint-rgb), 0.02);
 }
 .wchart svg { display: block; width: 100%; height: auto; }
+
+/* ---------- Складений графік вправи ------------------------------------
+   Дві серії на одному полі: стовпчики обʼєму (права шкала) і лінія
+   обраної метрики (ліва). Кольору немає — серії розрізняються ФОРМОЮ і
+   яскравістю, як і решта інтерфейсу. */
+
+.wchart--live { position: relative; }
+
+.exc__grid { stroke: rgba(var(--tint-rgb), 0.07); }
+.exc__axis { stroke: rgba(var(--tint-rgb), 0.16); }
+.exc__ylab,
+.exc__xlab {
+  font-size: 11px; fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Права шкала підписана тим самим --muted, що й ліва: це такий самий
+   текст із таким самим правом бути прочитаним. Приглушувати його
+   «бо це другорядна серія» означало б завалити 4,5:1. */
+.exc__ylab--r { text-anchor: start; }
+
+/* Стовпчики — фон, а не герой: приглушена заливка й тонка верхня межа,
+   щоб ряд читався як гістограма, а не як суцільна пляма. */
+.exc__bar {
+  fill: rgba(var(--tint-rgb), 0.11);
+  stroke: rgba(var(--tint-rgb), 0.16);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: exc-bar 0.5s var(--e-out) backwards;
+}
+.exc__area { fill: url(#exc-fill); animation: exc-fade 0.6s ease-out 0.25s backwards; }
+.exc__line {
+  fill: none; stroke: var(--acc-bar); stroke-width: 2.5;
+  stroke-linejoin: round; stroke-linecap: round;
+  /* pathLength="1" у розмітці робить довжину нормованою, тож обвід
+     малюється однаково і на трьох точках, і на дев'яноста. */
+  stroke-dasharray: 1;
+  animation: exc-draw 0.85s var(--e-out) backwards;
+}
+.exc__dot {
+  fill: var(--card-1); stroke: var(--acc-bar); stroke-width: 2;
+  transform-box: fill-box; transform-origin: center;
+  transition: transform 0.15s var(--e-out);
+  animation: exc-pop 0.28s var(--e-out) backwards;
+}
+.exc__cross {
+  stroke: rgba(var(--tint-rgb), 0.28);
+  stroke-width: 1; stroke-dasharray: 3 3;
+  opacity: 0; transition: opacity 0.12s linear;
+}
+.exc__hit { fill: transparent; }
+.exc__col:hover .exc__cross { opacity: 1; }
+.exc__col:hover .exc__dot { transform: scale(1.5); }
+
+@keyframes exc-bar  { from { transform: scaleY(0); } }
+@keyframes exc-fade { from { opacity: 0; } }
+@keyframes exc-pop  { from { opacity: 0; transform: scale(0.2); } }
+@keyframes exc-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+/* Підказка графіка. Живе в обгортці, а не в SVG: усередині SVG немає
+   переносу рядків і немає тіні, а тут це звичайний блок. */
+.chart-tip {
+  position: absolute; z-index: 4;
+  transform: translate(-50%, calc(-100% - 12px));
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-2); border-radius: 10px;
+  background: var(--glass-2);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  font-size: 0.78rem; line-height: 1.35; white-space: nowrap;
+  pointer-events: none;
+}
+.chart-tip__v { font-size: 0.95rem; font-weight: 700; }
+
+/* Легенда під графіком: лінія і стовпчик — саме тими формами, якими вони
+   намальовані вище. Квадратик для обох не сказав би, де що. */
+.legend--chart { margin-top: 10px; font-size: 0.79rem; }
+/* Селектори з .legend попереду навмисно: правило .legend i вище задає
+   всім маркерам 10×10, і без цієї ваги воно перебило б і лінію, і
+   стовпчик — обидва перетворились би на однакові квадрати. */
+.legend .legend__line,
+.legend .legend__bar { display: inline-block; margin-right: 7px; vertical-align: middle; }
+.legend .legend__line { width: 16px; height: 2.5px; border-radius: 2px; background: var(--acc-bar); }
+.legend .legend__bar {
+  width: 9px; height: 12px; border-radius: 2px;
+  background: rgba(var(--tint-rgb), 0.11);
+  border: 1px solid rgba(var(--tint-rgb), 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exc__bar, .exc__area, .exc__line, .exc__dot { animation: none; }
+  .exc__line { stroke-dasharray: none; }
+  .exc__dot { transition: none; }
+}
 
 /* Останні записи ваги: рядок «дата — число — видалити» */
 .wlog-row {

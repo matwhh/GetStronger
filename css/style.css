@@ -3574,18 +3574,29 @@ h1 > .h1-ico {
 /* Кнопка в шапці. Виглядає як сусідня позначка синхронізації: те саме
    коло, та сама висота, той самий колір — інакше вона читалася б як
    чужий елемент, приклеєний зверху. */
+/* Без плашки: сам знак і є кнопкою.
+   Спершу тут стояв кружок із рамкою — під пару до .nav__sync поруч. Але
+   sync має плашку тому, що в широкій шапці він показує ще й ТЕКСТ («Не
+   синхронізовано»), і без фону той напис висів би в порожнечі. У книжки
+   тексту немає, тож кружок нічого не тримав — лише зменшував сам знак і
+   робив із двох різних речей у шапці візуальну пару, якою вони не є.
+   Область натискання лишається 40×40: вона й раніше була більшою за знак,
+   просто тепер її не видно. */
 .nav__help {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 34px; height: 34px; padding: 0;
-  border: 1px solid var(--line-2); border-radius: 999px;
-  background: rgba(var(--tint-rgb), 0.04);
+  width: 40px; height: 40px; padding: 0;
+  border: 0; border-radius: 999px;
+  background: none;
   color: var(--text-2);
   cursor: pointer;
-  transition: all var(--t-fast);
+  transition: color var(--t-fast), transform var(--t-fast);
 }
 .nav__help[hidden] { display: none; }
-.nav__help .nav__ico { width: 19px; height: 19px; }
-.nav__help:hover { color: var(--text); border-color: transparent; background: rgba(var(--acc-rgb), 0.18); }
+/* 4:3, не квадрат: viewBox книги тісний, тож висота ставиться явно. */
+.nav__help .nav__ico { width: 34px; height: 26px; }
+.nav__help:hover { color: var(--text); transform: translateY(-1px); }
+/* Фокус із клавіатури мусить бути видимим — без рамки його інакше немає. */
+.nav__help:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; border-radius: 8px; }
 
 /* Вікно ширше за звичайне: у довідці є таблиці на три колонки, і в 460px
    вони перетворюються на стовпчик із двох слів. */
@@ -3704,7 +3715,7 @@ h1 > .h1-ico {
 .help__fab {
   position: fixed; z-index: 90;
   right: 16px; bottom: 16px;
-  width: 42px; height: 42px; padding: 0;
+  width: 48px; height: 48px; padding: 0;
   display: grid; place-items: center;
   border: 1px solid var(--line-2); border-radius: 999px;
   background: var(--bg-1); color: var(--text-2);
@@ -3712,7 +3723,10 @@ h1 > .h1-ico {
   cursor: pointer;
   transition: all var(--t-fast);
 }
-.help__fab svg { width: 19px; height: 19px; }
+/* Плашку тут лишено навмисно, на відміну від кнопки в шапці: ця кнопка
+   висить ПОВЕРХ довільного вмісту сторінки, і без фону знак губився б на
+   тексті. Сам знак — того самого розміру, що й у шапці. */
+.help__fab svg { width: 34px; height: 26px; }
 .help__fab:hover { color: var(--text); border-color: transparent; background: rgba(var(--acc-rgb), 0.18); }
 @supports (padding: env(safe-area-inset-bottom)) {
   .help__fab { bottom: calc(16px + env(safe-area-inset-bottom)); }

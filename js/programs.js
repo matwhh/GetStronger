@@ -1000,10 +1000,14 @@
     if (!host) return;
     const days = state.days;
 
-    host.innerHTML = '<div class="grid grid-3">' + PROGRAMS_FOR_ME().map(function (p) {
+    /* data-tilt вмикає нахил і блик (js/app.js), .picker дає світло під
+       сіткою, без якого скляна поверхня нічим не відрізняється від
+       матової. Ефект прибитий саме до цієї сітки: вибір програми — єдине
+       місце, де людина порівнює варіанти, а не читає дані. */
+    host.innerHTML = '<div class="grid grid-3 picker" data-tilt>' + PROGRAMS_FOR_ME().map(function (p) {
       if (!supports(p, days)) {
         return '' +
-          '<article class="card card--off">' +
+          '<article class="card card--glass card--off">' +
             '<div class="row row--split">' +
               '<h3 class="card__title">' + esc(p.name) + '</h3>' +
             '</div>' +
@@ -1017,7 +1021,7 @@
       const edited = Boolean(state.custom[planKey(p.id, days)]);
 
       return '' +
-        '<article class="card card--hover' + (selected ? ' is-selected' : '') + '">' +
+        '<article class="card card--glass card--hover' + (selected ? ' is-selected' : '') + '">' +
           '<div class="row row--split">' +
             '<h3 class="card__title">' + esc(p.name) + '</h3>' +
             (selected ? '<span class="chip chip--ok">обрана</span>' : (edited ? '<span class="chip">змінена</span>' : '')) +

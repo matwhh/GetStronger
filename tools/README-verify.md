@@ -49,6 +49,7 @@ node tools/verifyagegate.mjs     # 17+: гейт, обхід URL/історіє�
 node tools/verifyreps.mjs        # діапазони повторень: 4 стажі × 4 програми × великі/малі групи
 node tools/verifyheatmap.mjs     # теплокарта: рівні з журналу, підказка, легенда, перемикач дня
 node tools/verifyseg.mjs         # сегментований перемикач: доріжка по вмісту, виділення їздить і не бреше
+node tools/verifytilt.mjs        # скляні картки вибору: нахил, блик за курсором, фокус, контраст скла
 node tools/verifyperf.mjs        # вага сторінок, час завантаження, вузли — зі стелями
 node tools/verifysw.mjs          # service worker: оболонка, офлайн, аварійний вимикач
 node tools/verifyhelp.mjs        # контекстна довідка: кнопка на кожній сторінці, різний вміст, модальність

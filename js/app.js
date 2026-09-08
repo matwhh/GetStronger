@@ -1191,6 +1191,114 @@
   let accSeq = 0;
 
   /* ------------------------------------------------------------------ */
+  /* Нахил і блик на картках вибору                                       */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЩО РОБИТЬ. У контейнері з [data-tilt] стежить за вказівником і кладе
+   * у кожну картку чотири числа: два кути нахилу й позицію блику. Усе
+   * інше — CSS (.card--glass): і сам нахил, і блик, і приглушення сусідів.
+   * Тут немає жодного стилю, тільки координати.
+   *
+   * ЧОМУ ОДИН СЛУХАЧ НА КОНТЕЙНЕР. pointermove — найчастіша подія в
+   * браузері. Слухач на кожній картці означав би чотири підписки, які
+   * треба знімати при кожній перемальовці списку (а він перемальовується
+   * на кожну зміну кількості днів). Делегування на контейнері живе, доки
+   * живе сторінка.
+   *
+   * ЧОМУ rAF. Вказівник шле до 120 подій на секунду, екран малює 60. Без
+   * дроселя ми рахували б getBoundingClientRect удвічі частіше, ніж це
+   * можна побачити — і робили б це в обробнику події, тобто в
+   * найгіршому місці для читання розкладки.
+   *
+   * ЧОМУ ГЕОМЕТРІЯ КЕШУЄТЬСЯ. getBoundingClientRect змушує браузер
+   * перерахувати розкладку. Робити це на кожен рух миші по чотирьох
+   * картках — найпростіший спосіб перетворити красиву дрібницю на
+   * гальмування. Розміри читаються раз на вхід у картку й скидаються на
+   * прокрутці та зміні розміру вікна.
+   */
+  const TILT_MAX = 7;   /* градусів; більше — і текст на дальньому краї «пливе» */
+
+  function initTilt(root) {
+    const box = root || document;
+    (box.querySelectorAll ? box.querySelectorAll('[data-tilt]') : []).forEach(function (host) {
+      if (host.dataset.tiltOn === '1') return;
+      host.dataset.tiltOn = '1';
+      wireTilt(host);
+    });
+  }
+
+  function wireTilt(host) {
+    /* Ефект — для курсора. На дотику нахиляти нічим, а pointermove там
+       сперечається з прокруткою. */
+    try {
+      if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    } catch (_) { return; }
+
+    let cards = [];
+    let hot = null;      /* картка під курсором */
+    let rect = null;     /* її геометрія, поки курсор усередині */
+    let frame = 0;
+    let pending = null;
+
+    const list = function () {
+      /* Недоступні картки (.card--off) участі не беруть: нахиляти те, що
+         не можна обрати, означає обіцяти дію, якої немає. */
+      cards = [].slice.call(host.querySelectorAll('.card--glass:not(.card--off)'));
+      return cards;
+    };
+
+    const cool = function () {
+      list().forEach(function (c) {
+        c.classList.remove('is-hot', 'is-cold', 'is-tilting');
+        c.style.removeProperty('--tilt-x');
+        c.style.removeProperty('--tilt-y');
+      });
+      hot = null; rect = null;
+    };
+
+    const apply = function () {
+      frame = 0;
+      if (!hot || !rect || !pending) return;
+      const nx = (pending.x - rect.left) / rect.width;
+      const ny = (pending.y - rect.top) / rect.height;
+      /* Верх картки нахиляється ДО глядача, низ — від нього: інакше рух
+         читається навпаки, як провал під курсором. */
+      hot.style.setProperty('--tilt-x', ((0.5 - ny) * 2 * TILT_MAX).toFixed(2) + 'deg');
+      hot.style.setProperty('--tilt-y', ((nx - 0.5) * 2 * TILT_MAX).toFixed(2) + 'deg');
+      hot.style.setProperty('--spot-x', (nx * 100).toFixed(1) + '%');
+      hot.style.setProperty('--spot-y', (ny * 100).toFixed(1) + '%');
+    };
+
+    host.addEventListener('pointermove', function (e) {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      const card = e.target.closest && e.target.closest('.card--glass:not(.card--off)');
+      if (!card) { if (hot) cool(); return; }
+
+      if (card !== hot) {
+        cool();
+        hot = card;
+        rect = card.getBoundingClientRect();
+        list().forEach(function (c) {
+          c.classList.toggle('is-hot', c === card);
+          c.classList.toggle('is-cold', c !== card);
+        });
+        /* Клас переходу вмикаємо НАСТУПНИМ кадром: інакше вхід у картку
+           теж утратив би плавність і вона б смикалась із нуля. */
+        requestAnimationFrame(function () { if (hot === card) card.classList.add('is-tilting'); });
+      }
+      pending = { x: e.clientX, y: e.clientY };
+      if (!frame) frame = requestAnimationFrame(apply);
+    });
+
+    host.addEventListener('pointerleave', cool);
+    /* Геометрія застаріває від прокрутки й зміни розміру — простіше
+       відпустити картку, ніж міряти на кожному кадрі прокрутки. */
+    window.addEventListener('scroll', function () { if (hot) cool(); }, { passive: true });
+    window.addEventListener('resize', function () { if (hot) cool(); });
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Сегментований перемикач: виділення, що їздить                        */
   /* ------------------------------------------------------------------ */
   /*
@@ -1271,7 +1379,8 @@
       if (seg) measureSeg(seg);
     });
 
-    /* Нові доріжки після перемальовки сторінки. */
+    /* Нові доріжки після перемальовки сторінки. Тим самим спостерігачем
+       ловляться й нові сітки з нахилом — вони зʼявляються разом. */
     if (typeof MutationObserver === 'function') {
       new MutationObserver(function (recs) {
         for (let i = 0; i < recs.length; i++) {
@@ -1279,7 +1388,8 @@
           for (let j = 0; j < added.length; j++) {
             const n = added[j];
             if (n.nodeType !== 1) continue;
-            if (n.classList.contains('seg') || n.querySelector('.seg')) { scheduleSegs(); return; }
+            if (n.classList.contains('seg') || n.querySelector('.seg')) { scheduleSegs(); }
+            if (n.hasAttribute('data-tilt') || n.querySelector('[data-tilt]')) initTilt(n.parentNode || document);
           }
         }
       }).observe(document.body, { childList: true, subtree: true });
@@ -1719,6 +1829,7 @@
     safeUrl: safeUrl,
     initAccordions: initAccordions,
     initSegs: initSegs,
+    initTilt: initTilt,
     initLongform: initLongform,
     copyRich: copyRich,
     restTimer: { start: rtStart, stop: rtStop },
@@ -1792,7 +1903,8 @@
      * зовсім інша річ.
      */
     [buildNav, buildFooter, function () { initReveal(document); }, injectCanonical,
-     function () { initAccordions(document); }, initSegWatch, initCardGlow, injectJsonLd,
+     function () { initAccordions(document); }, initSegWatch,
+     function () { initTilt(document); }, initCardGlow, injectJsonLd,
      warnCorruptProfile]
       .forEach(function (step) {
         try { step(); } catch (e) { console.error('[app] крок ініціалізації впав:', e); }

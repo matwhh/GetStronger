@@ -2622,31 +2622,63 @@ button.mcal__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-off
    зліва, тижні колонками вправо. Свій grid із Пн…Нд згори тут був, і
    саме він робив два календарі одного журналу не схожими: у теплокарті
    тиждень читається вниз, у місяці читався впоперек. */
+/* Розкладка — та сама, що в теплокарти, і тепер повністю: підписи
+   місяців над сіткою, підписи днів тижня колонкою зліва, тижні
+   колонками вправо, роздільник у проміжку між місяцями. Календар
+   показує сім місяців, тож і прокручується так само. */
 .mcal {
   /* Ті самі токени, що й у теплокарти: клітинка одна на два календарі,
      тож і крок у них один. Мобільне збільшення теж спільне — воно
      живе там, де оголошено --cell для обох. */
   --cell: 30px;
   --cell-gap: 5px;
-  display: flex;
-  gap: var(--cell-gap);
-  width: max-content;
-  max-width: 100%;
+  --mc-mon: 15px;
+  display: flex; flex-direction: column; gap: var(--cell-gap);
   overflow-x: auto;
   padding-bottom: 6px;
   overscroll-behavior-x: contain;
 }
-.mcal__col { display: flex; flex-direction: column; gap: var(--cell-gap); }
-/* Підписи Пн…Нд: та сама колонка, що .heatmap__days, лише без
-   прилипання — місяць у ширину екрана вміщається завжди, прокручувати
-   під підписами нічого. */
+.mcal__grid { display: flex; gap: var(--cell-gap); width: max-content; }
+.mcal__col {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--cell-gap);
+}
+/* Підписи Пн…Нд прилипають до лівого краю: сім місяців у вузький екран
+   не вміщаються, і без цього підписи їдуть із сіткою — тобто зникають
+   рівно там, де вони найпотрібніші. Тло обов'язкове, інакше клітинки
+   просвічують крізь них. */
 .mcal__days {
+  position: sticky; left: 0; z-index: 3;
   display: flex; flex-direction: column; gap: var(--cell-gap);
   width: var(--hm-label, 28px); margin-right: 6px; flex: 0 0 auto;
+  background: var(--card-1);
+  box-shadow: 6px 0 0 var(--card-1);
 }
 .mcal__days span {
   height: var(--cell); line-height: var(--cell);
   font-size: 0.72rem; color: var(--muted);
+}
+/* Ряд місяців: перший слот-заглушка під ширину підписів днів, далі по
+   одному слоту на колонку. */
+.mcal__months {
+  display: flex; width: max-content;
+  height: var(--mc-mon); line-height: var(--mc-mon);
+}
+.mcal__months-pad {
+  width: var(--hm-label, 28px); margin-right: 6px; flex: 0 0 auto;
+}
+.mcal__month {
+  width: var(--cell); margin-right: var(--cell-gap); flex: 0 0 auto;
+  font-size: 0.68rem; color: var(--muted); white-space: nowrap;
+}
+/* Роздільник місяців живе в проміжку ПЕРЕД колонкою, а не тягнеться від
+   підпису наосліп: висота рахується від ряду місяців до низу колонки. */
+.mcal__col.is-month::before {
+  content: ''; position: absolute;
+  left: calc(var(--cell-gap) / -2 - 0.5px);
+  top: calc((var(--mc-mon) + var(--cell-gap)) * -1);
+  bottom: 0; width: 1px;
+  background: rgba(var(--tint-rgb), 0.16); pointer-events: none;
 }
 /* Вигляд клітинки — у розділі «СТАНДАРТНА КЛІТИНКА ДНЯ». Тут лишається
    тільки те, чого в теплокарті немає взагалі. */

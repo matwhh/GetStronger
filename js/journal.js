@@ -1903,40 +1903,69 @@
     const host = $('#jr-hcal');
     if (!host) return;
 
-    const y = state.hcalY, m = state.hcalM;
-    const now = new Date();
-    const first = new Date(y, m, 1);
-    const daysIn = new Date(y, m + 1, 0).getDate();
-    const startPad = (first.getDay() + 6) % 7;   // Пн = 0
-    const todayK = todayKey();
-    const isCurrentMonth = y === now.getFullYear() && m === now.getMonth();
-
     /*
-     * ВИГЛЯД — ТОЧНО ЯК У ТЕПЛОКАРТІ ТРЕНУВАНЬ.
+     * СІМ МІСЯЦІВ, А НЕ ОДИН.
      *
-     * Не лише клітинка (вона спільна вже давно), а й РОЗКЛАДКА: підписи
-     * днів тижня стоять збоку колонкою, а тижні йдуть колонками вправо.
-     * Було навпаки — Пн…Нд згори, дні поточкою вправо, — і два календарі
-     * одного журналу читались у різних напрямках: у теплокарті погляд
-     * веде вниз по тижню, у місяці вів упоперек. Тепер обидва читаються
-     * однаково, і перехід між ними нічого не переучує.
+     * Місяць за раз відповідав на питання «що було у вересні», а питання
+     * до історії інше: «як я тренувався останнім часом». Щоб побачити
+     * провал у липні, доводилось клацати назад чотири рази й тримати
+     * побачене в голові. Вікно те саме, що в теплокарті огляду
+     * (HM_MONTHS), тож обидві сітки показують один відрізок часу.
      *
-     * Рівень заливки рахує той самий hmLevel: глибина = частка закритих
-     * підходів.
+     * Стрілки лишились, але тепер зсувають ВІКНО на місяць, а не гортають
+     * місяці: історія глибша за сім місяців нікуди не поділась.
+     *
+     * Розкладка — теплокартова: підписи днів колонкою зліва, тижні
+     * колонками вправо, підписи місяців над ними, роздільник у проміжку
+     * між місяцями. Клітинка спільна, рівень рахує той самий hmLevel.
      */
-    const weeks = Math.ceil((startPad + daysIn) / 7);
+    const now = new Date();
+    const endY = state.hcalY, endM = state.hcalM;
+    const isCurrentMonth = endY === now.getFullYear() && endM === now.getMonth();
+
+    const firstDay = new Date(endY, endM - (HM_MONTHS - 1), 1);
+    const lastOfMonth = new Date(endY, endM + 1, 0);
+    const todayK = todayKey();
+    const firstK = keyOf(firstDay);
+    const lastK = keyOf(lastOfMonth) > todayK ? todayK : keyOf(lastOfMonth);
+
+    const start = mondayOf(firstDay);
+    const lastD = dateOf(lastK);
+    const weeks = Math.floor((mondayOf(lastD) - start) / 604800000) + 1;
+
+    /* Місяць колонки — за її ЧЕТВЕРГОМ, затиснутим у вікно: та сама
+       арифметика, що в теплокарті, і з тієї ж причини (перший тиждень
+       може починатись хвостом попереднього місяця). */
+    const colMonth = [];
+    const colFirst = [];
+    {
+      let prev = -1;
+      for (let w = 0; w < weeks; w++) {
+        const thu = new Date(start);
+        thu.setDate(start.getDate() + w * 7 + 3);
+        let k = keyOf(thu);
+        if (k > lastK) k = lastK;
+        if (k < firstK) k = firstK;
+        const mm = Number(k.slice(5, 7)) - 1;
+        colMonth[w] = mm;
+        colFirst[w] = (w === 0 || mm !== prev);
+        prev = mm;
+      }
+    }
+
     let cols = '';
     for (let w = 0; w < weeks; w++) {
       let cells = '';
       for (let r = 0; r < 7; r++) {
-        const day = w * 7 + r - startPad + 1;
-        if (day < 1 || day > daysIn) {
+        const day = new Date(start);
+        day.setDate(start.getDate() + w * 7 + r);
+        const k = keyOf(day);
+        if (k < firstK) {
           cells += '<i class="mcal__cell mcal__cell--pad" aria-hidden="true"></i>';
           continue;
         }
-        const k = keyOf(new Date(y, m, day));
-        if (k > todayK) {
-          cells += '<i class="mcal__cell mcal__cell--future">' + day + '</i>';
+        if (k > lastK) {
+          cells += '<i class="mcal__cell mcal__cell--future">' + day.getDate() + '</i>';
           continue;
         }
         const lvl = hmLevel(k);
@@ -1944,10 +1973,23 @@
         cells += '<button type="button" class="mcal__cell' +
           (sel ? ' mcal__cell--sel' : '') + '" data-lvl="' + lvl + '" data-hday="' + k + '" ' +
           'aria-pressed="' + sel + '" aria-label="' + esc(dateLabel(dateOf(k))) +
-          ': ' + esc(HM_LEVEL_TEXT[lvl]) + '">' + day + '</button>';
+          ': ' + esc(HM_LEVEL_TEXT[lvl]) + '"><span>' + day.getDate() + '</span></button>';
       }
-      cols += '<div class="mcal__col">' + cells + '</div>';
+      cols += '<div class="mcal__col' + (colFirst[w] && w > 0 ? ' is-month' : '') + '">' +
+              cells + '</div>';
     }
+
+    let months = '<span class="mcal__months-pad" aria-hidden="true"></span>';
+    for (let w = 0; w < weeks; w++) {
+      months += '<span class="mcal__month">' + (colFirst[w] ? MON[colMonth[w]] : '') + '</span>';
+    }
+
+    /* Підпис — діапазон, а не один місяць. Рік пишемо двічі лише тоді,
+       коли вікно його справді перетинає. */
+    const y0 = firstDay.getFullYear(), m0 = firstDay.getMonth();
+    const range = y0 === endY
+      ? MON[m0] + ' — ' + MON[endM] + ' ' + endY
+      : MON[m0] + ' ' + y0 + ' — ' + MON[endM] + ' ' + endY;
 
     const dow = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
 
@@ -1956,23 +1998,26 @@
         '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
           '<h2 style="margin:0">Історія</h2>' +
           '<div class="row" style="gap:8px;align-items:center">' +
-            '<button class="icon-btn" type="button" data-hnav="-1" aria-label="Попередній місяць">' +
+            '<button class="icon-btn" type="button" data-hnav="-1" aria-label="Зсунути вікно на місяць назад">' +
               '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>' +
             '</button>' +
-            '<b class="mono" style="min-width:140px;text-align:center">' + MONTHS_NOM[m] + ' ' + y + '</b>' +
-            '<button class="icon-btn" type="button" data-hnav="1" aria-label="Наступний місяць"' +
+            '<b class="mono" style="min-width:150px;text-align:center">' + range + '</b>' +
+            '<button class="icon-btn" type="button" data-hnav="1" aria-label="Зсунути вікно на місяць уперед"' +
               (isCurrentMonth ? ' disabled' : '') + '>' +
               '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>' +
             '</button>' +
           '</div>' +
         '</div>' +
-        '<div class="mcal mt-2" role="group" aria-label="Календар ' + MONTHS_NOM[m] + ' ' + y + '">' +
-          '<div class="mcal__days" aria-hidden="true">' + dow + '</div>' +
-          cols +
+        '<div class="mcal mt-2" role="group" aria-label="Календар: ' + esc(range) + '">' +
+          '<div class="mcal__months" aria-hidden="true">' + months + '</div>' +
+          '<div class="mcal__grid">' +
+            '<div class="mcal__days" aria-hidden="true">' + dow + '</div>' +
+            cols +
+          '</div>' +
         '</div>' +
-        '<p class="small muted mt-1 mb-0">Глибина заливки — частка закритих підходів, ' +
-          'як у теплокарті вище: контур — відмічено вручну, суцільна заливка — ' +
-          'закрито всі. Клік по дню — його підсумок нижче.</p>' +
+        '<p class="small muted mt-1 mb-0">' + HM_MONTHS + ' місяців. Глибина заливки — ' +
+          'частка закритих підходів, як у теплокарті вище: контур — відмічено вручну, ' +
+          'суцільна заливка — закрито всі. Клік по дню — його підсумок нижче.</p>' +
       '</div>';
   }
 

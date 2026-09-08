@@ -48,29 +48,15 @@
      не чекає на нього), а після завантаження перемикається на all.
      Без JS спрацьовує noscript-запасний варіант. -->
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
 <!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
      має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
      Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
 <script src="js/agegate.js"></script>
 <link rel="stylesheet" href="css/style.css">
-<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
-   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
-   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
-   інакше при кожному переході блимала б типова графітова темна перед
-   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
-   скрипт відпрацьовує раніше за app.js. */
-document.documentElement.className='js';
-try{var _r=document.documentElement,
-_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
-moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
-_t=localStorage.getItem('forge.theme');
-_t=_m[_t]||_t;if(_t==='graphite-amber')_t='';
-if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
-if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
-var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e7e7e7');}
-}catch(e){}</script>
+<script src="js/nosw.js"></script>
+<script src="js/theme-boot.js"></script>
 
 </head>
 <body>
@@ -170,43 +156,6 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
 <!-- Позначає нові факти побаченими для Forge Rating (App.stampRating) -->
 <script defer src="js/programs.js"></script>
 <script defer src="js/projection.js"></script>
-<script>
-/* Перемикання порожнього / заповненого стану і зняття вибору.
-   Логіка крихітна й потрібна лише цій сторінці — тримати заради неї
-   окремий файл сенсу немає. */
-(function () {
-  'use strict';
-  var root = document.getElementById('my-plan');
-
-  // Запобіжник: якщо скрипти плану чомусь не відпрацювали, сторінка не має
-  // лишитись порожньою назавжди — через 3 с показуємо порожній стан.
-  setTimeout(function () {
-    if (root.dataset.state === 'loading') root.dataset.state = 'empty';
-  }, 3000);
-
-  document.addEventListener('plan:change', function () {
-    var cur = window.PlanEngine && window.PlanEngine.current();
-    root.dataset.state = (cur && cur.plan) ? 'ready' : 'empty';
-  });
-
-  var drop = document.getElementById('drop-plan');
-  if (drop) {
-    drop.addEventListener('click', function () {
-      if (!confirm('Зняти вибір плану? Самі правки вправ і ваг залишаться збереженими.')) return;
-      window.Store.saveProfile({ activePlan: null }).then(function () {
-        location.reload();
-      }, function (e) {
-        /* Обробника відмови не було зовсім, і офлайн (чи прострочена сесія)
-           давали найгірше поєднання: у localStorage план уже знято, сторінка
-           показує старий, кнопка на вигляд не спрацювала, а в консолі —
-           необроблена відмова. .queued означає «лежить у черзі», тобто
-           локально все записано і перезавантаження чесне. */
-        if (e && e.queued) { location.reload(); return; }
-        window.App.toast('Не збереглося: ' + (e && e.message), 'err');
-      });
-    });
-  }
-})();
-</script>
+<script src="js/plan-ui.js"></script>
 </body>
 </html>

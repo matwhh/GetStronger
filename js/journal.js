@@ -94,17 +94,59 @@
    * записів: якщо зважувань було три за тиждень, середня йде по трьох.
    * Інакше пропуски розтягували б вікно на місяць і лінія брехала б.
    */
+  /*
+   * ЧОМУ ТУТ ДВА ВКАЗІВНИКИ, А НЕ FILTER.
+   *
+   * Було: для кожного запису — прохід по всьому масиву з двома new Date на
+   * ітерацію. Це O(N²) з розбором рядка дати всередині, і викликалось воно
+   * двічі на кожен рендер: при відкритті журналу, після кожного «Записати»,
+   * при зміні періоду і з кожного Store.onChange. На кількох роках щоденних
+   * зважувань це помітне підвисання інтерфейсу на ровному місці (PRF-002).
+   *
+   * Записи вже відсортовані за ключем (weightEntries сортує), тому вікно
+   * рухається одним указівником: складність O(N), а мітка часу рахується
+   * рівно раз на запис.
+   */
+  /*
+   * Дата «N днів тому» через setDate, а не мілісекунди (TIM-002).
+   *
+   * У ніч переходу на зимовий час доба триває 25 годин, і віднімання
+   * N × 86400000 зсуває межу вікна на день. Помітно це рівно двічі на рік
+   * і рівно там, де людина дивиться на графік і не розуміє, чому запис
+   * зник.
+   */
+  function daysAgo(n) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (Number(n) || 0));
+    return d;
+  }
+
   function rolling(entries) {
-    return entries.map(function (e) {
-      const end = dateOf(e.key).getTime();
-      const start = end - 6 * 86400000;
-      const win = entries.filter(function (x) {
-        const t = dateOf(x.key).getTime();
-        return t >= start && t <= end;
-      });
-      const avg = win.reduce(function (s, x) { return s + x.kg; }, 0) / win.length;
-      return { key: e.key, kg: e.kg, avg: avg };
-    });
+    const ts = entries.map(function (e) { return dateOf(e.key).getTime(); });
+    const out = [];
+    let from = 0, sum = 0;
+    for (let i = 0; i < entries.length; i++) {
+      sum += entries[i].kg;
+      const start = ts[i] - 6 * 86400000;
+      while (ts[from] < start) { sum -= entries[from].kg; from++; }
+      out.push({ key: entries[i].key, kg: entries[i].kg, avg: sum / (i - from + 1) });
+    }
+    return out;
+  }
+
+  /*
+   * Один розрахунок на рендер замість двох.
+   *
+   * renderWeight кличе rolling по всіх записах, а chartSvg — ще раз, і лише
+   * ПОТІМ обрізає за періодом. Кеш тримається на самому масиві записів:
+   * зміниться вміст журналу — зміниться й посилання, і кеш сам застаріє.
+   */
+  let rollCache = { src: null, out: null };
+  function rollingCached(entries) {
+    if (rollCache.src === entries) return rollCache.out;
+    rollCache = { src: entries, out: rolling(entries) };
+    return rollCache.out;
   }
 
   /**
@@ -115,11 +157,12 @@
    * саме на неї, тому вона і є кольоровою лінією.
    */
   function chartSvg(entries) {
+    const all = rollingCached(entries);
     const data = state.period
-      ? rolling(entries).filter(function (e) {
-          return e.key >= keyOf(new Date(Date.now() - state.period * 86400000));
+      ? all.filter(function (e) {
+          return e.key >= keyOf(daysAgo(state.period));
         })
-      : rolling(entries);
+      : all;
     if (data.length < 2) return '';
 
     const W = 640, H = 220, PAD = { l: 44, r: 10, t: 12, b: 24 };
@@ -209,6 +252,20 @@
 
   function overviewTiles() {
     const PC = window.ProgressCore;
+    /*
+     * ВІКНО В ДНЯХ — ЦЕ ВІКНО В ДНЯХ, А НЕ «ЗА СЕЗОН» (UX-002).
+     *
+     * Плитки з явним вікном (8 тижнів сили, 30 днів харчування, 30 днів
+     * часу, adherence за 6 повних тижнів) рахувались по СЕЗОННОМУ зрізу.
+     * Сезон AUTUMN-2026 почався 1 вересня, тож увесь інтервал adherence
+     * лежав ПОЗА зрізом — і плитка структурно показувала нуль, тоді як
+     * картка «Тренування» нижче на тій самій сторінці рахувала по повних
+     * журналах і показувала правду. Дві цифри про одне й те саме
+     * суперечили одна одній, і жодна не пояснювала, звідки взялась.
+     *
+     * Тому: «цього тижня» — за сезоном (це сезонний лічильник), усе з
+     * вікном у днях — за повними журналами.
+     */
     const sign = function (n) { return fmtNum.signed(n, 1); };
     const tiles = [];
 
@@ -220,23 +277,25 @@
       : { val: '—', lbl: 'вага', trend: 'ще без записів' });
 
     // Сила: найбільший приріст вправи за 8 тижнів
-    const lift = PC.bestLift(sn.weightLog, 56);
+    const lift = PC.bestLift(state.weightLog, 56);
     tiles.push(lift
       ? { val: sign(lift.delta) + ' кг', lbl: 'сила · ' + lift.name, trend: lift.from + ' → ' + lift.to + ' за 8 тиж' }
       : { val: '—', lbl: 'сила', trend: 'без змін ваг' });
 
     // Тренування: цього тижня X з Y (або всього)
     const tr = PC.trainingStats(sn.workLog, sn.sessionLog, state.daysTarget);
+    /* adherence має вікно в тижнях — беремо його з повних журналів. */
+    const trFull = PC.trainingStats(state.workLog, state.sessionLog, state.daysTarget);
     tiles.push({
       val: state.daysTarget ? tr.thisWeek + ' з ' + state.daysTarget : String(tr.thisWeek),
       lbl: 'тренувань цього тижня',
-      trend: tr.adherence
-        ? tr.adherence.done + ' із ' + tr.adherence.planned + ' за ' + tr.adherence.weeks + ' тиж'
+      trend: trFull.adherence
+        ? trFull.adherence.done + ' із ' + trFull.adherence.planned + ' за ' + trFull.adherence.weeks + ' тиж'
         : tr.total + ' всього'
     });
 
     // Харчування: середнє проти цілі за 30 днів
-    const f = PC.foodStats(sn.mealLog, 30);
+    const f = PC.foodStats(state.mealLog, 30);
     tiles.push(f && f.avgTarget
       ? { val: f.avgKcal + ' / ' + f.avgTarget, lbl: 'ккал: середнє / ціль',
           trend: f.inTarget + ' із ' + f.withTarget + ' днів у межах ±5%' }
@@ -248,14 +307,14 @@
     // тут була б шумом, а не оглядом (плитки вище — базові чотири осі).
 
     // Середня тривалість тренування — зі знімків часу сесій
-    const ts = PC.timeStats(sn.sessionLog, 30);
+    const ts = PC.timeStats(state.sessionLog, 30);
     if (ts) tiles.push({
       val: durTxt(ts.avgMin), lbl: 'середнє тренування',
       trend: ts.count + ' ' + window.App.plural(ts.count, 'сесія', 'сесії', 'сесій') + ' за 30 днів'
     });
 
     // Нові особисті рекорди за 30 днів
-    const prsNew = PC.prList(sn.weightLog, 30).filter(function (x) { return x.isNew; }).length;
+    const prsNew = PC.prList(state.weightLog, 30).filter(function (x) { return x.isNew; }).length;
     if (prsNew) tiles.push({
       val: '+' + prsNew, lbl: 'PR за 30 днів', trend: 'нові максимуми робочих ваг'
     });
@@ -331,13 +390,13 @@
     const today = todayKey();
     const todayVal = state.bodyLog[today];
     const last = entries.slice(-10).reverse();
-    const withAvg = rolling(entries);
+    const withAvg = rollingCached(entries);
     const avgNow = withAvg.length ? withAvg[withAvg.length - 1].avg : null;
 
     // Тижнева динаміка середньої: те число, з яким порівнюється ціль
     let weekDelta = null;
     if (withAvg.length >= 2) {
-      const weekAgoKey = keyOf(new Date(Date.now() - 7 * 86400000));
+      const weekAgoKey = keyOf(daysAgo(7));
       const older = withAvg.filter(function (e) { return e.key <= weekAgoKey; });
       if (older.length) weekDelta = avgNow - older[older.length - 1].avg;
     }
@@ -1259,7 +1318,7 @@
     let body;
     if (r.state === 'noplan') {
       body = '<p class="small muted mt-1 mb-0">План ще не обрано — оберіть програму на сторінці ' +
-        '<a href="programs.html">«Програми»</a>, і тут зʼявиться відсоток виконання.</p>';
+        '<a href="programs.html">«Плани тренувань»</a>, і тут зʼявиться відсоток виконання.</p>';
     } else if (r.state === 'nodata') {
       body = '<p class="small muted mt-1 mb-0">Ще немає даних. Завершіть перше тренування на сторінці ' +
         '<a href="workout.html">«Тренування»</a> — відсоток рахується з реальних сесій.</p>';
@@ -1515,6 +1574,25 @@
       return '<h3 style="margin:0">Тренування</h3>' +
         '<p class="small mt-1 mb-0">Позначено вручну в календарі — «був у залі», без деталей сесії.</p>';
     }
+    /*
+     * СЕСІЯ Є, РОБОТИ НЕМАЄ (UX-006).
+     *
+     * Кнопка «Завершити» ставить s.end = 1 незалежно від виконання. Такий
+     * день блокує день плану до наступного тижня і саме так підписаний на
+     * головній і на сторінці тренування — а тут читалось «Цього дня
+     * тренування не записано», тобто прямо навпаки. Людина бачила два
+     * різні твердження про один день і не мала способу зрозуміти, чому
+     * план не дає повторити тренування.
+     *
+     * Статистику це не міняє: у trainedDates і в теплокарті день і далі
+     * не тренувальний — роботи справді не було.
+     */
+    if (s && Number(s.end) > 0) {
+      return '<h3 style="margin:0">Тренування</h3>' +
+        '<p class="small mt-1 mb-0">Сесію закрито з нульовим виконанням: жодного підходу не відмічено.</p>' +
+        '<p class="small muted mt-1 mb-0">День плану вважається використаним, ' +
+        'але в статистику й у теплокарту таке тренування не входить.</p>';
+    }
     return '<h3 style="margin:0">Тренування</h3>' +
       '<p class="small muted mt-1 mb-0">Цього дня тренування не записано.</p>';
   }
@@ -1626,9 +1704,14 @@
   /* ------------------------------------------------------------------ */
 
   async function persist(patch) {
+    /* Патч може бути функцією (SYN-011) — вона виконується всередині
+       ланцюга збереження, на актуальному профілі. Для stampRating тут
+       потрібен звичайний обʼєкт, тому рахуємо його на тому, що маємо на
+       екрані: для позначки «факт побачено» цього досить. */
+    const flat = (typeof patch === 'function') ? (patch(state.profile) || {}) : patch;
     // Факт записано тут — тут його й позначаємо побаченим для Rating,
     // інакше він зарахується лише коли (і якщо) людина відкриє «Сьогодні».
-    window.App.stampRating(Object.assign({}, state.profile, patch), patch);
+    window.App.stampRating(Object.assign({}, state.profile, flat), flat);
     try { await Store.saveProfile(patch); }
     catch (e) {
       // .queued означає «мережі немає, лежить у черзі» — це не втрата даних,
@@ -1675,8 +1758,17 @@
           return;
         }
         // Пів кроку побутових ваг: 0,1 кг. Точніші цифри — ілюзія точності.
-        state.bodyLog[todayKey()] = Math.round(v * 10) / 10;
-        persist({ bodyLog: state.bodyLog });
+        const kg = Math.round(v * 10) / 10;
+        const day = todayKey();
+        state.bodyLog[day] = kg;
+        /* Патч — функція (SYN-011): дописуємо один день на актуальному
+           профілі, а не надсилаємо весь журнал, зчитаний колись. Інакше
+           сусідня вкладка втрачала б свої записи цілком. */
+        persist(function (p) {
+          const base = (p && p.bodyLog && typeof p.bodyLog === 'object') ? p.bodyLog : {};
+          const out = Object.assign({}, base); out[day] = kg;
+          return { bodyLog: out };
+        });
         keepFocus(renderWeight);
         toast('Записано', 'ok');
         return;
@@ -1688,7 +1780,13 @@
         // стоїть у щільному рядку впритул до інших елементів.
         if (!window.confirm('Видалити запис ваги за ' + key + '? Відновити його буде нічим.')) return;
         delete state.bodyLog[key];
-        persist({ bodyLog: state.bodyLog });
+        /* Видалення теж адресне: прибираємо один день, решту журналу
+           беремо з актуального профілю. */
+        persist(function (p) {
+          const base = (p && p.bodyLog && typeof p.bodyLog === 'object') ? p.bodyLog : {};
+          const out = Object.assign({}, base); delete out[key];
+          return { bodyLog: out };
+        });
         keepFocus(renderWeight);
         toast('Запис за ' + key + ' видалено', 'ok');
       }

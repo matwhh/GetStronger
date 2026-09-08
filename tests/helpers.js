@@ -17,8 +17,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
  * @param {string[]} files шляхи від кореня проєкту, у порядку залежностей
  * @returns {object} вміст window після виконання
  */
-export function loadModules(files) {
+export function loadModules(files, extras) {
   const sandbox = { window: {}, console, Math, Date, JSON, Number, String, Array, Object };
+  /* Другий аргумент — те, чого в чистому ядрі немає, але без чого частину
+     функцій не перевіриш: наприклад localStorage для денного стану
+     (readDay/writeDay у workout-core.js). Без нього виклик кидає
+     ReferenceError, його ковтає try/catch — і тест мовчки перевіряє лише
+     гілку «стану немає». */
+  Object.assign(sandbox, extras || {});
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   for (const f of files) {

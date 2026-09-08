@@ -18,20 +18,12 @@
      FCP 88 мс → 3068 мс при затримці 3 с). Решта 20 сторінок уже
      завантажували їх так — ця лишалась винятком. -->
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
 <link rel="stylesheet" href="css/style.css">
 <script src="js/agegate.js"></script>
-<script>document.documentElement.className='js';
-try{var _r=document.documentElement,
-_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
-moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
-_t=localStorage.getItem('forge.theme');
-_t=_m[_t]||_t;if(_t==='graphite-amber')_t='';
-if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
-if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
-var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e7e7e7');}
-}catch(e){}</script>
+<script src="js/nosw.js"></script>
+<script src="js/theme-boot.js"></script>
 </head>
 <body>
 

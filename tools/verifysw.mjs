@@ -48,16 +48,6 @@ await p.evaluate(() => navigator.serviceWorker.ready);
 await p.goto(base + 'journal.html', { waitUntil: 'load' });
 await p.waitForTimeout(800);
 
-/* Тепер вимикаємо мережу зовсім і пробуємо відкритись. */
-await ctx.setOffline(true);
-let offlineOk = false, text = '';
-try {
-  await p.goto(base + 'index.html', { waitUntil: 'domcontentloaded' });
-  text = await p.evaluate(() => document.body ? document.body.innerText.length : 0);
-  offlineOk = Number(text) > 0;
-} catch (e) { text = e.message.slice(0, 60); }
-ok('сторінка відкривається без мережі', offlineOk, String(text));
-
 const cached = await p.evaluate(async () => {
   const ks = await caches.keys();
   if (!ks.length) return 0;
@@ -66,7 +56,42 @@ const cached = await p.evaluate(async () => {
 });
 ok('у кеші є файли', cached > 0, String(cached));
 
-await ctx.setOffline(false);
+/*
+ * ОФЛАЙН ГЛУШИМО СЕРВЕРОМ, А НЕ setOffline (PWA-004).
+ *
+ * BrowserContext.setOffline() у Playwright не вимикає мережу для service
+ * worker: він ходить у мережу зі свого контексту. Тому попередня версія
+ * цієї перевірки насправді відкривала сторінку З МЕРЕЖІ — і worker, який
+ * фізично не здатний працювати офлайн, проходив усі три перевірки.
+ *
+ * Зупинений сервер не бреше нікому: ні сторінці, ні worker-у.
+ */
+await new Promise((r) => { srv.closeAllConnections(); srv.close(r); });
+
+let offlineOk = false, why = '';
+try {
+  await p.goto(base + 'index.html', { waitUntil: 'domcontentloaded' });
+  const st = await p.evaluate(() => ({
+    len: document.body ? document.body.innerText.length : 0,
+    store: typeof window.Store !== 'undefined',
+    title: document.title
+  }));
+  /* Довжина тексту сама по собі нічого не доводить: сторінка помилки теж
+     непорожня. Потрібен саме застосунок — тобто window.Store. */
+  offlineOk = st.len > 0 && st.store;
+  why = JSON.stringify(st);
+} catch (e) { why = e.message.slice(0, 80); }
+ok('сторінка відкривається без мережі й Store на місці', offlineOk, why);
+
+/* Незакешована адреса має давати чесну сторінку «немає звʼязку», а не
+   мовчазну підміну на index.html під запитаною адресою (PWA-005). */
+let offPage = '';
+try {
+  await p.goto(base + 'no-such-page.html', { waitUntil: 'domcontentloaded' });
+  offPage = await p.evaluate(() => document.title + '|' + (document.body ? document.body.innerText.slice(0, 40) : ''));
+} catch (e) { offPage = 'ERR ' + e.message.slice(0, 60); }
+ok('незакешована адреса дає сторінку «немає звʼязку»', /звʼязку/i.test(offPage), offPage);
+
 await b.close();
 srv.close();
 const bad = R.filter(x => !x).length;

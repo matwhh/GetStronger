@@ -1729,6 +1729,24 @@
     });
   }
 
+  /*
+   * Показати в конкретному полі рівно те, що збережено (UX-005).
+   *
+   * syncWeightInputs навмисно не чіпає поле у фокусі — інакше воно
+   * перебивало б набір. Але після події change набір уже завершено, і
+   * саме те поле мусить показати збережене значення: нормалізований
+   * запис (80,5 замість 80.50), обрізаний до межі, а при нечисловому
+   * вводі — попереднє число замість набраного тексту. Без цього
+   * «абв» лишалось у полі, у профілі — стара вага, і жодного слова.
+   */
+  function showStoredWeight(dayIdx, i) {
+    const el = document.querySelector(
+      '[data-act="weight"][data-day="' + dayIdx + '"][data-i="' + i + '"]');
+    if (!el) return;
+    const w = weightOf({ name: el.dataset.name });
+    el.value = w === null ? '' : window.App.fmtNum.kg(w);
+  }
+
   function syncWeightInputs(name) {
     $$('[data-act="weight"]').forEach(function (el) {
       if (name && el.dataset.name !== name) return;
@@ -1768,7 +1786,20 @@
     const snap = act === 'weight'
       ? null
       : JSON.stringify({ p: state.programId, d: state.days, plan: state.plan });
-    if (!applyEdit(act, dayIdx, i, value)) return;
+    if (!applyEdit(act, dayIdx, i, value)) {
+      /*
+       * Правку не прийнято. Для ваги це видно лише тут: поле лишалося з
+       * набраним текстом, у профілі — старе число, повідомлення не було
+       * взагалі (UX-005). Повертаємо поле до збереженого і кажемо межі.
+       */
+      if (act === 'weight') {
+        if (String(value == null ? '' : value).trim() !== '') {
+          toast('Робоча вага — число від 0 до 500 кг', 'err');
+        }
+        showStoredWeight(dayIdx, i);
+      }
+      return;
+    }
     if (snap) {
       undoStack.push(snap);
       if (undoStack.length > UNDO_MAX) undoStack.shift();
@@ -1795,6 +1826,16 @@
     // Натомість руками синхронізуємо решту полів цієї ж вправи в інших днях.
     if (act === 'weight') {
       syncWeightInputs(state.plan[dayIdx].exercises[i].name);
+      /* Поле, у якому щойно набрали, sync пропускає (воно ще у фокусі при
+         change з Enter) — показуємо в ньому збережене число саме тут. */
+      showStoredWeight(dayIdx, i);
+      /* Число поза межами мовчки обрізалось до 0–500: у полі лишалось
+         900, у профілі — 500. Тепер про обрізання кажемо вголос. */
+      const raw = String(value == null ? '' : value).trim().replace(',', '.');
+      const n = Number(raw);
+      if (raw !== '' && Number.isFinite(n) && (n < 0 || n > 500)) {
+        toast('Робоча вага — від 0 до 500 кг', 'err');
+      }
       /* Перша збережена вага завершує онбординг — банер має це сказати. */
       updateOnboardBanner();
     }
@@ -2130,7 +2171,9 @@
           refresh();
           return;
         }
-        state.active = { programId: state.programId, days: state.days };
+        /* days — ціле число: дробове валить серверний elo_planned_for
+           при першому дотику кожного нового тижня (ELO-003). */
+        state.active = { programId: state.programId, days: Math.round(Number(state.days) || 0) };
         saveOwn({
           activePlan: state.active,
           programId: state.programId,

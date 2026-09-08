@@ -388,9 +388,29 @@
       });
     }
 
+    /*
+     * НАБІР ОБʼЄКТІВ — ЦЕ @graph, А НЕ МАСИВ.
+     *
+     * Голий масив не має @context на верхньому рівні й не є валідним
+     * JSON-LD. Він зʼявлявся рівно на трьох сторінках (calculator,
+     * nutrition, cardio) — і саме звідти в Sentry три однакові
+     * TypeError: undefined is not an object (evaluating
+     * 'r["@context"].toLowerCase') (WEB-007). Змінна навіть зветься graph,
+     * але @graph не писався.
+     *
+     * Усередині @graph власний @context кожного обʼєкта зайвий: він один
+     * на весь документ.
+     */
     const el = document.createElement('script');
     el.type = 'application/ld+json';
-    el.textContent = JSON.stringify(graph.length === 1 ? graph[0] : graph);
+    el.textContent = JSON.stringify(graph.length === 1 ? graph[0] : {
+      '@context': 'https://schema.org',
+      '@graph': graph.map(function (o) {
+        const copy = Object.assign({}, o);
+        delete copy['@context'];
+        return copy;
+      })
+    });
     document.head.appendChild(el);
   }
 
@@ -739,7 +759,14 @@
     function paint() {
       const S = window.Store;
       if (!S || typeof S.pendingCount !== 'function') { el.hidden = true; return; }
-      const n = S.pendingCount();
+      /*
+       * «Є незіслані зміни» має ДВА джерела: чергу і позначку
+       * ib.profile.dirty. Позначка читала лише чергу (SYN-019) — а всі
+       * HTTP-помилки запису (400, 401, 403, 409, 429, 500) лишають чергу
+       * порожньою і ставлять саме dirty. Тобто рівно тоді, коли попередити
+       * треба найбільше, значок мовчав.
+       */
+      const n = (typeof S.unsyncedCount === 'function') ? S.unsyncedCount() : S.pendingCount();
       const offline = navigator.onLine === false;
 
       // Офлайн без черги — не проблема: локальний режим і так пише в
@@ -1595,16 +1622,10 @@
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
 
-    if (location.search.indexOf('nosw=1') !== -1) {
-      navigator.serviceWorker.getRegistrations().then(function (rs) {
-        rs.forEach(function (r) { r.unregister(); });
-      }).catch(function () {});
-      if (window.caches && caches.keys) {
-        caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); })
-          .catch(function () {});
-      }
-      return;
-    }
+    /* Сам вимикач переїхав у js/nosw.js: він має працювати й тоді, коли
+       зіпсовано саме цей файл або сам worker (PWA-006). Тут лишається
+       рівно одне — не реєструвати worker назад у тому ж завантаженні. */
+    if (window.__forgeNoSW || location.search.indexOf('nosw=1') !== -1) return;
 
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').catch(function (e) {
@@ -1704,6 +1725,29 @@
     rescue((e && e.message) || 'помилка виконання');
   });
 
+  /*
+   * Локальний профіль не прочитався — сказати про це вголос.
+   *
+   * Раніше нечитабельний ib.profile мовчки замінювався порожнім бланком, і
+   * перше ж автозбереження затирало сирі байти. Людина бачила застосунок
+   * без жодного свого тренування і без пояснень (LOC-001). Тепер Store
+   * відкладає вміст під ib.profile.corrupt.<час>, а тут — єдине місце, де
+   * це видно людині.
+   */
+  function warnCorruptProfile() {
+    if (!window.Store || typeof Store.corruptProfile !== 'function') return;
+    const c = Store.corruptProfile();
+    if (!c.found) return;
+    /* Один раз на вкладку: банер на кожній навігації — це вже не
+       попередження, а шум. */
+    try {
+      if (sessionStorage.getItem('ib.corrupt.seen') === '1') return;
+      sessionStorage.setItem('ib.corrupt.seen', '1');
+    } catch (_) {}
+    toast('Дані в цьому браузері не прочитались — застосунок відкрито з порожнім профілем. ' +
+          'Пошкоджену копію збережено; якщо у вас є хмарний акаунт, увійдіть — дані приїдуть звідти.', 'err');
+  }
+
   function boot() {
     /*
      * Кожен крок окремо. Падіння одного не має забирати з собою решту:
@@ -1712,7 +1756,7 @@
      */
     [buildNav, buildFooter, function () { initReveal(document); }, injectCanonical,
      function () { initAccordions(document); }, initCardGlow, injectJsonLd,
-     adoptProfileTheme]
+     adoptProfileTheme, warnCorruptProfile]
       .forEach(function (step) {
         try { step(); } catch (e) { console.error('[app] крок ініціалізації впав:', e); }
       });

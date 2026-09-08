@@ -119,11 +119,131 @@ describe('скидання ваг', () => {
     assert.equal(after['Махи з гантелями стоячи'], 9);
   });
 
-  it('не чіпає порожні й некоректні значення', () => {
+  it('некоректні значення викидає, а не «якось» обробляє', () => {
+    /*
+     * TST-013: тут стояло `after[k] === undefined || !Number.isFinite(...) ||
+     * after[k] === 0 || after[k] === null` — тобто приймалось майже будь-що,
+     * включно з мовчазним нулем замість ваги. Точний вихід: непридатні
+     * значення з мапи ЗНИКАЮТЬ (їх не можна ні показати, ні порахувати),
+     * придатні — зменшуються з кроком 2,5 кг.
+     */
+    /* Порівнюємо через join: обʼєкти з пісочниці vm мають інший прототип,
+       і deepStrictEqual падає навіть на однакових даних. */
     const after = P.applyDeload({ a: null, b: 0, c: 'abc', d: 100 }, 10);
+    assert.equal(Object.keys(after).sort().join(','), 'd', 'мали лишитись лише придатні ваги');
     assert.equal(after.d, 90);
-    for (const k of ['a', 'b', 'c']) {
-      assert.ok(after[k] === undefined || !Number.isFinite(after[k]) || after[k] === 0 || after[k] === null);
-    }
+
+    const edge = P.applyDeload({ x: -5, y: NaN, z: '80' }, 10);
+    assert.equal(Object.keys(edge).sort().join(','), 'z', 'відʼємне і NaN мали зникнути');
+    assert.equal(edge.z, 70, 'рядок «80» читається як число і ріжеться до кроку 2,5');
+
+    assert.equal(Object.keys(P.applyDeload({}, 10)).length, 0);
+  });
+});
+
+/*
+ * Побудова циклу, оцінка 1ПМ і підвищення (TST-007).
+ *
+ * Покриття було 58 %, і виживали три мутанти: знята стеля інтенсивності за
+ * типом вправи (ізоляція йшла б до 90 % від 1ПМ замість 75 — це вже травма,
+ * а не тренування), проігнорований заморожений 1ПМ (цикл «пливе» посеред
+ * себе, щойно змінилась робоча вага) і RIR без стелі 5 (оцінка 1ПМ
+ * задирається як завгодно високо).
+ */
+describe('buildCycle: стеля інтенсивності', () => {
+  const ISO = { name: 'Махи гантелями в сторони', reps: '12–15', rir: 2, lift: 'isolation' };
+  const COMP = { name: 'Присідання зі штангою', reps: '5', rir: 2, lift: 'compound' };
+  const w = (name) => (name === COMP.name ? 100 : 10);
+
+  it('ізоляція не піднімається вище 75 % від 1ПМ', () => {
+    const c = P.buildCycle({ weeks: 6 }, [ISO], w, {});
+    const row = c.rows[0];
+    assert.equal(row.kind, 'isolation');
+    assert.equal(row.ceiling, 75);
+    row.cells.forEach(function (cell, i) {
+      assert.ok(cell.pct <= 75, 'тиждень ' + (i + 1) + ': ' + cell.pct + ' %');
+    });
+    assert.ok(row.cells.some(function (cell) { return cell.capped; }),
+      'на важких тижнях стеля має спрацьовувати, інакше тест нічого не стереже');
+  });
+
+  it('база доходить до 95 %, але не вище', () => {
+    const c = P.buildCycle({ weeks: 6 }, [COMP], w, {});
+    const row = c.rows[0];
+    assert.equal(row.kind, 'compound');
+    assert.equal(row.ceiling, 95);
+    row.cells.forEach(function (cell) { assert.ok(cell.pct <= 95, String(cell.pct)); });
+  });
+
+  it('заморожений 1ПМ важливіший за книгу ваг', () => {
+    /* Інакше цикл «попливе» посеред себе: змінилась робоча вага або
+       спрацював деслоуд — і всі тижні перерахувались. */
+    const c = P.buildCycle({ weeks: 4, oneRM: { [COMP.name]: 200 } }, [COMP], w, {});
+    assert.equal(c.rows[0].oneRM, 200);
+    assert.equal(c.rows[0].source, 'frozen');
+  });
+
+  it('вправа без ваги й без рекорду пропускається, а не рахується з нуля', () => {
+    const c = P.buildCycle({ weeks: 4 }, [COMP], function () { return null; }, {});
+    /* Масиви з пісочниці vm мають інший Array.prototype — порівнюємо вміст. */
+    assert.equal(c.rows.length, 0);
+    assert.equal(c.skipped.join(','), COMP.name);
+  });
+});
+
+describe('estimateOneRM і midReps', () => {
+  it('середина діапазону повторень', () => {
+    assert.equal(P.midReps('6–8'), 7);
+    assert.equal(P.midReps('8'), 8);
+    assert.equal(P.midReps('10-12'), 11);
+    assert.equal(P.midReps('30 с'), 30, 'число є — беремо його');
+    assert.equal(P.midReps('—'), null);
+    assert.equal(P.midReps(null), null);
+  });
+
+  it('виміряний рекорд важливіший за оцінку', () => {
+    const ex = { name: 'Присідання зі штангою', reps: '5', rir: 2 };
+    const est = P.estimateOneRM(ex, 100, { squat: 180 });
+    assert.equal(est.value, 180);
+    assert.equal(est.source, 'record');
+  });
+
+  it('RIR має стелю 5: недосяжний запас не задирає 1ПМ як завгодно', () => {
+    const ex = (rir) => ({ name: 'Вправа без рекорду', reps: '5', rir: rir });
+    const a = P.estimateOneRM(ex(5), 100, {});
+    const b = P.estimateOneRM(ex(20), 100, {});
+    assert.equal(a.value, b.value, 'RIR 20 має рахуватись як 5');
+    const c = P.estimateOneRM(ex(0), 100, {});
+    assert.ok(c.value < a.value, 'без запасу оцінка 1ПМ нижча');
+  });
+
+  it('без ваги й без рекорду — нічого', () => {
+    assert.equal(P.estimateOneRM({ name: 'X', reps: '5' }, null, {}), null);
+    assert.equal(P.estimateOneRM({ name: 'X', reps: '5' }, 0, {}), null);
+    assert.equal(P.estimateOneRM(null, 100, {}), null);
+  });
+});
+
+describe('applyRaise — дзеркало applyDeload', () => {
+  it('підвищення й скидання симетричні за формою', () => {
+    const base = { 'Жим': 100, 'Присідання': 140 };
+    const up = P.applyRaise(base, 10);
+    const down = P.applyDeload(base, 10);
+    assert.ok(up['Жим'] > base['Жим'], 'підвищення піднімає');
+    assert.ok(down['Жим'] < base['Жим'], 'скидання опускає');
+    /* Обидва округлюють ВНИЗ до кроку млинців: обіцяно «плюс 10 %», а не
+       «плюс 10 % і трохи зверху». */
+    assert.ok(up['Жим'] <= base['Жим'] * 1.1 + 1e-9, 'не більше за обіцяне');
+    assert.ok(down['Жим'] <= base['Жим'] * 0.9 + 1e-9);
+  });
+
+  it('нуль відсотків нічого не міняє', () => {
+    const base = { 'Жим': 100 };
+    assert.equal(P.applyRaise(base, 0)['Жим'], 100);
+  });
+
+  it('чужі значення не псують книгу ваг', () => {
+    const out = P.applyRaise({ 'Жим': 100, 'Сміття': 'ой' }, 10);
+    assert.ok(Number.isFinite(out['Жим']));
   });
 });

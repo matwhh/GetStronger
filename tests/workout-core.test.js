@@ -158,3 +158,125 @@ describe('workout-core: блокування завершених сесій', (
     assert.equal(WC.completedToday(null, '2026-09-03'), null);
   });
 });
+
+/*
+ * Денний стан: readDay / writeDay / clampDay.
+ *
+ * TST-010: жоден тест не виконував ці функції — виживав мутант, у якому
+ * readDay віддає стан ІНШОЇ дати. Наслідок був би тихий і дорогий:
+ * учорашні закриті підходи показувались би як сьогоднішні й поїхали б у
+ * сьогоднішній ELO-сабміт. Тому тут перевіряється саме межа дня і межа
+ * плану, а не рендер.
+ */
+describe('workout-core: денний стан', () => {
+  const P = { activePlan: { programId: 'fullbody', days: 3 } };
+
+  /* Масиви з пісочниці vm мають ІНШИЙ Array.prototype, ніж масиви тесту,
+     тому deepStrictEqual на них падає навіть при однаковому вмісті.
+     Порівнюємо вміст, а не походження обʼєкта. */
+  const same = (a, b, msg) => assert.equal(JSON.stringify(a), JSON.stringify(b), msg);
+
+  function fresh() {
+    const store = new Map();
+    const ls = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k)
+    };
+    const c = loadModules(['js/exercises.js', 'js/workout-core.js'], { localStorage: ls });
+    return { W: c.WorkoutCore, ls: ls };
+  }
+
+  it('той самий план і та сама дата — стан повертається як є', () => {
+    const { W } = fresh();
+    W.writeDay(P, '2026-08-01', 1, [3, 2, 0]);
+    const d = W.readDay(P, '2026-08-01', 3);
+    assert.equal(d.fresh, false);
+    assert.equal(d.dayIdx, 1);
+    same(d.done, [3, 2, 0]);
+  });
+
+  it('інша дата — стан НЕ переноситься, а день пропонується наступний', () => {
+    /* Саме тут і жив мутант: віддати вчорашні галочки сьогодні. */
+    const { W } = fresh();
+    W.writeDay(P, '2026-08-01', 1, [3, 2, 0]);
+    const d = W.readDay(P, '2026-08-02', 3);
+    assert.equal(d.fresh, true, 'новий день має бути свіжим');
+    same(d.done, [], 'жодної галочки з учора');
+    assert.equal(d.dayIdx, 2, 'підказка — наступний день плану');
+  });
+
+  it('після останнього дня плану підказка йде по колу', () => {
+    const { W } = fresh();
+    W.writeDay(P, '2026-08-01', 2, [1]);
+    assert.equal(W.readDay(P, '2026-08-02', 3).dayIdx, 0);
+  });
+
+  it('інший план — стан чужий, починаємо з першого дня', () => {
+    const { W } = fresh();
+    W.writeDay(P, '2026-08-01', 2, [3, 3, 3]);
+    const other = { activePlan: { programId: 'upperlower', days: 4 } };
+    const d = W.readDay(other, '2026-08-01', 4);
+    assert.equal(d.fresh, true);
+    same(d.done, []);
+    assert.equal(d.dayIdx, 0, 'чужий стан не дає підказки');
+  });
+
+  it('зіпсований запис не валить читання', () => {
+    const { W, ls } = fresh();
+    ls.setItem(W.LS_TODAY, 'не json');
+    const d = W.readDay(P, '2026-08-01', 3);
+    assert.equal(d.fresh, true);
+    same(d.done, []);
+  });
+
+  it('індекс дня завжди в межах плану', () => {
+    const { W } = fresh();
+    assert.equal(W.clampDay(99, 3), 2);
+    assert.equal(W.clampDay(-5, 3), 0);
+    assert.equal(W.clampDay(1, 0), 0, 'плану немає — нема чого обмежувати');
+    assert.equal(W.clampDay('ой', 3), 0);
+  });
+
+  it('переповнене сховище не валить запис дня', () => {
+    const { W } = fresh();
+    const c = loadModules(['js/exercises.js', 'js/workout-core.js'], {
+      localStorage: { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); } }
+    });
+    assert.doesNotThrow(() => c.WorkoutCore.writeDay(P, '2026-08-01', 0, [1]));
+  });
+});
+
+describe('resolvePlan: битий день не валить сторінку (WEB-012)', () => {
+  const PROGRAMS = [{
+    id: 'test', name: 'Тест',
+    days: { '3': [{ title: 'A', exercises: [{ name: 'Жим', sets: 3, reps: '8' }] }] }
+  }];
+  const base = { activePlan: { programId: 'test', days: 3 }, sex: 'male', trainingAge: 'inter' };
+
+  it('день без exercises стає днем із порожнім списком', () => {
+    /*
+     * customPlans редагується імпортом і живе в localStorage. День, у
+     * якого масив вправ лежить під іншим іменем поля, давав TypeError і
+     * лишав три сторінки порожніми — вони не лікували себе самі, бо биті
+     * дані вже в профілі.
+     */
+    const p = Object.assign({}, base, {
+      customPlans: { 'test:3': [{ title: 'A' }, { title: 'B', exercises: null }, 'зовсім не день'] }
+    });
+    const r = WC.resolvePlan(p, PROGRAMS);
+    assert.ok(r, 'план має відкритись');
+    assert.equal(r.plan.length, 3);
+    r.plan.forEach(function (d, i) {
+      assert.ok(Array.isArray(d.exercises), 'день ' + i + ' без масиву вправ');
+      assert.equal(d.exercises.length, 0);
+    });
+  });
+
+  it('справжній план не змінюється', () => {
+    const r = WC.resolvePlan(base, PROGRAMS);
+    assert.equal(r.plan.length, 1);
+    assert.equal(r.plan[0].exercises.length, 1);
+    assert.equal(r.plan[0].title, 'A');
+  });
+});

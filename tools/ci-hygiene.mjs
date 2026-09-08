@@ -138,6 +138,130 @@ if (existsSync('js/config.js')) {
   }
 }
 
+/* ---- 7. Оболонка service worker покриває скрипти index.html ---------- */
+//
+// Офлайн одразу після встановлення показував шапку й заголовок без
+// window.Store: у SHELL лежало шість файлів, а index.html підключає 21
+// скрипт (PWA-013). Екран виглядав робочим і не працював — мовчки.
+// Перелік легко розʼїжджається знову, тому його звіряє машина.
+if (existsSync('sw.js') && existsSync('index.html')) {
+  const sw = readFileSync('sw.js', 'utf8');
+  const shell = new Set((sw.match(/const SHELL = \[([\s\S]*?)\];/) || [, ''])[1]
+    .match(/'([^']+)'/g) || []);
+  const have = new Set([...shell].map((x) => x.replace(/'/g, '').replace(/^\.\//, '')));
+  const want = (readFileSync('index.html', 'utf8').match(/src="([^"]+)"/g) || [])
+    .map((x) => x.slice(5, -1))
+    .filter((x) => !/^https?:/.test(x));
+  /* js/nosw.js навмисно поза кешем: аварійний вимикач має приїжджати з
+     мережі, інакше він ділить долю зіпсованого worker-а (PWA-006). */
+  const OFF_SHELL = new Set(['js/nosw.js']);
+  for (const src of want) {
+    if (OFF_SHELL.has(src)) {
+      if (have.has(src)) fail(`sw.js: ${src} не має лежати в SHELL — це аварійний вимикач`);
+      continue;
+    }
+    if (!have.has(src)) {
+      fail(`sw.js: у SHELL немає ${src}, який підключає index.html — офлайн після встановлення буде неповним`);
+    }
+  }
+}
+
+/* ---- 8. Барʼєр NOT_APPROVED не зникає з db/*.sql --------------------- */
+//
+// INV-002 / DB-013: у бойовій базі elo_state, elo_activate_grace, elo_submit
+// та інші RPC мають перевірку is_approved — вона приїхала міграціями
+// elo_approved_guard. А у файлах db/ її не було. Тобто виконання файла «щоб
+// оновити функції» ЗНІМАЛО перевірку з продакшену: непідтверджений акаунт
+// отримував доступ до сезонних RPC. Помітити це можна було тільки запитом
+// до бази — тепер помічає CI.
+//
+// Джерело правди — db/live-schema.sql (знімок бойової схеми). Якщо функція
+// має барʼєр там, вона мусить мати його в кожному файлі db/, який її
+// перевизначає.
+if (existsSync('db/live-schema.sql')) {
+  const live = readFileSync('db/live-schema.sql', 'utf8');
+  /* Межа тіла — початок НАСТУПНОЇ функції. Шукати роздільник $function$
+     ненадійно: частина функцій у знімку однорядкові, і він стоїть у тому
+     самому рядку, що й тіло. */
+  const heads = [...live.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\(/g)];
+  const guarded = new Set();
+  heads.forEach((m, i) => {
+    const end = i + 1 < heads.length ? heads[i + 1].index : live.length;
+    if (live.slice(m.index, end).includes('NOT_APPROVED')) guarded.add(m[1]);
+  });
+  for (const f of tracked.filter((x) => x.startsWith('db/') && x.endsWith('.sql') && x !== 'db/live-schema.sql')) {
+    const src = readFileSync(f, 'utf8');
+    const defs = [...src.matchAll(/create or replace function public\.(\w+)\s*\(/gi)];
+    defs.forEach((g, i) => {
+      if (!guarded.has(g[1])) return;
+      const end = i + 1 < defs.length ? defs[i + 1].index : src.length;
+      const body = src.slice(g.index, end);
+      if (!body.includes('NOT_APPROVED')) {
+        fail(`${f}: public.${g[1]} без перевірки is_approved, хоча в базі вона є — ` +
+             'виконання цього файла зніме барʼєр із продакшену');
+      }
+    });
+  }
+}
+
+/* ---- 9. Жодного inline-JS у розмітці --------------------------------- */
+//
+// WEB-006: щоб працював inline-скрипт теми і onload="this.media='all'" на
+// шрифтах, у CSP доводилось тримати script-src 'unsafe-inline'. А це рівно
+// та директива, яка дозволяє <img src=x onerror=…> — робочу форму єдиного
+// знайденого XSS-синка (WEB-002). Код винесено у js/theme-boot.js та
+// сусідні файли, 'unsafe-inline' прибрано. Один необережно доданий
+// onclick= поверне діру — і без цієї перевірки це помітить лише аудит.
+{
+  const INLINE = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+  const HANDLER = /\son[a-z]+\s*=\s*"/g;
+  for (const f of tracked.filter((x) => x.endsWith('.html'))) {
+    const html = readFileSync(f, 'utf8');
+    let m;
+    INLINE.lastIndex = 0;
+    while ((m = INLINE.exec(html))) {
+      if (m[1].trim()) fail(`${f}: inline <script> — через нього CSP потребує 'unsafe-inline'`);
+    }
+    HANDLER.lastIndex = 0;
+    while ((m = HANDLER.exec(html))) {
+      fail(`${f}: обробник у розмітці (${m[0].trim()}…) — те саме 'unsafe-inline'`);
+    }
+  }
+  if (existsSync('vercel.json')) {
+    const csp = (readFileSync('vercel.json', 'utf8').match(/script-src[^;"]*/) || [''])[0];
+    if (csp.includes('unsafe-inline')) fail("vercel.json: script-src знову дозволяє 'unsafe-inline'");
+    if (csp.includes('unsafe-eval')) fail("vercel.json: script-src дозволяє 'unsafe-eval'");
+  }
+}
+
+/* ---- 10. Баланс ELO не виходить за межі CHECK у базі ----------------- */
+//
+// DB-005: коментарі стверджують, що баланс міняється одним UPDATE
+// elo_config. Але дві межі продубльовані в CHECK: season_state.elo <= 2500
+// і grace_used <= 2. Підняти seasonMax до 3000 або graceWeeksPerSeason до 3
+// «одним UPDATE» можна — помилки не буде одразу, вона вилізе пізніше як
+// 23514 всередині elo_submit або elo_activate_grace, у людини під час
+// звичайної дії. Тут це ловиться до публікації.
+//
+// Джерело правди про межі — db/live-schema.sql (знімок бойової схеми).
+if (existsSync('db/elo-config.json') && existsSync('db/live-schema.sql')) {
+  const cfg = JSON.parse(readFileSync('db/elo-config.json', 'utf8'));
+  const live = readFileSync('db/live-schema.sql', 'utf8');
+  const bound = (re) => {
+    const m = live.match(re);
+    return m ? Number(m[1]) : null;
+  };
+  const eloMax = bound(/season_state_elo_check CHECK \(\(\(elo >= 0\) AND \(elo <= (\d+)\)\)\)/);
+  const graceMax = bound(/season_state_grace_used_check CHECK \(\(\(grace_used >= 0\) AND \(grace_used <= (\d+)\)\)\)/);
+  if (eloMax !== null && Number(cfg.seasonMax) > eloMax) {
+    fail(`db/elo-config.json: seasonMax ${cfg.seasonMax} більший за CHECK у базі (${eloMax}) — ` +
+         'підняти можна лише міграцією, інакше 23514 вилізе в людини під час дії');
+  }
+  if (graceMax !== null && Number(cfg.graceWeeksPerSeason) > graceMax) {
+    fail(`db/elo-config.json: graceWeeksPerSeason ${cfg.graceWeeksPerSeason} більший за CHECK у базі (${graceMax})`);
+  }
+}
+
 /* ---- підсумок -------------------------------------------------------- */
 if (problems.length) {
   console.error('Гігієна репозиторію — знайдено проблеми:\n');

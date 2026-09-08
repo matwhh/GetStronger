@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Акаунт — FORGE</title>
-<meta name="description" content="Усі дані профілю в одному місці: антропометрія, мета, активність, стаж, пульс і рекорди 1ПМ. Зміни підхоплює решта сайту.">
+<meta name="description" content="Усі дані профілю в одному місці: антропометрія, мета, активність, стаж і пульс. Зміни підхоплює решта сайту.">
 <!-- Картка для месенджерів і соцмереж. og:url і canonical додає
      js/app.js, коли в config.js заповнено siteUrl: без домену
      абсолютне посилання все одно було б неправильним. -->
@@ -49,29 +49,15 @@
      не чекає на нього), а після завантаження перемикається на all.
      Без JS спрацьовує noscript-запасний варіант. -->
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
 <!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
      має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
      Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
 <script src="js/agegate.js"></script>
 <link rel="stylesheet" href="css/style.css">
-<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
-   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
-   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
-   інакше при кожному переході блимала б типова графітова темна перед
-   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
-   скрипт відпрацьовує раніше за app.js. */
-document.documentElement.className='js';
-try{var _r=document.documentElement,
-_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
-moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
-_t=localStorage.getItem('forge.theme');
-_t=_m[_t]||_t;if(_t==='graphite-amber')_t='';
-if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
-if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
-var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e7e7e7');}
-}catch(e){}</script>
+<script src="js/nosw.js"></script>
+<script src="js/theme-boot.js"></script>
 
 </head>
 <body>
@@ -112,7 +98,7 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
             <h3 class="card__title">Що зберігається</h3>
             <p class="small">
               Стать, вік, зріст, вага, відсоток жиру, рівень активності, обрана програма,
-              кількість днів у залі, мета й рекорди 1ПМ. Крім них — усе, що ви самі
+              кількість днів у залі й мета. Крім них — усе, що ви самі
               вносите на сторінках: <strong>журнал ваги тіла й дати тренувань</strong>
               (це історія, вона накопичується), <strong>робочі ваги</strong>,
               <strong>відредаговані плани</strong>, <strong>власні рецепти</strong> та

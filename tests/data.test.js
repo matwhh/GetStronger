@@ -27,11 +27,28 @@ describe('групи мʼязів', () => {
   });
 
   it('стеля обʼєму відповідає розміру групи', () => {
+    /*
+     * TST-013: тут стояло assert.equal(m.cap ?? VOLUME_CAP[m.size], expected),
+     * де expected — той самий вираз. Тавтологія: тест проходив за будь-яких
+     * чисел, у тому числі за розсинхронізованих. Тепер числа названі явно —
+     * зміна VOLUME_CAP має бути свідомою і видимою в diff.
+     */
+    assert.equal(VOLUME_CAP.large, 14, 'стеля великої групи');
+    assert.equal(VOLUME_CAP.small, 12, 'стеля малої групи');
     for (const m of MUSCLES) {
-      const expected = m.cap != null ? m.cap : VOLUME_CAP[m.size];
-      assert.equal(m.cap ?? VOLUME_CAP[m.size], expected);
-      assert.ok(expected > 0 && expected <= 30, `стеля ${m.id} = ${expected}`);
+      assert.equal(typeof m.cap, 'number', `група ${m.id}: cap не число`);
+      assert.ok(m.cap <= VOLUME_CAP[m.size],
+        `група ${m.id}: cap ${m.cap} більший за стелю розміру ${VOLUME_CAP[m.size]}`);
+      assert.ok(m.cap > 0, `група ${m.id}: cap ${m.cap}`);
     }
+    /* Явний cap — виняток для окремої групи. Поки винятків немає, кожна
+       група має рівно стелю свого розміру; поява винятку має бути помітною. */
+    /* Порівнюємо довжину, а не масиви: MUSCLES приходить із пісочниці vm,
+       і в його похідних масивів інший прототип — deepStrictEqual падає
+       навіть на двох порожніх. */
+    const custom = MUSCLES.filter((m) => m.cap !== VOLUME_CAP[m.size]).map((m) => m.id);
+    assert.equal(custom.length, 0,
+      'зʼявились групи з власною стелею (' + custom.join(', ') + ') — це свідоме рішення?');
   });
 });
 

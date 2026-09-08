@@ -1,5 +1,9 @@
 /**
- * Віковий гейт: 18+ як умова доступу, а не як екран.
+ * Віковий гейт: 17+ як умова доступу, а не як екран.
+ *
+ * Межа саме 17, а не 18: AgeCore.MIN_AGE = 17, те саме число в
+ * register_request (сервер) і в legal.html. У шапці цього файла колись
+ * стояло «18+» — INV-010.
  *
  * Найважливіше тут — не те, що екран малюється, а те, що його не можна
  * обійти: прямим URL, історією, перезавантаженням, підробленим
@@ -79,9 +83,23 @@ async function toAge(p) {
     await p.evaluate(() => { try { sessionStorage.removeItem('ib.gateloop'); } catch (_) {} });
     await p.goto('file://' + ROOT + '/' + f, { waitUntil: 'load' });
     await p.waitForTimeout(160);
+    /*
+     * account.html — свідомий виняток у ЧИСТОМУ браузері (LOC-005): це
+     * єдиний інтерфейс імпорту резервної копії, і без нього відновитися з
+     * власного експорту неможливо саме тоді, коли це й потрібно. Профіль
+     * із дитячою датою вона так само не пускає — це перевірка 3 нижче.
+     */
+    if (f === 'account.html') continue;
     if (page(p.url()) !== 'welcome.html') bad.push(f + '→' + page(p.url()));
   }
-  ok('1. усі ' + PAGES.length + ' сторінок ведуть на гейт (прямий URL)', bad.length === 0, bad.join(', '));
+  ok('1. усі ' + (PAGES.length - 1) + ' сторінок ведуть на гейт (прямий URL)', bad.length === 0, bad.join(', '));
+
+  /* Зворотний бік того самого правила: імпорт має бути досяжним. */
+  await p.evaluate(() => { try { sessionStorage.removeItem('ib.gateloop'); } catch (_) {} });
+  await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
+  await p.waitForTimeout(160);
+  ok('1. account.html досяжний у чистому браузері — там імпорт копії',
+     page(p.url()) === 'account.html', page(p.url()));
 
   await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
   await toAge(p);
@@ -321,6 +339,62 @@ for (const w of [320, 390, 430]) {
   ok(w + 'px: кнопка ≥ 44px', m.btn >= 44, m.btn + 'px');
   ok(w + 'px: екран вміщається без скролу', m.fits);
   ok(w + 'px: без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 8. Токен з листа й запобіжник циклів ---- */
+{
+  /*
+   * WEB-009. Фрагмент #access_token=… споживає лише welcome.js. Коли
+   * сторож нікуди не редиректить (профіль повний), він лишався в адресному
+   * рядку й у записі історії назавжди — у скріншоті, у «поділитися», у
+   * синхронізації вкладок.
+   */
+  const { ctx, p } = await fresh(adultProfile());
+  /* Сторож редиректить із <head>, тому 'load' може не настати ніколи:
+     чекаємо лише на початок навігації і даємо йому відпрацювати. */
+  await p.goto('file://' + ROOT + '/index.html#access_token=STOLEN&refresh_token=r&type=signup',
+               { waitUntil: 'commit' }).catch(() => {});
+  await p.waitForTimeout(600);
+  const u = await p.evaluate(() => location.href);
+  ok('токен з листа не лишається в адресному рядку відкритої сторінки',
+     page(u) === 'index.html' && u.indexOf('access_token=') === -1, u.slice(-60));
+  await ctx.close();
+}
+{
+  const { ctx, p } = await fresh(adultProfile());
+  await p.evaluate(() => localStorage.setItem('ib.session', JSON.stringify({
+    access_token: 'own', refresh_token: 'r', expires_at: Date.now() + 3600e3,
+    user: { id: '00000000-0000-4000-8000-00000000000B', email: 'victim@example.com' } })));
+  /* Сторож редиректить із <head>, тому 'load' може не настати ніколи:
+     чекаємо лише на початок навігації і даємо йому відпрацювати. */
+  await p.goto('file://' + ROOT + '/index.html#access_token=STOLEN&refresh_token=r&type=signup',
+               { waitUntil: 'commit' }).catch(() => {});
+  await p.waitForTimeout(600);
+  const u = await p.evaluate(() => location.href);
+  ok('із чинною сесією чужий токен теж стирається і нікуди не їде',
+     page(u) === 'index.html' && u.indexOf('access_token=') === -1, u.slice(-60));
+  await ctx.close();
+}
+{
+  /*
+   * UX-007. Лічильник анти-циклу рахував УСІ редиректи за 10 секунд і
+   * обнулявся лише за часом. Пʼять переходів на закриті сторінки поспіль
+   * (людина тицяє в меню, поки заповнює онбординг) вичерпували ліміт — і
+   * шоста сторінка відкривалась із порожнім профілем, повз сторожа.
+   */
+  const { ctx, p } = await fresh(null);
+  const seen = [];
+  for (let i = 0; i < 6; i++) {
+    await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'commit' }).catch(() => {});
+    /* Довше за 1500 мс: рівно стільки сторож чекає, перш ніж визнати
+       показ справжнім і розірвати ланцюг. Людина, яка тицяє в меню,
+       затримується на екрані щонайменше на стільки. */
+    await p.waitForTimeout(1700);
+    seen.push(page(await p.evaluate(() => location.href)));
+  }
+  ok('шість переходів поспіль на закриту сторінку — усі шість на гейті',
+     seen.every(x => x === 'welcome.html'), seen.join(','));
   await ctx.close();
 }
 

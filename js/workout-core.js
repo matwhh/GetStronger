@@ -67,8 +67,25 @@
     if (typeof allowed === 'function' && !allowed(program, profile && profile.sex)) return null;
     const days = String(Number(a.days) || 3);
     const custom = (profile.customPlans || {})[planKey(a.programId, days)];
-    const plan = custom || (program.days && program.days[days]);
-    if (!Array.isArray(plan) || !plan.length) return null;
+    const raw = custom || (program.days && program.days[days]);
+    if (!Array.isArray(raw) || !raw.length) return null;
+
+    /*
+     * ДЕНЬ БЕЗ exercises — ЦЕ ДЕНЬ БЕЗ ВПРАВ, А НЕ ПАДІННЯ (WEB-012).
+     *
+     * customPlans редагується імпортом і живе в localStorage; день, у
+     * якого масив вправ лежить під іншим іменем поля або відсутній,
+     * давав TypeError «Cannot read properties of undefined (reading
+     * map)» — і три сторінки (plan, programs, workout) лишались
+     * порожніми, самі себе не лікуючи. Нормалізуємо ОДИН раз тут: через
+     * resolvePlan проходять усі три.
+     */
+    const plan = raw.map(function (day) {
+      const d = (day && typeof day === 'object') ? day : {};
+      return Object.assign({}, d, {
+        exercises: Array.isArray(d.exercises) ? d.exercises : []
+      });
+    });
     /* Діапазони повторень — похідне від стажу (js/reps-core.js), а не
        поле даних: перераховуються на кожному завантаженні плану. */
     const RC = window.RepsCore;
@@ -419,6 +436,18 @@
     };
   }
 
+  /**
+   * Записати денний стан. Повертає false, якщо не вдалося.
+   *
+   * Раніше виняток ковтався мовчки (LOC-002): при переповненому сховищі
+   * запис не відбувався, а сторінка далі показувала галочки, яких у
+   * сховищі немає. У ту саму мить Store.saveProfile чесно кидав помилку —
+   * тобто половина стану тренування скаржилась, а половина мовчала.
+   * Ковтати виняток тут і далі правильно (показ важливіший за памʼять),
+   * а от мовчати про це — ні: рішення за тим, хто викликає.
+   *
+   * @returns {boolean} true, якщо стан справді записано
+   */
   function writeDay(profile, key, dayIdx, done) {
     try {
       localStorage.setItem(LS_TODAY, JSON.stringify({
@@ -427,7 +456,8 @@
         dayIdx: dayIdx,
         done: done
       }));
-    } catch (_) { /* показ важливіший за памʼять */ }
+      return true;
+    } catch (_) { return false; }
   }
 
   window.WorkoutCore = {

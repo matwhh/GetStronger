@@ -14,6 +14,7 @@ declare
   t date := current_date; y date := current_date - 1;
   wk date := date_trunc('week', current_date)::date;
   r jsonb; out text := E'\n'; okn int := 0; alln int := 0; n int; s int; c boolean; k text; i int;
+  kinds1 text; kinds2 text;   -- TST-016: набір нагород до і після повторного закриття
 begin
   insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
   values (ua,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','eloint-a@local','x',now(),now()),
@@ -60,6 +61,17 @@ begin
   select planned into n from public.elo_week_plan where user_id = ua and week_start = date_trunc('week', y)::date;
   c := n = 3; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'знімок тижня = 3 і не змінюється правкою профілю' || E'\n';
+  /*
+   * Знімок ПОТОЧНОГО тижня — теж 3, і теж явно.
+   *
+   * У понеділок y (вчора) і t (сьогодні) належать РІЗНИМ ISO-тижням, тож
+   * для тижня t знімка ще немає, і elo_planned_for створив би його вже з
+   * виправленого профілю (days = 7). Реконсиляція нижче рахує від плану,
+   * і всі три її перевірки падали рівно щопонеділка — фікстура, а не
+   * сервер (TST-015, той самий клас).
+   */
+  insert into public.elo_week_plan (user_id, week_start, planned)
+  values (ua, date_trunc('week', t)::date, 3) on conflict do nothing;
   perform set_config('request.jwt.claims', json_build_object('sub', ua)::text, true);
   set local role authenticated;
   begin
@@ -156,12 +168,31 @@ begin
   r := public.elo_close_season(season_of(current_date - 200));
   c := (r->>'ok')::boolean and (r->>'elo')::int = 1234; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'минулий сезон (після вікна) закривається' || E'\n';
+  /* Знімок набору нагород ПЕРЕД повторним закриттям (TST-016). */
+  select coalesce(string_agg(kind, ',' order by kind), '')
+    into kinds1 from public.awards where user_id = ub and season = season_of(current_date - 200);
   r := public.elo_close_season(season_of(current_date - 200));
   c := (r->>'duplicate')::boolean is true; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'повторне закриття → duplicate' || E'\n';
-  select count(*) into n from public.awards where user_id = ub and season = season_of(current_date - 200);
-  c := n >= 1; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'нагороди видано один раз' || E'\n';
+  /*
+   * TST-016. Тут стояло count(*) >= 1 — і воно проходило на будь-чому:
+   * і на семи нагородах, і на чотирнадцяти (тобто на подвоєнні, від якого
+   * перевірка й мала стерегти), і на одній замість рівневих. Тепер
+   * порівнюється сам НАБІР до і після повторного закриття.
+   */
+  select coalesce(string_agg(kind, ',' order by kind), '')
+    into kinds2 from public.awards where user_id = ub and season = season_of(current_date - 200);
+  c := kinds2 = kinds1 and kinds1 <> '';
+  alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'повторне закриття не додало нагород :: ' || kinds2 || E'\n';
+
+  /* Рівневі нагороди — не «щось видали», а конкретний перелік для 1234 ELO
+     (Level 5 = 800, Level 7 = 1200; Level 8 = 1400 вже ні). */
+  c := kinds2 like '%level5%' and kinds2 like '%level7%' and kinds2 not like '%level8%';
+  alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'рівневі нагороди відповідають 1234 ELO' || E'\n';
   -- submit у закритий сезон неможливий навіть у вікні (емуляція: історія є)
   reset role;
   insert into public.season_history (user_id, season, final_elo, level, elite, grace_weeks_used, stats)

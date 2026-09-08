@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Добавки: що з них справді працює — FORGE</title>
-<meta name="description" content="Креатин, протеїн, ашваганда, мелатонін, магній: що показують дослідження з PubMed, як приймати, застереження щодо безпеки і вартість добової дози.">
+<meta name="description" content="Креатин і сироватковий протеїн: що показують дослідження з PubMed, як приймати, застереження щодо безпеки і вартість добової дози.">
 <!-- Картка для месенджерів і соцмереж. og:url і canonical додає
      js/app.js, коли в config.js заповнено siteUrl: без домену
      абсолютне посилання все одно було б неправильним. -->
@@ -48,29 +48,15 @@
      не чекає на нього), а після завантаження перемикається на all.
      Без JS спрацьовує noscript-запасний варіант. -->
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
 <!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
      має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
      Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
 <script src="js/agegate.js"></script>
 <link rel="stylesheet" href="css/style.css">
-<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
-   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
-   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
-   інакше при кожному переході блимала б типова графітова темна перед
-   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
-   скрипт відпрацьовує раніше за app.js. */
-document.documentElement.className='js';
-try{var _r=document.documentElement,
-_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
-moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
-_t=localStorage.getItem('forge.theme');
-_t=_m[_t]||_t;if(_t==='graphite-amber')_t='';
-if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
-if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
-var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e7e7e7');}
-}catch(e){}</script>
+<script src="js/nosw.js"></script>
+<script src="js/theme-boot.js"></script>
 </head>
 <body>
 
@@ -88,15 +74,15 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
 
       <h1 class="reveal">Добавки</h1>
       <p class="lead reveal" data-d="1">
-        Пʼять позицій, за якими стоять дослідження. Для кожної — що саме показали,
-        як приймати, чого очікувати не варто і скільки коштує доба.
+        Дві позиції, за якими стоять найміцніші дослідження: креатин і
+        сироватковий протеїн. Для кожної — що саме показали, як приймати,
+        чого очікувати не варто і скільки коштує доба.
       </p>
 
       <div class="notice mt-3 reveal" data-d="2">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
         <div>
-          <b>Це не медична порада.</b> Добавки взаємодіють із ліками й хворобами,
-          а частина з них має задокументовані ризики — найпомітніший тут в ашваганди.
+          <b>Це не медична порада.</b> Добавки взаємодіють із ліками й хворобами.
           Перед початком, особливо якщо ви приймаєте будь-які ліки або маєте хронічні
           захворювання, варто порадитись із лікарем.
         </div>
@@ -124,7 +110,8 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
           <li><b>Міцні докази</b> — багато рандомізованих досліджень і мета-аналізів,
               ефект відтворюється в різних лабораторіях.</li>
           <li><b>Помірні</b> — ефект є, але вибірки малі, або він залежить від умов
-              (наприклад, магній помітно працює переважно в тих, кому його бракує).</li>
+              (наприклад, добавка помітно працює переважно в тих, кому речовини
+              бракує). Зараз таких позицій у списку немає.</li>
         </ul>
         <p class="small">
           Третього рівня — «слабкі докази» — тут немає навмисно. Він був, і в ньому

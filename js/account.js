@@ -495,10 +495,19 @@
         '<div class="grid mt-3" style="gap:18px">' +
           sexField(p) +
           '<div class="grid grid-4">' +
-            field('Вік, років', numberInput('age', p.age, { min: 14, max: 90, placeholder: '25' }), '', fieldId('age')) +
-            field('Зріст, см', numberInput('height', p.height, { min: 120, max: 230, placeholder: '180' }), '', fieldId('height')) +
-            field('Вага, кг', numberInput('weight', p.weight, { min: 35, max: 250, step: 0.1, decimal: true, placeholder: '80' }), '', fieldId('weight')) +
-            field('Жир, %', numberInput('bodyfat', p.bodyfat, { min: 3, max: 60, step: 0.5, decimal: true }),
+            /*
+             * МЕЖІ ПОЛІВ — ЗВІДТИ Ж, ЗВІДКИ КЛАМП (TXT-008).
+             *
+             * Тут стояли свої числа (вік 14–90, зріст 120–230, вага
+             * 35–250), а coerce нижче різав за FIELD_RANGE (10–100,
+             * 120–250, 30–300), і те саме значення сторінка то не давала
+             * ввести, то мовчки приймала при імпорті. Три набори меж на
+             * одну величину — це не суворість, а розбіжність.
+             */
+            field('Вік, років', numberInput('age', p.age, { min: FIELD_RANGE.age[0], max: FIELD_RANGE.age[1], placeholder: '25' }), '', fieldId('age')) +
+            field('Зріст, см', numberInput('height', p.height, { min: FIELD_RANGE.height[0], max: FIELD_RANGE.height[1], placeholder: '180' }), '', fieldId('height')) +
+            field('Вага, кг', numberInput('weight', p.weight, { min: FIELD_RANGE.weight[0], max: FIELD_RANGE.weight[1], step: 0.1, decimal: true, placeholder: '80' }), '', fieldId('weight')) +
+            field('Жир, %', numberInput('bodyfat', p.bodyfat, { min: FIELD_RANGE.bodyfat[0], max: FIELD_RANGE.bodyfat[1], step: 0.5, decimal: true }),
                   'Необовʼязково. Якщо вказати — обмін рахується за Katch-McArdle.', fieldId('bodyfat')) +
           '</div>' +
         '</div>' +
@@ -658,7 +667,22 @@
      * попередження. saveProfileBeacon шле запит із keepalive, тобто такий,
      * що переживає закриття вкладки; якщо не влізає — кладе патч у чергу.
      */
-    return Store.saveProfileBeacon(patch);
+    /*
+     * Результат читаємо (LOC-003). saveProfileBeacon повертає, чи ліг патч
+     * у localStorage; при переповненому сховищі — false, і тоді в
+     * локальному режимі (черги й хмари немає) значення не потрапляє
+     * НІКУДИ. Раніше слухачі visibilitychange і pagehide результат просто
+     * ігнорували: людина йшла зі сторінки, вважаючи, що записано.
+     *
+     * Тост на pagehide уже не побачити, тому лишаємо слід у сховищі —
+     * наступне відкриття акаунта скаже про це вголос.
+     */
+    const ok = Store.saveProfileBeacon(patch);
+    if (!ok) {
+      try { sessionStorage.setItem('ib.save.failed', '1'); } catch (_) {}
+      toast('Сховище браузера переповнене — зміни не збережено', 'err');
+    }
+    return ok;
   }
 
   /* Сторінка ховається (перехід, згортання вкладки, блокування екрана) —
@@ -1044,7 +1068,11 @@
         }
 
         if (NUM_LIMITS[k]) {
-          const n = finite(v, NUM_LIMITS[k][0], NUM_LIMITS[k][1]);
+          let n = finite(v, NUM_LIMITS[k][0], NUM_LIMITS[k][1]);
+          /* Кількість днів і прийомів — ЦІЛІ (ELO-003). 4.5 проходило як
+             «скінченне число», лягало в профіль і валило серверний
+             elo_planned_for при першому дотику кожного нового тижня. */
+          if (n !== null && (k === 'daysPerWeek' || k === 'meals')) n = Math.round(n);
           return n === null ? reject(k) : accept(k, n);
         }
         if (ENUMS[k]) {
@@ -1078,9 +1106,19 @@
 
           case 'activePlan': {
             if (!isPlain(v)) return reject(k);
+            /*
+             * ЦІЛЕ ЧИСЛО, А НЕ ПРОСТО «У МЕЖАХ» (TIM-006).
+             *
+             * profiles.data пише клієнт, а сервер читає days у
+             * elo_planned_for. Нецілий 3.5 із файла проходив, лягав у
+             * хмару — і кожен наступний elo_submit цього користувача
+             * повертав 400, тобто рейтинг для нього переставав існувати
+             * мовчки. Серверний бік уже захищений (elo_num + floor);
+             * тут — щоб таке значення взагалі не потрапляло в базу.
+             */
             const days = finite(v.days, 1, 7);
             if (!str(v.programId, 60) || days === null) return reject(k);
-            return accept(k, { programId: v.programId, days: days });
+            return accept(k, { programId: v.programId, days: Math.round(days) });
           }
 
           case 'weights':  { const m = cleanNumMap(v, 0, 500);  return m ? accept(k, m) : reject(k); }
@@ -1141,7 +1179,9 @@
               if (done === null || total === null) continue;
               out[d] = {
                 programId: str(s.programId, 60) || '',
-                days: finite(s.days, 0, 7) || 0,
+                /* Ціле: дробове число днів валить серверний elo_planned_for
+                   (ELO-003). */
+                days: Math.round(finite(s.days, 0, 7) || 0),
                 dayIdx: finite(s.dayIdx, 0, 6) || 0,
                 title: str(s.title, 60) || '',
                 done: Math.round(done),
@@ -1541,6 +1581,17 @@
         return;
       }
 
+      /*
+       * Спершу міграції, потім перевірка (LOC-006). Файл річної давнини
+       * має приїхати у формі поточної версії, інакше він відновиться
+       * застарілим — і жодна наступна міграція його вже не полагодить,
+       * бо профіль і так свіжої версії.
+       */
+      if (Store.migrateImported) {
+        try { data = Store.migrateImported(data); }
+        catch (err) { console.warn('[account] міграція імпорту не вдалась:', err && err.message); }
+      }
+
       const res = validateImport(data);
       const known = res.taken.length;
 
@@ -1566,7 +1617,21 @@
        * Перевірка ПІСЛЯ валідації і ДО резервної копії: відхилений імпорт
        * не чіпає ні даних, ні копії.
        */
-      const MAX_PATCH_BYTES = 1024 * 1024;   // 1 МБ — вище стелі реального профілю за роки
+      /*
+       * СТЕЛЯ РАХУЄТЬСЯ ВІД КВОТИ СХОВИЩА, А НЕ ЗІ СТЕЛІ (PRF-005).
+       *
+       * Коментар «1 МБ — вище стелі реального профілю за роки» був
+       * неправдою: власний експорт відмовляється імпортуватись приблизно з
+       * 400 сесій реального плану, а валідатор при цьому дозволяє 4000 дат
+       * трекерів (тобто 4–8 МБ). Дві стелі не були узгоджені між собою, і
+       * людина отримувала «файл завеликий» на файл, який сама ж і зробила.
+       *
+       * Реальна межа — квота localStorage (близько 5 М символів у всіх
+       * браузерах, де це взагалі перевіряється) мінус місце під резервну
+       * копію перед імпортом і під чергу. Половина квоти — чесний ліміт:
+       * профіль плюс його доімпортна копія мусять уміститись разом.
+       */
+      const MAX_PATCH_BYTES = 2 * 1024 * 1024;
       let patchBytes = 0;
       try {
         patchBytes = new Blob([JSON.stringify(res.patch)]).size;
@@ -1575,7 +1640,8 @@
       }
       if (patchBytes > MAX_PATCH_BYTES) {
         toast('Файл завеликий: ' + Math.round(patchBytes / 1024) + ' КБ при межі ' +
-              Math.round(MAX_PATCH_BYTES / 1024) + ' КБ. Нічого не змінено.', 'err');
+              Math.round(MAX_PATCH_BYTES / 1024) + ' КБ. Нічого не змінено. ' +
+              'Сховище браузера має вмістити і профіль, і доімпортну копію.', 'err');
         return;
       }
 
@@ -1663,7 +1729,10 @@
           ? 'Стерти дані в цьому браузері й вийти з акаунта?\n\n' +
             'Те, що збережено в акаунті, ЛИШИТЬСЯ — після наступного входу ' +
             'дані повернуться. Щоб видалити їх назовсім, спершу експортуйте ' +
-            'копію, а потім видаліть акаунт у Supabase.'
+            /* Порада «видаліть акаунт у Supabase» відсилала людину туди,
+               куди вона не має доступу: панель проєкту бачить лише
+               власник (OPS-009). Кнопка для цього є тут-таки, нижче. */
+            'копію, а потім натисніть «Видалити акаунт» нижче.'
           : 'Стерти всі дані в цьому браузері? Дію не можна скасувати — ' +
             'іншої копії немає. Спершу варто зробити «Експортувати JSON».';
         if (!confirm(msg)) return;
@@ -1743,6 +1812,16 @@
     if (!$('#profile')) return;
     renderAll();
     Store.onChange(renderAll);
+
+    /* Слід від невдалого запису при виході зі сторінки (LOC-003): тост на
+       pagehide людина побачити не могла, тому кажемо це тут. */
+    try {
+      if (sessionStorage.getItem('ib.save.failed') === '1') {
+        sessionStorage.removeItem('ib.save.failed');
+        toast('Минулого разу зміни не збереглися: сховище браузера переповнене. ' +
+              'Звільніть місце — наприклад, зробіть експорт і видаліть старі дані.', 'err');
+      }
+    } catch (_) {}
   }
 
   if (document.readyState === 'loading') {

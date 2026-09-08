@@ -296,10 +296,50 @@
   }
 
   /** Записати зміну трекера дня й одразу оновити сторінку */
+  /**
+   * Записати зміну трекера дня й одразу оновити екран.
+   *
+   * Патч — функція (SYN-011): trackerLog передається як ЦІЛЕ значення
+   * поля, тож дві вкладки з однаковою базою затирали одна одну повністю.
+   * Функція виконується всередині ланцюга збереження, на актуальному
+   * профілі, і зливає лише СЬОГОДНІШНІЙ день — записи інших днів,
+   * зроблені в сусідній вкладці, лишаються на місці.
+   */
   function saveTrackerLog(next) {
     state.trackerLog = next;
     render();
-    saveOwn({ trackerLog: next }).catch(function (e) {
+    const today = state.todayKey;
+    /*
+     * ЖУРНАЛ ТРЕКЕРІВ КЛЮЧОВАНИЙ ТРЕКЕРОМ, А НЕ ДАТОЮ.
+     *
+     * Форма — trackerLog[id][РРРР-ММ-ДД], і саме так її будують
+     * TrackerCore.logValue / removeEntry. А тут стояло next[today], тобто
+     * пошук ДАТИ на верхньому рівні: він завжди давав undefined, гілка
+     * «запису немає» видаляла з профілю ключ, якого там не було, і патч
+     * повертав базу незміненою. Наслідок: жоден ввід на сторінці
+     * «Трекери» не потрапляв у профіль — ні сон, ні вода, ні настрій.
+     * На екрані все виглядало записаним (render малює зі state), а після
+     * перезавантаження зникало.
+     *
+     * Патч-функція, а не обʼєкт (SYN-011): переносимо лише СЬОГОДНІШНІ
+     * значення кожного трекера в актуальний профіль, не чіпаючи ні
+     * історії, ні трекерів, яких ця вкладка не бачила.
+     */
+    saveOwn(function (p) {
+      const base = (p && p.trackerLog && typeof p.trackerLog === 'object') ? p.trackerLog : {};
+      const merged = Object.assign({}, base);
+      Object.keys(next || {}).forEach(function (id) {
+        const src = next[id];
+        const dayVal = (src && typeof src === 'object') ? src[today] : undefined;
+        const cur = (merged[id] && typeof merged[id] === 'object')
+          ? Object.assign({}, merged[id]) : {};
+        if (dayVal === undefined) delete cur[today];
+        else cur[today] = dayVal;
+        if (Object.keys(cur).length) merged[id] = cur;
+        else delete merged[id];
+      });
+      return { trackerLog: merged };
+    }).catch(function (e) {
       if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err');
     });
   }

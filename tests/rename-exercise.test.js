@@ -12,7 +12,17 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadStore, makeStorage } from './helpers.js';
+
+/* Поточна версія форми даних — із самого store.js, а не переписана сюди:
+   інакше тест сперечався б із кодом при кожній новій міграції. */
+const SCHEMA_VERSION = Number(
+  /const SCHEMA_VERSION = (\d+);/.exec(
+    fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'js', 'store.js'), 'utf8')
+  )[1]);
 
 /** Профіль версії 9 з правкою плану під старою назвою. */
 function stored(extra) {
@@ -56,7 +66,11 @@ describe('перейменування вправи доїжджає до збе
   });
 
   test('версію піднято — міграція не крутиться щоразу', () => {
-    assert.equal(load(stored()).version, 10);
+    /* Число тут навмисно не 10: профіль доходить до ПОТОЧНОЇ версії, і
+       кожна наступна міграція має його підхопити. Прибите 10 змусило б
+       правити тест при кожному кроці схеми — і саме так тест перетворюється
+       на перешкоду замість сторожа. */
+    assert.equal(load(stored()).version, SCHEMA_VERSION);
   });
 
   test('решта плану недоторкана', () => {
@@ -114,15 +128,59 @@ describe('робочі ваги переїжджають разом із наз�
   });
 });
 
+describe('10 -> 11: русизм у назві вправи (TXT-001)', () => {
+  /* «Ягодичний міст» — калька з російської. Назва вправи є КЛЮЧЕМ книги
+     ваг і історії, тож правка рядка в js/exercises.js без міграції лишила
+     б вагу під старим ключем: на екрані нова назва з порожнім полем. */
+  function stored10() {
+    return {
+      version: 10,
+      customPlans: { 'women4:4': [{ title: 'Legs', exercises: [
+        { name: 'Ягодичний міст у тренажері', sets: 3 },
+        { name: 'Румунська тяга', sets: 3 }
+      ] }] },
+      weights: { 'Ягодичний міст у тренажері': 60, 'Румунська тяга': 50 },
+      weightLog: { 'Ягодичний міст у тренажері': [{ d: '2026-08-01', kg: 55 },
+                                                  { d: '2026-08-20', kg: 60 }] }
+    };
+  }
+
+  test('назва в збереженому плані переїхала', () => {
+    const p = load(stored10());
+    const names = p.customPlans['women4:4'][0].exercises.map((e) => e.name);
+    assert.ok(names.includes('Сідничний міст у тренажері'), names.join(', '));
+    assert.ok(!names.includes('Ягодичний міст у тренажері'));
+  });
+
+  test('поточна вага переїхала разом із назвою', () => {
+    const p = load(stored10());
+    assert.equal(p.weights['Сідничний міст у тренажері'], 60);
+    assert.equal(p.weights['Ягодичний міст у тренажері'], undefined);
+    assert.equal(p.weights['Румунська тяга'], 50, 'сусідню вправу не зачепило');
+  });
+
+  test('історія ваг не втрачена', () => {
+    const p = load(stored10());
+    const log = p.weightLog['Сідничний міст у тренажері'];
+    assert.equal(log.length, 2, 'обидва записи мали переїхати');
+    assert.equal(log[1].kg, 60);
+    assert.equal(p.weightLog['Ягодичний міст у тренажері'], undefined);
+  });
+
+  test('версія піднялась до поточної', () => {
+    assert.equal(load(stored10()).version, SCHEMA_VERSION);
+  });
+});
+
 describe('міграція безпечна для сміття у сховищі', () => {
   test('порожній профіль не падає', () => {
-    assert.equal(load({ version: 9 }).version, 10);
+    assert.equal(load({ version: 9 }).version, SCHEMA_VERSION);
   });
 
   test('customPlans неправильної форми не валять читання', () => {
     for (const bad of [null, 42, 'рядок', [], { 'ppl:6': 'не масив' }, { 'ppl:6': [null, 7] }]) {
       const p = load({ version: 9, customPlans: bad });
-      assert.equal(p.version, 10);
+      assert.equal(p.version, SCHEMA_VERSION);
     }
   });
 

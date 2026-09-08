@@ -151,22 +151,82 @@
         const res = await Api.submit(e.kind, e.key, e.day, e.payload);
         if (!res) continue;
         /*
-         * retry — сервер не знайшов дії у профілі. Відколи ELO рахується з
-         * profiles.data, а не з payload, таке буває нормально: черга
-         * профілю (Store) і черга подій (EloApi) незалежні, і подія може
-         * випередити збереження. Позначити її надісланою означало б
+         * retry === true — сервер не знайшов дії у профілі, і це нормально:
+         * черга профілю (Store) і черга подій (EloApi) незалежні, тож подія
+         * може випередити збереження. Позначити її надісланою означало б
          * втратити нарахування назавжди.
+         *
+         * retry === false — відмова остаточна: або запис дня є, але не
+         * дотягує до порога floors.workoutTotalMin (день з однією вправою
+         * цілком легальний), або це 4xx. Раніше сервер в обох випадках
+         * казав retry:true, і та сама подія йшла на сервер при КОЖНОМУ
+         * Store.onChange протягом трьох діб (INV-004).
          */
         if (res.ok === false && res.retry) continue;
         sent[e.key] = true;
         lsSet(SENT_KEY, sent);
         if (res.delta && !res.duplicate && window.App && window.App.toast) {
-          const sign = res.delta > 0 ? '+' : '';
-          window.App.toast(sign + res.delta + ' ELO — ' + e.reason +
-            (res.optimistic ? ' (досилається)' : ''), res.delta >= 0 ? 'ok' : 'err');
+          /*
+           * ОФЛАЙН — БЕЗ ЦИФРИ (ELO-008).
+           *
+           * Оптимістична дельта рахується тим самим ядром, але на інших
+           * вхідних: план береться з профілю, а не зі знімка тижня, і
+           * ціль по білку — з поточного розрахунку, а не з того, що
+           * записано в день. Тобто число майже завжди інше, ніж нарахує
+           * сервер, — і людина бачила, як «+51» перетворюється на «+17».
+           * Поки відповіді сервера немає, чесніше сказати, що подія
+           * зарахується, і не називати суму.
+           */
+          if (res.optimistic) {
+            window.App.toast(e.reason + ' — зарахується, коли зʼявиться мережа', 'ok');
+          } else {
+            const sign = res.delta > 0 ? '+' : '';
+            window.App.toast(sign + res.delta + ' ELO — ' + e.reason,
+                             res.delta >= 0 ? 'ok' : 'err');
+          }
         }
       }
     } finally { busy = false; }
+  }
+
+  /*
+   * ЗВІТ ПРО СЕЗОН — ЄДИНЕ, ЩО ЙДЕ З СЕРВЕРА ПРЯМО В innerHTML.
+   *
+   * js/season.js вставляє поля цього обʼєкта в розмітку без екранування
+   * (WEB-002) — це був єдиний робочий XSS-синк у застосунку. Екранування
+   * там додано, але фільтр потрібен і тут: у localStorage звіт може
+   * покласти і не сервер (інше розширення, сусідня вкладка, ручна правка),
+   * а season.js читає його як довірений.
+   *
+   * Тому лишаємо рівно очікувані поля й рівно очікуваних типів. Усе інше —
+   * зайве за визначенням: якщо колись сервер почне віддавати нове поле,
+   * його треба свідомо додати сюди, а не отримати в розмітку мовчки.
+   */
+  function num(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+
+  function sanitizeReport(r) {
+    if (!r || typeof r !== 'object') return null;
+    const st = (r.stats && typeof r.stats === 'object') ? r.stats : {};
+    const cats = {};
+    ['training', 'nutrition', 'sleep', 'recovery', 'activity'].forEach(function (c) {
+      const s = st[c];
+      if (s && typeof s === 'object' && num(s.elo) !== null) {
+        cats[c] = { elo: num(s.elo), avgQuality: num(s.avgQuality) };
+      }
+    });
+    return {
+      ok: r.ok === true,
+      season: typeof r.season === 'string' ? r.season.slice(0, 32) : null,
+      elo: num(r.elo), level: num(r.level), elite: r.elite === true,
+      rank: num(r.rank), of: num(r.of), percentile: num(r.percentile),
+      daysActive: num(r.daysActive), daysTotal: num(r.daysTotal),
+      graceUsed: num(r.graceUsed),
+      stats: Object.assign(cats, {
+        biggestGain: num(st.biggestGain), biggestLoss: num(st.biggestLoss),
+        bestCategory: typeof st.bestCategory === 'string' ? st.bestCategory.slice(0, 32) : null,
+        weakestCategory: typeof st.weakestCategory === 'string' ? st.weakestCategory.slice(0, 32) : null
+      })
+    };
   }
 
   function init() {
@@ -177,7 +237,7 @@
     window.EloApi.refresh().catch(function () {});
     window.EloApi.evaluateWeeks();
     window.EloApi.closeSeasonIfDue().then(function (report) {
-      if (report) lsSet('ib.eloReport', report);
+      if (report) lsSet('ib.eloReport', sanitizeReport(report));
     });
     window.Store.getProfile().then(sync).catch(function () {});
 

@@ -48,6 +48,21 @@ else
 fi
 [ -f .forge-publish ] && printf "Запит:      ${Y}є — публікація на найближчій хвилині${N}\n"
 
+# НЕВІДПРАВЛЕНІ КОМІТИ (OPS-002). Дерево може бути чистим, а робота — не на
+# GitHub: push відхилили, коміт лишився. Раніше статус у цьому випадку
+# казав «усе вже на GitHub».
+BR="$(git --no-optional-locks rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+if git rev-parse --verify --quiet "origin/$BR" > /dev/null 2>&1; then
+  AH="$(git rev-list --count "origin/$BR..HEAD" 2>/dev/null || echo 0)"
+  if [ "$AH" -gt 0 ] 2>/dev/null; then
+    printf "Відправка:  ${Y}%s коміт(ів) НЕ на GitHub${N}\n" "$AH"
+  else
+    printf "Відправка:  ${G}усе на GitHub${N}\n"
+  fi
+else
+  printf "Відправка:  ${D}гілку origin/%s ще не бачили${N}\n" "$BR"
+fi
+
 # --- Історія --------------------------------------------------------------
 printf "\n${B}Останні коміти${N}\n"
 git --no-optional-locks log --oneline -5 2>/dev/null | sed 's/^/  /'

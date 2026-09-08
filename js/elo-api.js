@@ -97,7 +97,13 @@
           if (res && res.ok === false && res.retry) continue;
           drop(item.key);
         } catch (e) {
-          if (e && e.offline) break;         // мережі немає — решта почекає
+          /*
+           * Симетрично до submit (SYN-012): раніше будь-яка помилка без
+           * ознаки offline видаляла подію з черги НАЗАВЖДИ — включно з 429,
+           * де повтор якраз і має сенс, і з 500, де сервер просто моргнув.
+           */
+          const st = e && e.status;
+          if (e && (e.offline || !st || st >= 500 || st === 429)) break;  // решта почекає
           // 4xx (out_of_window тощо) — з черги прибираємо, повтор марний
           drop(item.key);
         }
@@ -109,12 +115,61 @@
   /* ---------------- Публічне ---------------- */
 
   /** Свіжий стан із сервера (і кеш для бейджа між сторінками). */
+  /*
+   * Невдала спроба теж має бути ВИДИМОЮ (UX-003).
+   *
+   * Картка «Сезон» на головній малює «Завантажується…», поки Api.cached()
+   * порожній, — і лишалась у цьому стані НАЗАВЖДИ, якщо elo_state
+   * недоступна (мережа, 500) або повернула відповідь без config. Ні
+   * помилки, ні повтору, ні кнопки. rating.html у тих самих умовах
+   * поводиться правильно, і саме тому розбіжність ніхто не помічав.
+   */
+  let lastError = null;
+
   async function refresh() {
     if (!available()) return cached();
-    const data = await window.Store.rpc('elo_state', {});
-    setState(data);
-    return data;
+    try {
+      /*
+       * ДЕНЬ ПЕРЕДАЄ КЛІЄНТ (ELO-007).
+       *
+       * «Сьогодні: +X ELO» рахувалось за UTC-днем бази, а події лягають з
+       * локальним днем браузера. У Києві з 00:00 до 03:00 це різні дати:
+       * картка показувала вчорашню суму й о 03:00 обнулялась сама, без
+       * жодної дії людини. Сервер валідує це значення у вузькому вікні.
+       */
+      const data = await window.Store.rpc('elo_state', { p_today: localDayKey() });
+      lastError = null;
+      setState(data);
+      return data;
+    } catch (e) {
+      lastError = (e && e.message) || 'сервер не відповів';
+      reportUnexpected('elo_state', e);
+      throw e;
+    }
   }
+
+  /*
+   * ПОМИЛКА, ЯКОЇ НІХТО НЕ БАЧИТЬ, — ЦЕ НЕ ПОМИЛКА (INV-011).
+   *
+   * Sentry отримував лише необроблені винятки. А всі відмови серверних RPC
+   * ловились у catch і перетворювались на null або на позначку в черзі:
+   * 400 через зіпсований payload, 500 через баг у функції, 403 через
+   * несподіваний статус акаунта виглядали однаково — «нічого не сталось».
+   *
+   * Сюди йдуть лише НЕСПОДІВАНІ відмови. Офлайн, відсутність сесії й
+   * штатні 4xx (out_of_window, дубль) — не баги, і засмічувати ними звіт
+   * означає перестати їх читати.
+   */
+  function reportUnexpected(where, e) {
+    if (!e || e.offline || e.noauth || e.queued) return;
+    const st = Number(e.status) || 0;
+    if (st >= 400 && st < 500 && st !== 429) return;
+    try { if (window.ForgeErrors) window.ForgeErrors.report(e, { rpc: where, status: st || null }); }
+    catch (_) {}
+  }
+
+  /** Остання невдача refresh() або null. Для картки «Сезон». */
+  function stateError() { return cached() ? null : lastError; }
 
   /**
    * Подати дію. Повертає СЕРВЕРНУ відповідь {delta, elo, today} або
@@ -140,27 +195,77 @@
         p_kind: kind, p_action_key: key, p_day: day, p_payload: payload
       });
       if (res && res.ok) {
-        setState(Object.assign({}, cached() || {}, {
-          elo: res.elo, today: res.today !== undefined ? res.today : (cached() || {}).today
-        }));
+        /*
+         * res.today приходить із season_state.today_delta, а той прибитий
+         * до UTC-дня (ELO-007). Беремо лише elo, а «сьогодні» перепитуємо
+         * у elo_state — там воно рахується за локальним днем. Один зайвий
+         * запит на подану дію, тобто кілька на добу.
+         */
+        setState(Object.assign({}, cached() || {}, { elo: res.elo }));
+        refresh().catch(function () {});
       }
       return res;
     } catch (e) {
-      if (e && (e.offline || e.noauth)) {
+      /*
+       * ЩО ВАРТО ПОВТОРИТИ, А ЩО НІ (SYN-012).
+       *
+       * Раніше в чергу подія потрапляла лише при offline або noauth. Будь-яка
+       * інша відмова — 500, 502, 429 — давала return null: подія не
+       * записувалась нікуди, і тренування просто не зараховувалось. Тимчасова
+       * відмова сервера коштувала людині дня.
+       *
+       * Тепер: мережа, автентифікація, 5xx і 429 — у чергу (повтор має сенс);
+       * 4xx — ні (out_of_window, дубль, невідомий kind повторювати марно).
+       */
+      const st = e && e.status;
+      if (e && (e.offline || e.noauth || !st || st >= 500 || st === 429)) {
         queuePush({ kind: kind, key: key, day: day, payload: payload });
         return optimistic === null ? null : { ok: true, delta: optimistic, optimistic: true };
       }
-      return null;
+      /*
+       * 4xx — остаточна відмова (out_of_window, невідомий kind, сезон
+       * закрито). Раніше тут повертався null, і js/elo-hooks.js не
+       * позначав подію надісланою — тобто довбав сервер тією самою подією
+       * на кожен Store.onChange три доби (INV-004). Повертаємо явну
+       * відмову з retry:false, щоб її можна було закрити.
+       */
+      reportUnexpected('elo_submit:' + kind, e);
+      return { ok: false, error: 'rejected', status: st, retry: false };
     }
   }
 
+  /**
+   * Скільки тренувань на тиждень бере СЕРВЕР (ELO-008).
+   *
+   * Оптимістична дельта рахується тим самим ядром, що й серверна, але
+   * planned раніше брався з іншого джерела і за іншими межами: клієнт —
+   * Math.max(1, …) з ПОТОЧНОГО профілю, сервер — greatest(3, least(7, …))
+   * зі ЗНІМКА тижня (elo_week_plan). Для плану «1 день на тиждень» це
+   * давало тост «+51 ELO» там, де сервер нараховував +17, і людина бачила
+   * як число зменшується саме собою.
+   *
+   * Тепер джерело одне: elo_state віддає plannedWeek — те саме число, яким
+   * рахує сервер. Профіль лишається запасним варіантом на випадок, коли
+   * стану ще немає (перший запуск, офлайн до першого refresh) — але вже з
+   * серверними межами 3..7.
+   */
   function payloadPlanned() {
-    /* План читаємо з кешу профілю СИНХРОННО — submit не має чекати. */
+    const st = cached();
+    const fromServer = st && Number(st.plannedWeek);
+    if (fromServer >= 1) return fromServer;
     try {
       const p = JSON.parse(localStorage.getItem('ib.profile')) || {};
-      return Math.max(1, Math.min(7,
-        Number(p.activePlan && p.activePlan.days) || Number(p.daysPerWeek) || 3));
+      return Math.max(3, Math.min(7, Math.floor(
+        Number(p.activePlan && p.activePlan.days) || Number(p.daysPerWeek) || 3)));
     } catch (_) { return 3; }
+  }
+
+  /** Локальний день браузера у форматі РРРР-ММ-ДД. */
+  function localDayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
   }
 
   /**
@@ -213,10 +318,10 @@
      * seasonRange повертає межі поточного сезону; день перед його початком
      * гарантовано належить попередньому, у будь-якому місяці.
      */
-    const now = new Date();
-    const range = window.EloCore.seasonRange(window.EloCore.seasonOf(now));
-    const dayBefore = new Date(range[0].getFullYear(), range[0].getMonth(), range[0].getDate() - 1);
-    const code = window.EloCore.seasonOf(dayBefore);
+    /* Арифметика живе в ядрі (EloCore.previousSeasonCode) — там її й
+       перевіряють тести. Раніше вона була тут, а тест ганяв власну копію
+       (TST-001). */
+    const code = window.EloCore.previousSeasonCode(new Date());
 
     const done = lsGet('ib.eloClosed', {});
     if (done[code]) return null;
@@ -253,6 +358,7 @@
     available: available,
     cached: cached,
     refresh: refresh,
+    stateError: stateError,
     submit: submit,
     flush: flush,
     evaluateWeeks: evaluateWeeks,

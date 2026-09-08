@@ -1,0 +1,245 @@
+{
+  "note": "Згенеровано tools/gen-elo-parity.mjs. Правити руками не треба — перегенеруй після свідомої зміни правил ELO.",
+  "config": "db/elo-config.json",
+  "cases": [
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 0,
+        "total": 5,
+        "doneSets": 0,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 13
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 3,
+        "total": 5,
+        "doneSets": 11,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0.55,
+      "delta": 7
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 7,
+      "grace": false,
+      "quality": 1,
+      "delta": 7
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": true,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 0,
+        "totalSets": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 13
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2000,
+        "target": 2000,
+        "protein": 150,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 7
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2200,
+        "target": 2000,
+        "protein": 150,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0.725,
+      "delta": 5
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 1200,
+        "target": 2000,
+        "protein": 60,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0.05,
+      "delta": 0
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2000,
+        "target": 2000,
+        "protein": 0,
+        "proteinTarget": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 7
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 0,
+        "target": 0,
+        "protein": 0,
+        "proteinTarget": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 480,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 5
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 300,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0.625,
+      "delta": 0
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 960,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 5
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 10
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 2
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 5
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0.6,
+      "delta": 1
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 1
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0.6,
+      "delta": 1
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 8000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 2
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 2000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 0.25,
+      "delta": 0
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 100000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "quality": 1,
+      "delta": 2
+    }
+  ]
+}

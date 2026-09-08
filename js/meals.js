@@ -45,6 +45,25 @@
    * не те. Кома приймається як десятковий роздільник, «1e9», «∞», NaN,
    * відʼємне і понад max — ні.
    */
+  /**
+   * Контейнери рецепта: те саме правило, що й для грамів (UX-011).
+   *
+   * Було: clamp(Number(m.portions) || 0, 0.25, PORTIONS_MAX). Тобто
+   * значення поза межами мовчки затискалось, а нечисловий ввід ('abc',
+   * '-3') давав NaN → 0 → clamp → 0,25 контейнера. Прев'ю модалки при
+   * цьому показувало числа для введеного значення, а в день лягало інше:
+   * сміття в полі ДОДАВАЛО їжу.
+   *
+   * @returns {number|null} null — ввід відхилено, повідомити людині
+   */
+  function parsePortions(raw) {
+    const str = String(raw == null ? '' : raw).trim().replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(str)) return null;
+    const n = Number(str);
+    if (!Number.isFinite(n) || n < 0.25 || n > PORTIONS_MAX) return null;
+    return Math.round(n * 100) / 100;
+  }
+
   function parseGrams(raw, max) {
     const str = String(raw == null ? '' : raw).trim().replace(',', '.');
     if (!/^\d+(\.\d+)?$/.test(str)) return null;
@@ -86,30 +105,11 @@
    *   повідомлення користувачу — сама логіка перенесення від нього не
    *   залежить і не змінюється.
    */
+  /* Сама логіка — у js/day-core.js (TST-002): там її можуть завантажити
+     тести, а тут файл тягне DOM і window.App. Обгортка лишається заради
+     mealSchema(), який читає профіль. */
   function applySchema(meals, report) {
-    const names = mealSchema();
-    const src = Array.isArray(meals) ? meals : [];
-
-    const out = names.map(function (name, i) {
-      const m = src[i];
-      return { name: name, items: (m && Array.isArray(m.items)) ? m.items : [] };
-    });
-
-    const last = out[out.length - 1];
-    let moved = 0;
-    for (let i = names.length; i < src.length; i++) {
-      const extra = src[i];
-      if (extra && Array.isArray(extra.items) && extra.items.length) {
-        last.items = last.items.concat(extra.items);
-        moved += extra.items.length;
-      }
-    }
-    if (report) { report.moved = moved; report.into = last.name; }
-    // Стеля на прийом — та сама, що у валідаторі імпорту (js/account.js),
-    // інакше після злиття профіль став би таким, який сам сайт не приймає.
-    last.items = last.items.slice(0, 60);
-
-    return out;
+    return window.DayCore.applySchema(meals, mealSchema(), report);
   }
 
   /**
@@ -306,8 +306,16 @@
   const FOLD_KEY = 'ib.meals.fold';
 
   function loadFolds() {
-    try { return JSON.parse(localStorage.getItem(FOLD_KEY)) || {}; }
-    catch (_) { return {}; }
+    /*
+     * `|| {}` пропускало будь-яке істинне значення — рядок, число, true.
+     * Далі state.folds.foods = true кидало TypeError у строгому режимі,
+     * сторінка «Раціон» помирала, ключ ніхто не перезаписував — і кожне
+     * наступне відкриття падало так само, назавжди (LOC-010).
+     */
+    try {
+      const v = JSON.parse(localStorage.getItem(FOLD_KEY));
+      return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+    } catch (_) { return {}; }
   }
 
   function saveFolds(f) {
@@ -1132,7 +1140,7 @@
       '<div class="field">' +
         '<label class="field__label" for="m-grams">Скільки контейнерів</label>' +
         '<input class="input" id="m-grams" type="text" inputmode="decimal" ' +
-               'inputmode="decimal" value="' + esc(m.portions) + '">' +
+               'value="' + esc(m.portions) + '">' +
       '</div>' +
       '<div class="row" style="gap:8px;margin-bottom:18px">' +
         [0.5, 1, 1.5, 2].map(function (n) {
@@ -1217,7 +1225,15 @@
     if (!meal) return;
 
     if (m.kind === 'recipe') {
-      meal.items.push({ kind: 'recipe', recipeId: m.recipeId, portions: clamp(Number(m.portions) || 0, 0.25, PORTIONS_MAX) });
+      const portions = parsePortions(m.portions);
+      if (portions === null) {
+        toast('Контейнери: від 0,25 до ' + PORTIONS_MAX, 'err');
+        /* Поле контейнерів у розмітці має той самий id, що й поле грамів
+                   (#m-grams) — модалка одна на обидва режими. */
+        const inp = $('#m-grams'); if (inp) { inp.focus(); inp.select(); }
+        return;
+      }
+      meal.items.push({ kind: 'recipe', recipeId: m.recipeId, portions: portions });
     } else {
       // GRAMS_MIN, а не 1: нуль грамів — це чинний ввід («поки не додаю»),
       // і мовчки перетворювати його на 1 г неправильно.
@@ -1373,6 +1389,15 @@
               report.moved + ' ' + plural(report.moved, 'позицію', 'позиції', 'позицій') +
               ' з прибраних перенесено до «' + report.into + '».', 'ok');
       }
+      /* Понад стелю прийому позиції ВТРАТИЛИСЬ — про це не можна мовчати
+         (TST-002): 6 прийомів по 20 позицій, зведені у 3, дають 100 зі 120,
+         і раніше про зниклі 20 не було сказано нічого. */
+      if (report.dropped) {
+        toast('Не вмістилось у «' + report.into + '»: ' + report.dropped + ' ' +
+              plural(report.dropped, 'позиція', 'позиції', 'позицій') +
+              ' (стеля — ' + window.DayCore.MEAL_ITEM_CAP + ' на прийом). ' +
+              'Поверніть більше прийомів на «Харчуванні», щоб їжа не губилась.', 'err');
+      }
 
       const active = document.activeElement;
       if (!changed && active && active.closest && active.closest('#day')) return;
@@ -1510,7 +1535,10 @@
 
       const el = e.target.closest('[data-rf="grams"]');
       if (el) {
-        d.items[Number(el.dataset.ri)].grams = clamp(Number(el.value) || 0, GRAMS_MIN, RECIPE_GRAMS_MAX);
+        /* Так само кома, як і всюди в цьому файлі (TIM-005). */
+        d.items[Number(el.dataset.ri)].grams = clamp(
+          Number(String(el.value == null ? '' : el.value).trim().replace(',', '.')) || 0,
+          GRAMS_MIN, RECIPE_GRAMS_MAX);
         // Перемальовуємо тільки підсумок: інакше поле втратило б фокус на кожній цифрі
         const per = perContainer(d);
         const kpis = rHost.querySelectorAll('.kpi__val');
@@ -1630,7 +1658,12 @@
         // Верхня межа тут раніше була відсутня зовсім, і показане число
         // розходилось із порахованим у десять разів.
         if (it.kind === 'recipe') {
-          const raw = Number(el.value) || 0;
+          /* Кома як десятковий роздільник (TIM-005). Грами йшли через
+             parseGrams із заміною коми, а контейнери — через голий
+             Number(): «1,5» → NaN → 0. Поле при цьому не перезаписувалось
+             (String(0) === String(0)), тож людина бачила «1,5», а в день
+             лягав нуль. */
+          const raw = Number(String(el.value == null ? '' : el.value).trim().replace(',', '.')) || 0;
           it.portions = clamp(raw, PORTIONS_MIN, PORTIONS_MAX);
           if (String(raw) !== String(it.portions)) el.value = it.portions;
         } else {

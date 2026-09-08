@@ -7,6 +7,7 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82.4,ac
   daysPerWeek:3,activePlan:{programId:'fullbody',days:3},trainingAge:'inter'};
 
 async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:390,height:844}});
+  
   const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
   return {ctx,p,errs}; }
 

@@ -28,7 +28,7 @@
 <meta property="og:site_name" content="FORGE">
 <meta property="og:locale" content="uk_UA">
 <meta property="og:title" content="Харчування">
-<meta property="og:description" content="Калорії та макроси під твої зріст, вагу й мету.">
+<meta property="og:description" content="Калорії та макроси під ваші зріст, вагу й мету.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0b0b0b">
 <link rel="manifest" href="manifest.webmanifest">
@@ -48,29 +48,15 @@
      не чекає на нього), а після завантаження перемикається на all.
      Без JS спрацьовує noscript-запасний варіант. -->
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
 <!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
      має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
      Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
 <script src="js/agegate.js"></script>
 <link rel="stylesheet" href="css/style.css">
-<script>/* Позначаємо, що JS живий (анімація появи ховає блоки через CSS,
-   і без цього класу сторінка без JS лишилась би порожньою) і ставимо
-   ОБИДВІ осі оформлення — схему й акцент — ДО завантаження стилів:
-   інакше при кожному переході блимала б типова графітова темна перед
-   обраною. Тут же переносяться id прибраних кольорових тем, бо цей
-   скрипт відпрацьовує раніше за app.js. */
-document.documentElement.className='js';
-try{var _r=document.documentElement,
-_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
-moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
-_t=localStorage.getItem('forge.theme');
-_t=_m[_t]||_t;if(_t==='graphite-amber')_t='';
-if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
-if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
-var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e7e7e7');}
-}catch(e){}</script>
+<script src="js/nosw.js"></script>
+<script src="js/theme-boot.js"></script>
 
 </head>
 <body>
@@ -113,11 +99,11 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
             </div>
             <div class="field">
               <label class="field__label" for="n-height">Зріст, см</label>
-              <input class="input" id="n-height" type="number" inputmode="numeric" min="120" max="230" step="1" placeholder="180">
+              <input class="input" id="n-height" type="number" inputmode="numeric" min="120" max="250" step="1" placeholder="180">
             </div>
             <div class="field">
               <label class="field__label" for="n-weight">Вага, кг</label>
-              <input class="input" id="n-weight" type="text" inputmode="decimal" min="35" max="250" step="0.1" placeholder="80">
+              <input class="input" id="n-weight" type="text" inputmode="decimal" min="30" max="300" step="0.1" placeholder="80">
             </div>
             <div class="field">
               <label class="field__label" for="n-bodyfat">Жир, % <span class="muted">(необовʼязково)</span></label>
@@ -135,14 +121,12 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
 
           <div class="field">
             <label class="field__label">Мета</label>
-            <div class="seg">
-              <label class="seg__item"><input type="radio" name="goal" value="bulk"><span>Набір маси</span></label>
-              <label class="seg__item"><input type="radio" name="goal" value="bulkfast"><span>Агресивний набір</span></label>
-              <label class="seg__item"><input type="radio" name="goal" value="recomp"><span>Рекомпозиція</span></label>
-              <label class="seg__item"><input type="radio" name="goal" value="maintain" checked><span>Підтримання</span></label>
-              <label class="seg__item"><input type="radio" name="goal" value="cut"><span>Скидання</span></label>
-              <label class="seg__item"><input type="radio" name="goal" value="cutfast"><span>Агресивне схуднення</span></label>
-            </div>
+            <!-- Підписи беруться з NutritionCalc.GOALS (js/nutrition.js),
+                 а не пишуться тут: «Набір маси» проти «Набір мʼязової маси»
+                 і «Скидання» проти «Скидання ваги» — одна й та сама мета
+                 під двома назвами на сусідніх сторінках (TXT-003).
+                 Сторінка «Акаунт» уже бере їх звідти; тепер і ця. -->
+            <div class="seg" id="n-goal-seg"></div>
           </div>
 
           <div>
@@ -246,7 +230,7 @@ var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('c
               </table>
             </div>
             <p class="small mt-2">
-              Тобто вища калорійність дала <b>вп’ятеро більший приріст жиру й нуль додаткових мʼязів</b>.
+              Тобто вища калорійність дала <b>впʼятеро більший приріст жиру й нуль додаткових мʼязів</b>.
               Уся «перевага» в цифрі на вагах була жиром і водою.
             </p>
             <p class="small">

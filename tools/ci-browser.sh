@@ -11,18 +11,28 @@
 #  чотири створюють користувачів, останній стукає в бойовий домен. У CI
 #  їм робити нічого — вони лишаються ручними.
 #
+#  verifyauthz.mjs — теж ручний і з тієї самої причини: він бере anon-ключ
+#  і б'є ним у БОЙОВИЙ Supabase, доводячи, що незалогінений не бачить
+#  нічого. Читання, нічого не створює — але це все одно бойовий бекенд, а
+#  CI тут свідомо відрізаний від хмари (tools/ci-offline.sh). Запускати
+#  руками після змін у RLS (INV-006, TST-012).
+#
+#  verifyerrors.mjs натомість ПОВНІСТЮ офлайн: піднімає власний сервер на
+#  вигаданому домені forge.test і перехоплює конверти Sentry, перевіряючи,
+#  що в них немає ні пошти, ні токенів. Він у FULL.
+#
 #  Перевірки НЕ спиняються на першій невдачі: краще один звіт про всі
 #  проблеми, ніж п'ять прогонів по одній.
 set -u
 
 cd "$(dirname "$0")/.."
 
-CORE="verifyhistory verifyworkout verifydata verifyroundtrip verifyloop verify7 verifyaccountmix verifylink"
+CORE="verifyhistory verifyworkout verifydata verifyroundtrip verifyloop verify7 verifyaccountmix verifylink verifysw"
 FULL="verifya11y verifyflows verifyimport verifythemes verifyonboard \
       verifyonboarding verifyagegate verifyresponsive verifyperf verifyreps \
       verifypersetweight verifyplanfields verifysexplans verifysleepremember \
       verifytrackerspage verifywomen3 verifycreatine verifyexercise \
-      verifychaos verifychaos2 verifyfix90 verifysw verifyhardening"
+      verifychaos verifychaos2 verifyfix90 verifyhardening verifyerrors"
 
 case "${1:-core}" in
   core) LIST="$CORE" ;;

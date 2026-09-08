@@ -95,20 +95,32 @@ describe('Повторення: застосування до плану', () =>
 
 describe('Повторення: усі 4 програми проходять через одну логіку', () => {
   const P = loadModules(['js/exercises.js', 'js/programs-data.js', 'js/reps-core.js']);
+  /* Увесь набір діапазонів, які взагалі бувають у таблиці. Новачок і еліта
+     беруть із нього різні підмножини; ALLOWED стереже, щоб у таблиці не
+     зʼявився третій, ніде не описаний варіант (TST-013: константа була
+     оголошена й не вжита, тобто нічого не стерегла). */
   const ALLOWED = ['6–8', '8–10', '10–12'];
+  const NOVICE = ['8–10', '10–12'];
+  const ELITE = ['6–8', '8–10'];
 
   it('кожна вправа кожної програми отримує діапазон із таблиці', () => {
+    const seen = new Set();
     P.PROGRAMS.forEach((prog) => {
       Object.keys(prog.days).forEach((d) => {
         const out = P.RepsCore.applyPlan(prog.days[d], 'novice');
         out.forEach((day) => day.exercises.forEach((e) => {
-          assert.ok(['8–10', '10–12'].includes(e.reps), prog.id + ' ' + e.name + ' ' + e.reps);
+          seen.add(e.reps);
+          assert.ok(NOVICE.includes(e.reps), prog.id + ' ' + e.name + ' ' + e.reps);
         }));
         const out2 = P.RepsCore.applyPlan(prog.days[d], 'elite');
         out2.forEach((day) => day.exercises.forEach((e) => {
-          assert.ok(['6–8', '8–10'].includes(e.reps), prog.id + ' ' + e.name + ' ' + e.reps);
+          seen.add(e.reps);
+          assert.ok(ELITE.includes(e.reps), prog.id + ' ' + e.name + ' ' + e.reps);
         }));
       });
     });
+    const stray = [...seen].filter((r) => !ALLOWED.includes(r));
+    assert.equal(stray.length, 0, 'діапазони поза таблицею: ' + stray.join(', '));
+    assert.ok(seen.size >= 3, 'усі три діапазони мають зустрітись, а зустрілось ' + seen.size);
   });
 });

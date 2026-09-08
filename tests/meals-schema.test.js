@@ -7,7 +7,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadNutrition } from './helpers.js';
+import { loadNutrition, loadModules } from './helpers.js';
+import { readFileSync } from 'node:fs';
 
 const NC = loadNutrition();
 
@@ -41,24 +42,20 @@ test('замовчування лежить у дозволених межах',
   assert.ok(NC.MEALS_DEFAULT >= NC.MEALS_MIN && NC.MEALS_DEFAULT <= NC.MEALS_MAX);
 });
 
-/* Копія applySchema з js/meals.js: сам файл тягне DOM і window.App,
-   тому в пісочницю не вантажиться. Логіка звірена з оригіналом. */
-function applySchema(meals, count) {
-  const names = NC.mealNames(count);
-  const src = Array.isArray(meals) ? meals : [];
-  const out = names.map((name, i) => ({
-    name: name,
-    items: (src[i] && Array.isArray(src[i].items)) ? src[i].items : []
-  }));
-  const last = out[out.length - 1];
-  for (let i = names.length; i < src.length; i++) {
-    if (src[i] && Array.isArray(src[i].items) && src[i].items.length) {
-      last.items = last.items.concat(src[i].items);
-    }
-  }
-  last.items = last.items.slice(0, 60);
-  return out;
-}
+/*
+ * ПЕРЕВІРЯЄМО ПРОДАКШЕН-ФУНКЦІЮ (TST-002).
+ *
+ * Тут лежала КОПІЯ applySchema: js/meals.js тягне DOM і window.App, тож у
+ * пісочницю не вантажиться. Сигнатури копії й оригіналу вже розійшлись
+ * (count проти report), а сама функція не перевірялась узагалі — мутант,
+ * що прибирає злиття прийомів, проходив усі 483 тести.
+ *
+ * Логіку винесено в js/day-core.js; js/meals.js лишив тонку обгортку, яка
+ * лише підставляє назви зі схеми.
+ */
+const DC = loadModules(['js/day-core.js']).DayCore;
+const applySchema = (meals, count, report) =>
+  DC.applySchema(meals, NC.mealNames(count), report);
 
 test('зменшення кількості прийомів не втрачає жодної позиції', () => {
   const six = [1, 2, 3, 4, 5, 6].map(function (n) {
@@ -89,4 +86,47 @@ test('збільшення кількості прийомів додає пор
 test('назви завжди перезаписуються схемою', () => {
   const out = applySchema([{ name: 'Моя назва', items: [] }], 3);
   assert.equal(out[0].name, 'Сніданок');
+});
+
+test('позиції понад стелю прийому не зникають мовчки', () => {
+  /*
+   * Властивість «жодна позиція не губиться» хибна за межею: 6 прийомів по
+   * 20 позицій, зведені у 3, дають 100 зі 120. Стеля потрібна (той самий
+   * ліміт стоїть у валідаторі імпорту), але втрату треба ПОКАЗУВАТИ —
+   * інакше їжа зникає з дня без жодного слова.
+   */
+  const six = [1, 2, 3, 4, 5, 6].map(function (n) {
+    return {
+      name: 'x',
+      items: Array.from({ length: 20 }, function (_, k) {
+        return { kind: 'food', foodId: 'f' + n + '-' + k, grams: 100 };
+      })
+    };
+  });
+
+  const report = {};
+  const out = applySchema(six, 3, report);
+  const total = out.reduce(function (s2, m) { return s2 + m.items.length; }, 0);
+
+  assert.equal(out.length, 3);
+  assert.equal(DC.MEAL_ITEM_CAP, 60, 'стеля прийому — 60 позицій');
+  assert.equal(total, 100, '20 + 20 + 60 = 100 зі 120');
+  assert.equal(report.dropped, 20, 'втрату видно у звіті');
+  assert.equal(report.moved, 60, 'три прибрані прийоми — це 60 позицій');
+  assert.equal(report.into, out[2].name);
+});
+
+test('без втрат dropped дорівнює нулю', () => {
+  const report = {};
+  applySchema([{ name: 'a', items: [] }], 3, report);
+  assert.equal(report.dropped, 0);
+  assert.equal(report.moved, 0);
+});
+
+test('js/meals.js не тримає власної копії правила', () => {
+  /* Копія розходиться тихо — саме так і сталося. */
+  const src = readFileSync(new URL('../js/meals.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('window.DayCore.applySchema('), 'meals.js має кликати ядро');
+  assert.ok(!/last\.items\s*=\s*last\.items\.slice\(0,\s*60\)/.test(src),
+    'у meals.js знову зʼявилась власна стеля прийому');
 });

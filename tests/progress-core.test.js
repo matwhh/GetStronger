@@ -181,3 +181,90 @@ describe('progress-core: сесія рахується за підходами',
     assert.deepEqual(P.trainedDates({ '2026-08-31': 0 }, sess), []);
   });
 });
+
+/*
+ * Час сесій і рекорди (TST-006).
+ *
+ * Чотири функції не виконувались жодним тестом, і виживали мутанти:
+ * нульові сесії в статистиці, знята стеля 6 годин, вікно 31 день замість
+ * 30 (це вже був баг, описаний у коментарі коду), ±10 % замість ±5 %,
+ * «перший запис — рекорд». Найдорожчий тут — legacy: у бойовій базі є
+ * сесії з t0 === t1, і поведінку на них треба закріпити, а не покладатись
+ * на те, що вона правильна сьогодні.
+ */
+describe('Тривалість сесії', () => {
+  const s = (t0, t1) => ({ done: 1, total: 1, doneSets: 1, totalSets: 1, t0: t0, t1: t1 });
+  const T = Date.UTC(2026, 7, 17, 10, 0, 0);
+
+  it('legacy без часу: t0 === t1 не дає нуля, а дає «немає даних»', () => {
+    assert.equal(P.sessionMinutes(s(T, T)), null);
+  });
+
+  it('півхвилини — не тренування', () => {
+    assert.equal(P.sessionMinutes(s(T, T + 30 * 1000)), null);
+  });
+
+  it('понад 6 годин — забута вкладка', () => {
+    assert.equal(P.sessionMinutes(s(T, T + 361 * 60000)), null);
+    assert.equal(P.sessionMinutes(s(T, T + 360 * 60000)), 360, 'рівно 6 годин ще рахуються');
+  });
+
+  it('нормальна сесія рахується як є', () => {
+    assert.equal(P.sessionMinutes(s(T, T + 45 * 60000)), 45);
+  });
+
+  it('відсутній або зіпсований знімок часу', () => {
+    for (const bad of [undefined, null, {}, { t0: 'ой', t1: 'ай' }, s(T, T - 1000)]) {
+      assert.equal(P.sessionMinutes(bad), null, JSON.stringify(bad));
+    }
+  });
+
+  it('timeStats рахує лише сесії з часом, legacy не псує середню', () => {
+    const log = {
+      '2026-08-10': s(T, T + 40 * 60000),
+      '2026-08-12': s(T, T),                    // legacy: часу немає
+      '2026-08-14': s(T, T + 60 * 60000),
+      '2026-08-16': { done: 1, total: 1, doneSets: 1, totalSets: 1 }  // зовсім без t0/t1
+    };
+    const st = P.timeStats(log, 30, NOW);
+    assert.equal(st.count, 2, 'у статистику йдуть лише дві сесії з часом');
+    assert.equal(st.avgMin, 50);
+    assert.equal(st.totalMin, 100);
+  });
+
+  it('немає жодної сесії з часом — null, а не нулі', () => {
+    assert.equal(P.timeStats({ '2026-08-10': s(T, T) }, 30, NOW), null);
+  });
+});
+
+describe('Вікно періоду і рекорди', () => {
+  it('30 днів — це 30 днів, включно з сьогоднішнім', () => {
+    /* Мутант «31 день» виживав, а розбіжність із rating-core вже одного
+       разу давала різні знаменники в двох модулях. */
+    const log = {
+      '2026-07-19': { done: 1, total: 1, doneSets: 1, totalSets: 1, t0: 1, t1: 1 + 30 * 60000 },
+      '2026-07-18': { done: 1, total: 1, doneSets: 1, totalSets: 1, t0: 1, t1: 1 + 30 * 60000 }
+    };
+    const st = P.timeStats(log, 30, NOW);
+    assert.equal(st.count, 1, '18 липня вже поза вікном 30 днів від 17 серпня');
+  });
+
+  it('перший запис вправи рекордом не вважається', () => {
+    const H = ctx.HistoryCore;
+    let log = H.appendWeight({}, 'Жим', 100, '2026-08-01');
+    assert.deepEqual(P.prList(log, 30, NOW), [], 'одна точка — це відлік, а не рекорд');
+
+    log = H.appendWeight(log, 'Жим', 105, '2026-08-10');
+    const prs = P.prList(log, 30, NOW);
+    assert.equal(prs.length, 1);
+    assert.equal(prs[0].kg, 105);
+    assert.equal(prs[0].isNew, true, '10 серпня — у вікні 30 днів від 17 серпня');
+  });
+
+  it('зниження ваги рекордом не робить', () => {
+    const H = ctx.HistoryCore;
+    let log = H.appendWeight({}, 'Жим', 100, '2026-08-01');
+    log = H.appendWeight(log, 'Жим', 90, '2026-08-10');
+    assert.deepEqual(P.prList(log, 30, NOW), []);
+  });
+});

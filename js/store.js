@@ -93,6 +93,11 @@
    */
   const ELO_KEYS = ['ib.eloState', 'ib.eloPending', 'ib.eloSent',
                     'ib.eloWeeks', 'ib.eloClosed', 'ib.eloReport'];
+  /* Скільки чекати на відповідь сервера, перш ніж вважати запит втраченим
+     (SYN-004). 20 секунд — помітно більше за будь-який здоровий запит і
+     помітно менше за «назавжди». */
+  const REQ_TIMEOUT = 20000;
+
   const LS_PENDING = 'ib.pending';
   const LS_ACCOUNT = 'ib.account';   // кеш статусу акаунта (UX; барʼєр — RLS)
 
@@ -113,6 +118,11 @@
    */
   const PERSONAL_KEYS = [LS_PROFILE, LS_BACKUP, LS_PENDING, DIRTY_KEY,
     'forge.today', 'ib.meals.fold',
+    /* Чернетка реєстрації: пошта, дата народження, стать, вага, зріст і
+       згоди. Її не було ні у виході, ні в «стерти дані в цьому браузері»,
+       чий коментар обіцяв «прибирає ВСЕ» — і вона переживала обидва
+       (WEB-003). Вихід із account.html ішов повз clearDraft() у welcome.js. */
+    'ib.regdraft',
     /* стара назва: meals.js колись писав з «s». Тримаємо, щоб прибрати
        за минулими версіями. */
     'ib.meals.folds'];
@@ -121,6 +131,13 @@
     keys.forEach(function (k) {
       try { localStorage.removeItem(k); } catch (_) {}
     });
+    /* Відкладені копії пошкодженого профілю (LOC-001) — теж персональні
+       дані. У спільному браузері вони не мають діставатись наступному. */
+    try {
+      Object.keys(localStorage).forEach(function (k) {
+        if (k.indexOf(LS_PROFILE + '.corrupt.') === 0) localStorage.removeItem(k);
+      });
+    } catch (_) {}
   }
 
   /*
@@ -135,7 +152,7 @@
    * (не коли додається нове поле — для цього досить blankProfile).
    * migrate() нижче переганяє старі профілі вперед по одному кроку.
    */
-  const SCHEMA_VERSION = 10;
+  const SCHEMA_VERSION = 11;
 
   const listeners = new Set();
   let session = null;   // { access_token, refresh_token, expires_at, user }
@@ -531,6 +548,24 @@
     }
 
     /*
+     * 10 -> 11: русизм у назві вправи (TXT-001).
+     *
+     * «Ягодичний міст» — калька; українською сідниці, отже сідничний.
+     * Назва вправи — КЛЮЧ книги ваг і історії, тож просто виправити рядок
+     * у js/exercises.js замало: у того, хто вже ставив вагу, вона лишилась
+     * би висіти під старим ключем, а на екрані стояла б нова назва з
+     * порожнім полем. Тому та сама мапа, що й для попереднього
+     * перейменування: план, поточні ваги й історія переїжджають разом.
+     */
+    if (v < 11) {
+      renameExercises(p, {
+        'Ягодичний міст зі штангою': 'Сідничний міст зі штангою',
+        'Ягодичний міст у тренажері': 'Сідничний міст у тренажері'
+      });
+      v = 11;
+    }
+
+    /*
      * Зняття legacy-поля favorites («Обране», етап 6; прибране на етапі 7).
      *
      * Свідомо БЕЗ версійного гейта: профілі, що вже мають version 5, жодного
@@ -545,10 +580,57 @@
     return p;
   }
 
+  /* Підняли прапорець — інтерфейс покаже банер. Оголошення тут, а не
+     нижче: readLocalProfile викликається ще під час ініціалізації. */
+  let corruptSeen = false;
+
+  /*
+   * ПОШКОДЖЕНИЙ ib.profile НЕ ЗАТИРАЄТЬСЯ МОВЧКИ.
+   *
+   * lsGet ковтає виняток і повертає fallback, тож зіпсований ключ (обірваний
+   * запис при переповненні сховища, чуже розширення, ручне редагування)
+   * виглядав як «профілю немає»: readLocalProfile віддавав порожній бланк,
+   * а перше ж автозбереження перезаписувало сирі байти шістьмастами
+   * байтами дефолту. Ані копії, ані повідомлення — просто зникали всі
+   * тренування (LOC-001).
+   *
+   * Тепер сирий вміст відкладається під окремим ключем із міткою часу.
+   * Це не відновлення — це те, з чого відновлення взагалі можливе:
+   * ib.profile.corrupt.* видно в експорті резервної копії, і звідти дані
+   * дістає людина або підтримка.
+   */
   function readLocalProfile() {
-    const stored = lsGet(LS_PROFILE, {});
-    return migrate(Object.assign(blankProfile(), stored), stored);
+    let raw = null;
+    try { raw = localStorage.getItem(LS_PROFILE); } catch (_) {}
+
+    let stored = null;
+    if (raw) {
+      try { stored = JSON.parse(raw); } catch (_) { stored = null; }
+    }
+    const usable = stored && typeof stored === 'object' && !Array.isArray(stored);
+
+    if (raw && !usable) {
+      quarantineProfile(raw);
+      stored = null;
+    }
+    return migrate(Object.assign(blankProfile(), stored || {}), stored || {});
   }
+
+  /** Відкласти нечитабельний профіль убік і підняти прапорець для інтерфейсу. */
+  function quarantineProfile(raw) {
+    const key = LS_PROFILE + '.corrupt.' + Date.now();
+    try {
+      /* Уже відкладали й не прибрали — другий раз не дублюємо: копій
+         пошкодженого сміття не має бути більше, ніж самих даних. */
+      const seen = Object.keys(localStorage).some(function (k) {
+        return k.indexOf(LS_PROFILE + '.corrupt.') === 0;
+      });
+      if (!seen) localStorage.setItem(key, raw);
+    } catch (_) { /* сховище переповнене — тоді хоч прапорець */ }
+    corruptSeen = true;
+    console.warn('[store] ib.profile не читається — сирий вміст відкладено в ' + key);
+  }
+
 
   /* ------------------------------------------------------------------ */
   /* HTTP до Supabase                                                    */
@@ -643,6 +725,24 @@
            'redirect_to=' + encodeURIComponent(to);
   }
 
+  /*
+   * НЕСПОДІВАНА ВІДМОВА RPC МАЄ ЛИШАТИ СЛІД (INV-011).
+   *
+   * Sentry бачив лише необроблені винятки. refreshAccountState ковтала
+   * геть усе й повертала null: і «токен ще не оновився» (нормально), і
+   * 500 у самій функції account_state (баг, який ніхто не побачить).
+   * Сюди йдуть лише несподівані: офлайн, відсутність сесії і штатні 4xx
+   * не рахуються — інакше звіт перестануть читати.
+   */
+  function reportUnexpected(where, e) {
+    if (!e || e.offline || e.noauth || e.queued || e.local) return;
+    const st = Number(e.status) || 0;
+    if (st >= 400 && st < 500 && st !== 429) return;
+    try {
+      if (window.ForgeErrors) window.ForgeErrors.report(e, { rpc: where, status: st || null });
+    } catch (_) {}
+  }
+
   function authHeaders(useSession) {
     const h = { 'apikey': KEY, 'Content-Type': 'application/json' };
     h['Authorization'] = (useSession !== false && session && session.access_token)
@@ -692,20 +792,38 @@
     const opts = options || {};
     const headers = Object.assign(authHeaders(opts.auth), opts.headers || {});
 
+    /*
+     * ТАЙМАУТ. Без нього запит, який сервер прийняв і не відповідає
+     * (перевантаження, «мертве» мобільне зʼєднання, проксі), висить
+     * необмежено — а оскільки всі записи стоять в один ланцюг saveChain,
+     * він блокує ВСІ наступні збереження цієї вкладки назавжди (SYN-004).
+     *
+     * keepalive-запит (beacon при закритті сторінки) не обриваємо: у нього
+     * і так свій ліміт браузера, а перервати його означає гарантовано
+     * втратити останню зміну.
+     */
     let res;
+    const timeout = opts.keepalive === true ? null : REQ_TIMEOUT;
+    const ctl = (timeout && typeof AbortController === 'function') ? new AbortController() : null;
+    const timer = ctl ? setTimeout(function () { ctl.abort(); }, timeout) : null;
     try {
       res = await fetch(URL_ + path, {
         method: opts.method || 'GET',
         headers: headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
-        keepalive: opts.keepalive === true
+        keepalive: opts.keepalive === true,
+        signal: ctl ? ctl.signal : undefined
       });
     } catch (e) {
-      // Мережі немає. Розрізняти це від помилки сервера важливо:
-      // офлайн ставимо в чергу, 4xx у чергу ставити марно.
-      const err = new Error('Немає звʼязку з сервером');
+      // Мережі немає (або відповіді не дочекались). Розрізняти це від
+      // помилки сервера важливо: офлайн ставимо в чергу, 4xx — марно.
+      const err = new Error((e && e.name === 'AbortError')
+        ? 'Сервер не відповів вчасно'
+        : 'Немає звʼязку з сервером');
       err.offline = true;
       throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
 
     const text = await res.text();
@@ -1019,7 +1137,30 @@
      */
     const me = uid || ((session && session.user) ? session.user.id : null);
     if (pendingBlocked || !me) return false;
-    const q = pendingGet().filter(function (it) { return it && it.uid === me; });
+    let q = pendingGet().filter(function (it) { return it && it.uid === me; });
+
+    /*
+     * ЗГОРТАННЯ ЧЕРГИ ЗА КЛЮЧАМИ.
+     *
+     * Патч — це не «дельта», а повний знімок ключів, які змінились. Для
+     * тренування це весь sessionLog: при 365 сесіях ~350 тисяч символів на
+     * КОЖНУ галочку (дебаунс 1,5 с). Офлайн-тренування переповнювало
+     * localStorage за десяток підходів, pendingPush повертав false, і
+     * збереження падало — при тому, що всі ці знімки описують той самий
+     * стан (PRF-001).
+     *
+     * Тому старіші записи, ключі яких повністю перекриває новий, з черги
+     * прибираються: у новому знімку вже є все, що було в них.
+     */
+    const keys = Object.keys(patch || {});
+    if (keys.length) {
+      q = q.filter(function (it) {
+        const old = Object.keys((it && it.patch) || {});
+        if (!old.length) return true;
+        return !old.every(function (k) { return keys.indexOf(k) !== -1; });
+      });
+    }
+
     q.push({ at: Date.now(), uid: me, patch: patch });
     // Черга не має рости нескінченно: 200 патчів — це вже кількасот КБ.
     return lsSet(LS_PENDING, q.slice(-200));
@@ -1065,11 +1206,25 @@
     }
     if (!mine.length) { emit(); return 0; }
 
-    // Патчі накладаються по порядку на поточний профіль, і в хмару йде
-    // один запис — так само, як зробив би звичайний saveProfile.
+    /*
+     * СТАРІ ПАТЧІ НЕ НАКЛАДАЄМО НА НОВІШИЙ ПРОФІЛЬ.
+     *
+     * doSave пише ПОВНИЙ профіль у ib.profile ДО того, як покласти патч у
+     * чергу. Тому патч, старіший за локальний профіль, уже цілком у ньому
+     * міститься — а накладений поверх, він повертає той самий ключ до
+     * старішого стану. На практиці це виглядало як зникнення підходів,
+     * доданих після відновлення звʼязку: черга відкочувала їх і в
+     * localStorage, і в хмару (PRF-001).
+     *
+     * Тому база — поточний (найновіший) профіль, а з черги беруться лише
+     * записи, зроблені ПІСЛЯ нього.
+     */
     let merged = await api.getProfile();
+    const baseTs = Date.parse((merged && merged.updatedAt) || '') || 0;
     mine.forEach(function (item) {
-      if (item && item.patch) merged = Object.assign({}, merged, item.patch);
+      if (!item || !item.patch) return;
+      if (baseTs && Number(item.at) < baseTs) return;
+      merged = Object.assign({}, merged, item.patch);
     });
     merged.updatedAt = new Date().toISOString();
 
@@ -1140,6 +1295,115 @@
      і без цього прапорця міг обігнати незавершений saveProfile. */
   let saveInFlight = 0;
 
+  /*
+   * Читання профілю без дедуплікації — приватна частина getProfile.
+   * Публічний getProfile обгортає її inflight-обіцянкою (PRF-004).
+   */
+  let inflightProfile = null;
+
+  async function loadProfile() {
+
+      if (CLOUD && session && cloudAllowed()) {
+        const ok = await ensureFresh();
+        if (ok) {
+          try {
+            const rows = await req('/rest/v1/profiles?select=data&user_id=eq.' + session.user.id + '&limit=1');
+            const data = Array.isArray(rows) && rows[0] ? rows[0].data : null;
+
+            /*
+             * РЯДКА В ХМАРІ ЩЕ НЕМАЄ — це не те саме, що «в хмарі порожньо».
+             *
+             * Було: data || {} перетворювало відсутність рядка на порожній
+             * бланк, і той бланк ставав cache, а далі lsSet затирав ним
+             * локальний профіль. Тобто достатньо було відкрити сайт із
+             * сесією, для якої рядок ще не створено (щойно зареєструвався,
+             * перший запис не доїхав, рядок видалили) — і локальні дані
+             * зникали без жодного повідомлення.
+             *
+             * Порожня відповідь означає лише, що записувати ще нічого не
+             * встигли. Профіль у цьому випадку — локальний; наступне
+             * збереження створить рядок.
+             */
+            if (!data) {
+              cache = readLocalProfile();
+              return cache;
+            }
+
+            const remote = migrate(Object.assign(blankProfile(), data), data);
+
+            /*
+             * Локальна копія перемагає, якщо вона НОВІША і є незіслані патчі.
+             * Це той самий випадок «працював офлайн»: у хмарі лежить вчорашній
+             * рядок, а сьогоднішня робота чекає в черзі. Сліпа перевага хмари
+             * тут стирала б день роботи при кожному відкритті сайту.
+             *
+             * !remote.updatedAt — окремий випадок: старий хмарний рядок без
+             * позначки часу не має вигравати в локального, який її має.
+             */
+            const local = lsGet(LS_PROFILE, null);
+            if (local && (pendingGet().length || isDirty()) &&
+                local.updatedAt && (!remote.updatedAt ||
+                local.updatedAt > remote.updatedAt)) {
+              cache = migrate(Object.assign(blankProfile(), local), local);
+              flushPending().catch(function () {});
+              return cache;
+            }
+
+            /*
+             * ЛОКАЛЬНА КОПІЯ НОВІША, АЛЕ ПОЗНАЧОК НЕМАЄ (SYN-009).
+             *
+             * Сам по собі новіший updatedAt не важить нічого: перемагає
+             * хмара, і рядок одразу дзеркалиться в localStorage. Здебільшого
+             * це правильно (запис доїхав, позначку зняли, updatedAt локально
+             * просто свіжіший на мілісекунди). Але якщо розрив помітний, то
+             * позначку загубили — а це вже втрата даних без сліду.
+             *
+             * Кидати помилку тут не можна: сторінка мусить відкритись.
+             * Тому не заважаємо хмарі виграти, але кладемо локальну копію в
+             * той самий слот, що й при зміні власника — його видно в
+             * експорті резервної копії, і звідти дані можна дістати.
+             */
+            if (local && local.updatedAt && remote.updatedAt &&
+                Date.parse(local.updatedAt) - Date.parse(remote.updatedAt) > 60000) {
+              lsSet(LS_BACKUP_LOGIN, Object.assign(
+                { savedAt: new Date().toISOString(),
+                  owner: (session && session.user) ? session.user.id : null,
+                  reason: 'локальна копія була новішою за хмарну без позначки незісланих змін' },
+                local));
+              console.warn('[store] локальна копія була новішою за хмарну — збережено в ' + LS_BACKUP_LOGIN);
+            }
+
+            cache = remote;
+            /*
+             * ДЗЕРКАЛО В localStorage — критично для сторожа.
+             *
+             * agegate.js — синхронний скрипт у <head>: він бачить лише
+             * ib.profile і вирішує, куди пускати. Без цього рядка вхід у
+             * чистому браузері зациклював сайт: welcome читав повний
+             * профіль із хмари й слав на index, а сторож на index бачив
+             * ПОРОЖНІЙ localStorage і гнав назад на welcome — нескінченне
+             * перезавантаження. Тепер прочитане з хмари одразу лягає туди,
+             * куди дивиться сторож.
+             */
+            lsSet(LS_PROFILE, cache);
+            return cache;
+          } catch (e) {
+            console.warn('[store] хмара недоступна, читаю локально:', e.message);
+            /*
+             * Сесію відкликано (401/403). Локальний профіль лишається на
+             * місці — clearSession більше його не стирає — і саме він тут
+             * єдина копія даних, які могли не доїхати. Читаємо його, а не
+             * підсовуємо порожній бланк: людині треба перезайти, а не
+             * побачити застосунок без своєї історії.
+             */
+          }
+        }
+      }
+
+      cache = readLocalProfile();
+      return cache;
+      }
+
   const api = {
     mode: CLOUD ? 'cloud' : 'local',
     isCloud: CLOUD,
@@ -1203,6 +1467,7 @@
         return st;
       } catch (e) {
         // AUTH_REQUIRED тощо — кеш не чіпаємо, хай вирішує наступний виклик
+        reportUnexpected('account_state', e);
         return null;
       }
     },
@@ -1328,15 +1593,48 @@
          сервер напряму цим токеном, не записуючи його як свою сесію:
          інакше відмова від входу лишила б чужий токен у сховищі. */
       let me = null;
+      let offline = false;
       try {
-        const res = await fetch(URL_ + '/auth/v1/user', {
-          method: 'GET',
-          headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + at }
-        });
+        let res;
+        try {
+          res = await fetch(URL_ + '/auth/v1/user', {
+            method: 'GET',
+            headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + at }
+          });
+        } catch (netErr) {
+          /* fetch відхиляється лише коли зʼєднання не відбулось. */
+          offline = true;
+          throw netErr;
+        }
         if (!res.ok) throw new Error('HTTP ' + res.status);
         me = await res.json();
         if (!me || !me.id) throw new Error('no user');
       } catch (e) {
+        /*
+         * «МЕРЕЖІ НЕМАЄ» — ЦЕ НЕ «ПОСИЛАННЯ ВИКОРИСТАНЕ» (WEB-008).
+         *
+         * Раніше гілка не розрізняла ці випадки: людина в метро відкривала
+         * лист, бачила «посилання вже використане» — а фрагмент із токеном
+         * на той момент уже прибрано з адреси, тобто підтвердження спалено
+         * й повторити нічим. Тепер при мережевій відмові фрагмент
+         * повертається в адресу: токен живий ще годину, і перезавантаження
+         * при звʼязку спрацює.
+         */
+        /*
+         * Тимчасова відмова сервера — теж не «посилання використане»
+         * (SYN-017). 500 або 502 на GET /auth/v1/user нічого не каже про
+         * токен, а людині повідомлялось, що лист треба замовляти новий.
+         */
+        const retry = offline || (e && /HTTP 5\d\d/.test(String(e.message)));
+        if (retry) {
+          try { history.replaceState(null, '', location.pathname + location.search + '#' + h); } catch (_) {}
+          const off = new Error(offline
+            ? 'Немає звʼязку. Перезавантажте сторінку, коли зʼявиться мережа — посилання ще діє.'
+            : 'Сервер тимчасово не відповідає. Перезавантажте сторінку — посилання ще діє.');
+          off.code = offline ? 'link_offline' : 'link_retry';
+          off.offline = Boolean(offline);
+          throw off;
+        }
         const err = new Error('Посилання з листа вже використане або застаріле. Надішліть новий лист.');
         err.code = 'link_expired';
         throw err;
@@ -1586,6 +1884,104 @@
       }
     },
 
+    /**
+     * Чи знайшовся нечитабельний локальний профіль (LOC-001).
+     * Інтерфейс показує це банером: мовчазна втрата даних гірша за
+     * незрозуміле повідомлення.
+     * @returns {{found:boolean, keys:string[]}}
+     */
+    /**
+     * Скільки змін іще не в хмарі — для позначки синхронізації.
+     *
+     * Позначка читала лише довжину черги (SYN-019), а «є незіслані зміни»
+     * має ДВА джерела: черга і ib.profile.dirty. За матрицею відмов усі
+     * HTTP-помилки запису дають pending 0 і dirty true — тобто саме тоді,
+     * коли попередити треба найбільше, позначка мовчала.
+     *
+     * @returns {number} 0 — усе синхронізовано.
+     */
+    unsyncedCount: function () {
+      const q = pendingGet().length;
+      return q || (isDirty() ? 1 : 0);
+    },
+
+    /**
+     * Прогнати обʼєкт із файла імпорту крізь ланцюжок міграцій.
+     *
+     * ІМПОРТ ЙОГО НЕ ПРОХОДИВ (LOC-006). `version` свідомо не входить у
+     * білий список полів імпорту — імпорт це патч на вже версійований
+     * профіль, — тому патч лягав на профіль ПОТОЧНОЇ версії, і migrate()
+     * не виконував жодного кроку. Той самий обʼєкт, покладений напряму в
+     * ib.profile, мігрував; імпортований — ні. Тобто експорт річної
+     * давнини відновлювався в застарілій формі, і помітно це ставало
+     * далеко не одразу.
+     *
+     * Тут version читається саме з файла, як його бачив би storage.
+     *
+     * @param {object} data вміст файла експорту
+     * @returns {object} той самий вміст у формі поточної версії
+     */
+    /*
+     * Прогнати ФАЙЛ через міграції — але не роздути його до цілого профілю.
+     *
+     * migrate() працює лише на повній формі: кроки читають поля, яких у
+     * частковому файлі може не бути. Тому копія файла накладається на
+     * blankProfile() — і саме тут ховалась втрата даних: у результат
+     * потрапляли ВСІ поля бланка, тобто порожні {} для журналів, яких у
+     * файлі не було. Далі імпорт сумлінно записував ці порожні значення
+     * поверх наявних, і часткова копія (чи файл із "weightLog": null)
+     * стирала історію ваг, тіла й харчування. У хмарному режимі — одразу
+     * на всіх пристроях.
+     *
+     * Тепер із мігрованого повертаються лише: поля, які були у файлі;
+     * version; і те, що міграція справді ЗАПОВНИЛА (наприклад, weightLog,
+     * засіяний із weights кроком 1→2) — тобто відрізняється від бланка.
+     * Решта бланка відкидається, і імпорт лишається патчем, а не заміною.
+     */
+    migrateImported: function (data) {
+      if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+      const stored = Object.assign({}, data);
+      const migrated = migrate(Object.assign(blankProfile(), stored), stored);
+      if (!migrated || typeof migrated !== 'object') return migrated;
+
+      const blank = blankProfile();
+      const out = {};
+      Object.keys(migrated).forEach(function (k) {
+        if (k === 'version' || Object.prototype.hasOwnProperty.call(stored, k)) {
+          /*
+           * null у файлі лишається null.
+           *
+           * Інакше крок 1→2 перетворював "weightLog": null на порожній {},
+           * і перевірка імпорту («null означає не задано лише для
+           * скалярів») цього вже не бачила: до неї доходив порожній
+           * журнал, який виглядав як цілком легальне поле — і затирав
+           * історію. Рішення, що робити з null, ухвалює саме перевірка
+           * імпорту, а не міграція.
+           */
+          out[k] = stored[k] === null ? null : migrated[k];
+          return;
+        }
+        /* Поле, якого у файлі не було: беремо лише якщо міграція його
+           наповнила. Порівняння по JSON — форми тут прості (обʼєкти,
+           масиви, числа), а посилальна рівність тут ні про що не каже. */
+        let same = true;
+        try { same = JSON.stringify(migrated[k]) === JSON.stringify(blank[k]); }
+        catch (_) { same = migrated[k] === blank[k]; }
+        if (!same) out[k] = migrated[k];
+      });
+      return out;
+    },
+
+    corruptProfile: function () {
+      let keys = [];
+      try {
+        keys = Object.keys(localStorage).filter(function (k) {
+          return k.indexOf(LS_PROFILE + '.corrupt.') === 0;
+        });
+      } catch (_) {}
+      return { found: corruptSeen || keys.length > 0, keys: keys };
+    },
+
     discardLocalProfile: function () {
       cache = null;
       dropKeys([LS_PROFILE, LS_PENDING, DIRTY_KEY]);
@@ -1610,84 +2006,22 @@
       return cache || readLocalProfile();
     },
 
-    getProfile: async function () {
-      if (cache) return cache;
-
-      if (CLOUD && session && cloudAllowed()) {
-        const ok = await ensureFresh();
-        if (ok) {
-          try {
-            const rows = await req('/rest/v1/profiles?select=data&user_id=eq.' + session.user.id + '&limit=1');
-            const data = Array.isArray(rows) && rows[0] ? rows[0].data : null;
-
-            /*
-             * РЯДКА В ХМАРІ ЩЕ НЕМАЄ — це не те саме, що «в хмарі порожньо».
-             *
-             * Було: data || {} перетворювало відсутність рядка на порожній
-             * бланк, і той бланк ставав cache, а далі lsSet затирав ним
-             * локальний профіль. Тобто достатньо було відкрити сайт із
-             * сесією, для якої рядок ще не створено (щойно зареєструвався,
-             * перший запис не доїхав, рядок видалили) — і локальні дані
-             * зникали без жодного повідомлення.
-             *
-             * Порожня відповідь означає лише, що записувати ще нічого не
-             * встигли. Профіль у цьому випадку — локальний; наступне
-             * збереження створить рядок.
-             */
-            if (!data) {
-              cache = readLocalProfile();
-              return cache;
-            }
-
-            const remote = migrate(Object.assign(blankProfile(), data), data);
-
-            /*
-             * Локальна копія перемагає, якщо вона НОВІША і є незіслані патчі.
-             * Це той самий випадок «працював офлайн»: у хмарі лежить вчорашній
-             * рядок, а сьогоднішня робота чекає в черзі. Сліпа перевага хмари
-             * тут стирала б день роботи при кожному відкритті сайту.
-             *
-             * !remote.updatedAt — окремий випадок: старий хмарний рядок без
-             * позначки часу не має вигравати в локального, який її має.
-             */
-            const local = lsGet(LS_PROFILE, null);
-            if (local && (pendingGet().length || isDirty()) &&
-                local.updatedAt && (!remote.updatedAt ||
-                local.updatedAt > remote.updatedAt)) {
-              cache = migrate(Object.assign(blankProfile(), local), local);
-              flushPending().catch(function () {});
-              return cache;
-            }
-
-            cache = remote;
-            /*
-             * ДЗЕРКАЛО В localStorage — критично для сторожа.
-             *
-             * agegate.js — синхронний скрипт у <head>: він бачить лише
-             * ib.profile і вирішує, куди пускати. Без цього рядка вхід у
-             * чистому браузері зациклював сайт: welcome читав повний
-             * профіль із хмари й слав на index, а сторож на index бачив
-             * ПОРОЖНІЙ localStorage і гнав назад на welcome — нескінченне
-             * перезавантаження. Тепер прочитане з хмари одразу лягає туди,
-             * куди дивиться сторож.
-             */
-            lsSet(LS_PROFILE, cache);
-            return cache;
-          } catch (e) {
-            console.warn('[store] хмара недоступна, читаю локально:', e.message);
-            /*
-             * Сесію відкликано (401/403). Локальний профіль лишається на
-             * місці — clearSession більше його не стирає — і саме він тут
-             * єдина копія даних, які могли не доїхати. Читаємо його, а не
-             * підсовуємо порожній бланк: людині треба перезайти, а не
-             * побачити застосунок без своєї історії.
-             */
-          }
-        }
+    /**
+     * Профіль: із кеша, з хмари або локальний.
+     *
+     * ОДИН ЗАПИТ НА ВСІХ (PRF-004). Раніше перевірявся лише cache, а він
+     * зʼявляється тільки після відповіді — тож поки перший GET у польоті,
+     * кожен паралельний виклик робив власний. На завантаженні сторінки це
+     * 2–3 однакові запити: тема з app.js, ELO-хуки й сама сторінка.
+     */
+    getProfile: function () {
+      if (cache) return Promise.resolve(cache);
+      if (!inflightProfile) {
+        inflightProfile = loadProfile().then(function (v) {
+          inflightProfile = null; return v;
+        }, function (e) { inflightProfile = null; throw e; });
       }
-
-      cache = readLocalProfile();
-      return cache;
+      return inflightProfile;
     },
 
     /**
@@ -1702,6 +2036,17 @@
      * Помилка мережі — окремий випадок: патч іде в чергу, помилка кидається
      * з ознакою .queued, щоб інтерфейс сказав «збережеться, коли зʼявиться
      * мережа», а не «втрачено».
+     *
+     * ЖУРНАЛИ ПЕРЕДАЮТЬ ФУНКЦІЮ, А НЕ ОБʼЄКТ (SYN-011). Патч — це ціле
+     * значення поля, тож дві вкладки з однаковою базою затирали одна одну
+     * повністю. Функція викликається вже всередині ланцюга на актуальному
+     * профілі:
+     *
+     *   Store.saveProfile(function (p) {
+     *     return { bodyLog: Object.assign({}, p.bodyLog, { '2026-09-07': 82 }) };
+     *   });
+     *
+     * @param {object|function(object):object} patch
      */
     saveProfile: function (patch) {
       return queueWrite(function () { return doSave(patch); });
@@ -1727,10 +2072,26 @@
     saveProfileBeacon: function (patch) {
       const current = cache || readLocalProfile();
       const next = Object.assign({}, current, patch || {}, { updatedAt: new Date().toISOString() });
+      const prevCache = cache;
       cache = next;
       const okLocal = lsSet(LS_PROFILE, next);
+      /* Той самий принцип, що й у doSave (LOC-004). */
+      if (!okLocal && !(CLOUD && session)) cache = prevCache;
 
       if (!(CLOUD && session)) return okLocal;
+
+      /*
+       * ЄДИНИЙ ЗАПИС, ЯКИЙ НЕ ПРОХОДИТЬ ensureFresh (SYN-002).
+       *
+       * Сторінка вже закривається — оновлювати токен ніколи. Але й слати
+       * запит явно простроченим токеном немає сенсу: сервер відповість 401,
+       * а обробити відповідь буде вже нікому. Тому просто відкладаємо патч
+       * у чергу: він поїде з наступним відкриттям, коли токен живий.
+       */
+      if (Date.now() >= session.expires_at) {
+        pendingPush(patch || {});
+        return okLocal;
+      }
 
       const body = JSON.stringify([{ user_id: session.user.id, data: next }]);
       /*
@@ -1743,9 +2104,49 @@
     try { bytes = new Blob([body]).size; }
     catch (_) { bytes = body.length * 2; }
     if (bytes > 60000) {
-        // Не вліземо в ліміт keepalive — краще чесно покласти в чергу,
-        // ніж відправити запит, який браузер обірве на півдорозі.
-        pendingPush(patch || {});
+        /*
+         * ВЕСЬ ПРОФІЛЬ НЕ ВЛІЗЕ — ШЛЕМО САМ ПАТЧ (PRF-006).
+         *
+         * Тілом upsert-а є ВЕСЬ профіль, а він переростає 60 КБ приблизно
+         * після 40–60 записаних сесій. Тобто через місяць-два гілка
+         * keepalive ставала недосяжною назавжди: кожен запис при закритті
+         * вкладки лягав у чергу й доїжджав лише при наступному відкритті
+         * сайту. Дані не гинули, але «зберігається одразу» переставало
+         * бути правдою рівно для тих, хто користується довше за всіх.
+         *
+         * profile_patch(p_patch) зливає патч у рядок на СЕРВЕРІ
+         * (data || p_patch — те саме поверхневе злиття, що робить doSave).
+         * Для правок в «Акаунті» тіло — десятки байтів замість десятків
+         * кілобайтів.
+         *
+         * Патч журналу сесій сам по собі великий (це те саме поле, що й
+         * розпирає профіль), тож для нього лишається черга — інакше й бути
+         * не може: фізику ліміту не обійти.
+         */
+        const rpcBody = JSON.stringify({
+          p_patch: Object.assign({}, patch || {}, { updatedAt: next.updatedAt })
+        });
+        let rpcBytes;
+        try { rpcBytes = new Blob([rpcBody]).size; }
+        catch (_) { rpcBytes = rpcBody.length * 2; }
+        if (rpcBytes > 60000 || saveInFlight) {
+          pendingPush(patch || {});
+          return okLocal;
+        }
+        markDirty();
+        try {
+          fetch(URL_ + '/rest/v1/rpc/profile_patch', {
+            method: 'POST',
+            headers: authHeaders(true),
+            body: rpcBody,
+            keepalive: true
+          }).then(function (res) {
+            if (res && res.ok) clearDirty();
+            else pendingPush(patch || {});
+          }).catch(function () { pendingPush(patch || {}); });
+        } catch (_) {
+          pendingPush(patch || {});
+        }
         return okLocal;
       }
 
@@ -1803,8 +2204,14 @@
          s. Тобто кнопка обіцяла прибрати все, а стан тренування лишався
          видимим наступній людині за спільним компʼютером. Стару назву
          тримаємо для прибирання за минулими версіями. */
+      /* ib.cloud і ib.remember — теж сліди сайту: перший каже сторожу, що
+         тут хмарний режим, другий — де тримати сесію. Кнопка обіцяє
+         прибрати ВСЕ, і після неї браузер має виглядати так, наче сайт тут
+         не відкривали (LOC-011). store.js виставить ib.cloud назад сам при
+         наступному завантаженні. */
       dropKeys(PERSONAL_KEYS.concat(ELO_KEYS, [LS_SESSION, LS_BACKUP_LOGIN,
-        LS_OWNER, LS_ACCOUNT, 'forge.theme', 'forge.scheme']));
+        LS_OWNER, LS_ACCOUNT, 'forge.theme', 'forge.scheme',
+        'ib.cloud', 'ib.remember']));
       session = null;
       cache = null;
       emit();
@@ -1837,8 +2244,39 @@
      */
     const hadSession = CLOUD && !!session && cloudAllowed();
     const hadUid = (session && session.user) ? session.user.id : null;
-    const current = await api.getProfile();
-    const next = Object.assign({}, current, patch || {}, { updatedAt: new Date().toISOString() });
+    let current = await api.getProfile();
+
+    /*
+     * СВІЖІША КОПІЯ ЗІ СХОВИЩА ВИГРАЄ В КЕША ВКЛАДКИ (LOC-007).
+     *
+     * Кеш і ланцюг записів — свої на кожну вкладку, а синхронізує їх
+     * асинхронна подія storage, яка приходить уже ПІСЛЯ того, як друга
+     * вкладка зібрала свій next зі старого кеша. Патч першої зникав
+     * повністю. Перечитати сховище тут коштує мікросекунди й закриває
+     * вікно між подією та записом.
+     */
+    const stored = lsGet(LS_PROFILE, null);
+    if (stored && stored.updatedAt && (!current || !current.updatedAt ||
+        stored.updatedAt > current.updatedAt)) {
+      current = migrate(Object.assign(blankProfile(), stored), stored);
+      cache = current;
+    }
+
+    /*
+     * ПАТЧ МОЖЕ БУТИ ФУНКЦІЄЮ — І ДЛЯ ЖУРНАЛІВ МУСИТЬ (SYN-011).
+     *
+     * Патч — це ціле значення поля: {sessionLog: {…весь журнал…}}. Дві
+     * вкладки, які прочитали профіль до того, як хоч одна записала, будують
+     * свій обʼєкт з однакової бази — і другий запис затирає перший цілком.
+     * Ланцюг saveChain упорядковує записи всередині вкладки, але не робить
+     * другу вкладку свіжішою.
+     *
+     * Функція викликається ТУТ, усередині ланцюга, уже на актуальному
+     * профілі — тобто журнал добудовується поверх того, що записала сусідня
+     * вкладка, а не поверх того, що ця вкладка прочитала колись.
+     */
+    const applied = (typeof patch === 'function') ? (patch(current) || {}) : (patch || {});
+    const next = Object.assign({}, current, applied, { updatedAt: new Date().toISOString() });
 
     /*
      * ensureFresh ДО запису локальної копії.
@@ -1865,14 +2303,40 @@
     let fresh = true;
     if (wantCloud) fresh = await ensureFresh();
 
+    const prevCache = cache;
     cache = next;
     // Локальна копія пишеться завжди — офлайн-резерв
     const okLocal = lsSet(LS_PROFILE, next);
+    /*
+     * КЕШ НЕ БРЕШЕ ПРО ТЕ, ЧОГО У СХОВИЩІ НЕМАЄ (LOC-004).
+     *
+     * cache присвоювався ДО перевірки lsSet. Після невдалого запису
+     * (переповнена квота) у памʼяті лишалось значення, якого в сховищі
+     * немає, getProfile віддавав саме його — і всі сторінки вкладки
+     * показували «збережене» число аж до перезавантаження. У хмарному
+     * режимі це ще півбіди (запис поїде в мережу), а в локальному дані
+     * просто зникали при наступному відкритті.
+     */
+    if (!okLocal && !(CLOUD && session)) cache = prevCache;
+
+    /*
+     * СТАТУС НЕ approved — ЦЕ НЕ УСПІХ (SYN-015).
+     *
+     * Коли cloudAllowed() хибний (заявка ще на розгляді, кеш статусу
+     * порожній, акаунт заблокований), doSave просто пропускав усю хмарну
+     * гілку: запис ішов лише в localStorage, помилки не було, черга
+     * порожня, позначки немає. saveProfile при цьому обіцяє кидати виняток,
+     * якщо запис не доїхав. Кидати тут не можна — до підтвердження заявки
+     * робота й має жити локально, — але СЛІД лишити обовʼязково: інакше
+     * getProfile при першому ж підтвердженні візьме хмарний бланк і
+     * затре все, що людина встигла зробити.
+     */
+    if (CLOUD && session && !cloudAllowed()) markDirty();
 
     if (wantCloud) {
       /* !session — це саме той випадок: сесію відкликали дорогою. */
       if (!fresh || !session) {
-        throw queuedError(patch, 'Сесія прострочена або немає звʼязку — збережеться пізніше', hadUid);
+        throw queuedError(applied, 'Сесія прострочена або немає звʼязку — збережеться пізніше', hadUid);
       }
       try {
         saveInFlight++;
@@ -1887,7 +2351,7 @@
         }
       } catch (e) {
         if (e && (e.offline || !e.status)) {
-          throw queuedError(patch, 'Немає звʼязку — збережеться, коли зʼявиться мережа', hadUid);
+          throw queuedError(applied, 'Немає звʼязку — збережеться, коли зʼявиться мережа', hadUid);
         }
         console.warn('[store] не збереглось у хмару:', e.message);
         emit();
@@ -2004,8 +2468,16 @@
     }
 
     if (e.key !== LS_PROFILE) return;
-    cache = null;
-    api.getProfile().then(emit, function () {});
+    /*
+     * СУСІДНЯ ВКЛАДКА ВЖЕ ПОКЛАЛА НОВЕ ЗНАЧЕННЯ — воно в події (PRF-004).
+     *
+     * Раніше тут скидався кеш і йшов GET у мережу. Тобто кожне збереження
+     * в одній вкладці породжувало мережевий запит у КОЖНІЙ іншій — при
+     * тренуванні з дебаунсом це десятки зайвих запитів за сесію, і всі за
+     * тими самими даними, що вже лежать у localStorage.
+     */
+    cache = readLocalProfile();
+    emit();
   });
 
   if (CLOUD) {

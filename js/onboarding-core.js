@@ -90,11 +90,33 @@
    * Профіль уже жив: є журнали. Доказ користування, виведений з даних, —
    * захист наявних користувачів від повторного онбордингу.
    */
+  /*
+   * weightLog рахується лише з РЕАЛЬНОЮ вагою (UX-004).
+   *
+   * Онбординг вважався пройденим, щойно в профілі зʼявлявся журнал робочих
+   * ваг — навіть якщо сама вага нуль, тобто критерій кроку «програма»
+   * (хоча б одна вага > 0) НЕ виконано. Достатньо було вписати «0» у перше
+   * поле робочої ваги на plan.html, і банер одразу писав «Готово — профіль
+   * повний», хоча програми фактично немає. Нуль означає «вагу знято», а не
+   * подію журналу.
+   */
+  function hasLoggedWeight(log) {
+    if (!nonEmpty(log)) return false;
+    return Object.keys(log).some(function (name) {
+      const recs = log[name];
+      if (!Array.isArray(recs)) return false;
+      return recs.some(function (r) {
+        const n = Number(r && r.kg);
+        return Number.isFinite(n) && n > 0;
+      });
+    });
+  }
+
   function hasHistory(p) {
     if (!p) return false;
     return nonEmpty(p.bodyLog) || nonEmpty(p.workLog) ||
       nonEmpty(p.sessionLog) || nonEmpty(p.mealLog) ||
-      nonEmpty(p.weightLog) || nonEmpty(p.trackerLog);
+      hasLoggedWeight(p.weightLog) || nonEmpty(p.trackerLog);
   }
 
   /**

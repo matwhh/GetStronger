@@ -64,14 +64,27 @@ async function landing(p, f) {
 
 /* ---- 1. Матриця: кожен крок × кожна сторінка ---- */
 {
-  /* Вік не пройдено: усе веде на welcome. */
+  /*
+   * Вік не пройдено: усе веде на welcome — крім account.html.
+   *
+   * LOC-005: єдиний інтерфейс імпорту резервної копії живе на account.html.
+   * У чистому браузері (або одразу після «Стерти дані в цьому браузері»)
+   * профілю немає, крок = age, і сторож пускав лише на welcome.html, де
+   * слова «імпорт» немає взагалі. Тобто відновитися з власного експорту
+   * було неможливо рівно тоді, коли це й потрібно. Виняток вузький: лише
+   * поки дати народження немає ЗОВСІМ (дитяча дата — це відповідь «ні»,
+   * і її account.html не пускає).
+   */
   const { ctx, p } = await fresh(null);
   let bad = [];
   for (const f of PAGES) {
+    if (f === 'account.html') continue;
     const got = await landing(p, f);
     if (got !== 'welcome.html') bad.push(f + '→' + got);
   }
-  ok('1. без віку всі ' + PAGES.length + ' сторінок ведуть на welcome', bad.length === 0, bad.join(', '));
+  ok('1. без віку всі ' + (PAGES.length - 1) + ' сторінок ведуть на welcome', bad.length === 0, bad.join(', '));
+  ok('1. account.html доступна для імпорту копії (LOC-005)',
+     (await landing(p, 'account.html')) === 'account.html');
   await ctx.close();
 }
 {

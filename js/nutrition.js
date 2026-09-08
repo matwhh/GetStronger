@@ -181,6 +181,16 @@
     // сторінка «Харчування» рахувала за Mifflin (2759 ккал), а «Раціон» —
     // за Katch (1645 ккал). Різниця 1114 ккал для одного профілю.
     const hasBF = inRange(bodyfat, L.bodyfat);
+    /*
+     * ПРОІГНОРОВАНИЙ ЖИР ТРЕБА НАЗВАТИ ВГОЛОС (UX-008).
+     *
+     * Поле необовʼязкове, тому в bad воно не йде — блокувати розрахунок
+     * через нього не можна. Але мовчазне ігнорування було гірше за
+     * блокування: значення лишалось у полі, а формула непомітно
+     * переходила з Katch-McArdle на Mifflin-St Jeor. Для одного профілю
+     * це понад 1000 ккал різниці — і жодної підказки, звідки вона.
+     */
+    const bfIgnored = Number.isFinite(bodyfat) && !hasBF;
     const method = hasBF ? 'Katch-McArdle (за сухою масою)' : 'Mifflin-St Jeor';
     const lbm = hasBF ? weight * (1 - bodyfat / 100) : null;
 
@@ -343,6 +353,16 @@
                   ? ' <a href="https://pubmed.ncbi.nlm.nih.gov/' + goal.pmid + '/" target="_blank" rel="noopener">PMID ' + goal.pmid + '</a>'
                   : '') +
               '</div>' +
+            '</div>'
+          : '') +
+
+        (bfIgnored
+          ? '<div class="notice">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9L2.4 17a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>' +
+              '<div>Відсоток жиру (' + round(bodyfat, 1) + '%) поза межами ' +
+                L.bodyfat[0] + '–' + L.bodyfat[1] + '% — це поле проігноровано, ' +
+                'розрахунок пішов за Mifflin-St Jeor. Виправте його або приберіть, ' +
+                'щоб отримати оцінку за сухою масою.</div>' +
             '</div>'
           : '') +
 
@@ -628,6 +648,26 @@
 
   async function init() {
     if (!$('#nutri-out')) return;
+
+    /*
+     * МЕТИ — З ЯДРА, А НЕ З РОЗМІТКИ (TXT-003).
+     *
+     * У nutrition.html підписи були написані руками: «Набір маси» проти
+     * «Набір мʼязової маси» і «Скидання» проти «Скидання ваги» в ядрі.
+     * Та сама мета під двома назвами на сусідніх сторінках — і жодного
+     * способу помітити розходження, крім читання очима. Сторінка «Акаунт»
+     * уже бере підписи з NutritionCalc.GOALS; тепер і ця.
+     *
+     * Порядок фіксований: від набору до дефіциту, як було в розмітці.
+     */
+    const goalSeg = $('#n-goal-seg');
+    if (goalSeg && !goalSeg.children.length) {
+      const ORDER = ['bulk', 'bulkfast', 'recomp', 'maintain', 'cut', 'cutfast'];
+      goalSeg.innerHTML = ORDER.filter(k => GOALS[k]).map(k =>
+        '<label class="seg__item"><input type="radio" name="goal" value="' + k + '"' +
+        (k === 'maintain' ? ' checked' : '') + '><span>' + esc(GOALS[k].label) + '</span></label>'
+      ).join('');
+    }
 
     // Заповнити список активності
     const act = $('#n-activity');

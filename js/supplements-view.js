@@ -174,7 +174,10 @@
       '<div class="card">' +
         '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
           '<h2 style="margin:0">Що з цього працює</h2>' +
-          '<span class="chip chip--acc">' + SUPPLEMENTS.length + ' позицій</span>' +
+          /* TXT-004: тут було зашите «позицій», і на двох добавках чип казав
+             «2 позицій». Число і слово беруться з одного джерела. */
+          '<span class="chip chip--acc">' + SUPPLEMENTS.length + ' ' +
+            window.App.plural(SUPPLEMENTS.length, 'позиція', 'позиції', 'позицій') + '</span>' +
         '</div>' +
         '<p class="small muted mt-1">' +
           'Рівень доказовості — це не оцінка «добре / погано», а відповідь на питання, ' +

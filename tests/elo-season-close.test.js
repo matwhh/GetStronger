@@ -12,17 +12,24 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
+import { readFileSync } from 'node:fs';
 
 const EC = loadModules(['js/elo-core.js']).EloCore;
 
-/** Чинна реалізація: день перед початком поточного сезону. */
-function prevSeason(now) {
-  const range = EC.seasonRange(EC.seasonOf(now));
-  const before = new Date(range[0].getFullYear(), range[0].getMonth(), range[0].getDate() - 1);
-  return EC.seasonOf(before);
-}
+/*
+ * ПЕРЕВІРЯЄМО ПРОДАКШЕН-ФУНКЦІЮ, А НЕ ЇЇ ДВІЙНИКА.
+ *
+ * Тут лежала копія реалізації, і 366 днів ганялись через неї; сам
+ * js/elo-api.js не завантажував жоден тест (TST-001). Копія розходиться з
+ * оригіналом тихо — а ціна розбіжності тут висока: сезон, що не
+ * закривається, це ні історії, ні нагород, ні звіту.
+ *
+ * Арифметику винесено в EloCore.previousSeasonCode; elo-api.js кличе саме
+ * її.
+ */
+const prevSeason = EC.previousSeasonCode;
 
-/** Стара реалізація — лишена в тесті як доказ, що баг був справжній. */
+/** Стара реалізація — лишена як доказ, що баг був справжній (див. нижче). */
 function prevSeasonOld(now) {
   const p = new Date(now);
   p.setMonth(p.getMonth() - 3);
@@ -80,5 +87,17 @@ describe('Попередній сезон', () => {
         assert.match(prev, /^(WINTER|SPRING|SUMMER|AUTUMN)-\d{4}$/);
       }
     }
+  });
+});
+
+describe('Продакшен-код справді кличе ядро', () => {
+  test('js/elo-api.js не має власної копії арифметики сезону', () => {
+    /* Копія в елo-api.js була б непомітною для цього файла — саме через
+       це TST-001 і виникла. Перевіряємо текстом: інакше наступна копія
+       знову проживе рік. */
+    const src = readFileSync(new URL('../js/elo-api.js', import.meta.url), 'utf8');
+    assert.ok(src.includes('previousSeasonCode('), 'elo-api.js має кликати ядро');
+    assert.ok(!/setMonth\(\s*\w+\.getMonth\(\)\s*-\s*3/.test(src),
+      'у elo-api.js знову зʼявилась наївна арифметика «мінус три місяці»');
   });
 });

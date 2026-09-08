@@ -54,6 +54,7 @@ const PAGES = [
   { file: 'boxing.html',         priority: '0.7', changefreq: 'monthly' },
   { file: 'journal.html',        priority: '0.7', changefreq: 'monthly' },
   { file: 'trackers.html',       priority: '0.7', changefreq: 'monthly' },
+  { file: 'trackers-settings.html', priority: '0.5', changefreq: 'monthly' },
   { file: 'rating.html',         priority: '0.6', changefreq: 'monthly' },
   { file: 'nutrition.html',      priority: '0.9', changefreq: 'monthly' },
   { file: 'meals.html',          priority: '0.8', changefreq: 'monthly' },

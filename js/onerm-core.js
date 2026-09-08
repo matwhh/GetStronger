@@ -130,11 +130,22 @@
   function oneRepMax(weight, reps) {
     const w = num(weight);
     const r = num(reps);
-    if (w === null || w <= 0) return null;
-    // Нуль або відʼємне — це «підхід не зроблено», а не разовий максимум.
-    // Умова r <= 1 ловила і їх теж: oneRepMax(100, 0) повертав 100.
-    if (r !== null && r <= 0) return null;
-    if (r === 1) return w > MAX_WEIGHT ? null : w;
+    /*
+     * ТІ САМІ МЕЖІ, ЩО Й В estimates() (TIM-001, TST-009).
+     *
+     * estimates() відсіює w > 500 і r > 36, а тут межа ваги перевірялась
+     * ЛИШЕ для r === 1, а кількість повторень не перевірялась узагалі.
+     * Наслідок: oneRepMax(600, 5) = 699,5 при estimates(600, 5) = [];
+     * oneRepMax(100, 100) = 204,8; oneRepMax(100, undefined) = 99,36 —
+     * бо num(undefined) давало null, і формули рахувались із нуля.
+     *
+     * Два джерела правди про «що взагалі можна порахувати» — це два
+     * різні числа на одній сторінці, і людина не має способу зрозуміти,
+     * яке з них справжнє.
+     */
+    if (w === null || w <= 0 || w > MAX_WEIGHT) return null;
+    if (r === null || r < 1 || r > MAX_REPS) return null;
+    if (r === 1) return w;
 
     /*
      * Медіану беремо з ПОВНОГО набору формул, а санітарну межу

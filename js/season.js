@@ -272,20 +272,26 @@
   };
 
   /** Деталі підсумку сезону (§19): категорії, дні, grace, екстремуми. */
+  /* Число або порожньо. Звіт приходить із localStorage, а туди його могла
+     покласти не лише наша ж відповідь сервера (WEB-002): усе, що йде в
+     innerHTML нижче, мусить бути числом за побудовою, а не за вірою. */
+  function n(v) { var x = Number(v); return Number.isFinite(x) ? x : null; }
+  function ns(v, dflt) { var x = n(v); return x === null ? (dflt === undefined ? '' : dflt) : String(x); }
+
   function reportStats(rep) {
     var st = rep.stats || {};
     var rows = Object.keys(CAT_UA).filter(function (c) { return st[c]; }).map(function (c) {
       var s = st[c];
       return '<div class="row row--split small" style="padding:4px 0">' +
         '<span class="muted">' + CAT_UA[c] + '</span>' +
-        '<span class="mono">' + (s.elo >= 0 ? '+' : '') + s.elo + ' ELO · якість ' +
+        '<span class="mono">' + (n(s.elo) >= 0 ? '+' : '') + ns(s.elo, '0') + ' ELO · якість ' +
           Math.round((Number(s.avgQuality) || 0) * 100) + '%</span></div>';
     }).join('');
     var extra = [];
-    if (rep.daysActive != null) extra.push('Активних днів: <b class="mono">' + rep.daysActive + '/' + (rep.daysTotal || 92) + '</b>');
-    if (rep.graceUsed != null) extra.push('Grace Weeks: <b class="mono">' + rep.graceUsed + '/2</b>');
-    if (st.biggestGain != null) extra.push('Найкращий день: <b class="mono">+' + st.biggestGain + '</b>');
-    if (st.biggestLoss != null && st.biggestLoss < 0) extra.push('Найгірший день: <b class="mono">' + st.biggestLoss + '</b>');
+    if (n(rep.daysActive) !== null) extra.push('Активних днів: <b class="mono">' + ns(rep.daysActive) + '/' + ns(rep.daysTotal, '92') + '</b>');
+    if (n(rep.graceUsed) !== null) extra.push('Grace Weeks: <b class="mono">' + ns(rep.graceUsed) + '/2</b>');
+    if (n(st.biggestGain) !== null) extra.push('Найкращий день: <b class="mono">+' + ns(st.biggestGain) + '</b>');
+    if (n(st.biggestLoss) !== null && n(st.biggestLoss) < 0) extra.push('Найгірший день: <b class="mono">' + ns(st.biggestLoss) + '</b>');
     if (st.bestCategory) extra.push('Сильна категорія: <b>' + (CAT_UA[st.bestCategory] || esc(st.bestCategory || '')) + '</b>');
     if (st.weakestCategory && st.weakestCategory !== st.bestCategory) {
       extra.push('Слабка категорія: <b>' + (CAT_UA[st.weakestCategory] || esc(st.weakestCategory || '')) + '</b>');
@@ -302,15 +308,15 @@
     $('#sz-report').innerHTML = card(
       '<h2 style="margin:0 0 6px">Сезон завершено</h2>' +
       '<div class="rating-hero">' +
-        '<span class="rating-hero__val mono">' + rep.elo + '<span class="tile__of"> ELO</span></span>' +
+        '<span class="rating-hero__val mono">' + ns(rep.elo, '0') + '<span class="tile__of"> ELO</span></span>' +
         '<span class="rating-hero__meta">' +
-          '<span class="lvl-circle">' + window.App.levelIcon(rep.level, 'Level ' + rep.level) + '</span>' +
-          '<span class="small muted">Level ' + rep.level + (rep.elite ? ' — ELITE' : '') + '</span>' +
+          '<span class="lvl-circle">' + window.App.levelIcon(n(rep.level), 'Level ' + ns(rep.level)) + '</span>' +
+          '<span class="small muted">Level ' + ns(rep.level) + (rep.elite === true ? ' — ELITE' : '') + '</span>' +
         '</span>' +
       '</div>' +
       '<p class="small mt-1" style="margin-bottom:8px">' +
-        (rep.rank ? 'Місце: <b class="mono">#' + rep.rank + '</b> із ' + rep.of : '') +
-        (rep.percentile ? ' · Top ' + rep.percentile + '%' : '') +
+        (n(rep.rank) ? 'Місце: <b class="mono">#' + ns(rep.rank) + '</b> із ' + ns(rep.of) : '') +
+        (n(rep.percentile) ? ' · Top ' + ns(rep.percentile) + '%' : '') +
       '</p>' +
       reportStats(rep) +
       '<button class="btn btn--ghost btn--sm" type="button" id="sz-report-hide">Сховати звіт</button>');

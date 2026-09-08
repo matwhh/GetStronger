@@ -1,0 +1,4549 @@
+{
+ "account.html": {
+  "title": "Акаунт — FORGE",
+  "url": "account.html",
+  "h1": [
+   "Акаунт"
+  ],
+  "h2": [
+   "Сесія",
+   "Мої дані",
+   "Приватність"
+  ],
+  "links": [
+   "plan.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Вийти",
+    "id": "a-signout",
+    "data": ""
+   },
+   {
+    "t": "Експортувати JSON",
+    "id": "p-export",
+    "data": ""
+   },
+   {
+    "t": "Імпортувати JSON",
+    "id": "p-import",
+    "data": ""
+   },
+   {
+    "t": "Стерти локальні дані",
+    "id": "p-clear",
+    "data": ""
+   },
+   {
+    "t": "Видалити акаунт",
+    "id": "p-delete-acc",
+    "data": ""
+   },
+   {
+    "t": "Монохром",
+    "id": "",
+    "data": "themePick"
+   },
+   {
+    "t": "Navy blue",
+    "id": "",
+    "data": "themePick"
+   },
+   {
+    "t": "Дерево",
+    "id": "",
+    "data": "themePick"
+   },
+   {
+    "t": "Рожевий",
+    "id": "",
+    "data": "themePick"
+   },
+   {
+    "t": "Фіолетовий",
+    "id": "",
+    "data": "themePick"
+   },
+   {
+    "t": "Багрянець",
+    "id": "",
+    "data": "themePick"
+   },
+   {
+    "t": "Мох",
+    "id": "",
+    "data": "themePick"
+   },
+   {
+    "t": "Смарагд",
+    "id": "",
+    "data": "themePick"
+   },
+   {
+    "t": "Океан",
+    "id": "",
+    "data": "themePick"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "p-age",
+    "name": "",
+    "data": "p",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "p-height",
+    "name": "",
+    "data": "p",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "p-weight",
+    "name": "",
+    "data": "p",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "p-bodyfat",
+    "name": "",
+    "data": "p",
+    "im": "decimal"
+   },
+   {
+    "tag": "SELECT",
+    "type": "select-one",
+    "id": "p-activity",
+    "name": "",
+    "data": "p",
+    "im": ""
+   },
+   {
+    "tag": "SELECT",
+    "type": "select-one",
+    "id": "p-goal",
+    "name": "",
+    "data": "p",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "p-meals",
+    "name": "",
+    "data": "p",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "daysPerWeek",
+    "data": "p",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "daysPerWeek",
+    "data": "p",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "daysPerWeek",
+    "data": "p",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "daysPerWeek",
+    "data": "p",
+    "im": ""
+   },
+   {
+    "tag": "SELECT",
+    "type": "select-one",
+    "id": "p-trainingAge",
+    "name": "",
+    "data": "p",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "p-hrRest",
+    "name": "",
+    "data": "p",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "p-hrMax",
+    "name": "",
+    "data": "p",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "file",
+    "id": "p-import-file",
+    "name": "",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "p-scheme",
+    "name": "",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/nutrition-core.js",
+   "js/bmi-core.js",
+   "js/measure-core.js",
+   "js/programs-data.js",
+   "js/account.js"
+  ],
+  "domNodes": 357,
+  "errors": []
+ },
+ "admin.html": {
+  "title": "Адмін — FORGE",
+  "url": "admin.html",
+  "h1": [
+   "Адміністрування"
+  ],
+  "h2": [],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Оновити",
+    "id": "adm-reload",
+    "data": ""
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adm-tab",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adm-tab",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adm-f",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adm-f",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/admin.js",
+   "js/admin-elo.js"
+  ],
+  "domNodes": 177,
+  "errors": []
+ },
+ "boxing.html": {
+  "title": "Бокс: тренування на мішку — FORGE",
+  "url": "boxing.html",
+  "h1": [
+   "Бокс"
+  ],
+  "h2": [
+   "1. Розминка",
+   "2. Техніка",
+   "3. Тіньовий бій",
+   "4. Мішок",
+   "5. Завершення"
+  ],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Скопіювати тренування",
+    "id": "copy-session",
+    "data": ""
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "TEXTAREA",
+    "type": "textarea",
+    "id": "",
+    "name": "",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/boxing-data.js",
+   "js/boxing.js"
+  ],
+  "domNodes": 524,
+  "errors": []
+ },
+ "calculator.html": {
+  "title": "Калькулятор разового максимуму (1ПМ) — FORGE",
+  "url": "calculator.html",
+  "h1": [
+   "Разовий максимум"
+  ],
+  "h2": [
+   "Мої рекорди"
+  ],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Зберегти як рекорд",
+    "id": "orm-save",
+    "data": ""
+   },
+   {
+    "t": "Точність оцінкиЧому сім формул і яка похибка",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "orm-weight",
+    "name": "",
+    "data": "",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "orm-reps",
+    "name": "",
+    "data": "",
+    "im": "numeric"
+   },
+   {
+    "tag": "SELECT",
+    "type": "select-one",
+    "id": "orm-lift",
+    "name": "",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/onerm-core.js",
+   "js/onerm.js"
+  ],
+  "domNodes": 412,
+  "errors": []
+ },
+ "cardio.html": {
+  "title": "Кардіо: пульсові зони й LISS проти HIIT — FORGE",
+  "url": "cardio.html",
+  "h1": [
+   "Кардіо"
+  ],
+  "h2": [
+   "Скільки й коли бігати",
+   "Що стоїть за цифрами"
+  ],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Зберегти мої дані",
+    "id": "c-save",
+    "data": ""
+   },
+   {
+    "t": "Головне «Зона жироспалювання» не робить того, що обіцяє назв",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "VO2max Чому саме 4 × 4 хвилини",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Формули Максимум пульсу й резерв",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Межі Чого цей калькулятор не враховує",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "cardio-goal",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "cardio-goal",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "c-age",
+    "name": "",
+    "data": "",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "c-rest",
+    "name": "",
+    "data": "",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "c-max",
+    "name": "",
+    "data": "",
+    "im": "numeric"
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/cardio.js"
+  ],
+  "domNodes": 358,
+  "errors": []
+ },
+ "index.html": {
+  "title": "FORGE — сьогодні",
+  "url": "index.html",
+  "h1": [
+   "Середа, 2 вересня"
+  ],
+  "h2": [
+   "Харчування",
+   "Сезон",
+   "Тиждень"
+  ],
+  "links": [
+   "workout.html",
+   "nutrition.html",
+   "journal.html",
+   "trackers.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [],
+  "inputs": [],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/history-core.js",
+   "js/exercises.js",
+   "js/reps-core.js",
+   "js/programs-data.js",
+   "js/foods.js",
+   "js/recipes-data.js",
+   "js/day-core.js",
+   "js/nutrition-core.js",
+   "js/tracker-core.js",
+   "js/workout-core.js",
+   "js/today.js"
+  ],
+  "domNodes": 229,
+  "errors": []
+ },
+ "journal.html": {
+  "title": "Прогрес: вага тіла й тренування — FORGE",
+  "url": "journal.html",
+  "h1": [
+   "Прогрес"
+  ],
+  "h2": [
+   "Огляд",
+   "План тренувань",
+   "План харчування",
+   "Вага тіла",
+   "Тренування",
+   "Робочі ваги",
+   "Прогрес вправи",
+   "Особисті рекорди",
+   "Харчування",
+   "Трекери"
+  ],
+  "links": [
+   "rating.html",
+   "workout.html",
+   "meals.html",
+   "plan.html",
+   "trackers-settings.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Записати",
+    "id": "w-add",
+    "data": ""
+   },
+   {
+    "t": "1 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "2 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "3 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "4 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "5 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "6 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "7 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "8 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "9 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "10 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "11 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "12 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "13 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "14 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "15 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "16 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "17 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "18 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "19 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "20 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "21 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "22 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "23 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "24 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "25 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "26 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "27 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "28 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "29 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "30 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "31 березня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "1 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "2 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "3 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "4 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "5 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "6 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "7 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "8 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "9 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "10 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "11 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "12 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "13 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "14 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "15 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "16 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "17 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "18 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "19 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "20 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "21 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "22 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "23 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "24 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "25 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "26 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "27 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "28 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "29 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "30 квітня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "1 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "2 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "3 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "4 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "5 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "6 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "7 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "8 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "9 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "10 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "11 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "12 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "13 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "14 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "15 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "16 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "17 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   },
+   {
+    "t": "18 травня: тренування не позначено. Натисніть, щоб змінити",
+    "id": "",
+    "data": "hm"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "jr-view",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "jr-view",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adh-period",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adh-period",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adh-period",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adh-period",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adh-period",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adh-period",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "adh-period",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "w-kg",
+    "name": "",
+    "data": "",
+    "im": "decimal"
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/history-core.js",
+   "js/season-core.js",
+   "js/progress-core.js",
+   "js/adherence-core.js",
+   "js/onerm-core.js",
+   "js/exercise-core.js",
+   "js/tracker-core.js",
+   "js/journal.js"
+  ],
+  "domNodes": 580,
+  "errors": []
+ },
+ "legal.html": {
+  "title": "Правові документи — FORGE",
+  "url": "legal.html",
+  "h1": [
+   "Правові документи"
+  ],
+  "h2": [
+   "Політика конфіденційності",
+   "Умови використання",
+   "Медичне застереження",
+   "Застереження щодо тренувань і харчування"
+  ],
+  "links": [
+   "welcome.html"
+  ],
+  "navLinks": [
+   "#privacy",
+   "#terms",
+   "#medical",
+   "#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "← Назад",
+    "id": "",
+    "data": ""
+   }
+  ],
+  "inputs": [],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [],
+  "domNodes": 99,
+  "errors": []
+ },
+ "meals.html": {
+  "title": "Раціон: продукти, рецепти й план дня — FORGE",
+  "url": "meals.html",
+  "h1": [
+   "Раціон"
+  ],
+  "h2": [
+   "День",
+   "Продукти",
+   "Рецепти"
+  ],
+  "links": [
+   "nutrition.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Закрити день",
+    "id": "d-close",
+    "data": ""
+   },
+   {
+    "t": "Очистити",
+    "id": "d-clear",
+    "data": ""
+   },
+   {
+    "t": "+ Додати продукт",
+    "id": "",
+    "data": "addTo"
+   },
+   {
+    "t": "+ Додати продукт",
+    "id": "",
+    "data": "addTo"
+   },
+   {
+    "t": "+ Додати продукт",
+    "id": "",
+    "data": "addTo"
+   },
+   {
+    "t": "+ Додати продукт",
+    "id": "",
+    "data": "addTo"
+   },
+   {
+    "t": "Розгорнути",
+    "id": "",
+    "data": "fold"
+   },
+   {
+    "t": "Згорнути",
+    "id": "",
+    "data": "fold"
+   },
+   {
+    "t": "Створити рецепт",
+    "id": "r-new",
+    "data": ""
+   },
+   {
+    "t": "Склад",
+    "id": "",
+    "data": "rToggle"
+   },
+   {
+    "t": "Зробити копію",
+    "id": "",
+    "data": "rCopy"
+   },
+   {
+    "t": "Додати в день…",
+    "id": "",
+    "data": "addRecipe"
+   },
+   {
+    "t": "ІнгредієнтиЩо потрібно",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Звідки числа й наскільки їм віритиДжерела складу продуктів і",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "search",
+    "id": "d-quick",
+    "name": "",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 1,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/history-core.js",
+   "js/foods.js",
+   "js/recipes-data.js",
+   "js/day-core.js",
+   "js/nutrition-core.js",
+   "js/meals.js"
+  ],
+  "domNodes": 356,
+  "errors": []
+ },
+ "measure.html": {
+  "title": "Заміри тіла — FORGE",
+  "url": "measure.html",
+  "h1": [
+   "Заміри тіла"
+  ],
+  "h2": [
+   "Останній замір"
+  ],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "+ Новий замір",
+    "id": "ms-new",
+    "data": ""
+   },
+   {
+    "t": "Як мірятиЯк міряти, щоб цифри мали сенс",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/history-core.js",
+   "js/measure-core.js",
+   "js/measure.js"
+  ],
+  "domNodes": 182,
+  "errors": []
+ },
+ "nutrition.html": {
+  "title": "План харчування: калорії та макроси — FORGE",
+  "url": "nutrition.html",
+  "h1": [
+   "План харчування"
+  ],
+  "h2": [
+   "Що стоїть за цифрами"
+  ],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Зберегти мої дані",
+    "id": "n-save",
+    "data": ""
+   },
+   {
+    "t": "Білок Скільки треба",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Дефіцит Швидкість втрати ваги",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Профіцит Чому агресивний набір не дає більше мʼязів",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Формули Mifflin-St Jeor і Katch-McArdle",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Межі Чого калькулятор не враховує",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "sex",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "sex",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "n-age",
+    "name": "",
+    "data": "",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "n-height",
+    "name": "",
+    "data": "",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "n-weight",
+    "name": "",
+    "data": "",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "n-bodyfat",
+    "name": "",
+    "data": "",
+    "im": "decimal"
+   },
+   {
+    "tag": "SELECT",
+    "type": "select-one",
+    "id": "n-activity",
+    "name": "",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "goal",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "goal",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "goal",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "goal",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "goal",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "goal",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/nutrition-core.js",
+   "js/nutrition.js"
+  ],
+  "domNodes": 365,
+  "errors": []
+ },
+ "periodization.html": {
+  "title": "Періодизація: цикл на 8–16 тижнів — FORGE",
+  "url": "periodization.html",
+  "h1": [
+   "Періодизація"
+  ],
+  "h2": [
+   "Спочатку потрібен план",
+   "Цикл",
+   "Нема з чого рахувати"
+  ],
+  "links": [
+   "programs.html",
+   "plan.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Запустити цикл",
+    "id": "pd-start-cycle",
+    "data": ""
+   },
+   {
+    "t": "Скопіювати таблицю",
+    "id": "pd-copy",
+    "data": ""
+   },
+   {
+    "t": "Як це рахуєтьсяФормула циклу й межі інтенсивності",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "SELECT",
+    "type": "select-one",
+    "id": "pd-weeks",
+    "name": "",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "pd-cadence",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "pd-cadence",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "pd-start",
+    "name": "",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "pd-mode",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "pd-mode",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "number",
+    "id": "pd-end",
+    "name": "",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/exercises.js",
+   "js/reps-core.js",
+   "js/programs-data.js",
+   "js/onerm-core.js",
+   "js/periodization-core.js",
+   "js/periodization.js"
+  ],
+  "domNodes": 292,
+  "errors": []
+ },
+ "plan.html": {
+  "title": "Мій план тренувань і прогноз ваг — FORGE",
+  "url": "plan.html",
+  "h1": [
+   "Мій план"
+  ],
+  "h2": [
+   "План ще не обрано",
+   "Full Body",
+   "Прогноз"
+  ],
+  "links": [
+   "programs.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Скопіювати план",
+    "id": "copy-plan",
+    "data": ""
+   },
+   {
+    "t": "Робочі вагиКрок ваги та зниження ваги в усіх вправах",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "−2,5 кг",
+    "id": "",
+    "data": "bump"
+   },
+   {
+    "t": "+2,5 кг",
+    "id": "",
+    "data": "bump"
+   },
+   {
+    "t": "−5 кг на ноги",
+    "id": "",
+    "data": "bumpLegs"
+   },
+   {
+    "t": "+5 кг на ноги",
+    "id": "",
+    "data": "bumpLegs"
+   },
+   {
+    "t": "Знизити ваги",
+    "id": "deload-go",
+    "data": ""
+   },
+   {
+    "t": "Додати +10%",
+    "id": "deload-add",
+    "data": ""
+   },
+   {
+    "t": "РозминкаОднакова для всіх тренувань · у тижневий обʼєм не вх",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Початковий план",
+    "id": "reset-plan",
+    "data": ""
+   },
+   {
+    "t": "Редагувати",
+    "id": "toggle-edit",
+    "data": ""
+   },
+   {
+    "t": "1День AУсе тіло · 14 вправ · 34 підходів · ~106 хв",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "2День BУсе тіло · 14 вправ · 34 підходів · ~106 хв",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "3День CУсе тіло · 14 вправ · 34 підходів · ~106 хв",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "ЗаминкаОднакова для всіх тренувань",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Прогресія та як це виконуватиЯк додавати вагу і як читати пл",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Зняти вибір",
+    "id": "drop-plan",
+    "data": ""
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "bump-legs",
+    "name": "",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "SELECT",
+    "type": "select-one",
+    "id": "deload-pct",
+    "name": "",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "TEXTAREA",
+    "type": "textarea",
+    "id": "",
+    "name": "",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [
+   "act"
+  ],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/history-core.js",
+   "js/exercises.js",
+   "js/reps-core.js",
+   "js/programs-data.js",
+   "js/workout-core.js",
+   "js/onerm-core.js",
+   "js/periodization-core.js",
+   "js/programs.js",
+   "js/projection.js"
+  ],
+  "domNodes": 1087,
+  "errors": []
+ },
+ "programs.html": {
+  "title": "Плани тренувань — FORGE",
+  "url": "programs.html",
+  "h1": [
+   "Плани тренувань"
+  ],
+  "h2": [
+   "Full Body"
+  ],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Показана нижче",
+    "id": "",
+    "data": "pick"
+   },
+   {
+    "t": "Це мій поточний план",
+    "id": "adopt-plan",
+    "data": ""
+   },
+   {
+    "t": "РозминкаОднакова для всіх тренувань · у тижневий обʼєм не вх",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Початковий план",
+    "id": "reset-plan",
+    "data": ""
+   },
+   {
+    "t": "Редагувати",
+    "id": "toggle-edit",
+    "data": ""
+   },
+   {
+    "t": "1День AУсе тіло · 14 вправ · 34 підходів · ~106 хв",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "2День BУсе тіло · 14 вправ · 34 підходів · ~106 хв",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "3День CУсе тіло · 14 вправ · 34 підходів · ~106 хв",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Таймер відпочинку 2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "ЗаминкаОднакова для всіх тренувань",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Прогресія та як це виконуватиЯк додавати вагу і як читати пл",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Як читати таблицюПозначення, обʼєм і вибір плану",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "days",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "days",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "days",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "days",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "act,day,i,name",
+    "im": "decimal"
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [
+   "act"
+  ],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/history-core.js",
+   "js/exercises.js",
+   "js/reps-core.js",
+   "js/programs-data.js",
+   "js/workout-core.js",
+   "js/programs.js"
+  ],
+  "domNodes": 1107,
+  "errors": []
+ },
+ "rating.html": {
+  "title": "Рейтинг — FORGE",
+  "url": "rating.html",
+  "h1": [
+   "Рейтинг"
+  ],
+  "h2": [],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Як це працюєПравила сезону й чесні межі",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/season.js"
+  ],
+  "domNodes": 199,
+  "errors": []
+ },
+ "research.html": {
+  "title": "Дослідження з PubMed про тренування — FORGE",
+  "url": "research.html",
+  "h1": [
+   "Дослідження"
+  ],
+  "h2": [
+   "Тренування",
+   "Харчування",
+   "Кардіо",
+   "Як читати ці дані"
+  ],
+  "links": [],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [],
+  "inputs": [],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js"
+  ],
+  "domNodes": 396,
+  "errors": []
+ },
+ "supplements.html": {
+  "title": "Добавки: що з них справді працює — FORGE",
+  "url": "supplements.html",
+  "h1": [
+   "Добавки"
+  ],
+  "h2": [
+   "Що з цього працює",
+   "Поширені твердження"
+  ],
+  "links": [
+   "research.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "ВиробництвоЯк це роблять",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "ДжерелаЩо саме показали дослідження",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "ВиробництвоЯк це роблять",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "ДжерелаЩо саме показали дослідження",
+    "id": "",
+    "data": "bound"
+   },
+   {
+    "t": "Не підтверджено«Креатин садить нирки»",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "ev",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "ev",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "ev",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/supplements.js",
+   "js/supplements-view.js"
+  ],
+  "domNodes": 407,
+  "errors": []
+ },
+ "today.html": {
+  "title": "FORGE — сьогодні",
+  "url": "index.html",
+  "h1": [
+   "Середа, 2 вересня"
+  ],
+  "h2": [
+   "Харчування",
+   "Сезон",
+   "Тиждень"
+  ],
+  "links": [
+   "workout.html",
+   "nutrition.html",
+   "journal.html",
+   "trackers.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [],
+  "inputs": [],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/history-core.js",
+   "js/exercises.js",
+   "js/reps-core.js",
+   "js/programs-data.js",
+   "js/foods.js",
+   "js/recipes-data.js",
+   "js/day-core.js",
+   "js/nutrition-core.js",
+   "js/tracker-core.js",
+   "js/workout-core.js",
+   "js/today.js"
+  ],
+  "domNodes": 229,
+  "errors": []
+ },
+ "trackers-settings.html": {
+  "title": "Налаштування трекерів — FORGE",
+  "url": "trackers-settings.html",
+  "h1": [
+   "Налаштування трекерів"
+  ],
+  "h2": [
+   "Мої трекери",
+   "Добавки",
+   "Звички"
+  ],
+  "links": [
+   "trackers.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "Водаще без записів",
+    "id": "",
+    "data": "expand"
+   },
+   {
+    "t": "Сонще без записів",
+    "id": "",
+    "data": "expand"
+   },
+   {
+    "t": "Настрійще без записів",
+    "id": "",
+    "data": "expand"
+   },
+   {
+    "t": "Крокище без записів",
+    "id": "",
+    "data": "expand"
+   },
+   {
+    "t": "Кофеїнще без записів",
+    "id": "",
+    "data": "expand"
+   },
+   {
+    "t": "Recoveryще без записів",
+    "id": "",
+    "data": "expand"
+   },
+   {
+    "t": "Біль / втомаще без записів",
+    "id": "",
+    "data": "expand"
+   },
+   {
+    "t": "Настрій до/після тренуванняще без записів",
+    "id": "",
+    "data": "expand"
+   },
+   {
+    "t": "+ Додати добавку",
+    "id": "",
+    "data": "addCustom"
+   },
+   {
+    "t": "+ Додати звичку",
+    "id": "",
+    "data": "addCustom"
+   },
+   {
+    "t": "Навіщо цеЩо Forge робить із цими даними",
+    "id": "",
+    "data": "bound"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "toggle",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "doseSet",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "add-supplement",
+    "name": "",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "add-supplement-dose",
+    "name": "",
+    "data": "",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "add-habit",
+    "name": "",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/tracker-core.js",
+   "js/trackers-settings.js"
+  ],
+  "domNodes": 297,
+  "errors": []
+ },
+ "trackers.html": {
+  "title": "Трекери — FORGE",
+  "url": "trackers.html",
+  "h1": [
+   "Трекери"
+  ],
+  "h2": [],
+  "links": [
+   "trackers-settings.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "+0.25",
+    "id": "",
+    "data": "trkAdd,amount"
+   },
+   {
+    "t": "+0.5",
+    "id": "",
+    "data": "trkAdd,amount"
+   },
+   {
+    "t": "+1",
+    "id": "",
+    "data": "trkAdd,amount"
+   },
+   {
+    "t": "1",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "2",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "3",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "4",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "5",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "6",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "7",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "8",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "9",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "10",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "1",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "2",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "3",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "4",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "5",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "6",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "7",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "8",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "9",
+    "id": "",
+    "data": "trkScale,val"
+   },
+   {
+    "t": "10",
+    "id": "",
+    "data": "trkScale,val"
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "id": "",
+    "name": "",
+    "data": "trkMark",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "trkDose",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "trkDurh",
+    "im": "numeric"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "",
+    "name": "",
+    "data": "trkDurm",
+    "im": "numeric"
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [
+   "trkAdd"
+  ],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/tracker-core.js",
+   "js/trackers-day.js"
+  ],
+  "domNodes": 239,
+  "errors": []
+ },
+ "welcome.html": {
+  "title": "FORGE",
+  "url": "welcome.html",
+  "h1": [
+   "Оберіть нік"
+  ],
+  "h2": [],
+  "links": [],
+  "navLinks": [],
+  "buttons": [
+   {
+    "t": "Продовжити",
+    "id": "au-name-go",
+    "data": ""
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "au-name",
+    "name": "",
+    "data": "",
+    "im": ""
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/nutrition-core.js",
+   "js/bmi-core.js",
+   "js/password-core.js",
+   "js/legal-versions.js",
+   "js/welcome.js"
+  ],
+  "domNodes": 66,
+  "errors": []
+ },
+ "workout.html": {
+  "title": "Тренування — FORGE",
+  "url": "workout.html",
+  "h1": [
+   "Тренування"
+  ],
+  "h2": [],
+  "links": [
+   "index.html"
+  ],
+  "navLinks": [
+   "index.html",
+   "workout.html",
+   "plan.html",
+   "programs.html",
+   "periodization.html",
+   "boxing.html",
+   "cardio.html",
+   "meals.html",
+   "nutrition.html",
+   "supplements.html",
+   "journal.html",
+   "rating.html",
+   "journal.html#history",
+   "measure.html",
+   "trackers.html",
+   "calculator.html",
+   "research.html",
+   "account.html",
+   "legal.html#privacy",
+   "legal.html#terms",
+   "legal.html#medical",
+   "legal.html#fitness"
+  ],
+  "buttons": [
+   {
+    "t": "3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Жим у тренажері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Жим у тренажері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Жим штанги під нахилом",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Тяга верхнього блоку вузьким паралельним хватом",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Тяга верхнього блоку вузьким паралельним хватом",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "3 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Тяга верхнього блоку широким хватом",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Тяга верхнього блоку широким хватом",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Розгинання ніг",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Розгинання ніг",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 3: Розгинання ніг",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 4: Розгинання ніг",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Згинання ніг сидячи",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Згинання ніг сидячи",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 3: Згинання ніг сидячи",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 4: Згинання ніг сидячи",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Жим гантелей сидячи",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Жим гантелей сидячи",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Відведення рук у кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Відведення рук у кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Задні дельти у тренажері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Задні дельти у тренажері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 3: Задні дельти у тренажері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Шраги у Сміті",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Шраги у Сміті",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 3: Шраги у Сміті",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Біцепс у кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Біцепс у кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Розгинання в кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Розгинання в кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Прес у кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Прес у кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 3: Прес у кросовері",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "2 хв",
+    "id": "",
+    "data": "restSec,restName"
+   },
+   {
+    "t": "Підхід 1: Підйом на ікри у Сміті стоячи",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Підхід 2: Підйом на ікри у Сміті стоячи",
+    "id": "",
+    "data": "setEx,setN"
+   },
+   {
+    "t": "Ваги підходів",
+    "id": "",
+    "data": "logTgl"
+   },
+   {
+    "t": "Завершити тренування",
+    "id": "wk-finish",
+    "data": ""
+   }
+  ],
+  "inputs": [
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "wk-day",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "wk-day",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "radio",
+    "id": "",
+    "name": "wk-day",
+    "data": "",
+    "im": ""
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-0",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-1",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-2",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-3",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-4",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-5",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-6",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-7",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-8",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-9",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-10",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-11",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-12",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   },
+   {
+    "tag": "INPUT",
+    "type": "text",
+    "id": "wk-w-13",
+    "name": "",
+    "data": "wt",
+    "im": "decimal"
+   }
+  ],
+  "dialogs": 0,
+  "forms": 0,
+  "dataAttrs": [
+   "setEx",
+   "wt"
+  ],
+  "scripts": [
+   "js/agegate.js",
+   "js/config.js",
+   "js/age-core.js",
+   "js/onboarding-core.js",
+   "js/app.js",
+   "js/store.js",
+   "js/elo-core.js",
+   "js/elo-api.js",
+   "js/elo-hooks.js",
+   "js/history-core.js",
+   "js/exercises.js",
+   "js/reps-core.js",
+   "js/programs-data.js",
+   "js/tracker-core.js",
+   "js/workout-core.js",
+   "js/workout.js"
+  ],
+  "domNodes": 434,
+  "errors": []
+ }
+}

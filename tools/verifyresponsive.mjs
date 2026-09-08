@@ -7,10 +7,31 @@ const PAGES=readdirSync(ROOT).filter(f=>f.endsWith('.html')).sort();
 const VP=[{w:320,h:568,n:'320 (iPhone SE1)'},{w:375,h:667,n:'375'},{w:430,h:932,n:'430'},
           {w:768,h:1024,n:'768 планшет'},{w:1024,h:768,n:'1024 планшет ланд.'},
           {w:1280,h:800,n:'1280'},{w:1920,h:1080,n:'1920'}];
+/*
+ * Дати рекордів — відносні, не прибиті до місяця.
+ *
+ * «Особисті рекорди» рахуються за поточний сезон (SeasonCore.clipSeries),
+ * тож фіксована серпнева дата вилітала б із зрізу щоразу після 1 вересня —
+ * блок ставав порожнім, і перевірка UX-010 мовчки нічого не перевіряла.
+ */
+function dayKey(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  const p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
 const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82.4,bodyfat:18,activity:1.55,goal:'cut',meals:4,
   daysPerWeek:3,activePlan:{programId:'fullbody',days:3},trainingAge:'inter',hrRest:58,hrMax:190,
   weights:{'Жим у тренажері':60,'Присідання зі штангою':100},records:{squat:140},
   bodyLog:{'2026-08-14':83.1,'2026-08-16':82.7,'2026-08-17':82.4},workLog:{'2026-08-17':1},
+  /* Назва одним словом без пробілів і дефісів, 60 символів (UX-010). Гнучкий рядок
+     .wlog-row за замовчуванням не звужується менше за вміст, тож така
+     назва розпирала «Особисті рекорди» і давала горизонтальну прокрутку
+     ВСІЄЇ journal.html на 375px. Заголовки від цього захищені
+     (overflow-wrap: break-word), а цей рядок не був. */
+  weightLog:{'ЖимлежачивузькимхватомусмітінапохилійлавіпідкутомпятнадцятьГ':[
+    {d:dayKey(-3),kg:60},{d:dayKey(0),kg:65}]},
   ratingLog:{'2026-08-18':{rating:3120,delta:25,quality:0.7,reasons:[]}},ratingAlgorithmVersion:1};
 const b=await chromium.launch({executablePath:CHROME});
 let fails=0, checks=0;

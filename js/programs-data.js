@@ -108,10 +108,10 @@ const WARMUP = [
   { name: 'Розминка плечей з резинкою',           detail: 'на кожне плече' },
   { name: 'Махи з резинкою в руках',              detail: '' },
   { name: 'Розтягування резинки на груди',        detail: '' },
-  { name: 'Місток на ролі',                       detail: 'рол під лопатки, лягти й полежати' },
+  { name: 'Місток на ролику',                       detail: 'рол під лопатки, лягти й полежати' },
   { name: '«Нитка в голку»',                      detail: 'на кожну сторону' },
   { name: 'Лопатки вгору-вниз стоячи',            detail: 'у положенні планки, стоячи — не на колінах' },
-  { name: 'Запригування на степ',                 detail: 'на кожну ногу' },
+  { name: 'Застрибування на степ',                 detail: 'на кожну ногу' },
   { name: 'Тяга верхнього блоку зворотним хватом', detail: 'легка вага' }
 ];
 
@@ -274,7 +274,7 @@ const W_PULL = {
   title: 'Pull', focus: 'Сідниці, біцепс стегна, спина, задня дельта, біцепс',
   exercises: [
     { pattern: 'Тазостегновий шарнір', name: 'Гіперекстензія на сідниці',          muscles: ['glutes', 'hamstrings'], sets: 1, reps: '10–12', weight: null, rir: '2', rest: '90 с', note: 'Розминочний підхід перед мостом' },
-    { pattern: 'Тазостегновий шарнір', name: 'Ягодичний міст у тренажері',         muscles: ['glutes'],               sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },
+    { pattern: 'Тазостегновий шарнір', name: 'Сідничний міст у тренажері',         muscles: ['glutes'],               sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },
     { pattern: 'Тазостегновий шарнір', name: 'Румунська тяга',                     muscles: ['hamstrings', 'glutes'], sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2–3 хв', note: '' },
     { pattern: 'Вертикальна тяга',     name: 'Тяга верхнього блоку звичайним хватом', muscles: ['back'],              sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },
     { pattern: 'Горизонтальна тяга',   name: 'Горизонтальна тяга в тренажері',     muscles: ['back'],                 sets: 3, reps: '10–12', weight: null, rir: '2', rest: '2 хв', note: '' },

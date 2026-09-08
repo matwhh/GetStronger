@@ -72,6 +72,29 @@
 
   /* ---------------- Рівні ---------------- */
 
+  /**
+   * Код сезону, що передував даті. День ПЕРЕД початком поточного сезону.
+   *
+   * Живе тут, а не в js/elo-api.js, з двох причин. Перша: це чиста
+   * арифметика календаря, і їй місце в ядрі. Друга: у тесті лежала копія
+   * цієї функції, і перевірявся саме тестовий двійник — сам elo-api.js не
+   * завантажував жоден тест (TST-001). Копія розходиться з оригіналом тихо.
+   *
+   * Наївне setMonth(getMonth() - 3) переповнюється: 31 травня мінус три
+   * місяці — це «31 лютого», тобто 3 березня, тобто ВЕСНА, тобто поточний
+   * сезон. Сервер відповідав season_running, клієнт позначав сезон
+   * закритим — і той не закривався ніколи. Вікно бага: 29–31 травня.
+   *
+   * @param {Date} now
+   * @returns {string} код попереднього сезону
+   */
+  function previousSeasonCode(now) {
+    const range = seasonRange(seasonOf(now || new Date()));
+    const before = new Date(range[0].getFullYear(), range[0].getMonth(), range[0].getDate() - 1);
+    return seasonOf(before);
+  }
+
+
   function levelFor(elo, cfg) {
     const e = clamp(Math.round(Number(elo) || 0), 0, cfg.seasonMax);
     const idx = Math.min(cfg.levelCount, Math.floor(e / cfg.levelSize) + 1);
@@ -242,6 +265,7 @@
     seasonDay: seasonDay,
     seasonLabel: seasonLabel,
     levelFor: levelFor,
+    previousSeasonCode: previousSeasonCode,
     weeklyBudget: weeklyBudget,
     dailyBudget: dailyBudget,
     ladder: ladder,

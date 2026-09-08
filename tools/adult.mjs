@@ -48,6 +48,16 @@ export function adultProfile(extra) {
  * @param {import('playwright').BrowserContext} ctx
  */
 export async function localMode(ctx) {
+  /*
+   * Дебаунс журналу сесії — той самий, що й в adultContext (див. нижче).
+   *
+   * Контексти, які починають із чистого браузера (verifyonboard,
+   * verifyagegate), adultContext не використовують — і після PRF-003
+   * (вікно 20 секунд) тап по підходу переставав доїжджати в sessionLog
+   * протягом перевірки. verifyonboard мовчки давав 38/39 і виглядав як
+   * «майже добре», хоча йшлося про непрацюючий крок.
+   */
+  await ctx.addInitScript(() => { window.__FORGE_SESSION_DEBOUNCE_MS = 300; });
   await ctx.addInitScript(() => {
     let v;
     Object.defineProperty(window, 'APP_CONFIG', {
@@ -69,6 +79,21 @@ export async function localMode(ctx) {
 export async function adultContext(browser, opts, extra) {
   const ctx = await browser.newContext(opts);
   const local = !!(extra && extra.local);
+
+  /*
+   * ДЕБАУНС ЖУРНАЛУ СЕСІЇ — 300 мс замість 20 секунд.
+   *
+   * У житті він довгий навмисно (PRF-003): кожен запис — це POST усього
+   * профілю, а між підходами в залі хвилини. Але перевірка не може чекати
+   * 20 секунд після кожного тапу, тому вікно вкорочується. Це не «режим
+   * тестів»: js/workout.js читає значення щоразу, і в житті його ніхто не
+   * ставить.
+   *
+   * Стоїть тут, а не в кожному скрипті окремо: інакше наступна перевірка
+   * з тапом по підходу знову впаде на порожньому sessionLog і півгодини
+   * піде на зʼясування, чому.
+   */
+  await ctx.addInitScript(() => { window.__FORGE_SESSION_DEBOUNCE_MS = 300; });
 
   /*
    * ЛОКАЛЬНИЙ РЕЖИМ на замовлення.

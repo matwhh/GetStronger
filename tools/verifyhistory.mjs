@@ -20,10 +20,32 @@ const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + 
 
 const b = await chromium.launch({ executablePath: CHROME });
 
-/* Дати рахуємо від «сьогодні», щоб перевірка не протухла через місяць. */
-const now = new Date();
-const key = (d) => d.toISOString().slice(0, 10);
+/*
+ * Дати рахуємо від «сьогодні», щоб перевірка не протухла через місяць.
+ *
+ * ДВІ ПАСТКИ, ЧЕРЕЗ ЯКІ ЦЯ ПЕРЕВІРКА ДЕТЕРМІНОВАНО ПАДАЛА 1–4 ЧИСЛА
+ * КОЖНОГО МІСЯЦЯ (TIM-008):
+ *
+ * 1. Ключ рахувався через toISOString() — тобто в UTC. У Києві після
+ *    третьої ночі це вже інша дата, ніж локальна, і сесія сіялась не в
+ *    той день, який шукає календар.
+ * 2. Дні бралися як «−2, −3, −4 від сьогодні» без огляду на межу місяця.
+ *    Першого числа всі три опинялись у попередньому місяці, якого календар
+ *    не показує: перевірки не знаходили клітинку, а наступний .click() по
+ *    відсутньому елементу валив увесь скрипт.
+ *
+ * Тому ключ локальний, а якір — не «сьогодні», а такий день місяця, від
+ * якого −2/−3/−4 гарантовано лишаються в тому самому місяці.
+ */
+const key = (d) => {
+  const p2 = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+};
 const at = (d, h, m) => { const x = new Date(d); x.setHours(h, m, 0, 0); return x.getTime(); };
+
+const today = new Date();
+const now = new Date(today);
+if (now.getDate() <= 4) now.setDate(5);   /* якір усередині місяця */
 
 const dGood = new Date(now); dGood.setDate(dGood.getDate() - 2);   // нормальна сесія
 const dLegacy = new Date(now); dLegacy.setDate(dLegacy.getDate() - 3); // стара, t0 === t1

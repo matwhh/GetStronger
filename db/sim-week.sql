@@ -220,7 +220,23 @@ begin
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'ранги послідовні, рівний ELO — рівний ранг :: порушень ' || n || E'\n';
 
   -- ---- гонка: подія вже є, submit приходить другим -------------------------
+  --
+  -- TST-015. Тут падало щосуботи й щонеділі, і причина була у ФІКСТУРІ, а не
+  -- в сервері. У користувача 5 тижневий бюджет тренувань до кінця тижня вже
+  -- вичерпаний посівом (4×10 + 9 + 2 = 51 при бюджеті 51). Тест вставляв
+  -- подію з delta 4 повз бюджет і чекав доплати; сервер чесно рахував
+  -- inc = least(намір − сплачено, бюджет − витрачено) = 0 і повертав
+  -- duplicate. Тобто перевірка вимагала від сервера порушити власну стелю.
+  --
+  -- Тепер тижневі training-події цього користувача перед сценарієм
+  -- прибираються: бюджет звільняється, і реконсиляція має де відбутись.
   u := uids[5];
+  delete from public.elo_events
+   where user_id = u and category = 'training'
+     and day between date_trunc('week', current_date)::date
+                 and date_trunc('week', current_date)::date + 6;
+  update public.season_state set elo = (select coalesce(sum(delta),0) from public.elo_events e
+    where e.user_id = u and e.season = szn) where user_id = u and season = szn;
   delete from public.elo_events where user_id = u and day = current_date and event_type = 'workout';
   insert into public.elo_events (user_id, season, day, category, event_type, action_key, quality, delta, elo_after, reason)
   values (u, szn, current_date, 'training', 'workout', 'workout:race', 0.5, 4, 0, 'частково зараховано');
@@ -233,7 +249,11 @@ begin
   reset role;
   select elo into elo_b from public.season_state where user_id = u and season = szn;
   select count(*) into n from public.elo_events where user_id = u and day = current_date and event_type = 'workout';
-  c := n = 1 and (r->>'reconciled')::boolean is true; alln:=alln+1; okn:=okn+c::int;
+  -- Подія має лишитись ОДНА, а доплата — додатною: саме це відрізняє
+  -- реконсиляцію від «нічого не сталось» (TST-015: раніше перевірялось
+  -- лише n = 1 і прапорець, тож нульова доплата теж вважалась успіхом).
+  c := n = 1 and (r->>'reconciled')::boolean is true and (elo_b - elo_a) > 0;
+  alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end
             || 'гонка звелась до реконсиляції :: подій ' || n || ', +' || (elo_b - elo_a) || E'\n';
 
@@ -271,9 +291,21 @@ begin
   r := public.elo_eval_week_for(uids[1], wk + 1, cfg);
   c := (r->>'error') = 'not_monday'; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'не понеділок :: ' || coalesce(r->>'error', r::text) || E'\n';
-  r := public.elo_eval_week_for(uids[1], wk - 7, cfg);
-  c := (r->>'error') = 'other_season'; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чужий сезон :: ' || coalesce(r->>'error', r::text) || E'\n';
+  /*
+   * Тиждень із ЧУЖОГО сезону.
+   *
+   * Тут очікувалось 'other_season' — коду, який його повертав, більше немає:
+   * після ELO-001/002/005 elo_week_ready віддає 'season_closed', якщо сезон
+   * підбито, і 'before_first_event', якщо в цьому сезоні людина ще не існує.
+   * Друге — саме наш випадок: симуляція заселяє лише поточний тиждень.
+   *
+   * wk − 14, а не wk − 7: неділя попереднього тижня ще належить поточному
+   * сезону, і відповіддю було б week_not_over (вікно подання не минуло) —
+   * тобто перевірка міряла б зовсім інший запобіжник (TST-015).
+   */
+  r := public.elo_eval_week_for(uids[1], wk - 14, cfg);
+  c := (r->>'error') in ('before_first_event', 'season_closed'); alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'тиждень чужого сезону не оцінюється :: ' || coalesce(r->>'error', r::text) || E'\n';
 
   -- ---- catch_up у всіх ----------------------------------------------------
   n := 0;

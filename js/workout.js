@@ -110,8 +110,49 @@
     });
   }
 
+  /*
+   * Одна дія людини — ДВА незалежні записи: галочки в forge.today і
+   * історія в profile.sessionLog. Спільної транзакції немає, кожен може
+   * впасти сам, і раніше обидві відмови були мовчазні: writeDay ковтав
+   * виняток, а помилка sessionLog ішла лише в console.warn (LOC-002,
+   * LOC-009). Людина бачила галочки, яких у сховищі вже немає.
+   *
+   * Скаржимось один раз на завантаження сторінки: якщо сховище повне,
+   * тост на кожен підхід перетворив би тренування на боротьбу з тостами.
+   */
+  let quotaWarned = false;
+  /*
+   * Сторінку ховають — дописуємо негайно (PRF-003).
+   *
+   * Відкладений на 20 секунд запис не має шансу виконатись, якщо людина
+   * перейшла на іншу вкладку або заблокувала екран. beacon переживає
+   * закриття; звичайний fetch у цей момент браузер скасовує.
+   */
+  function flushSessionLog() {
+    if (!sessionTimer) return;
+    clearTimeout(sessionTimer);
+    sessionTimer = null;
+    if (!state.plan || !window.HistoryCore || endedToday()) return;
+    const st = WC.dayStats(state.plan[state.dayIdx], state.done);
+    if (!st.doneSets) return;
+    const log = window.HistoryCore.upsertSession(
+      state.profile.sessionLog, state.todayKey, sessionRecord(false));
+    state.profile.sessionLog = log;
+    lastSelfWrite = Date.now();
+    window.Store.saveProfileBeacon({ sessionLog: log });
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flushSessionLog();
+  });
+  window.addEventListener('pagehide', flushSessionLog);
+
   function saveDayState() {
-    WC.writeDay(state.profile, state.todayKey, state.dayIdx, state.done);
+    if (!WC.writeDay(state.profile, state.todayKey, state.dayIdx, state.done) && !quotaWarned) {
+      quotaWarned = true;
+      toast('Сховище браузера переповнене — галочки цього дня не збережуться. ' +
+            'Звільніть місце або видаліть старі дані в акаунті.', 'err');
+    }
     scheduleSessionLog();
   }
 
@@ -120,6 +161,12 @@
   /* ------------------------------------------------------------------ */
 
   /** Сьогоднішня сесія вже закрита кнопкою (будь-який день плану) */
+  /** 'РРРР-ММ-ДД' → Date у ЛОКАЛЬНОМУ поясі (TIM-009). */
+  function keyToDate(key) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ''));
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(key);
+  }
+
   function endedToday() {
     return Boolean(WC.completedToday(state.profile, state.todayKey));
   }
@@ -257,6 +304,31 @@
     return rec;
   }
 
+  /*
+   * ЧОМУ ДЕБАУНС ТАКИЙ ДОВГИЙ (PRF-003).
+   *
+   * Профіль пишеться в хмару ЦІЛКОМ: profiles.data — один jsonb без
+   * часткових оновлень. Тобто кожна галочка підходу — це POST з усією
+   * історією тренувань (при тисячі сесій ~1,4 МБ). Дебаунс 1,5 с у залі не
+   * рятує: між підходами хвилини, і кожен підхід ішов окремим запитом.
+   *
+   * Часткове оновлення на сервері (jsonb_set по дню або окрема таблиця
+   * днів) — це зміна схеми й окреме рішення. Дешева половина: рідше
+   * писати. 20 секунд — довше за паузу між підходами всередині вправи й
+   * коротше за перерву між вправами; плюс примусовий запис, коли сторінку
+   * ховають (перехід, згортання вкладки, блокування екрана). Локальний
+   * стан forge.today пишеться на кожен тап як і раніше — він дешевий.
+   */
+  const SESSION_DEBOUNCE_MS = 20000;
+
+  /* Браузерні перевірки не можуть чекати 20 секунд на кожен тап, тому
+     дозволяємо вкоротити вікно ззовні. Це не «режим тестів»: значення
+     читається щоразу, і в житті його ніхто не ставить. */
+  function sessionDebounceMs() {
+    const v = Number(window.__FORGE_SESSION_DEBOUNCE_MS);
+    return Number.isFinite(v) && v >= 0 ? v : SESSION_DEBOUNCE_MS;
+  }
+
   function scheduleSessionLog() {
     if (!state.plan || !window.HistoryCore) return;
     if (endedToday()) return;   // закриту сесію пізніші дотики не переписують
@@ -265,13 +337,26 @@
 
     clearTimeout(sessionTimer);
     sessionTimer = setTimeout(function () {
+      sessionTimer = null;   /* спрацював — flushSessionLog більше не потрібен */
       const log = window.HistoryCore.upsertSession(
         state.profile.sessionLog, state.todayKey, sessionRecord(false));
       state.profile.sessionLog = log;
-      saveOwn({ sessionLog: log }).catch(function (e) {
-        if (!(e && e.queued)) console.warn('[workout] сесія не збереглась:', e.message);
+      /*
+       * Патч — ФУНКЦІЯ (SYN-011): журнал добудовується вже всередині
+       * ланцюга збереження, на актуальному профілі. Інакше друга вкладка,
+       * яка прочитала профіль раніше, затирала б сесію першої цілком —
+       * sessionLog передається як ціле значення поля.
+       */
+      saveOwn(function (p) {
+        return { sessionLog: window.HistoryCore.upsertSession(
+          p.sessionLog, state.todayKey, sessionRecord(false)) };
+      }).catch(function (e) {
+        /* Було лише console.warn — тобто друга половина того самого запису
+           падала мовчки (LOC-009). .queued означає «лежить у черзі», це не
+           втрата й лякати нею не треба. */
+        if (!(e && e.queued)) toast('Історія тренування не збереглася: ' + (e && e.message), 'err');
       });
-    }, 1500);
+    }, sessionDebounceMs());
   }
 
   /*
@@ -300,9 +385,15 @@
       ? window.HistoryCore.upsertSession(state.profile.sessionLog, state.todayKey, sessionRecord(true))
       : state.profile.sessionLog;
     state.profile.sessionLog = log;
-    WC.writeDay(state.profile, state.todayKey, state.dayIdx, state.done);
+    if (!WC.writeDay(state.profile, state.todayKey, state.dayIdx, state.done)) {
+      toast('Сховище браузера переповнене — стан дня не збережено локально', 'err');
+    }
     render();
-    saveOwn({ sessionLog: log }).catch(function (e) {
+    saveOwn(function (p) {
+      return { sessionLog: window.HistoryCore
+        ? window.HistoryCore.upsertSession(p.sessionLog, state.todayKey, sessionRecord(true))
+        : log };
+    }).catch(function (e) {
       if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err');
     });
   }
@@ -417,6 +508,28 @@
     return list.map(function (rec, k) { return setRowHtml(i, k, rec, ex); }).join('');
   }
 
+  /*
+   * ЯКІ ПАНЕЛІ «Ваги підходів» РОЗГОРНУТІ — ЦЕ СТАН, А НЕ АТРИБУТ У РОЗМІТЦІ.
+   *
+   * Панель закривалась сама приблизно через 120 мс після відкриття (UX-001):
+   * фонове збереження профілю давало відкладений render(), а розмітка
+   * вправи містить hidden КОНСТАНТОЮ. Тобто перемальовка щоразу згортала
+   * те, що людина щойно розгорнула; другий клік «спрацьовував», бо
+   * відкладеного render у той момент уже не було.
+   */
+  const openLogs = new Set();
+
+  /** Повернути розгорнуті панелі після перемальовки списку. */
+  function restoreOpenLogs() {
+    openLogs.forEach(function (i) {
+      const box = document.querySelector('[data-set-log="' + i + '"]');
+      const tgl = box && box.closest('.tdy-ex') && box.closest('.tdy-ex').querySelector('[data-log-tgl]');
+      if (!box || !tgl || tgl.disabled) { openLogs.delete(i); return; }
+      box.hidden = false;
+      tgl.setAttribute('aria-expanded', 'true');
+    });
+  }
+
   /**
    * Дописати/прибрати рядки підходів після тапу, НЕ чіпаючи вже наявні:
    * повна перемальовка забирала б фокус із поля, яке зараз редагують.
@@ -436,7 +549,11 @@
     const tgl = rowEl.querySelector('[data-log-tgl]');
     if (tgl) {
       tgl.disabled = !list.length;
-      if (!list.length) { box.hidden = true; tgl.setAttribute('aria-expanded', 'false'); }
+      if (!list.length) {
+        box.hidden = true;
+        tgl.setAttribute('aria-expanded', 'false');
+        openLogs.delete(i);
+      }
     }
   }
 
@@ -543,7 +660,10 @@
         : (s.done || 0) + ' з ' + (s.total || 0) + ' вправ';
       return '<div class="notice mt-1" id="wk-ended">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>' +
-        '<div><b>Завершено' + (weekDate === state.todayKey ? ' сьогодні' : ' ' + dateLabel(weekDate)) + '</b> — ' +
+        /* dateLabel хоче Date, а не ключ (TIM-009): new Date('2026-09-04')
+           — це UTC-північ, і в поясах на захід від Гринвіча getDate()
+           віддає попередній день. Усі інші виклики передають саме Date. */
+        '<div><b>Завершено' + (weekDate === state.todayKey ? ' сьогодні' : ' ' + dateLabel(keyToDate(weekDate))) + '</b> — ' +
           dsTxt + '. Цей день знову доступний із понеділка.</div>' +
       '</div>';
     }
@@ -621,6 +741,8 @@
     }
 
     host.innerHTML = state.plan ? (workoutCard() + moodCard()) : emptyCard();
+    /* Розгорнуті панелі «Ваги підходів» — стан, а не розмітка (UX-001). */
+    restoreOpenLogs();
   }
 
   /**
@@ -655,11 +777,39 @@
        00:00 має писатись у новий день, а не перетирати вчорашній. */
     if (window.App && window.App.onDayChange) {
       window.App.onDayChange(function () {
+        const prevKey = state.todayKey;
         state.todayKey = WC.todayKey();
         if (state.plan && state.plan.length) {
-          const nd = WC.readDay(state.profile, state.todayKey, state.plan.length);
-          state.dayIdx = nd.dayIdx;
-          state.done = nd.done;
+          /*
+           * ТРЕНУВАННЯ ЧЕРЕЗ ПІВНІЧ НЕ ОБНУЛЯЄТЬСЯ (TIM-003).
+           *
+           * Сторож півночі спрацьовує щохвилини. Раніше він просто
+           * перечитував стан під новим ключем: forge.today датований учора
+           * → readDay віддає fresh із порожнім done і підказкою НАСТУПНОГО
+           * дня плану. Тобто о 00:00 закриті підходи зникали з екрана, «День
+           * A» ставав «Днем B», а подальші тапи йшли вже в іншу сесію — одне
+           * тренування розпадалось на дві часткові.
+           *
+           * Якщо тренування ще триває (є закриті підходи і день не
+           * завершено), переносимо стан під новий ключ ЯК Є, з тим самим
+           * dayIdx. Людина сама завершить його кнопкою.
+           */
+          const st = WC.dayStats(state.plan[state.dayIdx], state.done);
+          /* «Завершено» перевіряємо за ВЧОРАШНІМ ключем: сесія, яку ведемо,
+             належить ще йому. За новим ключем завершеного дня немає за
+             визначенням, і перевірка була б завжди хибною. */
+          const alive = Boolean(st && st.doneSets > 0 &&
+            !WC.completedToday(state.profile, prevKey));
+          if (alive) {
+            WC.writeDay(state.profile, state.todayKey, state.dayIdx, state.done);
+          } else {
+            const nd = WC.readDay(state.profile, state.todayKey, state.plan.length);
+            state.dayIdx = nd.dayIdx;
+            state.done = nd.done;
+          }
+          if (prevKey !== state.todayKey && alive) {
+            toast('Північ минула — тренування триває під сьогоднішньою датою', 'ok');
+          }
         }
         render();
       });
@@ -825,6 +975,8 @@
         if (box) {
           box.hidden = !box.hidden;
           tgl.setAttribute('aria-expanded', String(!box.hidden));
+          const idx = Number(box.dataset.setLog);
+          if (box.hidden) openLogs.delete(idx); else openLogs.add(idx);
         }
         return;
       }

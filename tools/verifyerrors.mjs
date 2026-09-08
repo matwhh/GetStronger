@@ -13,6 +13,7 @@
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
+import { CHROME } from './pw.mjs';
 
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
@@ -24,7 +25,9 @@ const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push(c); console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-const b = await chromium.launch();
+/* Той самий Chromium, що й у решті перевірок (tools/pw.mjs): у CI
+   завантаженого браузера за замовчуванням може не бути. */
+const b = await chromium.launch({ executablePath: CHROME });
 const ctx = await b.newContext();
 
 /* Порядок реєстрації важливий: у Playwright пізніший маршрут головніший.

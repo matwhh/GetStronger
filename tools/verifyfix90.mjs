@@ -27,6 +27,26 @@ function check(name, ok, info) {
 }
 const last = (p) => p.url().split('/').pop().split('?')[0].split('#')[0];
 
+/*
+ * Посів у localStorage ОДРАЗУ ПІСЛЯ goto — це гонка.
+ *
+ * welcome.js і сторож віку вміють редиректити з <head>, тобто контекст
+ * сторінки може бути знищений навігацією рівно в момент evaluate. У CI це
+ * давало не провал перевірки, а падіння всього скрипта з «Execution
+ * context was destroyed» — і решта 20 перевірок не виконувалась узагалі.
+ * Даємо сторінці осісти й повторюємо один раз.
+ */
+async function seed(p, fn, arg) {
+  for (let i = 0; i < 3; i++) {
+    try { return await p.evaluate(fn, arg); }
+    catch (e) {
+      if (!/Execution context was destroyed|Target closed/.test(String(e && e.message))) throw e;
+      await p.waitForTimeout(250);
+    }
+  }
+  return undefined;
+}
+
 /** Профіль у сховищі (як його бачить Store, синхронно). */
 const localProfile = (p) => p.evaluate(() => window.Store.localProfile() || {});
 async function setProfile(p, patch) {
@@ -262,11 +282,11 @@ const browser = await chromium.launch({ executablePath: EXE });
   await approvedRpc(ctx);
   const p = await ctx.newPage(); p.on('dialog', d => d.accept());
   await p.goto(url('welcome.html'), { waitUntil: 'load' });
-  await p.evaluate(() => { localStorage.setItem('ib.profile', JSON.stringify({ version: 6 })); });
+  await seed(p, () => { localStorage.setItem('ib.profile', JSON.stringify({ version: 6 })); });
   await p.goto(url('welcome.html'), { waitUntil: 'load' }); await p.waitForTimeout(800);
   check('B6 крок віку показано залогіненому', await p.locator('#gate-go').count() === 1, last(p));
   check('B6 «Вийти» є на кроці віку', await p.locator('#au-out').count() === 1);
-  await p.evaluate(() => { localStorage.setItem('ib.profile', JSON.stringify({ version: 6, birthDate: '1990-06-15' })); });
+  await seed(p, () => { localStorage.setItem('ib.profile', JSON.stringify({ version: 6, birthDate: '1990-06-15' })); });
   await p.goto(url('welcome.html'), { waitUntil: 'load' }); await p.waitForTimeout(800);
   check('B6 крок тіла показано залогіненому', await p.locator('#body-go').count() === 1, last(p));
   check('B6 «Вийти» є на кроці тіла', await p.locator('#au-out').count() === 1);

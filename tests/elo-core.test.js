@@ -47,6 +47,22 @@ describe('ELO: рівні 0–2500', () => {
     assert.equal(b.level, 10); assert.equal(b.elite, true); assert.equal(b.name, 'Level 10 — ELITE');
   });
 
+  it('межа ELITE — РІВНО на eliteFloor, не на одиницю далі', () => {
+    /*
+     * TST-003: тести брали 1942 і 2247, тобто саму межу не чіпали. Мутант
+     * «>= → >» виживав: людина з рівно 2000 ELO переставала бути ELITE, і
+     * помітити це можна було тільки очима — levelFor читають season.js,
+     * app.js, today.js і admin-elo.js.
+     */
+    assert.equal(E.levelFor(1999, CFG).elite, false);
+    assert.equal(E.levelFor(2000, CFG).elite, true);
+    assert.equal(E.levelFor(2000, CFG).floor, 2000);
+    assert.equal(E.levelFor(2000, CFG).name, 'Level 10 — ELITE');
+    /* Межа береться з конфігу, а не з числа 2000 у коді. */
+    assert.equal(E.levelFor(CFG.eliteFloor, CFG).elite, true);
+    assert.equal(E.levelFor(CFG.eliteFloor - 1, CFG).elite, false);
+  });
+
   it('стеля 2500', () => {
     assert.equal(E.clampElo(2600, CFG), 2500);
     assert.equal(E.clampElo(-50, CFG), 0);

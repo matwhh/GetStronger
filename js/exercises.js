@@ -175,8 +175,8 @@ const EXERCISES = [
   { name: 'Випади з гантелями',                muscles: ['glutes'], lift: 'compound' },
   { name: 'Випади у Сміті на сідниці',         muscles: ['glutes'], lift: 'compound' },
   { name: 'Болгарські випади',                 muscles: ['glutes'], lift: 'compound' },
-  { name: 'Ягодичний міст зі штангою',         muscles: ['glutes'], lift: 'compound' },
-  { name: 'Ягодичний міст у тренажері',        muscles: ['glutes'], lift: 'compound' },
+  { name: 'Сідничний міст зі штангою',         muscles: ['glutes'], lift: 'compound' },
+  { name: 'Сідничний міст у тренажері',        muscles: ['glutes'], lift: 'compound' },
   /* Гіперекстензія з акцентом на сідниці: округлена спина, робота
      стегном. Головна група — сідниці, тому й стоїть тут, а не в спині. */
   { name: 'Гіперекстензія на сідниці',         muscles: ['glutes', 'hamstrings'], lift: 'compound' },

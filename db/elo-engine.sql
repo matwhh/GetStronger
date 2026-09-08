@@ -3,8 +3,22 @@
 -- Конфіг читається з elo_config (дзеркало db/elo-config.json).
 -- =============================================================================
 
-insert into public.elo_config (id, data) values (1, '{"version":2,"seasonMax":2500,"levelSize":200,"levelCount":10,"eliteFloor":2000,"weeklyBudget":200,"weights":{"training":0.3,"nutrition":0.3,"sleep":0.2,"recovery":0.1,"activity":0.1},"categoryShare":0.857,"cleanDayBonus":3,"cleanWeekBonus":9,"cleanThreshold":0.9,"nutritionSplit":{"kcal":0.55,"protein":0.45},"tolerance":{"training":[[0.99,1.0],[0.97,0.82],[0.9,0.45],[0.8,0.45],[0.65,0.3],[0.5,0.12],[0,0.05]],"kcalBand":[[0.02,1.0],[0.05,0.82],[0.1,0.5],[0.2,0.45],[0.35,0.15],[1,0.05]],"protein":[[0.99,1.0],[0.95,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]],"sleep":[[0.99,1.0],[0.97,0.82],[0.9,0.55],[0.8,0.5],[0.65,0.22],[0,0.05]],"activity":[[0.99,1.0],[0.97,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]]},"recoveryFillShare":0.6,"recoveryGoodValue":7,"missedWorkoutPenalty":-8,"openMealPenalty":-3,"dayLossFloor":-15,"dayGainCap":45,"graceWeeksPerSeason":2,"graceDays":7,"submitWindowDays":2,"minUsersForPercentile":8,"leaderboardTops":[0.1,0.05,0.01],"leaderboardRanks":[1000,100,10,3,1]}'::jsonb)
-on conflict (id) do update set data = excluded.data, updated_at = now();
+-- ЗАСІВ КОНФІГУ — ТІЛЬКИ НА ПОРОЖНЮ БАЗУ (INV-003).
+--
+-- Тут стояло on conflict do update: повторний прогін файла ЗАТИРАВ бойовий
+-- конфіг цим рядком. А рядок відставав — у ньому не було блоку floors
+-- (sleepMax, stepsMax, sleepGoalMin, stepsGoalMin, workoutTotalMin), тож
+-- elo_facts тихо переходила на дефолти з коду. Сьогодні вони збігаються,
+-- завтрашні зміни floors зникли б без сліду — рівно той сценарій, яким із
+-- продакшену колись зник guard NOT_APPROVED (INV-002, DB-007).
+--
+-- Тепер do nothing: файл засіває конфіг там, де його ще немає, і не чіпає
+-- там, де він уже є. Зміна конфігу — окремою міграцією.
+--
+-- Значення — рівно db/elo-config.json (tests/elo-config-sync.test.js
+-- звіряє їх посимвольно й валить збірку при розбіжності).
+insert into public.elo_config (id, data) values (1, '{"version":2,"seasonMax":2500,"levelSize":200,"levelCount":10,"eliteFloor":2000,"weeklyBudget":200,"weights":{"training":0.3,"nutrition":0.3,"sleep":0.2,"recovery":0.1,"activity":0.1},"categoryShare":0.857,"cleanDayBonus":3,"cleanWeekBonus":9,"cleanThreshold":0.9,"nutritionSplit":{"kcal":0.55,"protein":0.45},"tolerance":{"training":[[0.99,1.0],[0.97,0.82],[0.9,0.45],[0.8,0.45],[0.65,0.3],[0.5,0.12],[0,0.05]],"kcalBand":[[0.02,1.0],[0.05,0.82],[0.1,0.5],[0.2,0.45],[0.35,0.15],[1,0.05]],"protein":[[0.99,1.0],[0.95,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]],"sleep":[[0.99,1.0],[0.97,0.82],[0.9,0.55],[0.8,0.5],[0.65,0.22],[0,0.05]],"activity":[[0.99,1.0],[0.97,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]]},"recoveryFillShare":0.6,"recoveryGoodValue":7,"missedWorkoutPenalty":-8,"openMealPenalty":-3,"dayLossFloor":-15,"dayGainCap":45,"graceWeeksPerSeason":2,"graceDays":7,"submitWindowDays":2,"minUsersForPercentile":8,"leaderboardTops":[0.1,0.05,0.01],"leaderboardRanks":[1000,100,10,3,1],"floors":{"sleepGoalMin":240,"sleepMax":960,"stepsGoalMin":3000,"stepsMax":100000,"workoutTotalMin":3}}'::jsonb)
+on conflict (id) do nothing;
 
 -- Драбина якості: масив [[поріг, множник], ...] згори вниз
 create or replace function public.elo_ladder(steps jsonb, x numeric)
@@ -109,6 +123,10 @@ declare
   existing elo_events;
 begin
   if uid is null then raise exception 'not authenticated'; end if;
+  /* Барʼєр повернено (INV-002 / DB-013): у базі він є з міграцій
+     elo_approved_guard/elo_approved_guard2, а в цьому файлі його не було —
+     виконання файла «щоб оновити функції» знімало перевірку з продакшену. */
+  if not public.is_approved(uid) then raise exception 'NOT_APPROVED'; end if;
   if p_kind not in ('workout','meal','sleep','recovery','activity') then
     raise exception 'unknown kind %', p_kind;
   end if;
@@ -239,6 +257,10 @@ declare
   pen int := 0; bon int := 0; d int;
 begin
   if uid is null then raise exception 'not authenticated'; end if;
+  /* Барʼєр повернено (INV-002 / DB-013): у базі він є з міграцій
+     elo_approved_guard/elo_approved_guard2, а в цьому файлі його не було —
+     виконання файла «щоб оновити функції» знімало перевірку з продакшену. */
+  if not public.is_approved(uid) then raise exception 'NOT_APPROVED'; end if;
   if extract(isodow from p_week_start) <> 1 then
     return jsonb_build_object('ok', false, 'error', 'not_monday');
   end if;
@@ -307,6 +329,12 @@ declare
   st season_state;
 begin
   if uid is null then raise exception 'not authenticated'; end if;
+  /* БАРʼЄР ДОДАНО НАЗАД (INV-002 / DB-013, аудит 2026-09). Він живе в
+     базі з міграцій elo_approved_guard/elo_approved_guard2, а в цьому
+     файлі його не було — тобто виконання цього файла «щоб оновити
+     функції» ЗНІМАЛО перевірку з продакшену: непідтверджений акаунт
+     отримував доступ до сезонних RPC. Файл і база тепер збігаються. */
+  if not public.is_approved(uid) then raise exception 'NOT_APPROVED'; end if;
   select data into cfg from elo_config where id = 1;
   insert into season_state (user_id, season) values (uid, szn)
   on conflict (user_id, season) do nothing;
@@ -344,6 +372,12 @@ declare
   cfg jsonb;
 begin
   if uid is null then raise exception 'not authenticated'; end if;
+  /* БАРʼЄР ДОДАНО НАЗАД (INV-002 / DB-013, аудит 2026-09). Він живе в
+     базі з міграцій elo_approved_guard/elo_approved_guard2, а в цьому
+     файлі його не було — тобто виконання цього файла «щоб оновити
+     функції» ЗНІМАЛО перевірку з продакшену: непідтверджений акаунт
+     отримував доступ до сезонних RPC. Файл і база тепер збігаються. */
+  if not public.is_approved(uid) then raise exception 'NOT_APPROVED'; end if;
   select data into cfg from elo_config where id = 1;
   select * into st from season_state where user_id = uid and season = szn;
   select count(*) into total from season_state where season = szn;
@@ -375,6 +409,10 @@ declare
   rows jsonb;
 begin
   if auth.uid() is null then raise exception 'not authenticated'; end if;
+  /* Барʼєр повернено (INV-002 / DB-013): у базі він є з міграцій
+     elo_approved_guard/elo_approved_guard2, а в цьому файлі його не було —
+     виконання файла «щоб оновити функції» знімало перевірку з продакшену. */
+  if not public.is_approved(auth.uid()) then raise exception 'NOT_APPROVED'; end if;
   select jsonb_agg(jsonb_build_object('rank', r, 'name', name, 'elo', elo,
                                       'me', user_id = auth.uid()) order by r)
     into rows
@@ -394,6 +432,10 @@ returns void
 language plpgsql security definer set search_path = public as $$
 begin
   if auth.uid() is null then raise exception 'not authenticated'; end if;
+  /* Барʼєр повернено (INV-002 / DB-013): у базі він є з міграцій
+     elo_approved_guard/elo_approved_guard2, а в цьому файлі його не було —
+     виконання файла «щоб оновити функції» знімало перевірку з продакшену. */
+  if not public.is_approved(auth.uid()) then raise exception 'NOT_APPROVED'; end if;
   update season_state set display_name = left(coalesce(p_name, ''), 24)
   where user_id = auth.uid() and season = season_of(current_date);
 end;
@@ -415,6 +457,10 @@ declare
   stats jsonb;
 begin
   if uid is null then raise exception 'not authenticated'; end if;
+  /* Барʼєр повернено (INV-002 / DB-013): у базі він є з міграцій
+     elo_approved_guard/elo_approved_guard2, а в цьому файлі його не було —
+     виконання файла «щоб оновити функції» знімало перевірку з продакшену. */
+  if not public.is_approved(uid) then raise exception 'NOT_APPROVED'; end if;
   if p_season = season_of(current_date) then
     return jsonb_build_object('ok', false, 'error', 'season_running');
   end if;

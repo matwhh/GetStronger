@@ -1,4 +1,26 @@
-/** Вага сторінок, час до інтерактивності, повільна мережа. */
+/**
+ * Вага сторінок, час до інтерактивності, кількість вузлів — З ПОРОГАМИ.
+ *
+ * TST-012: раніше цей скрипт лише друкував таблицю і завжди виходив з
+ * кодом 0 — жодного ok(), жодного process.exit. При цьому він стояв у
+ * наборі full і ci-browser.sh рахував його ПРОЙДЕНИМ. Тобто в CI був
+ * зелений рядок, за яким не стояло жодного твердження: сторінка могла
+ * вирости вдвічі, і ніхто б не дізнався.
+ *
+ * Пороги взяті з фактичних значень на день фіксу (найважча plan.html
+ * 862 КБ, найповільніша 248 мс, найбільше вузлів programs.html 1118) з
+ * запасом. Це не ідеал, до якого треба тягнутись, а стеля, за яку не можна
+ * заповзти непомітно. Ростуть навмисно — піднімай числа тут і поясни чому.
+ */
+const LIMIT = {
+  /* КБ рахуються слухачем 'response' і залежать від того, скільки тіл
+     встигло дочитатись до кінця навігації, — між прогонами розкид
+     помітний (862…1054 на тій самій збірці). Тому стеля з подвійним
+     запасом: вона ловить подвоєння сторінки, а не шум. */
+  kb: 1500,
+  loadMs: 900,   // найповільніша, мс — file://, тож із великим запасом на CI
+  nodes: 1600    // найбільше вузлів DOM (факт 2026-09-07: 1118)
+};
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
 import { readdirSync, statSync } from 'node:fs';
@@ -30,3 +52,11 @@ console.log('сторінка'.padEnd(22), 'КБ'.padStart(6), 'запитів'.
 for(const r of rows) console.log(r.page.padEnd(22), String(r.kb).padStart(6), String(r.reqs).padStart(8), String(r.loadMs).padStart(8), String(r.dcl).padStart(7), String(r.nodes).padStart(7), String(r.scripts).padStart(9));
 const worst=rows[0], slowest=rows.slice().sort((a,b)=>b.loadMs-a.loadMs)[0], most=rows.slice().sort((a,b)=>b.nodes-a.nodes)[0];
 console.log('\nнайважча:', worst.page, worst.kb+' КБ | найповільніша:', slowest.page, slowest.loadMs+' мс | найбільше вузлів:', most.page, most.nodes);
+
+const bad=[];
+if(worst.kb    > LIMIT.kb)     bad.push(worst.page+' важить '+worst.kb+' КБ (стеля '+LIMIT.kb+')');
+if(slowest.loadMs > LIMIT.loadMs) bad.push(slowest.page+' вантажиться '+slowest.loadMs+' мс (стеля '+LIMIT.loadMs+')');
+if(most.nodes  > LIMIT.nodes)  bad.push(most.page+' має '+most.nodes+' вузлів (стеля '+LIMIT.nodes+')');
+if(bad.length){ console.log('\nПЕРЕВИЩЕНО:'); bad.forEach(x=>console.log('  ✗ '+x)); }
+else console.log('\nусі три стелі витримано');
+process.exit(bad.length?1:0);

@@ -490,7 +490,7 @@
     const b = BC.bmi(toNum(state.body.weight), toNum(state.body.height));
     if (b === null) { el.innerHTML = ''; return; }
     const cat = BC.category(b);
-    el.innerHTML = 'BMI: <b class="mono">' + String(b).replace('.', ',') + '</b> — ' +
+    el.innerHTML = 'ІМТ: <b class="mono">' + String(b).replace('.', ',') + '</b> — ' +
       BC.CAT_LABEL[cat] +
       '<span class="muted"> · скринінговий показник, не діагноз</span>';
   }
@@ -600,6 +600,10 @@
       } else if (msg.indexOf('USERNAME_TAKEN') !== -1 || msg.indexOf('USERNAME_INVALID') !== -1) {
         state.err = 'Нік зайнятий або некоректний — оберіть інший.';
         nav('name');
+      } else if (msg.indexOf('REJECTED') !== -1) {
+        /* SEC-001: відмова більше не скасовується повторною заявкою — і
+           екран має сказати саме це, а не «невідома помилка». */
+        nav('rejected');
       } else if (msg.indexOf('BLOCKED') !== -1) {
         nav('blocked');
       } else {
@@ -1171,14 +1175,21 @@
       '</div>';
   }
 
+  /*
+   * Екран відмови. Кнопки «Подати ще раз» тут більше немає (SEC-001):
+   * повторна заявка обнуляла рішення адміна разом із decided_at і
+   * decided_by, тобто відхилений сам повертав собі розгляд. Сервер тепер
+   * відповідає REJECTED, і обіцяти в інтерфейсі те, чого не буде, — гірше
+   * за відсутність кнопки.
+   */
   function renderRejected(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title">Заявку відхилено</h1>' +
-      '<p class="small mt-1">Цю заявку не підтверджено. Можете подати нову — ' +
-        'дані скринінгу заповните ще раз.</p>' +
+      '<p class="small mt-1">Цю заявку не підтверджено, і подати її повторно ' +
+        'з цього акаунта не можна. Якщо вважаєте це помилкою — напишіть ' +
+        'адміністратору.</p>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
-        '<button class="btn btn--primary" type="button" data-nav="age">Подати ще раз</button>' +
         '<button class="btn btn--ghost" type="button" id="au-out">Вийти</button>' +
       '</div>';
   }

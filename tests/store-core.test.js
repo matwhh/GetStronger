@@ -16,7 +16,7 @@ const UID_B = 'bbbbbbbb-0000-4000-8000-000000000002';
 /** Мережа, яка вміє все, що треба для входу й читання-запису профілю. */
 function net(cloudRow, opts) {
   const o = opts || {};
-  const state = { row: cloudRow === undefined ? null : cloudRow, pushed: [] };
+  const state = { row: cloudRow === undefined ? null : cloudRow, pushed: [], patched: [] };
   const f = makeNet();
   f.route((u) => u.includes('/auth/v1/token'), () => ({
     status: o.loginStatus || 200,
@@ -33,6 +33,13 @@ function net(cloudRow, opts) {
     status: o.readStatus || 200,
     body: state.row === null ? [] : [{ data: state.row }]
   }));
+  f.route((u) => u.includes('rpc/profile_patch'), (u, opt) => {
+    if (o.writeNetworkError) return { networkError: true };
+    if (o.writeStatus && o.writeStatus >= 400) return { status: o.writeStatus, body: { message: 'no' } };
+    state.patched.push(opt.body.p_patch);
+    state.row = Object.assign({}, state.row || {}, opt.body.p_patch);   // data || p_patch
+    return { status: 200, body: null };
+  });
   f.route((u) => u.includes('/rest/v1/profiles?on_conflict'), (u, opt) => {
     if (o.writeNetworkError) return { networkError: true };
     if (o.writeStatus && o.writeStatus >= 400) return { status: o.writeStatus, body: { message: 'no' } };
@@ -395,5 +402,356 @@ describe('Auth: redirect_to у листах', () => {
     const f = authNet();
     const { Store } = loadStore({ fetch: f, location: { hash: '#anchor' } });
     assert.equal(await Store.adoptUrlSession(), null);
+  });
+});
+
+/*
+ * Вибір людини при першому вході (TST-010).
+ *
+ * signIn повертає merge='conflict', коли непорожні і локальні, і хмарні
+ * дані. Далі рішення за людиною — і саме ці два шляхи не виконував жоден
+ * тест. Виживали мутанти: «взяти мої дані» заливає копію ПЕРЕД імпортом
+ * замість поточної; «лишити хмарні» не скидає кеш і повертає локальні.
+ * Обидва тихі: людина натискає кнопку, бачить підтвердження і втрачає
+ * рівно ті дані, які просила зберегти.
+ */
+describe('Конфлікт першого входу: що обрала людина, те й сталось', () => {
+  function conflicted() {
+    const ls = makeStorage({
+      'ib.profile': JSON.stringify({ weight: 88, version: 9, bodyLog: { '2026-05-05': 88 } }),
+      'ib.profile.backup': JSON.stringify({ weight: 1, version: 9 })
+    });
+    const f = net({ weight: 70, version: 9, bodyLog: { '2026-01-01': 70 } });
+    return { ls: ls, f: f, s: loadStore({ fetch: f, storage: ls }) };
+  }
+
+  test('«взяти дані з цього браузера» — у хмару їде саме локальний профіль', async () => {
+    const c = conflicted();
+    const res = await c.s.Store.signIn('a@test', 'password');
+    assert.equal(res.merge, 'conflict');
+
+    await c.s.Store.adoptLocalProfile();
+    const prof = await c.s.Store.getProfile();
+    assert.equal(prof.weight, 88, 'локальні дані стали профілем');
+    assert.equal(prof.bodyLog['2026-05-05'], 88, 'журнал ваги переїхав, а не зник');
+  });
+
+  test('копія перед імпортом при цьому не використовується', async () => {
+    /* ib.profile.backup — це знімок ПЕРЕД імпортом, а не «мої дані».
+       Переплутати їх означає залити в акаунт стан місячної давнини. */
+    const c = conflicted();
+    await c.s.Store.signIn('a@test', 'password');
+    await c.s.Store.adoptLocalProfile();
+    const prof = await c.s.Store.getProfile();
+    assert.notEqual(prof.weight, 1, 'взято не доімпортну копію');
+  });
+
+  test('службові поля слота не переїжджають у профіль', async () => {
+    const ls = makeStorage({
+      /* owner тут — ВЛАСНИЙ (інакше спрацює барʼєр SYN-003 і переносити
+         буде нічого). Перевіряємо саме те, що службові поля слота не
+         стають полями профілю. */
+      'ib.profile': JSON.stringify({ weight: 88, version: 9, owner: UID_A, savedAt: 'колись' })
+    });
+    const s = loadStore({ fetch: net({ weight: 70, version: 9 }), storage: ls });
+    await s.Store.signIn('a@test', 'password');
+    await s.Store.adoptLocalProfile();
+    const prof = await s.Store.getProfile();
+    assert.equal(prof.owner, undefined);
+    assert.equal(prof.savedAt, undefined);
+  });
+
+  test('«лишити дані акаунта» — повертається хмарний профіль, а не локальний', async () => {
+    const c = conflicted();
+    await c.s.Store.signIn('a@test', 'password');
+    /* Саме тут ламалось: cache = null не чіпав ні чергу, ні dirty, ні
+       ib.profile, тож наступний getProfile віддавав локальні дані. */
+    c.s.ls.setItem('ib.pending', JSON.stringify([{ at: Date.now(), uid: UID_A, patch: { weight: 88 } }]));
+    c.s.ls.setItem('ib.profile.dirty', String(Date.now()));
+
+    c.s.Store.discardLocalProfile();
+    assert.equal(c.s.ls.getItem('ib.pending'), null, 'черга прибрана');
+    assert.equal(c.s.ls.getItem('ib.profile.dirty'), null, 'позначка знята');
+
+    const prof = await c.s.Store.getProfile();
+    assert.equal(prof.weight, 70, 'узято хмарний профіль');
+  });
+
+  test('після «лишити дані акаунта» локальні патчі не їдуть у хмару', async () => {
+    const c = conflicted();
+    await c.s.Store.signIn('a@test', 'password');
+    c.s.ls.setItem('ib.pending', JSON.stringify([{ at: Date.now(), uid: UID_A, patch: { weight: 88 } }]));
+    const before = c.f.state.pushed.length;
+
+    c.s.Store.discardLocalProfile();
+    await c.s.Store.flushPending();
+    assert.equal(c.f.state.pushed.length, before,
+      'нічого не відправлено: черги вже немає');
+  });
+});
+
+/*
+ * Пошкоджений локальний профіль (LOC-001).
+ *
+ * Нечитабельний ib.profile виглядав як «профілю немає»: перше ж
+ * автозбереження перезаписувало сирі байти порожнім бланком — без копії й
+ * без жодного слова людині.
+ */
+describe('Нечитабельний ib.profile', () => {
+  test('сирий вміст відкладається, а не зникає', async () => {
+    const ls = makeStorage({ 'ib.profile': '{обірваний json' });
+    const s = loadStore({ fetch: net(null), storage: ls });
+    await s.Store.getProfile();
+
+    const keys = Object.keys(ls.dump ? ls.dump() : {}).length
+      ? Object.keys(ls.dump()) : null;
+    const corrupt = (keys || []).filter((k) => k.indexOf('ib.profile.corrupt.') === 0);
+    assert.equal(corrupt.length, 1, 'рівно одна відкладена копія');
+    assert.equal(ls.getItem(corrupt[0]), '{обірваний json');
+    assert.equal(s.Store.corruptProfile().found, true, 'інтерфейс дізнається про це');
+  });
+
+  test('масив замість обʼєкта — теж пошкодження', async () => {
+    const ls = makeStorage({ 'ib.profile': '[1,2,3]' });
+    const s = loadStore({ fetch: net(null), storage: ls });
+    await s.Store.getProfile();
+    assert.equal(s.Store.corruptProfile().found, true);
+  });
+
+  test('справний профіль нічого не відкладає', async () => {
+    const ls = makeStorage({ 'ib.profile': JSON.stringify({ weight: 80, version: 9 }) });
+    const s = loadStore({ fetch: net(null), storage: ls });
+    await s.Store.getProfile();
+    assert.equal(s.Store.corruptProfile().found, false);
+  });
+});
+
+/*
+ * Тихі шляхи, на яких зміна не доїжджала й ніхто цього не бачив.
+ *
+ * SYN-002 — beacon слав запит явно простроченим токеном;
+ * SYN-011 — дві вкладки затирали журнали одна одної цілком;
+ * SYN-015 — запис при не-approved статусі звітував про успіх без сліду;
+ * SYN-019 — позначка синхронізації бачила лише чергу, не позначку dirty.
+ */
+describe('Незіслане має лишати слід', () => {
+  test('beacon із простроченим токеном не шле запит, а кладе патч у чергу', () => {
+    /* SYN-002: це єдиний запис, який не проходить ensureFresh — сторінка
+       вже закривається. Слати завідомо мертвим токеном немає сенсу:
+       відповідь 401 обробляти буде нікому. */
+    const ls = makeStorage({
+      'ib.account': JSON.stringify({ status: 'approved' }),
+      'ib.session': JSON.stringify({ access_token: 't', refresh_token: 'r',
+        expires_at: Date.now() - 1000, user: { id: UID_A, email: 'a@test' } }),
+      'ib.profile.owner': UID_A
+    });
+    const f = net({ weight: 70, version: 9 });
+    const s = loadStore({ fetch: f, storage: ls });
+    s.Store.saveProfileBeacon({ weight: 71 });
+    assert.equal(f.state.pushed.length, 0, 'жодного запиту простроченим токеном');
+    assert.equal(JSON.parse(ls.getItem('ib.pending') || '[]').length, 1, 'патч у черзі');
+  });
+
+  test('запис до підтвердження заявки лишає позначку', async () => {
+    /* SYN-015: до approved RLS однаково відмовить, тож у хмару не ходимо.
+       Але без позначки перший же getProfile після підтвердження взяв би
+       хмарний бланк і затер усе, що людина встигла зробити. */
+    const ls = makeStorage({
+      'ib.account': JSON.stringify({ status: 'pending' }),
+      'ib.session': JSON.stringify({ access_token: 't', refresh_token: 'r',
+        expires_at: Date.now() + 86400000, user: { id: UID_A, email: 'a@test' } }),
+      'ib.profile.owner': UID_A
+    });
+    const f = net(null);
+    const s = loadStore({ fetch: f, storage: ls });
+    await s.Store.saveProfile({ weight: 77 });
+    assert.equal(f.state.pushed.length, 0, 'у хмару не ходили');
+    assert.ok(ls.getItem('ib.profile.dirty'), 'але слід лишили');
+  });
+
+  test('позначка синхронізації бачить і чергу, і dirty', () => {
+    /* SYN-019 */
+    const ls = makeStorage({ 'ib.profile.dirty': String(Date.now()) });
+    const s = loadStore({ fetch: net(null), storage: ls });
+    assert.equal(s.Store.pendingCount(), 0);
+    assert.equal(s.Store.unsyncedCount(), 1, 'dirty без черги — теж «не синхронізовано»');
+    ls.setItem('ib.pending', JSON.stringify([
+      { at: 1, uid: UID_A, patch: { a: 1 } }, { at: 2, uid: UID_A, patch: { b: 2 } }]));
+    assert.equal(s.Store.unsyncedCount(), 2, 'черга важливіша за прапорець');
+  });
+});
+
+describe('Дві вкладки й журнали (SYN-011)', () => {
+  test('патч-функція будується на актуальному профілі, а не на прочитаному колись', async () => {
+    /*
+     * Відтворення: вкладка А зберігає свій запис, вкладка Б будує патч зі
+     * СТАРОЇ бази. З обʼєктом-патчем запис А зникав; з функцією — ні.
+     */
+    const ls = makeStorage({
+      'ib.account': JSON.stringify({ status: 'approved' }),
+      'ib.session': JSON.stringify({ access_token: 't', refresh_token: 'r',
+        expires_at: Date.now() + 86400000, user: { id: UID_A, email: 'a@test' } }),
+      'ib.profile.owner': UID_A
+    });
+    const f = net({ version: 9, bodyLog: {} });
+    const s = loadStore({ fetch: f, storage: ls });
+
+    /* Вкладка А: записала вагу за 1 серпня. */
+    await s.Store.saveProfile({ bodyLog: { '2026-08-01': 80 } });
+
+    /* Вкладка Б: у неї в памʼяті журнал ще порожній. */
+    const staleLog = {};
+    await s.Store.saveProfile(function (p) {
+      const out = Object.assign({}, p.bodyLog, staleLog);
+      out['2026-08-02'] = 81;
+      return { bodyLog: out };
+    });
+
+    const prof = await s.Store.getProfile();
+    assert.equal(prof.bodyLog['2026-08-01'], 80, 'запис першої вкладки лишився');
+    assert.equal(prof.bodyLog['2026-08-02'], 81, 'запис другої вкладки додався');
+  });
+
+  test('обʼєкт-патч і далі замінює поле цілком', async () => {
+    /* Свідомо: видалення запису журналу робиться саме так, і ламати цю
+       семантику заради SYN-011 не можна. */
+    const ls = makeStorage({
+      'ib.account': JSON.stringify({ status: 'approved' }),
+      'ib.session': JSON.stringify({ access_token: 't', refresh_token: 'r',
+        expires_at: Date.now() + 86400000, user: { id: UID_A, email: 'a@test' } }),
+      'ib.profile.owner': UID_A
+    });
+    const s = loadStore({ fetch: net({ version: 9, bodyLog: {} }), storage: ls });
+    await s.Store.saveProfile({ bodyLog: { '2026-08-01': 80 } });
+    await s.Store.saveProfile({ bodyLog: {} });
+    const prof = await s.Store.getProfile();
+    assert.deepEqual(Object.keys(prof.bodyLog), []);
+  });
+});
+
+/*
+ * PRF-006. Профіль росте, keepalive — ні.
+ *
+ * Тілом upsert-а є ВЕСЬ профіль, а ліміт keepalive — 64 КБ байтів. Після
+ * 40–60 записаних сесій (місяць-два) гілка keepalive ставала недосяжною
+ * НАЗАВЖДИ: кожен запис при закритті вкладки лягав у чергу й доїжджав
+ * лише при наступному відкритті сайту. Це не втрата даних, але
+ * «зберігається одразу» переставало бути правдою рівно для тих, хто
+ * користується довше за всіх.
+ */
+describe('Великий профіль і збереження при закритті вкладки (PRF-006)', () => {
+  const bigProfile = () => {
+    const sessionLog = {};
+    for (let i = 0; i < 600; i++) {
+      sessionLog['2026-01-' + i] = { title: 'Тренування довгою назвою для обʼєму', done: 5, total: 8,
+        sets: 20, reps: 120, vol: 8400, t0: 1, t1: 2, end: 1, ex: [] };
+    }
+    return { version: 9, weight: 80, sessionLog: sessionLog };
+  };
+  const liveSession = () => ({
+    'ib.account': JSON.stringify({ status: 'approved' }),
+    'ib.session': JSON.stringify({ access_token: 't', refresh_token: 'r',
+      expires_at: Date.now() + 86400000, user: { id: UID_A, email: 'a@test' } }),
+    'ib.profile.owner': UID_A
+  });
+
+  test('дрібна правка доїжджає патчем, а не всім профілем', () => {
+    const prof = bigProfile();
+    assert.ok(JSON.stringify(prof).length > 60000, 'профіль для тесту має бути завеликим');
+    const ls = makeStorage(Object.assign(liveSession(), { 'ib.profile': JSON.stringify(prof) }));
+    const f = net(prof);
+    const s = loadStore({ fetch: f, storage: ls });
+
+    s.Store.saveProfileBeacon({ weight: 81 });
+
+    assert.equal(f.state.pushed.length, 0, 'весь профіль не шлемо — він не влізе');
+    assert.equal(f.state.patched.length, 1, 'патч мав піти окремим запитом');
+    assert.equal(f.state.patched[0].weight, 81);
+    assert.ok(f.state.patched[0].updatedAt, 'без updatedAt патч не переможе старіший рядок');
+    assert.equal(Object.keys(f.state.patched[0]).length, 2, 'у тілі лише те, що змінилось');
+    assert.equal(JSON.parse(ls.getItem('ib.pending') || '[]').length, 0, 'у чергу нічого не лягло');
+  });
+
+  test('патч, який сам завеликий, чесно лягає в чергу', () => {
+    /* Журнал сесій — це те саме поле, що розпирає профіль. Фізику ліміту
+       не обійти: такий патч і далі їде чергою при наступному відкритті. */
+    const prof = bigProfile();
+    const ls = makeStorage(Object.assign(liveSession(), { 'ib.profile': JSON.stringify(prof) }));
+    const f = net(prof);
+    const s = loadStore({ fetch: f, storage: ls });
+
+    s.Store.saveProfileBeacon({ sessionLog: prof.sessionLog });
+
+    assert.equal(f.state.patched.length, 0, 'завеликий патч у мережу не йде');
+    assert.equal(f.state.pushed.length, 0);
+    assert.equal(JSON.parse(ls.getItem('ib.pending') || '[]').length, 1, 'патч у черзі');
+  });
+
+  test('малий профіль і далі йде звичайним upsert-ом', () => {
+    /* Робочий шлях не мав змінитись: перевіряємо, що нова гілка вмикається
+       саме за розміром, а не завжди. */
+    const ls = makeStorage(Object.assign(liveSession(),
+      { 'ib.profile': JSON.stringify({ version: 9, weight: 80 }) }));
+    const f = net({ version: 9, weight: 80 });
+    const s = loadStore({ fetch: f, storage: ls });
+
+    s.Store.saveProfileBeacon({ weight: 81 });
+
+    assert.equal(f.state.patched.length, 0, 'RPC для малого профілю не потрібен');
+    assert.equal(f.state.pushed.length, 1, 'звичайний upsert');
+    assert.equal(f.state.pushed[0].weight, 81);
+  });
+});
+
+/*
+ * Імпорт часткового файла НЕ мусить бути заміною профілю.
+ *
+ * Store.migrateImported прогоняє файл через міграції, а для цього накладає
+ * його на blankProfile() — інакше кроки міграції не мають на чому
+ * працювати. Але в результат потрапляли ВСІ поля бланка, тобто порожні
+ * журнали для полів, яких у файлі не було. Далі імпорт записував ці
+ * порожні значення поверх наявних: часткова копія стирала історію ваг,
+ * тіла й харчування, а в хмарному режимі — одразу на всіх пристроях.
+ *
+ * Окремо — null: крок 1→2 перетворював "weightLog": null на порожній {},
+ * і перевірка імпорту («null означає не задано лише для скалярів») до
+ * цього вже не доходила.
+ */
+describe('Імпорт часткового файла нічого не затирає', () => {
+  const load = (init) => loadStore({ storage: makeStorage(init), local: true });
+
+  test('поля, яких у файлі немає, у результат не потрапляють', () => {
+    const s = load({});
+    const out = s.Store.migrateImported({ weight: 70, version: 11 });
+    const keys = Object.keys(out).sort().join(',');
+    assert.equal(keys, 'version,weight',
+      'у мігрованому файлі мали лишитись лише його власні поля, а не бланк: ' + keys);
+  });
+
+  test('null лишається null і не стає порожнім журналом', () => {
+    const s = load({});
+    const out = s.Store.migrateImported({ weightLog: null, bodyLog: null, weight: 70 });
+    assert.equal(out.weightLog, null, 'weightLog мав лишитись null');
+    assert.equal(out.bodyLog, null, 'bodyLog мав лишитись null');
+  });
+
+  test('те, що міграція справді заповнила, зберігається', () => {
+    /* Крок 1→2 засіває weightLog із weights: цього поля у файлі немає, але
+       воно вже не порожнє — тож має доїхати. */
+    const s = load({});
+    const out = s.Store.migrateImported({ version: 1, weights: { 'Присідання зі штангою': 100 } });
+    assert.ok(out.weightLog, 'weightLog, засіяний міграцією, мав лишитись');
+    assert.ok(out.weightLog['Присідання зі штангою'], 'у засіяному журналі має бути вправа');
+  });
+
+  test('повний профіль проходить незмінно за складом полів', () => {
+    const s = load({});
+    const full = { version: 9, weight: 80, height: 180, weights: { X: 50 },
+                   bodyLog: { '2026-08-01': 80 }, sessionLog: {}, mealLog: {} };
+    const out = s.Store.migrateImported(full);
+    for (const k of Object.keys(full)) {
+      if (k === 'version') continue;
+      assert.ok(k in out, 'поле ' + k + ' зникло з імпорту');
+    }
   });
 });

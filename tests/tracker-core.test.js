@@ -403,3 +403,49 @@ describe('tracker-core: креатин з коробки не воскресає
     assert.equal(T.removeCustom(a.trackers, a.id)[a.id], undefined);
   });
 });
+
+/*
+ * Форма журналу трекерів — trackerLog[id][РРРР-ММ-ДД].
+ *
+ * Сторінка «Трекери» будувала патч як next[дата], тобто шукала ДАТУ на
+ * верхньому рівні. Вона там ніколи не лежить, тож патч завжди виходив
+ * порожнім, а гілка «запису немає» видаляла ключ, якого не існувало. На
+ * екрані значення виглядало записаним (сторінка малює зі свого стану), у
+ * профілі — нічого, після перезавантаження зникало. Ці тести фіксують
+ * саму форму, щоб наступний, хто писатиме патч, побачив її з тесту.
+ */
+describe('Журнал трекерів: ключ — трекер, потім дата', () => {
+  const TC = T;   // модуль уже завантажений на початку файла
+  const TRK = TC.ensureBuiltins({});   // справжній каталог, а не саморобний
+  /* Запис — обʼєкт {value, source, date}; число з нього дістає entryValue. */
+  const v = (log, id, d) => TC.entryValue((log[id] || {})[d]);
+
+  it('logValue кладе значення під id, а не під дату', () => {
+    const log = TC.logValue(TRK, {}, 'sleep', 407, '2026-09-07');
+    assert.equal(typeof log.sleep, 'object', 'верхній рівень — id трекера');
+    assert.equal(v(log, 'sleep', '2026-09-07'), 407);
+    assert.equal(log['2026-09-07'], undefined, 'дати на верхньому рівні бути не має');
+  });
+
+  it('removeEntry прибирає день, а не трекер', () => {
+    const log = TC.logValue(TRK, {}, 'sleep', 407, '2026-09-07');
+    const out = TC.removeEntry(log, 'sleep', '2026-09-07');
+    assert.equal(typeof out.sleep, 'object');
+    assert.equal(out.sleep['2026-09-07'], undefined);
+  });
+
+  it('два трекери одного дня лежать окремо', () => {
+    let log = TC.logValue(TRK, {}, 'sleep', 407, '2026-09-07');
+    log = TC.logValue(TRK, log, 'water', 5, '2026-09-07');
+    assert.equal(v(log, 'sleep', '2026-09-07'), 407);
+    assert.equal(v(log, 'water', '2026-09-07'), 5);
+    assert.equal(Object.keys(log).sort().join(','), 'sleep,water');
+  });
+
+  it('запис іншого дня не чіпає вчорашній', () => {
+    let log = TC.logValue(TRK, {}, 'sleep', 400, '2026-09-06');
+    log = TC.logValue(TRK, log, 'sleep', 407, '2026-09-07');
+    assert.equal(v(log, 'sleep', '2026-09-06'), 400);
+    assert.equal(v(log, 'sleep', '2026-09-07'), 407);
+  });
+});

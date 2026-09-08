@@ -283,14 +283,26 @@ ok('weight-хаос: без JS-помилок', errsPlan2.length === 0, errsPlan
 section('F. TOGGLE-EDIT SPAM ×200');
 {
   await p.evaluate(PERSIST_PROBE);
-  const nodes0 = await p.evaluate(() => document.querySelectorAll('*').length);
+  /*
+   * ТОСТИ НЕ РАХУЮТЬСЯ.
+   *
+   * Попередній розділ навмисно шле десятки НЕПРИЙНЯТНИХ ваг, і кожна
+   * тепер чесно відповідає тостом (UX-005). Тости живуть 3,5 секунди й
+   * зникають самі — тобто між першим і другим виміром DOM встигав
+   * СХУДНУТИ на цілий десяток вузлів, і перевірка на витік падала на
+   * власному прибиранні. Рахуємо все, крім контейнера тостів.
+   */
+  const countNodes = () => p.evaluate(() =>
+    document.querySelectorAll('*').length -
+    document.querySelectorAll('.toasts, .toasts *').length);
+  const nodes0 = await countNodes();
   const adds0 = await p.evaluate(() => window.__persistAdds);
   for (let n = 0; n < 200; n++) {
     await p.evaluate(() => { const b = document.querySelector('#toggle-edit'); if (b) b.click(); });
     if (n % 25 === 0) await p.waitForTimeout(10);
   }
   await p.waitForTimeout(200);
-  const nodes1 = await p.evaluate(() => document.querySelectorAll('*').length);
+  const nodes1 = await countNodes();
   const adds1 = await p.evaluate(() => window.__persistAdds);
   /* Вузли після парної кількості перемикань мають повернутись до вихідного
      порядку; допускаємо невеликий дельта на тост/банер. */

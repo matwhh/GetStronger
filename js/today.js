@@ -292,10 +292,19 @@
 
     const st = Api.cached();
     if (!st || !st.config) {
+      /*
+       * ТРЕТІЙ СТАН: не лише «є дані» і «ще їдуть», а й «не приїхали»
+       * (UX-003). Раніше картка показувала «Завантажується…» НАЗАВЖДИ,
+       * якщо elo_state недоступна: ні помилки, ні повтору, ні кнопки.
+       */
+      const err = (Api.stateError && Api.stateError()) || null;
       return '' +
         '<div class="card card--rating">' +
           '<h2 style="margin:0">Сезон</h2>' +
-          '<p class="small muted mt-2" style="margin-bottom:0">Завантажується…</p>' +
+          (err
+            ? '<p class="small muted mt-2">Сезон недоступний: ' + esc(err) + '</p>' +
+              '<button class="btn btn--ghost btn--sm" type="button" id="tdy-season-retry">Спробувати ще</button>'
+            : '<p class="small muted mt-2" style="margin-bottom:0">Завантажується…</p>') +
         '</div>';
     }
 
@@ -665,6 +674,18 @@
        Чекаємо трохи довше за розрив між blur і focus: інакше «доганялка»
        спрацьовувала б посеред переходу з поля в поле й забирала б те саме
        поле, яке щойно вибрали. */
+    /* Кнопка повтору в картці «Сезон» (UX-003). Делегуванням, бо картка
+       перемальовується разом із рештою сторінки. */
+    $('#today').addEventListener('click', function (e) {
+      const r = e.target.closest && e.target.closest('#tdy-season-retry');
+      if (!r) return;
+      r.disabled = true;
+      r.textContent = 'Пробуємо…';
+      const Api = window.EloApi;
+      if (!Api) return;
+      Api.refresh().then(function () { render(); }, function () { render(); });
+    });
+
     $('#today').addEventListener('focusout', function () {
       if (!pendingRender) return;
       setTimeout(function () {

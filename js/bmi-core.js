@@ -43,8 +43,8 @@
   const WARN = {
     under: {
       title: 'Зверніть увагу',
-      body: 'Ваш BMI знаходиться нижче стандартного діапазону для дорослих. ' +
-        'BMI — лише орієнтовний скринінговий показник: він не може самостійно ' +
+      body: 'Ваш ІМТ (індекс маси тіла) нижчий за стандартний діапазон для дорослих. ' +
+        'ІМТ — лише орієнтовний скринінговий показник: він не може самостійно ' +
         'визначити стан здоровʼя чи склад тіла. Перед початком інтенсивних ' +
         'тренувань, зміною харчування або використанням рекомендацій Forge ' +
         'радимо проконсультуватися з лікарем або іншим відповідним медичним ' +
@@ -53,8 +53,8 @@
     },
     over: {
       title: 'Зверніть увагу',
-      body: 'Ваш BMI знаходиться вище стандартного діапазону для дорослих. ' +
-        'BMI — лише скринінговий показник: він не враховує мʼязову масу, ' +
+      body: 'Ваш ІМТ (індекс маси тіла) вищий за стандартний діапазон для дорослих. ' +
+        'ІМТ — лише скринінговий показник: він не враховує мʼязову масу, ' +
         'розподіл жирової тканини та інші індивідуальні фактори — у людей із ' +
         'великою мʼязовою масою він завищений за побудовою. Якщо є сумніви ' +
         'щодо здоровʼя, харчування чи безпеки навантажень — проконсультуйся ' +
@@ -96,15 +96,64 @@
       '<div class="modal__backdrop"></div>' +
       '<div class="modal__box" role="alertdialog" aria-modal="true" aria-labelledby="bmi-w-t">' +
         '<h3 id="bmi-w-t" style="margin:0">' + esc(w.title) + '</h3>' +
-        '<p class="small mt-1">Ваш BMI: <b class="mono">' + String(b).replace('.', ',') + '</b>.</p>' +
+        '<p class="small mt-1">Ваш ІМТ: <b class="mono">' + String(b).replace('.', ',') + '</b>.</p>' +
         '<p class="small mt-1">' + esc(w.body) + '</p>' +
         '<button class="btn btn--primary btn--wide mt-2" type="button" id="bmi-w-ok">Я зрозумів</button>' +
       '</div>';
     document.body.appendChild(wrap);
-    wrap.querySelector('#bmi-w-ok').addEventListener('click', function () {
+
+    /*
+     * МОДАЛКА МАЄ БУТИ МОДАЛКОЮ (UX-009).
+     *
+     * Розмітка оголошувала role="alertdialog" aria-modal="true", а
+     * поводилась як звичайний прямокутник поверх сторінки: фокус лишався
+     * на тому, що під нею, Tab вільно ходив по схованих кнопках, Escape і
+     * клік по підкладці не закривали, фон прокручувався. Для екранного
+     * читача це пряма брехня: він оголошував «діалог» і лишав користувача
+     * поза ним.
+     *
+     * Пастка фокуса тут проста навмисно: у діалозі рівно одна кнопка,
+     * тож достатньо не випускати Tab за межі box.
+     */
+    const okBtn = wrap.querySelector('#bmi-w-ok');
+    const prevFocus = document.activeElement;
+    let closed = false;
+
+    try { window.App.lockScroll(true); } catch (_) {}
+
+    function close() {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('keydown', onKey, true);
       wrap.remove();
+      try { window.App.lockScroll(false); } catch (_) {}
+      /* Фокус повертається туди, звідки його забрали: інакше після
+         закриття він опинявся на document.body, і клавіатурна навігація
+         починалась зі шапки сторінки. */
+      try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (_) {}
       if (onAck) onAck();
-    });
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key !== 'Tab') return;
+      /* У діалозі рівно один фокусований елемент, тож будь-який Tab
+         (і Shift+Tab) веде назад у нього — за межі box фокус не йде. */
+      e.preventDefault();
+      okBtn.focus();
+    }
+
+    document.addEventListener('keydown', onKey, true);
+    okBtn.addEventListener('click', close);
+    /*
+     * Клік по підкладці закриває — але це саме підтвердження, а не
+     * скасування: попередження прочитане й повторювати його щоразу
+     * означало б навчити людину клацати «Я зрозумів» не читаючи.
+     */
+    const backdrop = wrap.querySelector('.modal__backdrop');
+    if (backdrop) backdrop.addEventListener('click', close);
+
+    try { okBtn.focus(); } catch (_) {}
   }
 
   window.BmiCore = {

@@ -287,7 +287,12 @@
     let adherence = null;
     const WEEKS = 6;
     if (daysTarget > 0) {
-      const from = keyOf(new Date(monday.getTime() - WEEKS * 7 * DAY_MS));
+      /* Через setDate, а не мілісекунди (TIM-002): у ніч переходу на
+         зимовий час доба триває 25 годин, і віднімання DAY_MS зсуває межу
+         вікна на день. Той самий підхід, що й у cutKey вище. */
+      const fromDate = new Date(monday);
+      fromDate.setDate(fromDate.getDate() - WEEKS * 7);
+      const from = keyOf(fromDate);
       const done = dates.filter(function (d) { return d >= from && d < weekKey; }).length;
       const planned = daysTarget * WEEKS;
       adherence = {

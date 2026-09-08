@@ -4,8 +4,8 @@
  * Суттєва зміна документа = нова версія тут і в тексті документа.
  */
 window.LEGAL_VERSIONS = {
-  privacy_policy:     '1.1',
+  privacy_policy:     '1.2',
   terms_of_use:       '1.1',
   medical_disclaimer: '1.0',
-  updated:            '3 вересня 2026'
+  updated:            '7 вересня 2026'
 };

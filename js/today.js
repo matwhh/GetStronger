@@ -14,10 +14,18 @@
  * ЗВІДКИ ЧИСЛА.
  *
  * Сезон — js/season-core.js, той самий, за яким живе вся аналітика.
- * Тиждень 1 — календарний тиждень (Пн→Нд), у якому сезон почався: увесь
- * проєкт рахує тижні від понеділка (теплокарта, календар історії,
- * adherence), і заводити тут власний відлік означало б, що два екрани
- * називають «тижнем» різні сім днів.
+ *
+ * Тиждень рахується від ПЕРШОГО ВИКОНАНОГО ТРЕНУВАННЯ, а не від старту
+ * сезону: сезон починається за календарем і однаковий для всіх, а «мій
+ * тиждень 3» має означати третій тиждень МОГО тренування. Людина, яка
+ * зайшла в застосунок посеред сезону, інакше бачила б «Тиждень 7» у свій
+ * перший день у залі.
+ *
+ * Тиждень 1 — календарний тиждень (Пн→Нд), у якому те перше тренування
+ * сталось: увесь проєкт рахує тижні від понеділка (теплокарта, календар
+ * історії, adherence), і заводити тут власний відлік означало б, що два
+ * екрани називають «тижнем» різні сім днів. Поки тренувань немає — це
+ * тиждень 1.
  *
  * Тренувальні дні тижня — з активного плану: у плані N днів на тиждень,
  * тож перші N слотів тижня тренувальні, решта — відпочинок. Це те, що
@@ -66,18 +74,44 @@
   function dowIndex(d) { return (d.getDay() + 6) % 7; }
 
   /**
-   * Номер тижня сезону для дати. 1 — тиждень, у якому сезон почався.
-   * null — сезону ще немає (дата раніша за старт першого періоду).
+   * Номер тижня для дати, рахуючи від тижня, у якому лежить startKey.
+   * 1 — той самий тиждень. null — startKey немає.
    */
-  function weekNoOf(date, season) {
-    if (!season) return null;
-    const p = String(season.start).split('-');
+  function weekNoOf(date, startKey) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(startKey || ''))) return null;
+    const p = String(startKey).split('-');
     const base = mondayOf(new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])));
     const here = mondayOf(date);
     /* Різниця в добах, а не в мілісекундах: перехід на зимовий час робить
        тиждень 169-годинним, і ділення мілісекунд дало б 0.99 тижня. */
     const days = Math.round((here - base) / 86400000);
     return Math.floor(days / 7) + 1;
+  }
+
+  /**
+   * Дата першого виконаного тренування, або ''.
+   *
+   * Правило «що вважається тренуванням» списане з теплокарти журналу
+   * (js/journal.js → trained): явний 0 у workLog знімає день навіть за
+   * наявної сесії, інакше рахується сесія з бодай одним закритим
+   * підходом або вправою. Два екрани не можуть по-різному відповідати на
+   * питання «чи тренувався я того дня».
+   */
+  function firstTrainedKey() {
+    const wl = state.profile.workLog || {};
+    const sl = state.profile.sessionLog || {};
+    const counts = function (x) {
+      return !!x && typeof x === 'object' && (Number(x.done) > 0 || Number(x.doneSets) > 0);
+    };
+    let best = '';
+    Object.keys(wl).concat(Object.keys(sl)).forEach(function (k) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
+      if (best && k >= best) return;
+      const v = Number(wl[k]);
+      const on = Number.isFinite(v) ? v > 0 : counts(sl[k]);
+      if (on) best = k;
+    });
+    return best;
   }
 
   /* ------------------------------------------------------------------ */
@@ -179,7 +213,7 @@
        не було. Номер тижня лишається як позначка, де ти в сезоні. */
     return '' +
       '<div class="tdy-week">' +
-        '<b class="tdy-week__num">Тиждень ' + state.week + ' сезону</b>' +
+        '<b class="tdy-week__num">Тиждень ' + state.week + '</b>' +
         '<div class="tdy-days">' + days + '</div>' +
       '</div>';
   }
@@ -258,10 +292,8 @@
   }
 
   function readWeek() {
-    const SC = window.SeasonCore;
-    const season = SC && SC.current ? SC.current() : null;
-    const n = weekNoOf(new Date(), season);
-    /* Сезон ще не почався — показуємо перший тиждень. */
+    const n = weekNoOf(new Date(), firstTrainedKey());
+    /* Тренувань ще не було — це перший тиждень. */
     state.week = (n && n > 0) ? n : 1;
     state.slot = dowIndex(new Date());
   }
@@ -302,6 +334,10 @@
     window.Store.onChange(async function () {
       try { state.profile = await window.Store.getProfile() || {}; } catch (_) { return; }
       readPlan();
+      /* Журнал міг поповнитись у сусідній вкладці — а разом із першим
+         тренуванням з'являється й точка відліку тижнів. */
+      const n = weekNoOf(new Date(), firstTrainedKey());
+      state.week = (n && n > 0) ? n : 1;
       render();
     });
   }

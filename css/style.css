@@ -787,7 +787,9 @@ a.card > .btn {
    днів увесь список наново «випливав» із затримками до 0,32 с. */
 .card--off {
   opacity: 0.45;
-  filter: grayscale(1);
+  /* grayscale прибраний: на монохромній темі він не міняє жодного
+     пікселя, але змушує браузер тримати окремий шар композиції під
+     кожною такою карткою. Чинні значення — у шарі застосунку нижче. */
 }
 /* Необовʼязковий блок: раунди 7–8 на мішку. Це не «вимкнено» й не
    «недоступно» — роботу робити треба, якщо лишились сили, тому картка
@@ -2172,24 +2174,70 @@ main:focus:not(:focus-visible) { outline: none; }
    3+ → найсвітліший акцент. Це те саме правило «статус яскравістю». */
 /* 12 тижнів × Пн…Нд. Клітинки — кнопки-перемикачі з числом місяця,
    як у календарі; 24px — щоб число читалось і день ловився пальцем */
-/* Теплокарта тренувань — у стилі календаря внесків GitHub: пласкі
-   квадратики, заповнений день = акцентна заливка (--acc-bar), і ряд назв
-   місяців згори. Розмір/крок/ширина підписів — на змінних, щоб мобільний
-   варіант лише перевизначав їх, а вирівнювання рахувалось само.
-   Ця частина була пласкою ще до загального переходу — і саме тому
-   пережила його без жодної правки. */
+/* --------------------------------------------------------------------
+   ТЕПЛОКАРТА ТРЕНУВАНЬ
+   --------------------------------------------------------------------
+   Сітка внесків: колонка = тиждень, рядок = день тижня, сім місяців у
+   ряд. Пласка від початку — саме тому вона пережила відмову від
+   неоморфізму без жодної правки.
+
+   ЩО ТУТ РОБИТЬ КОЛІР. Нічого: він тут не потрібен і його немає. Рівень
+   заповненості дня показує ЯСКРАВІСТЬ заливки — чотири сходинки від 22%
+   до 100% акценту. Це те саме правило, на якому стоїть уся тема, і воно
+   ж рятує від класичної біди теплокарт: зеленої шкали, у якій дальтонік
+   не бачить різниці між сусідніми кроками.
+
+   ЧОМУ САМЕ ЧОТИРИ СХОДИНКИ. Три — замало, щоб відрізнити «майже все»
+   від «половину»; пʼять і більше на квадратику 30px уже не читаються
+   окремо: різниця між 60% і 70% білого на такій площі за межею
+   помітності. Кроки нерівні навмисно — між «нічого» й «щось» перепад
+   мусить бути більший, ніж між двома робочими днями.
+   -------------------------------------------------------------------- */
+/* Обгортка: система координат для підказки. Сама сітка прокручується й
+   тому обрізає все, що з неї виступає, — включно з підказкою. */
+.heatmap-wrap { position: relative; }
 .heatmap {
   --hm-cell: 30px;   /* сторона квадратика */
   --hm-gap: 5px;     /* проміжок між квадратиками й колонками */
   --hm-label: 28px;  /* ширина стовпця підписів Пн…Нд */
   display: flex; flex-direction: column; gap: var(--hm-gap);
   overflow-x: auto; padding-bottom: 6px;
+  /* Прокрутка сітки не має тягнути за собою сторінку, коли дійшла до
+     краю: на телефоні це головна причина «сторінка сама стрибнула». */
+  overscroll-behavior-x: contain;
 }
-.heatmap__grid { display: flex; gap: var(--hm-gap); }
+/*
+ * width: max-content — не косметика, а умова роботи прилиплого стовпця.
+ *
+ * .heatmap__grid — flex-елемент у колонковому .heatmap, тож його ширина
+ * розтягується до ширини КОНТЕЙНЕРА (297px на телефоні), а колонки просто
+ * вилазять за неї. Блок-контейнер прилиплого елемента при цьому теж
+ * завширшки 297px: щойно прокрутка проходить цю відстань, sticky виїжджає
+ * разом із ним — і підписи Пн…Нд зникають рівно там, де вони найпотрібніші.
+ * З max-content блок-контейнер дорівнює всій прокручуваній ширині.
+ */
+.heatmap__grid { display: flex; gap: var(--hm-gap); width: max-content; }
 .heatmap__col { display: flex; flex-direction: column; gap: var(--hm-gap); }
+/*
+ * Стовпець Пн…Нд ПРИЛИПАЄ до лівого краю.
+ *
+ * Він лежить усередині того самого контейнера, що прокручується, тож
+ * на телефоні (де видно 6–8 колонок із 31) він виїжджав за край разом із
+ * найстарішими тижнями. А сітка при цьому відкривається прокрученою в
+ * кінець — тобто людина бачить сім рядів квадратиків і жодної підказки,
+ * який із них понеділок.
+ *
+ * Тло обовʼязкове: інакше клітинки, що проїжджають під підписами,
+ * просвічують крізь них.
+ */
 .heatmap__days {
+  position: sticky; left: 0; z-index: 3;
   display: flex; flex-direction: column; gap: var(--hm-gap);
   width: var(--hm-label); margin-right: 6px; flex: 0 0 auto;
+  background: var(--card-1);
+  /* Проміжок між підписами й першою колонкою теж має бути закритий —
+     інакше квадратик визирає в шпарину 6px. */
+  box-shadow: 6px 0 0 var(--card-1);
 }
 .heatmap__days span {
   height: var(--hm-cell); line-height: var(--hm-cell);
@@ -2198,33 +2246,160 @@ main:focus:not(:focus-visible) { outline: none; }
 /* Ряд місяців: перший слот-заглушка під ширину підписів днів, далі по
    одному слоту на колонку; підпис може вільно виступати праворуч над
    порожніми слотами — як на GitHub. */
-.heatmap__months { display: flex; }
-.heatmap__months-pad { width: var(--hm-label); margin-right: 6px; flex: 0 0 auto; }
+.heatmap__months { display: flex; width: max-content; }
+
+/* Заглушка ряду місяців прилипає разом зі стовпцем підписів — інакше
+   назви місяців роз'їхалися б із колонками на прокрутці. */
+.heatmap__months-pad {
+  position: sticky; left: 0; z-index: 3;
+  width: var(--hm-label); margin-right: 6px; flex: 0 0 auto;
+  background: var(--card-1);
+  box-shadow: 6px 0 0 var(--card-1);
+}
 .heatmap__month {
+  position: relative;
   width: var(--hm-cell); margin-right: var(--hm-gap); flex: 0 0 auto;
   font-size: 0.7rem; color: var(--muted); white-space: nowrap;
 }
+/* Роздільник місяця: тонка лінія на всю висоту сітки перед першою
+   колонкою місяця. Сім місяців поспіль без неї — суцільне поле
+   квадратиків, у якому межу місяця доводиться шукати по підпису. */
+.heatmap__months { position: relative; z-index: 2; }
+.heatmap__month.is-first::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--hm-gap) / -2 - 1px);
+  top: -2px;
+  height: calc(var(--hm-cell) * 7 + var(--hm-gap) * 8 + 1.4em);
+  border-left: 1px solid rgba(var(--tint-rgb), 0.20);
+  pointer-events: none;
+}
+
 .heatmap__cell {
-  width: var(--hm-cell); height: var(--hm-cell); border-radius: 6px;
+  width: var(--hm-cell); height: var(--hm-cell); border-radius: 7px;
   border: 0; padding: 0; flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(var(--tint-rgb), 0.07);
+  background: rgba(var(--tint-rgb), 0.06);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--muted);
   cursor: pointer;
-  transition: background var(--t-fast), color var(--t-fast);
+  transition: background var(--t-fast), color var(--t-fast),
+              transform var(--t-fast), opacity var(--t-fast);
 }
-button.heatmap__cell:hover { background: rgba(var(--tint-rgb), 0.16); color: var(--text); }
-button.heatmap__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 1px; }
-/* Позначений день: суцільна акцентна заливка теми, число читабельне */
-.heatmap__cell--on { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; }
-button.heatmap__cell--on:hover { background: var(--acc-ink); color: var(--on-acc); }
+/* Число дня ховається, поки на клітинку не навели: сітка на 217 чисел
+   читається як таблиця, а не як картина місяців. Число потрібне рівно в
+   момент «а що це за день» — і тоді ж зʼявляється підказка з датою. */
+.heatmap__cell > span { opacity: 0; transition: opacity var(--t-fast); }
+button.heatmap__cell:hover > span,
+button.heatmap__cell:focus-visible > span { opacity: 1; }
+
+/* ЧОТИРИ СХОДИНКИ ЗАПОВНЕНОСТІ.
+   1 — відмічено вручну: підходів не записано, тому заливки немає, є лише
+       контур. Так день видно, але він не бреше про обсяг. */
+.heatmap__cell[data-lvl="1"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgba(var(--acc-rgb), 0.55);
+  color: var(--acc-ink);
+}
+.heatmap__cell[data-lvl="2"] { background: rgba(var(--acc-rgb), 0.30); color: var(--text); }
+.heatmap__cell[data-lvl="3"] { background: rgba(var(--acc-rgb), 0.60); color: var(--on-acc); }
+.heatmap__cell[data-lvl="4"] { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; }
+
+button.heatmap__cell:hover { transform: scale(1.18); z-index: 2; }
+button.heatmap__cell[data-lvl="0"]:hover { background: rgba(var(--tint-rgb), 0.16); color: var(--text); }
+button.heatmap__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; z-index: 2; }
+
 .heatmap__cell--future {
   background: transparent;
-  border: 1px dashed rgba(var(--tint-rgb), 0.07);
-  color: rgba(var(--tint-rgb), 0.22);
+  box-shadow: inset 0 0 0 1px rgba(var(--tint-rgb), 0.05);
   cursor: default;
+}
+
+/* ПІДСВІЧУВАННЯ З ЛЕГЕНДИ: показуємо дні одного рівня, решту гасимо.
+   Гасимо прозорістю, а не кольором: інакше «приглушений» рівень 3 став
+   би схожим на звичайний рівень 2 і збрехав би про дані. */
+.heatmap[data-only] .heatmap__cell { opacity: 0.16; }
+.heatmap[data-only="1"] .heatmap__cell[data-lvl="1"],
+.heatmap[data-only="2"] .heatmap__cell[data-lvl="2"],
+.heatmap[data-only="3"] .heatmap__cell[data-lvl="3"],
+.heatmap[data-only="4"] .heatmap__cell[data-lvl="4"] { opacity: 1; transform: scale(1.1); }
+
+/* ПОЯВА ХВИЛЕЮ. --i несе номер клітинки по порядку; крок 6мс дає на 217
+   клітинок близько 1,3 с — довше вже помітно як очікування. Стеля на
+   затримці потрібна для довших вікон: без неї останні клітинки річного
+   діапазону зʼявлялись би через кілька секунд. */
+@keyframes hm-in { from { opacity: 0; } to { opacity: 1; } }
+/*
+ * З'ЯВА — ТІЛЬКИ ПРОЗОРІСТЮ, БЕЗ МАСШТАБУ.
+ *
+ * Тут стояло scale(0.4) → scale(1): гарно, але клітинка при цьому
+ * ФІЗИЧНО менша, поки триває анімація. На телефоні клітинка й так 36px
+ * (до норми дотику 44 її добирає ::after), а на 0,85 масштабу це вже
+ * 30px — тобто перші півтори секунди після відкриття сторінки людина
+ * цілиться в мішень, яка ще їде. Клік по ній МИТТЄВО пише в журнал
+ * тренувань, тож промах коштує даних, а не лише прикрості.
+ *
+ * Знайшов це не я, а verifyresponsive: «дрібні цілі 30×30, 31×31,
+ * 32×32» — три різні розміри однієї клітинки, тобто заміри в різні
+ * кадри анімації. Хвиля читається й на самій прозорості.
+ *
+ * Крок 6мс на 217 клітинок дає близько 1,3 с — довше вже помітно як
+ * очікування. Стеля на затримці потрібна для довших вікон: без неї
+ * останні клітинки річного діапазону з'являлись би через кілька секунд.
+ */
+.heatmap.is-in .heatmap__cell {
+  animation: hm-in 0.34s var(--e-out) backwards;
+  animation-delay: calc(min(var(--i, 0) * 6ms, 1300ms));
+}
+
+/* ЛЕГЕНДА */
+.heatmap__legend {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 10px; flex-wrap: wrap;
+}
+.heatmap__legend-lbl { font-size: 0.72rem; color: var(--muted); }
+.heatmap__legend-sp { flex: 1 1 auto; min-width: 8px; }
+/* Крок легенди — це КНОПКА (тап підсвічує дні цього рівня), тому вона
+   мусить бути завбільшки з ціль дотику, а не зі свій зразок кольору.
+   Зразок лишається 15px, розмір дає сама кнопка: 21×21 — те, що було, —
+   на телефоні не влучити. */
+.heatmap__key {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 32px; min-height: 32px;
+  padding: 3px 6px; border: 0; border-radius: 8px;
+  background: none; cursor: pointer;
+  transition: background var(--t-fast);
+}
+.heatmap__key:hover { background: rgba(var(--tint-rgb), 0.07); }
+.heatmap__key:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 1px; }
+/* Квадратик у легенді дрібніший за клітинку сітки: він зразок, а не
+   елемент керування сіткою. */
+.heatmap__key .heatmap__cell {
+  --hm-cell: 15px;
+  border-radius: 4px; cursor: inherit;
+}
+.heatmap__key--manual { font-size: 0.72rem; color: var(--muted); }
+
+/* ПІДКАЗКА. Власна, а не title: системну браузер показує через півтори
+   секунди, системним шрифтом і взагалі не показує на дотику. */
+.heatmap__tip {
+  position: absolute; z-index: 5;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 6px 9px;
+  border: 1px solid var(--line-2); border-radius: 8px;
+  background: var(--card-2); color: var(--text);
+  font-size: 0.74rem; line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+}
+.heatmap__tip[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .heatmap.is-in .heatmap__cell { animation: none; }
+  button.heatmap__cell:hover,
+  .heatmap[data-only] .heatmap__cell { transform: none; }
 }
 
 /* --------------------------------------------------------------------
@@ -2813,15 +2988,55 @@ body {
    Було чотири окремі підняті плашки з проміжком 10px — тобто чотири
    кнопки, а не один перемикач: за виглядом не було зрозуміло, що вибір
    тут ВЗАЄМОВИКЛЮЧНИЙ. Тепер це одна доріжка з межею, всередині якої
-   рухається обраний елемент. */
+   ЇЗДИТЬ біле виділення.
+
+   ЧОМУ ДОРІЖКА НЕ НА ВСЮ ШИРИНУ. .seg часто лежить у .field — а це
+   колонковий flex, тобто його діти за замовчуванням розтягуються на всю
+   ширину. Обводка йшла через увесь екран, а кнопки тулились у лівому
+   куті: рамка обіцяла, що всередині щось є, і брехала на 900 пікселів.
+   width: fit-content плюс align-self/justify-self прибивають доріжку до
+   вмісту в будь-якому батькові — і у flex, і в grid, і в блоці.
+
+   ЧОМУ ВИДІЛЕННЯ ЇЗДИТЬ, А НЕ ПЕРЕСКАКУЄ. Рух показує, що це ОДИН
+   елемент, який змінив місце, а не два різні, з яких один згас, а другий
+   спалахнув. Це вся роль анімації тут: 0,28 с рівно на переїзд, без
+   декоративних затримок.
+
+   Розміри виділення рахує js/app.js (initSegs) і кладе у змінні. У CSS
+   їх не порахувати: ширина кроку залежить від тексту, а кроків буває від
+   двох до восьми. */
 .seg {
+  position: relative;
   display: inline-flex;
+  align-self: flex-start;      /* у колонковому flex-батьку (.field) */
+  justify-self: start;         /* у grid-батьку */
+  width: fit-content;
+  max-width: 100%;
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--line-2);
   border-radius: 11px;
   background: var(--field);
+  flex-wrap: wrap;             /* довгий ряд на телефоні переноситься */
 }
+/* Саме виділення. Позиція й розмір — від JS; поки їх немає, воно
+   невидиме (--seg-on: 0), і вибір показує запасне правило нижче. */
+.seg::before {
+  content: '';
+  position: absolute; left: 0; top: 0;
+  width: var(--seg-w, 0px); height: var(--seg-h, 0px);
+  transform: translate(var(--seg-x, 0px), var(--seg-y, 0px));
+  border-radius: 8px;
+  background: var(--acc);
+  opacity: var(--seg-on, 0);
+  pointer-events: none;
+  transition: transform 0.28s var(--e-out), width 0.28s var(--e-out),
+              height 0.18s linear, opacity 0.18s linear;
+}
+/* Перший замір не має бути переїздом із лівого кута: до is-ready
+   переходів немає взагалі. */
+.seg:not(.is-ready)::before { transition: none; }
+.seg__item { position: relative; z-index: 1; }
 .seg__item span {
   border: 0;
   background: transparent;
@@ -2830,12 +3045,27 @@ body {
 }
 .seg__item span:hover { background: rgba(var(--tint-rgb), 0.07); color: var(--text); box-shadow: none; }
 .seg__item input:checked + span {
-  background: var(--acc);
+  background: transparent;     /* фон дає виділення, що їздить */
   color: var(--on-acc);
   border: 0;
   box-shadow: none;
 }
-.seg__item input:checked + span:hover { background: var(--acc-hi); }
+.seg__item input:checked + span:hover { background: transparent; }
+/*
+ * ЗАПАСНИЙ ВАРІАНТ БЕЗ JS.
+ *
+ * Якщо js/app.js не відпрацював (помилка вище по файлу, вимкнений JS),
+ * виділення лишилось би невидимим — і перемикач показував би, що не
+ * обрано НІЧОГО. Тому доки немає is-ready, обраний крок фарбується сам,
+ * по-старому.
+ */
+.seg:not(.is-ready) .seg__item input:checked + span {
+  background: var(--acc);
+  border-radius: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .seg::before { transition: opacity 0.18s linear; }
+}
 
 /* ---- Контейнери -------------------------------------------------------
    Усі однакові: одна поверхня, одна межа, спільний радіус. Різниця між
@@ -2880,6 +3110,36 @@ body {
 .kpis { gap: 12px; }
 .kpi { border-radius: var(--r-box); padding: 16px 14px; }
 .kpi__val { color: var(--text); }
+
+/* ---- Картка вибору: план тренувань ------------------------------------
+   Три стани в одній сітці, і кожен мусить читатись без підпису:
+
+     доступна   звичайна картка, кнопка «Показати план»
+     обрана     світліша поверхня, акцентна межа, смужка зліва
+     недоступна приглушена, без кнопки — на цій кількості днів схеми немає
+
+   Було: обрану позначала лише тонка межа (її губили серед чотирьох
+   карток), а недоступну — opacity 0.45 плюс grayscale. Фільтр на
+   монохромній темі не робить нічого взагалі, крім окремого шару
+   композиції під кожною такою карткою.
+
+   Смужка зліва потрібна тому, що межа по всьому периметру на темному
+   тлі читається слабо: погляд ловить контраст на КРАЮ вмісту, а не
+   рівномірний контур. Три пікселі біля тексту помітніші за рамку
+   навколо всієї картки. */
+.card.is-selected {
+  border-color: rgba(var(--acc-ink-rgb), 0.45);
+  background: #171717;
+  box-shadow: inset 3px 0 0 var(--acc);
+}
+.card--off {
+  opacity: 0.42;
+  filter: none;
+  /* Пунктир каже «сюди не можна» без жодного слова — і не потребує
+     другого відтінку сірого, якого в монохромі й немає. */
+  border-style: dashed;
+}
+.card--off:hover { border-color: var(--line); }
 
 /* ---- Оверлеї: єдине, що справді висить над сторінкою ------------------ */
 .modal__box,
@@ -3001,14 +3261,12 @@ button.heatmap__cell::after {
   border-radius: 12px;
 }
 /*
- * color лишається ТЕМНИМ.
- *
- * Цей нео-шар перебивав темний color з базової частини на #fff, і контраст
- * позначеного дня падав до 3,75:1 при нормі 4,5:1. Колір тексту тут бере
- * --on-acc: у темній схемі смуга --acc-bar світла, тож текст на ній
- * темний; у світлій навпаки. Обидва напрямки дають ≥ 9:1.
+ * Заливку й колір числа тепер задають рівні [data-lvl] у секції
+ * теплокарти вище — там же й пояснення, чому кроків саме чотири. Тут
+ * лишається сама вимога, заради якої це правило колись зʼявилось: на
+ * світлій заливці число мусить бути ТЕМНИМ (--on-acc). Білий давав
+ * контраст 3,75:1 при нормі 4,5:1.
  */
-.heatmap__cell--on { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; }
 
 :focus-visible {
   outline: 2px solid var(--acc-ink);

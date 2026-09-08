@@ -1190,6 +1190,150 @@
 
   let accSeq = 0;
 
+  /* ------------------------------------------------------------------ */
+  /* Сегментований перемикач: виділення, що їздить                        */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЩО ЦЕ РОБИТЬ. Міряє обраний крок .seg і кладе його позицію й розмір у
+   * CSS-змінні доріжки. Малює виділення сам CSS (.seg::before), тут лише
+   * числа — тому анімацію тримає браузер, а не JS.
+   *
+   * ЧОМУ ЦЕ ТУТ, А НЕ В КОЖНІЙ СТОРІНЦІ. .seg будують вісім місць у
+   * пʼятьох файлах (журнал, акаунт, адмінка, плани…), і половина з них
+   * перемальовує розмітку цілком при кожній зміні профілю. Механізм на
+   * кожній сторінці означав би вісім копій, які розійдуться.
+   *
+   * ЧОМУ MutationObserver, А НЕ ВИКЛИК ПІСЛЯ КОЖНОГО РЕНДЕРУ. Той самий
+   * розрахунок: вісім місць — вісім місць, де про виклик забудуть. Тут
+   * спостерігач один, він дивиться лише на появу вузлів, робота
+   * відкладена в rAF, а самих .seg на сторінці найбільше чотири.
+   */
+
+  /** Перерахувати виділення однієї доріжки. */
+  function measureSeg(seg) {
+    const on = seg.querySelector('input:checked');
+    const span = on && on.nextElementSibling;
+    if (!span) { seg.style.setProperty('--seg-on', '0'); return; }
+
+    const r = span.getBoundingClientRect();
+    const b = seg.getBoundingClientRect();
+    /* Нульова ширина = елемент іще не в розкладці (прихована вкладка,
+       display:none). Ставити 0 у змінні не можна: виділення схлопнеться
+       й потім поїде з кута, щойно вкладку відкриють. */
+    if (!r.width || !r.height) return;
+
+    /* Абсолютний нащадок рахується від ПОЛЯ ВІДСТУПІВ, тобто без рамки —
+       звідси clientLeft/clientTop (це і є її товщина). */
+    seg.style.setProperty('--seg-w', r.width + 'px');
+    seg.style.setProperty('--seg-h', r.height + 'px');
+    seg.style.setProperty('--seg-x', (r.left - b.left - seg.clientLeft) + 'px');
+    seg.style.setProperty('--seg-y', (r.top - b.top - seg.clientTop) + 'px');
+    seg.style.setProperty('--seg-on', '1');
+
+    /* is-ready вмикає переходи — але тільки з НАСТУПНОГО кадру, інакше
+       перший замір сам стане анімацією з лівого кута. */
+    if (!seg.classList.contains('is-ready')) {
+      requestAnimationFrame(function () { seg.classList.add('is-ready'); });
+    }
+  }
+
+  /* Спостерігач за шириною: текст кроку не міняється, а от ширина
+     доріжки — так (поворот екрана, підвантаження шрифту, перенесення
+     ряду). Один на всі доріжки. */
+  const segRO = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(function (list) {
+        list.forEach(function (e) { measureSeg(e.target); });
+      })
+    : null;
+
+  function initSegs(root) {
+    const box = root || document;
+    (box.querySelectorAll ? box.querySelectorAll('.seg') : []).forEach(function (seg) {
+      measureSeg(seg);
+      if (segRO && !seg.dataset.segRo) { seg.dataset.segRo = '1'; segRO.observe(seg); }
+    });
+  }
+
+  let segFrame = 0;
+  function scheduleSegs() {
+    if (segFrame) return;
+    segFrame = requestAnimationFrame(function () { segFrame = 0; initSegs(document); });
+  }
+
+  function initSegWatch() {
+    initSegs(document);
+
+    /* Зміна вибору — єдине, після чого виділення мусить поїхати. Слухач
+       делегований на document: доріжки зникають і зʼявляються разом із
+       перемальовками, а document лишається. */
+    document.addEventListener('change', function (e) {
+      const seg = e.target.closest && e.target.closest('.seg');
+      if (seg) measureSeg(seg);
+    });
+
+    /* Нові доріжки після перемальовки сторінки. */
+    if (typeof MutationObserver === 'function') {
+      new MutationObserver(function (recs) {
+        for (let i = 0; i < recs.length; i++) {
+          const added = recs[i].addedNodes;
+          for (let j = 0; j < added.length; j++) {
+            const n = added[j];
+            if (n.nodeType !== 1) continue;
+            if (n.classList.contains('seg') || n.querySelector('.seg')) { scheduleSegs(); return; }
+          }
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+    }
+
+    /* Шрифт приїжджає після першого малювання й міняє ширину кроків. */
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { initSegs(document); }, function () {});
+    }
+    window.addEventListener('resize', scheduleSegs);
+
+    /*
+     * ВИБІР, ПОСТАВЛЕНИЙ КОДОМ, НЕ ШЛЕ ПОДІЙ.
+     *
+     * Це головна пастка всього механізму. Сторінка читає профіль
+     * асинхронно й потім ставить radio.checked = true — а це ВЛАСТИВІСТЬ,
+     * не атрибут: ні change, ні мутації DOM не відбувається. Перший замір
+     * на той момент уже минув, тож виділення лишалось на першому кроці,
+     * хоча обраний був четвертий. На екрані це виглядало як «перемикач
+     * бреше», і побачити це можна лише з реальним профілем — на порожній
+     * сторінці обидва збігаються.
+     *
+     * Ловимо саме ту подію, після якої сторінки й переставляють свої
+     * контроли: приїзд профілю. rAF потрібен, бо наш обробник може
+     * виконатись РАНІШЕ за сторінковий — тоді ми поміряли б ще старий
+     * стан.
+     */
+    if (window.Store && typeof window.Store.onChange === 'function') {
+      try { window.Store.onChange(scheduleSegs); } catch (_) {}
+    }
+
+    /*
+     * Наздоганяння перших двох секунд.
+     *
+     * onChange покриває зміну профілю, але ПЕРШЕ читання його не завжди
+     * породжує: сторінка може прочитати профіль напряму й одразу
+     * поставити radio.checked, без жодної події. Ловити цей момент
+     * загальним механізмом нічим — тому кілька замірів за фіксований
+     * проміжок, після чого все затихає назавжди.
+     *
+     * Це не опитування в циклі: чотири заміри по кілька доріжок за два
+     * перші секунди життя сторінки, далі — тиша.
+     */
+    [120, 400, 900, 1800].forEach(function (ms) { setTimeout(scheduleSegs, ms); });
+
+    /* Останній запобіжник — перед самою взаємодією. Якщо щось усе-таки
+       переставило вибір мовчки, людина побачить правильне положення до
+       того, як натисне. */
+    document.addEventListener('pointerdown', function (e) {
+      const seg = e.target.closest && e.target.closest('.seg');
+      if (seg) measureSeg(seg);
+    }, true);
+  }
+
   /**
    * Акордеони.
    *
@@ -1574,6 +1718,7 @@
     initReveal: initReveal,
     safeUrl: safeUrl,
     initAccordions: initAccordions,
+    initSegs: initSegs,
     initLongform: initLongform,
     copyRich: copyRich,
     restTimer: { start: rtStart, stop: rtStop },
@@ -1647,7 +1792,7 @@
      * зовсім інша річ.
      */
     [buildNav, buildFooter, function () { initReveal(document); }, injectCanonical,
-     function () { initAccordions(document); }, initCardGlow, injectJsonLd,
+     function () { initAccordions(document); }, initSegWatch, initCardGlow, injectJsonLd,
      warnCorruptProfile]
       .forEach(function (step) {
         try { step(); } catch (e) { console.error('[app] крок ініціалізації впав:', e); }

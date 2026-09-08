@@ -471,9 +471,54 @@
 
 
   /**
-   * День або тренувальний, або ні. Раніше клітинка мала рівні «1–3 за день»,
-   * але два тренування на день — не та звичка, яку сайт має заохочувати
-   * яскравішим кольором, а клік-перемикач із рівнями несумісний.
+   * НАСИЧЕНІСТЬ ДНЯ: 0…4.
+   *
+   * Раніше клітинка була бінарною, і на те була причина: рівні «1–3
+   * тренування за день» заохочували б яскравішим кольором звичку, якої
+   * сайт заохочувати не має, а клік-перемикач такими рівнями керувати не
+   * може.
+   *
+   * Ця причина стосувалась КІЛЬКОСТІ ТРЕНУВАНЬ. Тут рівень означає інше —
+   * ЯКА ЧАСТКА ЗАПЛАНОВАНИХ ПІДХОДІВ закрита, тобто рівно те, за що
+   * нараховує ELO (js/elo-core.js рахує доданок workout як
+   * doneSets/totalSets). Двічі за день на цю шкалу не впливає ніяк, а
+   * перемикач лишається бінарним: клік вмикає й вимикає ДЕНЬ, рівень
+   * усередині нього — похідне від записаних підходів, і клацанням не
+   * задається.
+   *
+   *   0  тренування немає
+   *   1  відмічено вручну — підходів не записано, частки ми НЕ ЗНАЄМО
+   *   2  закрито менше половини підходів
+   *   3  закрито більшу частину
+   *   4  закрито все
+   *
+   * Рівень 1 стоїть окремо навмисно: поставити його поруч із «менше
+   * половини» означало б сказати про день те, чого в даних немає. У
+   * підказці так і написано, а в легенді він має власну позначку.
+   */
+  function hmLevel(key) {
+    if (!trained(key)) return 0;
+    const s = state.sessionLog[key];
+    const total = Number(s && s.totalSets);
+    const done = Number(s && s.doneSets);
+    if (!(total > 0) || !(done > 0)) return 1;      /* відмічено руками */
+    const share = done / total;
+    if (share >= 0.999) return 4;
+    if (share >= 0.5) return 3;
+    return 2;
+  }
+
+  /** Підпис рівня — той самий текст у підказці й у легенді. */
+  const HM_LEVEL_TEXT = [
+    'без тренування',
+    'відмічено вручну — підходи не записані',
+    'закрито менше половини підходів',
+    'закрито більшу частину підходів',
+    'закрито всі підходи'
+  ];
+
+  /**
+   * День або тренувальний, або ні — саме це вмикає й вимикає клік.
    */
   function trained(key) {
     const v = Number(state.workLog[key]);
@@ -546,6 +591,18 @@
    * Кожна клітинка вікна — кнопка: клік ставить або знімає позначку.
    * Дні ПОЗА вікном — хвіст попереднього місяця в першому тижні й
    * майбутнє поточного — порожні заглушки, їх клацати нема чого.
+   *
+   * ПРО ПІДКАЗКУ. Атрибута title тут немає навмисно: браузер показує його
+   * через півтори секунди, системним шрифтом, поза межами вікна прокрутки
+   * і взагалі не показує на дотику. Замість нього — власна підказка (див.
+   * wireHeatmap), а для читалок екрана лишається aria-label, який був і
+   * раніше.
+   *
+   * ПРО ЗАТРИМКУ ПОЯВИ. Кожна клітинка несе --i: свій номер по порядку.
+   * З нього CSS рахує затримку анімації, тож сітка проявляється хвилею
+   * зліва направо. Це не прикраса: 31 колонка × 7 днів = 217 клітинок,
+   * і поява їх усіх одночасно читається як стрибок розмітки. Хвиля
+   * показує, що сітка має напрямок — час іде вліво-вправо.
    */
   function heatmapHtml() {
     const weeks = hmWeeks();
@@ -554,6 +611,7 @@
     const todayK = todayKey();
 
     let cols = '';
+    let idx = 0;
     for (let w = 0; w < weeks; w++) {
       let cells = '';
       for (let d = 0; d < 7; d++) {
@@ -562,16 +620,33 @@
         const k = keyOf(day);
         const num = day.getDate();
         if (k > todayK || k < firstK) {
-          cells += '<i class="heatmap__cell heatmap__cell--future">' + num + '</i>';
+          cells += '<i class="heatmap__cell heatmap__cell--future" aria-hidden="true"></i>';
           continue;
         }
-        const on = trained(k);
+        const lvl = hmLevel(k);
+        const on = lvl > 0;
         const label = dateLabel(dateOf(k));
+        const s = state.sessionLog[k];
+        const total = Number(s && s.totalSets);
+        const hasSets = total > 0;
+        const frac = hasSets ? (Number(s.doneSets) || 0) + '/' + total + ' підходів' : '';
+        /*
+         * У ПІДКАЗЦІ — дріб, у aria-label — слова.
+         *
+         * «закрито всі підходи · 20/20 підходів» — це одне й те саме
+         * двічі, причому другий раз точніше. Тому оком людина бачить
+         * дріб, а читалка екрана читає формулювання: «20/20» вголос
+         * звучить гірше за «закрито всі підходи».
+         */
+        const tip = label + ' · ' + (hasSets ? frac : HM_LEVEL_TEXT[lvl]);
+        const aria = label + ': ' + HM_LEVEL_TEXT[lvl] + (hasSets ? ' (' + frac + ')' : '');
         cells += '<button type="button" class="heatmap__cell' + (on ? ' heatmap__cell--on' : '') + '" ' +
-                 'data-hm="' + k + '" aria-pressed="' + on + '" ' +
-                 'title="' + esc(label) + (on ? ': тренування' : '') + '" ' +
-                 'aria-label="' + esc(label) + (on ? ': тренування було. ' : ': тренування не позначено. ') +
-                 'Натисніть, щоб змінити">' + num + '</button>';
+                 'data-hm="' + k + '" data-lvl="' + lvl + '" ' +
+                 'style="--i:' + (idx++) + '" ' +
+                 'data-tip="' + esc(tip) + '" ' +
+                 'aria-pressed="' + on + '" ' +
+                 'aria-label="' + esc(aria) +
+                 '. Натисніть, щоб змінити"><span>' + num + '</span></button>';
       }
       cols += '<div class="heatmap__col">' + cells + '</div>';
     }
@@ -592,16 +667,165 @@
       const m = Number(k.slice(5, 7)) - 1;
       const show = (w === 0 || m !== prevMon);
       prevMon = m;
-      months += '<span class="heatmap__month">' + (show ? MON[m] : '') + '</span>';
+      /* Роздільник місяця — тонка лінія перед першою колонкою місяця.
+         Без нього при семи місяцях у ряду очима не знайти, де межа. */
+      months += '<span class="heatmap__month' + (show && w > 0 ? ' is-first' : '') + '">' +
+                (show ? MON[m] : '') + '</span>';
     }
 
     const days = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
-    return '<div class="heatmap" role="group" aria-label="Календар тренувань за ' + HM_MONTHS + ' місяців">' +
-             '<div class="heatmap__months" aria-hidden="true">' + months + '</div>' +
-             '<div class="heatmap__grid">' +
-               '<div class="heatmap__days" aria-hidden="true">' + days + '</div>' + cols +
+    /* Підказка лежить ПОЗА .heatmap. У сітки overflow-x: auto, а це
+       обрізає вміст і по вертикалі теж — підказка над верхнім рядом
+       зрізалась навпіл. Обгортка дає їй систему координат, з якої нічого
+       не обрізається. */
+    return '<div class="heatmap-wrap">' +
+             '<div class="heatmap" role="group" aria-label="Календар тренувань за ' + HM_MONTHS + ' місяців">' +
+               '<div class="heatmap__months" aria-hidden="true">' + months + '</div>' +
+               '<div class="heatmap__grid">' +
+                 '<div class="heatmap__days" aria-hidden="true">' + days + '</div>' + cols +
+               '</div>' +
              '</div>' +
+             '<div class="heatmap__tip" hidden></div>' +
+           '</div>' +
+           hmLegendHtml();
+  }
+
+  /**
+   * Легенда: «менше → більше» плюс окрема позначка ручного дня.
+   *
+   * Наведення на крок легенди підсвічує в сітці саме ті дні — інакше
+   * шкала з чотирьох майже однакових сірих квадратиків нічого не пояснює:
+   * побачити, ЯКІ це дні, можна лише показавши їх.
+   */
+  function hmLegendHtml() {
+    const steps = [2, 3, 4].map(function (l) {
+      return '<button type="button" class="heatmap__key" data-key-lvl="' + l + '" ' +
+               'aria-label="Підсвітити дні: ' + esc(HM_LEVEL_TEXT[l]) + '">' +
+               '<i class="heatmap__cell heatmap__cell--on" data-lvl="' + l + '"></i>' +
+             '</button>';
+    }).join('');
+    return '<div class="heatmap__legend">' +
+             '<button type="button" class="heatmap__key heatmap__key--manual" data-key-lvl="1" ' +
+               'aria-label="Підсвітити дні: ' + esc(HM_LEVEL_TEXT[1]) + '">' +
+               '<i class="heatmap__cell heatmap__cell--on" data-lvl="1"></i>' +
+               '<span>вручну</span>' +
+             '</button>' +
+             '<span class="heatmap__legend-sp"></span>' +
+             '<span class="heatmap__legend-lbl">менше</span>' +
+             steps +
+             '<span class="heatmap__legend-lbl">більше</span>' +
            '</div>';
+  }
+
+  /**
+   * Підказка й підсвічування — ОДИН слухач на всю сітку.
+   *
+   * Слухач на кожній із 217 клітинок коштував би 217 підписок, які треба
+   * знімати при кожній перемальовці; делегування на контейнері живе
+   * стільки ж, скільки сторінка. Контейнер постійний (renderTrain міняє
+   * лише innerHTML нащадків), тому навішуємо один раз — той самий guard,
+   * що й скрізь у проєкті.
+   */
+  let hmWired = false;
+  function wireHeatmap() {
+    const host = $('#jr-train');
+    if (!host || hmWired) return;
+    hmWired = true;
+
+    const show = function (btn) {
+      const wrap = host.querySelector('.heatmap-wrap');
+      const tip = wrap && wrap.querySelector('.heatmap__tip');
+      if (!wrap || !tip) return;
+      tip.textContent = btn.dataset.tip || '';
+      tip.hidden = false;
+      /*
+       * Координати рахуються від ОБГОРТКИ, а не від вікна: сітка всередині
+       * прокручується по горизонталі, і позиція, порахована від вікна,
+       * лишилась би правильною рівно до першого руху пальцем.
+       *
+       * getBoundingClientRect кнопки вже враховує прокрутку сітки, тому
+       * додавати scrollLeft тут не треба — це саме та помилка на подвійне
+       * врахування, через яку підказка від'їжджає в кінці ряду.
+       */
+      const b = btn.getBoundingClientRect();
+      const w = wrap.getBoundingClientRect();
+      const x = b.left - w.left + b.width / 2;
+      tip.style.left = x + 'px';
+      tip.style.top = (b.top - w.top) + 'px';
+      /* Підказка не має вилазити за край картки. Зсув рахується ПІСЛЯ
+         показу: до нього в неї ще немає ширини. */
+      const t = tip.getBoundingClientRect();
+      let shift = 0;
+      if (t.left < w.left + 2) shift = w.left + 2 - t.left;
+      else if (t.right > w.right - 2) shift = w.right - 2 - t.right;
+      if (shift) tip.style.left = (x + shift) + 'px';
+    };
+    const hide = function () {
+      const tip = host.querySelector('.heatmap__tip');
+      if (tip) tip.hidden = true;
+    };
+
+    host.addEventListener('pointerover', function (e) {
+      const btn = e.target.closest('[data-hm]');
+      if (btn) show(btn);
+    });
+    host.addEventListener('pointerout', function (e) {
+      if (e.target.closest('[data-hm]')) hide();
+    });
+    /* Клавіатура: підказка мусить зʼявлятись і без миші. */
+    host.addEventListener('focusin', function (e) {
+      const btn = e.target.closest('[data-hm]');
+      if (btn) show(btn);
+    });
+    host.addEventListener('focusout', hide);
+    /* Прокрутка сітки зсуває клітинку з-під підказки — ховаємо. */
+    host.addEventListener('scroll', hide, true);
+
+    /* Легенда: підсвітити дні одного рівня. Працює і наведенням, і
+       фокусом з клавіатури, і тапом — на телефоні наведення немає. */
+    /*
+     * ДВА РІЗНІ ПІДСВІЧУВАННЯ, І ЦЕ ВАЖЛИВО.
+     *
+     * Наведення — тимчасове: відвів мишу, підсвітка зникла. Клік — стійке:
+     * лишається, поки не клікнеш удруге. Без цього поділу підсвітка не
+     * працювала на дотику взагалі: Chrome на тапі шле pointerover ПЕРЕД
+     * click, тому обробник кліку бачив уже виставлений атрибут, вважав це
+     * «другим тапом» і одразу гасив те, що щойно ввімкнулось. На миші
+     * помилки не було видно — там pointerover приходить задовго до кліку.
+     */
+    let stickyLvl = null;
+    const mark = function (lvl) {
+      const box = host.querySelector('.heatmap');
+      if (!box) return;
+      if (lvl == null) box.removeAttribute('data-only');
+      else box.setAttribute('data-only', String(lvl));
+    };
+    const hover = function (lvl) {
+      if (stickyLvl != null) return;   /* стійкий вибір сильніший */
+      mark(lvl);
+    };
+    host.addEventListener('pointerover', function (e) {
+      const k = e.target.closest('[data-key-lvl]');
+      if (k) hover(k.dataset.keyLvl);
+    });
+    host.addEventListener('pointerout', function (e) {
+      if (e.target.closest('[data-key-lvl]')) hover(null);
+    });
+    host.addEventListener('focusin', function (e) {
+      const k = e.target.closest('[data-key-lvl]');
+      if (k) hover(k.dataset.keyLvl);
+    });
+    host.addEventListener('click', function (e) {
+      const k = e.target.closest('[data-key-lvl]');
+      if (!k) return;
+      stickyLvl = (stickyLvl === k.dataset.keyLvl) ? null : k.dataset.keyLvl;
+      mark(stickyLvl);
+      /* Кнопка каже вголос, увімкнена вона чи ні: без цього для читалки
+         екрана стійкий вибір нічим не відрізняється від його відсутності. */
+      host.querySelectorAll('[data-key-lvl]').forEach(function (el) {
+        el.setAttribute('aria-pressed', String(el.dataset.keyLvl === stickyLvl));
+      });
+    });
   }
 
   /** Рядок статистики регулярності під теплокартою */
@@ -687,9 +911,39 @@
      * ширинах. Прокручуємо до кінця — актуальний тиждень має бути видно
      * без пошуку пальцем усередині сторінки, що й сама скролиться.
      */
+    /*
+     * Прокрутка в кінець — ПІСЛЯ розкладки, а не одразу.
+     *
+     * Тут стояло присвоєння відразу після innerHTML. На телефоні воно
+     * мовчки не спрацьовувало: у момент виконання картка ще не мала
+     * ширини, scrollWidth дорівнював clientWidth, умова не виконувалась —
+     * і сітка лишалась на найстаріших тижнях, тобто рівно там, звідки її
+     * і хотіли зрушити. На робочому столі сітка вміщалась цілком, і
+     * помилки не було видно взагалі.
+     */
     const hm = host.querySelector('.heatmap');
-    if (hm && hm.scrollWidth > hm.clientWidth) hm.scrollLeft = hm.scrollWidth;
+    if (hm) {
+      requestAnimationFrame(function () {
+        if (hm.scrollWidth > hm.clientWidth) hm.scrollLeft = hm.scrollWidth;
+      });
+    }
+
+    wireHeatmap();
+
+    /*
+     * Хвиля появи — ТІЛЬКИ при першому малюванні.
+     *
+     * renderTrain викликається на кожен клік по дню (і на кожну зміну
+     * профілю ззовні). Якби анімація йшла щоразу, один тап по клітинці
+     * перезапускав би появу всієї сітки з двохсот квадратиків — тобто
+     * саме те миготіння, від якого анімація мала б рятувати.
+     */
+    if (hm && !hmAnimated) {
+      hmAnimated = true;
+      hm.classList.add('is-in');
+    }
   }
+  let hmAnimated = false;
 
 
   /* ------------------------------------------------------------------ */

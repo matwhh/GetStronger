@@ -55,13 +55,20 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   ok('1. немає кнопок таймера відпочинку', await p.locator('#today [data-rest-sec]').count() === 0);
   ok('1. немає блоку настрою', await p.locator('#today [data-trk-pair="workoutMood"]').count() === 0);
 
-  const card = p.locator('#tdy-training');
-  ok('1. є картка-вхід', await card.count() === 1);
-  const txt = await card.innerText();
-  ok('1. картка називає програму й день', /Full Body/.test(txt) && /День/.test(txt), txt.replace(/\n+/g, ' | '));
-  ok('1. картка називає обсяг і ЧАС дня', /вправ/.test(txt) && /≈\d+ хв/.test(txt), txt.replace(/\n+/g, ' | '));
-  ok('1. картка веде на сторінку тренування',
-     (await card.getAttribute('href')) === 'workout.html');
+  /*
+   * КАРТКИ-ВХОДУ БІЛЬШЕ НЕМАЄ.
+   *
+   * «Сьогодні» перебрано до назви програми й смуги тижня, тож перевірки
+   * її вмісту (назва дня, обсяг, час, href) знято — вони перевіряли те,
+   * чого на екрані немає. Суть цього блоку від початку була в іншому: на
+   * «Сьогодні» НЕ МАЄ бути другого редактора тренування. Це й лишилось —
+   * разом із тим, що назву програми екран усе-таки називає, і вона та
+   * сама, що на сторінці тренування.
+   */
+  const txt = await p.locator('#today').innerText();
+  ok('1. екран називає програму', /Full Body/.test(txt), txt.replace(/\n+/g, ' | ').slice(0, 60));
+  ok('1. вхід у тренування — через навігацію',
+     await p.locator('a[href="workout.html"]').count() >= 1);
   ok('1. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -69,9 +76,13 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 /* ---- 2. Перехід туди й назад ---- */
 {
   const { ctx, p, errs } = await open();
-  await tap(p.locator('#tdy-training'));
+  /* Раніше сюди заходили кліком по картці-входу на «Сьогодні». Картки
+     немає, а пункт навігації на вузькому екрані лежить у згорнутому
+     меню — тож переходимо адресою. Питання блоку від цього не міняється:
+     тренування живе на ОКРЕМІЙ сторінці, а не модалкою поверх головної. */
+  await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
-  ok('2. клік по картці відкриває окрему сторінку', p.url().endsWith('workout.html'), p.url().split('/').pop());
+  ok('2. перехід відкриває окрему сторінку', p.url().endsWith('workout.html'), p.url().split('/').pop());
   ok('2. це не модалка — головної під нею немає', await p.locator('#today').count() === 0);
   ok('2. усе тренування тут', await p.locator('#workout .tdy-ex').count() === 14);
   ok('2. підходи й RIR на місці',
@@ -169,12 +180,16 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await p.waitForTimeout(1300);
   ok('4. підхід пережив перезавантаження', await p.locator('#wk-done').innerText() === done, done);
 
+  /* Раніше свіжий прогрес звіряли з карткою на «Сьогодні». Картки немає
+     (екран перебрано), тож те саме питання — «стан пережив ПЕРЕХІД, а не
+     лише перезавантаження» — ставиться круговим маршрутом: пішли на
+     головну, повернулись, лічильник на місці. */
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1000);
+  await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
-  const card = await p.locator('#tdy-training').innerText();
-  ok('4. «Сьогодні» показує свіжий прогрес у підходах', /Виконано 1 з \d+ підходів/.test(card),
-     card.replace(/\n+/g, ' | '));
-  ok('4. і кличе продовжити, а не почати', /Продовжити/.test(card));
+  ok('4. прогрес пережив перехід на головну й назад',
+     await p.locator('#wk-done').innerText() === done, done);
   ok('4. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -225,12 +240,16 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   ok('5. другий день сьогодні не почати (одна сесія на день)',
      /вже завершене/.test(await p.locator('#workout').innerText()));
 
-  /* «Сьогодні» показує завершення */
+  /* Завершення теж більше не переказується на «Сьогодні». Питання
+     лишається тим самим: після відходу зі сторінки й повернення день
+     ЗАЛИШАЄТЬСЯ закритим, а не відкривається наново. */
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1000);
+  await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
-  const card = await p.locator('#tdy-training').innerText();
-  ok('5. картка на «Сьогодні» каже «Завершено … з понеділка»',
-     /Завершено/.test(card) && /понеділка/.test(card), card.replace(/\n+/g, ' | '));
+  const wk = await p.locator('#workout').innerText();
+  ok('5. після повернення день і далі закритий',
+     /завершен/i.test(wk), wk.replace(/\n+/g, ' | ').slice(0, 90));
   ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

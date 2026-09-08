@@ -19,22 +19,16 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
  await p.evaluate(async s=>{await window.Store.saveProfile(s);},SEED);
  await p.reload(); await p.waitForTimeout(1200);
 
- const rating=await p.locator('#today .card--rating').innerText();
- ok('головна: картка сезону на місці', /Сезон/.test(rating), rating.split('\n')[0]);
-
- const tiles=await p.locator('#today .tile').count();
- ok('головна: плитки стану є (2–3)', tiles>=2 && tiles<=3, 'tiles='+tiles);
-
- const train=await p.locator('#tdy-training').count();
- ok('головна: картка тренування одразу тут, без переходу', train===1);
-
- const entry=p.locator('#tdy-training');
- ok('головна: картка-вхід у тренування, а не список вправ',
-    await entry.count()===1 && await p.locator('#today .tdy-ex').count()===0);
- ok('головна: картка веде на окрему сторінку',
-    (await entry.getAttribute('href'))==='workout.html');
-
- ok('головна: підсумок тижня внизу', /Тиждень/.test(await p.locator('#today').innerText()));
+ /* Головну перебрано: картки сезону, плиток стану й картки-входу в
+    тренування там більше немає. Лишились назва програми, номер сезону і
+    смуга тижня — їх і перевіряємо. Те, що на головній НЕ МАЄ бути
+    редактора тренування, лишається як було. */
+ const home=await p.locator('#today').innerText();
+ ok('головна: назва програми й сезон', /Full Body/.test(home) && /Сезон/.test(home), home.split('\n')[0]);
+ ok('головна: смуга тижня', /Тиждень/.test(home) && await p.locator('.tdy-day').count()===7);
+ ok('головна: видно поточний день', await p.locator('.tdy-day.is-now').count()===1);
+ ok('головна: не список вправ', await p.locator('#today .tdy-ex').count()===0);
+ ok('головна: плиток стану немає', await p.locator('#today .tile').count()===0);
  ok('головна: без JS-помилок', errs.length===0, errs.join('|'));
  await ctx.close();
 }

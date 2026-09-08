@@ -225,9 +225,16 @@ const browser = await chromium.launch({ executablePath: EXE });
   await p.fill('#m-grams', '50'); await p.click('#m-add'); await p.waitForTimeout(400);
   const d1 = (await localProfile(p)).day;
   check('B4 додане сьогодні пішло в день ' + Y + ' (задокументована поведінка)', d1.date === Y && d1.meals.flatMap(m => m.items || []).length === 2);
-  await p.goto(url('index.html'), { waitUntil: 'load' }); await p.waitForTimeout(500);
-  const idx = (await p.locator('main').innerText()).replace(/\s+/g, ' ');
-  check('B4 «Сьогодні» попереджає про незакритий день', idx.includes('Це день за ' + Y), idx.slice(0, 80));
+  /* Попередження про незакритий день переказувала «Сьогодні». Екран
+     перебрано — картки харчування там більше немає, тож питання
+     лишається там, де воно й виникає: на самому «Раціоні». Обидві
+     позначки (чип із датою й нотатка) вже перевірені вище, тут
+     звіряємо, що вони переживають перехід і повернення. */
+  await p.goto(url('index.html'), { waitUntil: 'load' }); await p.waitForTimeout(400);
+  await p.goto(url('meals.html'), { waitUntil: 'load' }); await p.waitForTimeout(600);
+  const stale = await p.locator('#d-stale').innerText();
+  check('B4 «Раціон» і далі попереджає про незакритий день',
+        (await p.locator('#d-stale').isVisible()) && stale.includes(Y), stale);
   await p.goto(url('meals.html'), { waitUntil: 'load' }); await p.waitForTimeout(400);
   await p.click('#d-close'); await p.waitForTimeout(700);
   const prof = await localProfile(p);

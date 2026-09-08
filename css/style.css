@@ -4148,6 +4148,81 @@ button.heatmap__cell::after {
 .acc--longform > .acc__head:hover { color: var(--text); }
 
 /* ==========================================================================
+   «СЬОГОДНІ»: ЗАГОЛОВОК І СМУГА ТИЖНЯ
+   ==========================================================================
+   Екран перебрано з нуля: лишились назва програми з номером сезону і
+   смуга тижня. Нових кольорів і радіусів немає — типографіка й токени ті
+   самі, що всюди.
+   ========================================================================== */
+
+.tdy-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.tdy-sub { margin: 6px 0 0; font-size: 1rem; color: var(--muted); }
+
+.tdy-week { margin-top: clamp(28px, 6vw, 44px); }
+.tdy-week__nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 18px;
+}
+.tdy-week__num { font-size: 1.15rem; font-weight: 700; }
+
+/* Сім рівних колонок. Не flex із переносом: смуга тижня, у якій сьомий
+   день з'їхав на другий рядок, перестає бути тижнем. Вузькі екрани
+   тримаються зменшенням шрифту, а не переносом. */
+.tdy-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.tdy-day {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  color: var(--muted);
+  text-align: center;
+  min-width: 0;
+}
+/* Крапка над днем — позначка «ти тут». Місце під неї зайняте ЗАВЖДИ,
+   навіть коли її не видно: інакше поточний день був би на кілька
+   пікселів нижчий за сусідів і смуга смикалася б через тиждень. */
+.tdy-day__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: transparent;
+  margin-bottom: 6px;
+}
+.tdy-day.is-now { color: var(--text); }
+.tdy-day.is-now .tdy-day__dot { background: var(--acc-bar); }
+/* Підпис є лише в днів відпочинку, але рядок під нього тримають УСІ:
+   порожній span зберігає висоту, тож числа й місяці стоять на одній
+   лінії. Без цього тренувальні дні їхали б угору, і смуга виглядала б
+   рваною. */
+.tdy-day__lbl {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  line-height: 1.1;
+  min-height: 1.1em;
+}
+.tdy-day__val {
+  font-family: var(--font-mono);
+  font-size: 1.5rem; font-weight: 700; line-height: 1.1;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 1.5em;
+}
+.tdy-day.is-now .tdy-day__val { color: var(--text); }
+/* Місяць — на висоту цифри поруч, не менший: обидва живуть у тому
+   самому рядку й мають важити однаково. */
+.tdy-day__moon { width: 1.5rem; height: 1.5rem; display: block; }
+
+@media (max-width: 420px) {
+  .tdy-days { gap: 2px; }
+  .tdy-day__lbl { font-size: 0.6rem; letter-spacing: 0.05em; }
+  .tdy-day__val { font-size: 1.2rem; }
+  .tdy-day__moon { width: 20px; height: 20px; }
+}
+
+/* ==========================================================================
    КАРТКА-ВХІД У ТРЕНУВАННЯ + ПОВЕРНЕННЯ НАЗАД
    ==========================================================================
    Нових кольорів, радіусів і тіней тут немає: .tdy-entry — це та сама

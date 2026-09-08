@@ -84,18 +84,11 @@
   <section class="section section--dash">
     <div class="wrap wrap--narrow">
 
-      <!-- Заголовок сторінки — сама дата. Слово FORGE стоїть у шапці
-           за два сантиметри вище, і повторювати його тут означало б
-           віддати найкраще місце екрана тому, що людина вже прочитала.
-           Тому надрядка немає, а розділ називає знак будинку — той самий,
-           що на «Сьогодні» в нижній панелі.
-
-           id висить на span, а не на h1: js/today.js пише дату через
-           textContent, і на h1 це стерло б і малюнок разом із нею. -->
-      <h1 class="dash__h1"><svg class="h1-ico" viewBox="-20.24 -5.24 284.48 284.48" fill="currentColor" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M122 10 L234 122 L234 264 L157 264 L157 172 L87 172 L87 264 L10 264 L10 122 Z"/></svg><span id="tdy-date">Сьогодні</span></h1>
-
-
-      <div id="today" class="mt-2">
+      <!-- Заголовок малює js/today.js: це назва обраної програми, а вона
+           відома лише після читання профілю. Статичного h1 тут немає
+           навмисно — інакше на екрані на мить стояв би чужий заголовок,
+           який потім підміняється. -->
+      <div id="today">
         <noscript><p class="small">Ця сторінка збирає ваш день із профілю — без JavaScript їй нема з чого збиратись.</p></noscript>
       </div>
 
@@ -130,6 +123,7 @@
 <script defer src="js/nutrition-core.js"></script>
 <script defer src="js/tracker-core.js"></script>
 <script defer src="js/workout-core.js"></script>
+<script defer src="js/season-core.js"></script>
 <script defer src="js/today.js"></script>
 </body>
 </html>

@@ -73,7 +73,7 @@ const SHELL = ['./index.html', './offline.html', './css/style.css', './logo-mark
                './js/history-core.js', './js/exercises.js', './js/reps-core.js',
                './js/programs-data.js', './js/foods.js', './js/recipes-data.js',
                './js/day-core.js', './js/nutrition-core.js', './js/tracker-core.js',
-               './js/workout-core.js', './js/today.js',
+               './js/workout-core.js', './js/season-core.js', './js/today.js',
                './js/help-content.js', './js/help.js'];
 
 /* Скільки чекати на мережу, перш ніж віддати кеш (PWA-002). */

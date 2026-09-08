@@ -36,10 +36,11 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   const { ctx, p, errs } = await open('index.html');
   ok('1. на «Сьогодні» немає рядків трекерів', await p.locator('#today .tdy-trk__row').count() === 0);
   ok('1. на «Сьогодні» немає шкал 1..10', await p.locator('#today .qi-scale').count() === 0);
-  const tile = p.locator('#today .tile', { hasText: 'Трекери' }).first();
-  ok('1. плитка «Трекери» є', await tile.count() === 1);
-  const href = await tile.getAttribute('href');
-  ok('1. плитка веде на trackers.html, а не в налаштування', href === 'trackers.html', String(href));
+  /* Плитки з «Сьогодні» прибрані разом з рештою екрана: сторінку перебрано
+     до назви програми й смуги тижня. Вхід у трекери лишився один — пункт
+     навігації, і його перевіряє verifylink. Тут лишається головне для
+     ЦЬОГО набору: ввід трекерів на «Сьогодні» не живе. */
+  ok('1. плиток стану на «Сьогодні» немає', await p.locator('#today .tile').count() === 0);
   ok('1. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -65,10 +66,19 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   });
   ok('2. вода й настрій записались', saved.water === 0.25 && saved.mood === 7, JSON.stringify(saved));
 
-  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  /* Раніше тут перевірялось, що плитка на «Сьогодні» показує «2 / N».
+     Плиток більше немає (екран перебрано), тож питання переїхало туди, де
+     воно тепер і має ставитись: чи бачить САМА сторінка трекерів свої
+     дві позначки після перезавантаження. Це та сама суть — запис не
+     загубився, — але на живому екрані, а не на прибраному. */
+  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
-  const tileTxt = await p.locator('#today .tile', { hasText: 'Трекери' }).first().innerText();
-  ok('2. плитка на «Сьогодні» показує 2 відмічені', /2\s*\/\s*\d/.test(tileTxt.replace(/\n/g, ' ')), tileTxt.replace(/\n+/g, ' '));
+  const again = await p.evaluate(async () => {
+    const pr = await window.Store.getProfile();
+    const k = window.TrackerCore.todayKey();
+    return { water: (pr.trackerLog.water || {})[k], mood: (pr.trackerLog.mood || {})[k] };
+  });
+  ok('2. позначки живі після перезавантаження', again.water === 0.25 && again.mood === 7, JSON.stringify(again));
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

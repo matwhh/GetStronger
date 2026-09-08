@@ -188,8 +188,12 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
 
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
+  /* «Сьогодні» перебрано: списку тренування там більше немає, є назва
+     програми. Чужу схему сторінка відмовляється НАЗВАТИ — resolvePlan
+     віддає null, і заголовок каже «Програму не обрано». */
+  const tdy = await p.locator('#today').innerText();
   ok('6. «Сьогодні» теж не відкриває',
-     /План ще не обрано/.test(await p.locator('#today').innerText()));
+     /Програму не обрано/.test(tdy) && !/Жіноч/i.test(tdy), tdy.split('\n')[0]);
 
   await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);

@@ -1,9 +1,15 @@
 /**
  * Щоденний цикл: відкрив → побачив стан → зробив → стан оновився.
  *
- * Стереже головне, заради чого Home і «Сьогодні» звели в один екран:
- * після будь-якої дії число на головній має змінитись САМЕ, без переходів
- * і без ручного оновлення — бо джерело в них одне.
+ * Стереже головне: після будь-якої дії стан оновлюється САМ, без ручного
+ * оновлення сторінки — бо джерело в екранів одне.
+ *
+ * ЩО ЗМІНИЛОСЬ. Раніше кожен потік закінчувався поверненням на «Сьогодні»
+ * й звіркою числа там: головна переказувала стан усіх розділів. Екран
+ * перебрано — на ньому лишились назва програми, сезон і смуга тижня, —
+ * тож звірка переїхала туди, де стан тепер живе: тренування на
+ * workout.html, їжа на meals.html, трекери на trackers.html. Питання те
+ * саме, місце інше.
  */
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
@@ -40,29 +46,23 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 {
   const { ctx, p, errs } = await open();
 
-  ok('1. на головній є картка сезону',
-     /Сезон/.test(await cardText(p, '#today .card--rating')));
-  ok('1. головна відповідає «що робити» — картка-вхід у тренування',
-     await p.locator('#tdy-training').count() === 1 &&
-     await p.locator('#today .tdy-ex').count() === 0);
-  ok('1. головна відповідає «куди веде» — підсумок тижня',
-     /Тиждень/.test(await p.locator('#today').innerText()));
+  const home = await p.locator('#today').innerText();
+  ok('1. головна називає програму й сезон', /Full Body/.test(home) && /Сезон/.test(home),
+     home.replace(/\n+/g, ' | ').slice(0, 60));
+  ok('1. головна показує тиждень', /Тиждень/.test(home));
+  ok('1. головна не редагує тренування', await p.locator('#today .tdy-ex').count() === 0);
 
-  /* Дія живе на своєму екрані; головна має показати її результат одразу
-     після повернення — це і є замикання циклу. */
-  const before = await p.locator('#tdy-training').innerText();
-  await tap(p.locator('#tdy-training'));
+  /* Дія живе на своєму екрані, і стан там оновлюється сам. */
+  await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
+  const before = await p.locator('#wk-done').innerText();
   await tap(p.locator('#workout .tdy-ex [data-set-n="1"]').first());
   await p.waitForTimeout(2400);
-  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
-  await p.waitForTimeout(1400);
-  const after = await p.locator('#tdy-training').innerText();
-  ok('1. галочка змінила стан на головній', before !== after,
-     after.replace(/\n+/g, ' | '));
-  ok('1. рухалась смуга тренування, а не рейтингу',
+  const after = await p.locator('#wk-done').innerText();
+  ok('1. галочка змінила лічильник підходів', before !== after, before + ' → ' + after);
+  ok('1. рухалась смуга тренування',
      await p.evaluate(() => {
-       const w = document.getElementById('tdy-bar').style.width;
+       const w = document.getElementById('wk-bar').style.width;
        return w && w !== '0%';
      }));
   ok('1. без JS-помилок', errs.length === 0, errs.join(' | '));
@@ -78,8 +78,9 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   const { ctx, p, errs } = await open(null, { local: true });
   /* Без ключів Supabase сезонний рейтинг не існує: картка пояснює це,
      бейдж у шапці не зʼявляється, локального сурогата немає. */
-  ok('2. картка сезону чесно каже про локальний режим',
-     /локальному режимі/.test(await cardText(p, '#today .card--rating')));
+  /* Картку сезону з головної прибрано разом з рештою екрана; пояснення
+     локального режиму лишилось там, де воно й потрібне — на сторінці
+     сезону, і саме її перевіряємо нижче. */
   ok('2. бейдж рівня прихований — рахувати нема кому',
      await p.locator('.nav__rating').isHidden());
 
@@ -94,21 +95,16 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 /* ---- Flow 3: харчування → збереження → головна ---- */
 {
   const { ctx, p, errs } = await open();
-  /* Плитки харчування на головній більше немає — над ними стоїть повна
-     картка «Харчування» з тими самими числами (js/today.js, tilesStrip).
-     Дивимось саме на неї: у смужці плиток тепер вага й трекери, і вона
-     після додавання їжі закономірно не змінюється. */
-  const kcalCard = () => p.evaluate(() => {
-    const c = [...document.querySelectorAll('#today .card')]
-      .find(x => /набрано, ккал/i.test(x.innerText));   // innerText приходить у CAPS через text-transform
-    return c ? c.innerText : '';
-  });
-  const before = await kcalCard();
-  ok('3. до їжі картка харчування показує 0 набраних', /\b0\b/.test(before),
-     before.replace(/\n+/g, ' | ').slice(0, 60));
-
+  /* Харчування з головної прибране — дивимось на самому «Раціоні»:
+     скільки набрано до їжі й скільки після. */
   await p.goto('file://' + ROOT + '/meals.html', { waitUntil: 'load' });
   await p.waitForTimeout(1100);
+  const kcalCard = () => p.evaluate(async () => {
+    const pr = await window.Store.getProfile();
+    return JSON.stringify((pr.day && pr.day.meals || []).flatMap(m => m.items || []).length);
+  });
+  const before = await kcalCard();
+  ok('3. до їжі в дні порожньо', before === '0', before);
   await p.locator('#d-quick').fill('рис');
   await p.waitForTimeout(700);
   await tap(p.locator('.quick-list__item').first());
@@ -116,13 +112,11 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await tap(p.locator('#m-add'));
   await p.waitForTimeout(900);
 
-  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(1400);
   const after = await kcalCard();
-  ok('3. головна показує зʼїдене без жодного налаштування', after !== before && after !== '',
-     after.replace(/\n+/g, ' | ').slice(0, 70));
-  ok('3. і картка «Харчування» на головній теж',
-     /\d/.test(await p.locator('#today').innerText()));
+  ok('3. зʼїдене лишилось у дні без жодного налаштування', after !== before && after !== '0', after);
+  ok('3. «Раціон» показує його числом', /\d/.test(await p.locator('main').innerText()));
   ok('3. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -130,25 +124,23 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 /* ---- Flow 4: відновлення (трекер) → головна ---- */
 {
   const { ctx, p, errs } = await open();
-  const before = await cardText(p, '#today .tiles');
-
-  const water = p.locator('#today [data-trk-add]').first();
-  if (await water.count()) {
-    await tap(water);
-  } else {
-    await p.goto('file://' + ROOT + '/trackers-settings.html', { waitUntil: 'load' });
-    await p.waitForTimeout(1100);
-    const row = p.locator('.tr-row', { hasText: 'Вода' }).first();
-    await tap(row.locator('[data-expand]').first());
-    await p.waitForTimeout(400);
-    await tap(row.locator('[data-add]').first());
-  }
+  /* Плиток трекерів на головній більше немає — відмічаємо й звіряємо на
+     сторінці трекерів, тобто там, де це тепер і робиться. */
+  const logged = () => p.evaluate(async () => {
+    const pr = await window.Store.getProfile();
+    const k = window.TrackerCore.todayKey();
+    return String((pr.trackerLog && pr.trackerLog.water || {})[k]);
+  });
+  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  const before = await logged();
+  await tap(p.locator('#trk-day [data-trk-add]').first());
   await p.waitForTimeout(900);
-  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
-  await p.waitForTimeout(1400);
-  const after = await cardText(p, '#today .tiles');
-  ok('4. відмічений трекер видно на головній', after !== before,
-     after.replace(/\n+/g, ' | ').slice(0, 70));
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  const after = await logged();
+  ok('4. відмічений трекер пережив перезавантаження', after !== before && after !== 'undefined',
+     before + ' → ' + after);
   ok('4. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

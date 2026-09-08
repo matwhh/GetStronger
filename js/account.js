@@ -22,137 +22,18 @@
   /* Оформлення: схема + акцент                                          */
   /* ------------------------------------------------------------------ */
   /*
-   * Дві незалежні осі, і саме так вони й показані:
+   * ВИБОРУ ОФОРМЛЕННЯ ТУТ БІЛЬШЕ НЕМАЄ.
    *
-   *   СХЕМА   світло / темрява — поверхні. Типова темна.
-   *   АКЦЕНТ  один хроматичний колір. Типовий Navy Blue.
+   * Був перемикач «світла тема» й дев'ять плашок акценту (монохром +
+   * вісім кольорових). Прибрано разом із самими темами — див. блок
+   * «Оформлення» в js/app.js: лишилась одна монохромна темна основа, і
+   * вибирати нічого.
    *
-   * Сімей тем більше немає. Раніше їх було дві по девʼять: у «кольорових»
-   * тон заходив і в поверхні (фон ставав рожевим, деревʼяним, фіолетовим),
-   * у «графітових» поверхні лишались нейтральними. Кольорові прибрані —
-   * правило «один відтінок плюс нейтральні» вони порушували в найдорожчому
-   * місці, на суцільних поверхнях, і саме через це половина сайту виглядала
-   * інакше, ніж задумана графітова основа.
-   *
-   * Свотчі захардкоджені, а не читаються з CSS: getComputedStyle на
-   * невключеній темі повернув би кольори поточної, і всі плашки були б
-   * однакові.
-   *
-   * Перший кружок — ПОВЕРХНЯ (вона спільна для всіх акцентів), другий —
-   * те єдине, чим акценти різняться: заливка.
+   * Ключі theme / scheme у профілі лишились і не заважають: правил під
+   * ці значення в CSS немає, тож старі профілі просто малюються
+   * монохромом. Імпорт чужого JSON їх так само приймає й так само нічого
+   * не міняє на екрані.
    */
-  const SURFACE = { dark: '#171717', light: '#f6f6f6' };
-
-  /*
-   * Заливка акценту різна у схемах: у темряві світліший крок палітри (щоб
-   * кнопку було видно на графіті), у світлі — темніший (щоб її було видно
-   * на папері). Свотч показує ту, яка діє ЗАРАЗ, інакше він брехав би
-   * рівно в половині випадків.
-   */
-  /*
-   * Типовий вигляд — МОНОХРОМ (id: null, значення з :root). Кольорові
-   * акценти лишаються як додаткові й нічого, крім акценту, не міняють.
-   *
-   * «Бурштин» прибраний: id 'graphite-amber' більше не чинний, і профілі
-   * з ним App.normTheme відкочує на монохром.
-   */
-  const ACCENTS = [
-    { id: null,               name: 'Монохром',   dark: '#e8e8e8', light: '#1a1a1a' },
-    { id: 'graphite-navy',    name: 'Navy blue',  dark: '#6685b6', light: '#2c4160' },
-    { id: 'graphite',         name: 'Дерево',     dark: '#93663e', light: '#7a5230' },
-    { id: 'graphite-pink',    name: 'Рожевий',    dark: '#c43e72', light: '#c43e72' },
-    { id: 'graphite-violet',  name: 'Фіолетовий', dark: '#8063c7', light: '#6b4ab8' },
-    { id: 'graphite-crimson', name: 'Багрянець',  dark: '#db302a', light: '#c7231d' },
-    { id: 'graphite-moss',    name: 'Мох',        dark: '#50802e', light: '#3a7410' },
-    { id: 'graphite-emerald', name: 'Смарагд',    dark: '#1f835e', light: '#1e7455' },
-    { id: 'graphite-ocean',   name: 'Океан',      dark: '#0d7e9a', light: '#296f81' }
-  ];
-
-  /*
-   * Поточний акцент читаємо через App.normTheme, а не з атрибута напряму:
-   * у профілі може лежати старий id прибраної кольорової теми ('pink'), і
-   * тоді жодна плашка не була б активною — людина бачила б список, у якому
-   * нічого не обрано, хоча колір на екрані є.
-   */
-  function currentTheme() {
-    const raw = document.documentElement.getAttribute('data-theme') || null;
-    return (window.App.normTheme ? window.App.normTheme(raw) : raw) || null;
-  }
-
-  function currentScheme() {
-    return window.App.currentScheme ? window.App.currentScheme() : 'dark';
-  }
-
-  function renderTheme() {
-    const host = $('#theme');
-    if (!host) return;
-    const cur = currentTheme();
-    const scheme = currentScheme();
-    const light = scheme === 'light';
-
-    const swatches = ACCENTS.map(function (t) {
-      const active = (t.id || null) === cur;
-      return '<button class="theme-btn' + (active ? ' is-active' : '') + '" type="button" ' +
-               'data-theme-pick="' + (t.id || '') + '" aria-pressed="' + active + '">' +
-               '<i style="background:' + SURFACE[scheme] + '"></i>' +
-               '<i style="background:' + t[scheme] + '"></i>' +
-               '<span>' + esc(t.name) + '</span>' +
-             '</button>';
-    }).join('');
-
-    host.innerHTML =
-      '<div class="card">' +
-        /* Без підписів: лишились самі контроли. Перемикач і свотчі
-           говорять самі за себе, а для читалок екрана підпис нікуди не
-           дівся — він у .sr-only всередині <label> і в aria-label свотчів. */
-        '<div class="row row--split" style="gap:14px;align-items:center">' +
-          '<label class="switch">' +
-            '<input type="checkbox" id="p-scheme"' + (light ? ' checked' : '') + '>' +
-            '<span class="switch__track"><span class="switch__thumb"></span></span>' +
-            '<span class="sr-only">Світла тема</span>' +
-          '</label>' +
-        '</div>' +
-
-        '<div class="themes mt-3">' + swatches + '</div>' +
-      '</div>';
-  }
-
-  /* Слухачі вішаються РІВНО ОДИН РАЗ. wireTheme() викликається з renderAll,
-     а renderAll — це Store.onChange; без цього guard кожне збереження теми
-     (setTheme -> saveProfile -> onChange -> renderAll) додавало б ще один
-     click-слухач на постійний #theme і ще один на document. Клік теми тоді
-     плодив setTheme -> saveProfile -> onChange по колу, слухачі росли
-     експоненційно, і після 3-4 перемикань сторінка зависала. Делегування
-     живе на контейнері, що не зникає (renderTheme() міняє лише innerHTML),
-     тож одноразового навішування досить назавжди. */
-  let themeWired = false;
-  function wireTheme() {
-    const host = $('#theme');
-    if (!host || themeWired) return;
-    themeWired = true;
-    host.addEventListener('click', function (e) {
-      const btn = e.target.closest('[data-theme-pick]');
-      if (!btn) return;
-      window.App.setTheme(btn.dataset.themePick || null);
-      renderTheme();
-    });
-    /*
-     * Схему міняє не лише цей перемикач: App.setScheme викликають
-     * adoptProfileTheme (вхід на новому пристрої) та імпорт JSON. Подія
-     * forge:scheme розсилалась, але слухача не мав ніхто — перемикач і
-     * свотчі лишались у старому стані, показуючи темні поверхні на папері.
-     */
-    document.addEventListener('forge:scheme', function () { renderTheme(); });
-
-    host.addEventListener('change', function (e) {
-      if (!e.target || e.target.id !== 'p-scheme') return;
-      window.App.setScheme(e.target.checked ? 'light' : 'dark');
-      /* Свотчі показують заливку ДІЮЧОЇ схеми — після перемикання їх треба
-         перемалювати, інакше поруч зі світлими поверхнями лишились би
-         темні кружки. */
-      renderTheme();
-    });
-  }
 
   /* ------------------------------------------------------------------ */
   /* Блок режиму роботи                                                  */
@@ -844,10 +725,11 @@
       // профіль мовчки рахувався за чоловічою формулою (+166 ккал).
       sex: ['male', 'female'],
       trainingAge: ['novice', 'inter', 'adv', 'elite'],
-      /* Прибрані кольорові id лишаються дозволеними НА ВХОДІ: у старих
-         резервних копіях вони є, а App.normTheme переносить їх на
-         найближчий чинний акцент. Відкинути їх означало б мовчки втратити
-         вибір людини під час імпорту. */
+      /* Поле мертве (оформлення одне), але список лишається: у старих
+         резервних копіях ці значення є, і відкидати їх поіменно означало б
+         показувати людині «відкинуто 1 поле» щоразу, коли вона імпортує
+         власний давній експорт. Приймаємо й кладемо в профіль — воно
+         нічого не малює. */
       theme: ['pink', 'wood', 'violet',
               'crimson', 'amber', 'moss', 'emerald', 'ocean',
               'graphite', 'graphite-navy', 'graphite-pink', 'graphite-violet',
@@ -1668,11 +1550,6 @@
         toast('Імпортовано полів: ' + known +
               (res.rejected.length ? ' · відкинуто: ' + res.rejected.length : ''), 'ok');
         renderProfile();
-        // Тему треба саме ЗАСТОСУВАТИ, а не лише перемалювати перемикач:
-        // renderTheme малює вибір, а колір на сторінці ставить App.setTheme.
-        if ('theme' in res.patch && App.setTheme) App.setTheme(res.patch.theme, { save: false });
-        if ('scheme' in res.patch && App.setScheme) App.setScheme(res.patch.scheme, { save: false });
-        renderTheme();
       } catch (err) {
         toast(err.queued ? err.message : 'Не збереглося: ' + err.message, err.queued ? 'ok' : 'err');
       }
@@ -1707,9 +1584,6 @@
           await Store.saveProfile(restore);
           toast('Профіль повернуто до стану перед імпортом', 'ok');
           renderProfile();
-          if (App.setTheme) App.setTheme(restore.theme || null, { save: false });
-          if (App.setScheme) App.setScheme(restore.scheme || 'dark', { save: false });
-          renderTheme();
         } catch (err) {
           toast(err.queued ? err.message : 'Не вдалося відкотити: ' + err.message, err.queued ? 'ok' : 'err');
         }
@@ -1795,8 +1669,6 @@
 
   async function renderAll() {
     renderMode();
-    renderTheme();
-    wireTheme();
     renderAuth();
 
     // Якщо фокус зараз у полі профілю, значить його саме зараз редагують —

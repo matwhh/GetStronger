@@ -49,6 +49,7 @@ node tools/verifyagegate.mjs     # 17+: гейт, обхід URL/історіє�
 node tools/verifyreps.mjs        # діапазони повторень: 4 стажі × 4 програми × великі/малі групи
 node tools/verifyperf.mjs        # вага сторінок, час завантаження, вузли — зі стелями
 node tools/verifysw.mjs          # service worker: оболонка, офлайн, аварійний вимикач
+node tools/verifyhelp.mjs        # контекстна довідка: кнопка на кожній сторінці, різний вміст, модальність
 node tools/verifylink.mjs        # вхід за посиланням із листа, чужий токен, beacon
 node tools/verifyerrors.mjs      # що саме летить у Sentry: без пошти, токенів і профілю
 node tools/verify-schema-perms.mjs  # права й політики: справжні запити клієнта по копії схеми

@@ -1,19 +1,28 @@
 /**
- * Оформлення: дві осі, обидві малюються, обидві проходять пороги контрасту.
+ * Оформлення: воно ОДНЕ, і воно тримає контраст.
  *
- *   СХЕМА   темна (типова) / світла   — html[data-scheme]
- *   АКЦЕНТ  девʼять графітових        — html[data-theme]
+ * Донедавна тут міряли 9 акцентів × 2 схеми = 18 комбінацій. Ні акцентів,
+ * ні світлої схеми більше немає — лишилась одна монохромна темна основа
+ * (:root у css/style.css). Тому перевірка змінила предмет, але не суть:
  *
- * Тобто 9 × 2 = 18 комбінацій, і кожна міряється окремо. Міряємо НЕ значення
- * з генератора, а те, що браузер реально порахував: getComputedStyle на живих
- * елементах. Пороги ті самі, що заявлені в коментарі до палітри в
- * css/style.css:
+ *   1. єдина палітра проходить ті самі пороги контрасту, і міряються не
+ *      значення з файла, а те, що браузер реально порахував;
+ *   2. кольори НЕ МОЖНА повернути випадково: якщо на <html> поставити
+ *      старий data-theme або data-scheme, не мусить змінитись НІЧОГО —
+ *      саме на цьому тримається тихий перехід для чужих профілів;
+ *   3. прибраного API (App.setTheme, setScheme, themes, toggleScheme…)
+ *      справді немає, а сторінка акаунта без нього не падає;
+ *   4. профіль зі старим значенням theme/scheme імпортується, зберігається
+ *      й нічого не фарбує.
+ *
+ * Пороги ті самі, що заявлені в коментарі до палітри в css/style.css:
  *   • основний текст на поверхні         ≥ 4,5:1
  *   • акцентний текст (--acc-ink, лінки) ≥ 4,5:1
  *   • текст на заливці кнопки (--on-acc) ≥ 4,5:1
  *   • смуги даних і межі                 ≥ 3:1
  */
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 import { adultContext } from './adult.mjs';
 import { CHROME } from './pw.mjs';
 
@@ -21,21 +30,25 @@ const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-/* null = монохром: атрибута немає, значення беруться з :root.
-   Далі всі чинні кольорові акценти — контраст кожного міряється окремо
-   в обох схемах. 'graphite-amber' у списку навмисно: він прибраний, і
-   перевірка мусить показати, що він дає монохромні токени з :root, а не
-   «поламану» тему без кольорів. */
-const ACCENTS = [null, 'graphite-navy', 'graphite', 'graphite-pink',
-                 'graphite-violet', 'graphite-crimson', 'graphite-moss',
-                 'graphite-emerald', 'graphite-ocean', 'graphite-amber'];
-const SCHEMES = ['dark', 'light'];
+/* Значення, які могли лишитись у чужих профілях і в localStorage. Жодне з
+   них не має нічого міняти на екрані. */
+const LEGACY = ['graphite', 'graphite-navy', 'graphite-pink', 'graphite-violet',
+                'graphite-crimson', 'graphite-moss', 'graphite-emerald',
+                'graphite-ocean', 'graphite-amber', 'pink', 'wood', 'violet',
+                'crimson', 'moss', 'emerald', 'ocean'];
 
-/* Прибрані кольорові теми: id лишились у старих профілях і мусять
-   переноситись на найближчий графітовий акцент, а не зникати. */
-const LEGACY = { pink: 'graphite-pink', wood: 'graphite', violet: 'graphite-violet',
-                 crimson: 'graphite-crimson', moss: 'graphite-moss',
-                 emerald: 'graphite-emerald', ocean: 'graphite-ocean' };
+/* ------------------------------------------------------------------ */
+/* 0. У самому CSS правил під теми не лишилось                          */
+/* ------------------------------------------------------------------ */
+{
+  const css = readFileSync(ROOT + '/css/style.css', 'utf8');
+  /* Коментарі не рахуються: у них ці слова стоять як пояснення, чому
+     правил немає. Ловимо саме селектори. */
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const hits = (bare.match(/\[data-(theme|scheme)/g) || []);
+  ok('у css/style.css немає жодного селектора з data-theme / data-scheme',
+     hits.length === 0, hits.join(', '));
+}
 
 const b = await chromium.launch({ executablePath: CHROME });
 const ctx = await adultContext(b, { viewport: { width: 1280, height: 900 } });
@@ -85,155 +98,94 @@ await p.addScriptTag({ content: `
   };
 `});
 
-const rows = [];
-for (const scheme of SCHEMES) {
-  for (const t of ACCENTS) {
-    await p.evaluate(([t, scheme]) => {
-      if (t) document.documentElement.setAttribute('data-theme', t);
-      else document.documentElement.removeAttribute('data-theme');
-      if (scheme === 'light') document.documentElement.setAttribute('data-scheme', 'light');
-      else document.documentElement.removeAttribute('data-scheme');
-    }, [t, scheme]);
-    await p.waitForTimeout(120);
-    const m = await p.evaluate(() => window.__probe());
-    const name = (scheme === 'light' ? 'світла/' : 'темна/') + (t || 'монохром');
-    rows.push([name, scheme, t, m]);
+/* ------------------------------------------------------------------ */
+/* 1. Єдина палітра тримає пороги                                       */
+/* ------------------------------------------------------------------ */
+const base = await p.evaluate(() => window.__probe());
+ok('поверхні непрозорі', !base.transparent, base.cardBg + ' / ' + base.bodyBg);
+ok('основний текст ≥ 4,5', base.text >= 4.5, base.text.toFixed(2));
+ok('приглушений текст ≥ 4,5', base.muted >= 4.5, base.muted.toFixed(2));
+ok('акцентний текст ≥ 4,5', base.ink >= 4.5, base.ink.toFixed(2));
+ok('акцентний текст у полі ≥ 4,5', base.inkSurf >= 4.5, base.inkSurf.toFixed(2));
+ok('посилання ≥ 4,5', base.link >= 4.5, base.link.toFixed(2));
+ok('текст на заливці кнопки ≥ 4,5', base.onFill >= 4.5, base.onFill.toFixed(2));
+ok('заливка видима на картці ≥ 3', base.fill >= 3, base.fill.toFixed(2));
+ok('смуги даних ≥ 3', base.bar >= 3, base.bar.toFixed(2));
+ok('межі акценту ≥ 3', base.line >= 3, base.line.toFixed(2));
 
-    ok(name + ': поверхні непрозорі', !m.transparent, m.cardBg + ' / ' + m.bodyBg);
-    ok(name + ': основний текст ≥ 4,5', m.text >= 4.5, m.text.toFixed(2));
-    ok(name + ': приглушений текст ≥ 4,5', m.muted >= 4.5, m.muted.toFixed(2));
-    ok(name + ': акцентний текст ≥ 4,5', m.ink >= 4.5, m.ink.toFixed(2));
-    ok(name + ': акцентний текст у полі ≥ 4,5', m.inkSurf >= 4.5, m.inkSurf.toFixed(2));
-    ok(name + ': посилання ≥ 4,5', m.link >= 4.5, m.link.toFixed(2));
-    ok(name + ': текст на заливці кнопки ≥ 4,5', m.onFill >= 4.5, m.onFill.toFixed(2));
-    ok(name + ': заливка видима на картці ≥ 3', m.fill >= 3, m.fill.toFixed(2));
-    ok(name + ': смуги даних ≥ 3', m.bar >= 3, m.bar.toFixed(2));
-    ok(name + ': межі акценту ≥ 3', m.line >= 3, m.line.toFixed(2));
+/* Монохром — це не «сірувато», а рівно один тон: у кожного акцентного
+   токена R = G = B. Саме це й ламається першим, якщо колір повернеться
+   через окремий селектор, а не через тему. */
+{
+  const grey = await p.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const toRgb = h => { const d = document.createElement('i'); d.style.color = h;
+      document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+    const bad = [];
+    ['--text', '--muted', '--acc', '--acc-ink', '--acc-bar', '--acc-line', '--link', '--on-acc']
+      .forEach(function (n) {
+        const [r, g, bl] = toRgb(cs.getPropertyValue(n).trim()).match(/\d+/g).slice(0, 3).map(Number);
+        if (Math.max(r, g, bl) - Math.min(r, g, bl) > 6) bad.push(n + ' = ' + [r, g, bl].join(','));
+      });
+    return bad;
+  });
+  ok('палітра справді монохромна (R=G=B у кожного токена)', grey.length === 0, grey.join(' | '));
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. Старі атрибути не міняють нічого                                  */
+/* ------------------------------------------------------------------ */
+{
+  const changed = [];
+  for (const t of LEGACY) {
+    const m = await p.evaluate((t) => {
+      document.documentElement.setAttribute('data-theme', t);
+      const cs = getComputedStyle(document.documentElement);
+      const out = ['--acc', '--acc-ink', '--acc-bar', '--link']
+        .map(n => cs.getPropertyValue(n).trim()).join('|');
+      document.documentElement.removeAttribute('data-theme');
+      return out;
+    }, t);
+    const ref = await p.evaluate(() => {
+      const cs = getComputedStyle(document.documentElement);
+      return ['--acc', '--acc-ink', '--acc-bar', '--link']
+        .map(n => cs.getPropertyValue(n).trim()).join('|');
+    });
+    if (m !== ref) changed.push(t + ': ' + m);
   }
+  ok('жодне збережене значення data-theme не фарбує сторінку',
+     changed.length === 0, changed.join(' ; '));
+
+  const lightRef = await p.evaluate(() => {
+    const before = getComputedStyle(document.querySelector('.card')).backgroundColor;
+    document.documentElement.setAttribute('data-scheme', 'light');
+    const after = getComputedStyle(document.querySelector('.card')).backgroundColor;
+    document.documentElement.removeAttribute('data-scheme');
+    return [before, after];
+  });
+  ok('data-scheme="light" не вмикає світлу схему', lightRef[0] === lightRef[1],
+     lightRef.join(' → '));
 }
 
-/* Поверхні спільні для ВСІХ акцентів усередині схеми — у цьому весь сенс
-   однієї графітової основи. Кольорових сімей, де тон заходив у поверхні,
-   більше немає, і цей тест стереже, щоб вони не повернулись. */
-for (const scheme of SCHEMES) {
-  const cards = rows.filter(r => r[1] === scheme).map(r => r[3].cardBg);
-  ok('схема ' + scheme + ': усі акценти ділять одну поверхню',
-     new Set(cards).size === 1, [...new Set(cards)].join(' | '));
-}
-
-/* Схеми мусять справді відрізнятись, і саме в потрібний бік */
+/* ------------------------------------------------------------------ */
+/* 3. Прибране API справді прибране                                     */
+/* ------------------------------------------------------------------ */
 {
-  const dark = rows.find(r => r[1] === 'dark' && r[2] === null)[3];
-  const light = rows.find(r => r[1] === 'light' && r[2] === null)[3];
-  const lum = s => { const [r, g, bl] = String(s).match(/\d+/g).slice(0, 3).map(Number);
-                     return 0.2126 * r + 0.7152 * g + 0.0722 * bl; };
-  ok('світла схема справді світліша за темну',
-     lum(light.cardBg) > lum(dark.cardBg) + 100,
-     Math.round(lum(dark.cardBg)) + ' → ' + Math.round(lum(light.cardBg)));
-}
+  const left = await p.evaluate(() =>
+    ['setTheme', 'setScheme', 'toggleScheme', 'currentScheme', 'normTheme', 'themes']
+      .filter(k => k in window.App));
+  ok('App більше не має API оформлення', left.length === 0, left.join(', '));
 
-/* ---- API: акцент ---- */
-await p.evaluate(() => { document.documentElement.removeAttribute('data-theme'); });
-for (const t of ['graphite-ocean']) {
-  const applied = await p.evaluate(t => {
-    window.App.setTheme(t, { save: false });
-    return { attr: document.documentElement.getAttribute('data-theme'),
-             ls: localStorage.getItem('forge.theme') };
-  }, t);
-  ok('App.setTheme("' + t + '") застосовує й запамʼятовує', applied.attr === t && applied.ls === t,
-     JSON.stringify(applied));
-}
-const bogus = await p.evaluate(() => {
-  window.App.setTheme('не-існує', { save: false });
-  return document.documentElement.getAttribute('data-theme');
-});
-ok('невідомий акцент скидається на типовий', bogus === null, String(bogus));
-
-for (const [oldId, newId] of Object.entries(LEGACY)) {
-  const got = await p.evaluate(o => {
-    window.App.setTheme(o, { save: false });
-    return document.documentElement.getAttribute('data-theme');
-  }, oldId);
-  ok('прибрана тема «' + oldId + '» переїхала на ' + newId, got === newId, String(got));
-}
-
-/* ---- API: схема ---- */
-{
-  const dark = await p.evaluate(() => {
-    window.App.setScheme('dark', { save: false });
-    return { attr: document.documentElement.getAttribute('data-scheme'),
-             ls: localStorage.getItem('forge.scheme'),
-             meta: document.querySelector('meta[name="theme-color"]').content };
+  const meta = await p.evaluate(() => {
+    const m = document.querySelector('meta[name="theme-color"]');
+    return m ? m.content.toLowerCase() : '(немає)';
   });
-  ok('темна схема — без атрибута й без запису', dark.attr === null && dark.ls === null,
-     JSON.stringify(dark));
-
-  const light = await p.evaluate(() => {
-    window.App.setScheme('light', { save: false });
-    return { attr: document.documentElement.getAttribute('data-scheme'),
-             ls: localStorage.getItem('forge.scheme'),
-             meta: document.querySelector('meta[name="theme-color"]').content };
-  });
-  ok('світла схема ставить атрибут і памʼятає', light.attr === 'light' && light.ls === 'light',
-     JSON.stringify(light));
-  ok('колір системної смуги йде за схемою',
-     light.meta.toLowerCase() === '#e7e7e7' && dark.meta.toLowerCase() === '#0b0b0b',
-     dark.meta + ' → ' + light.meta);
-
-  const toggled = await p.evaluate(() => {
-    window.App.toggleScheme();
-    const a = document.documentElement.getAttribute('data-scheme');
-    window.App.toggleScheme();
-    return [a, document.documentElement.getAttribute('data-scheme')];
-  });
-  ok('toggleScheme перемикає туди й назад', toggled[0] === null && toggled[1] === 'light',
-     JSON.stringify(toggled));
-
-  const bad = await p.evaluate(() => {
-    window.App.setScheme('сепія', { save: false });
-    return document.documentElement.getAttribute('data-scheme');
-  });
-  ok('невідома схема скидається на темну', bad === null, String(bad));
-  await p.evaluate(() => window.App.setScheme('dark', { save: false }));
+  ok('колір системної смуги — темний і незмінний', meta === '#0b0b0b', meta);
 }
 
-/* ---- Кнопка схеми в шапці ---- */
-{
-  const c4 = await adultContext(b, { viewport: { width: 1280, height: 900 } });
-  const q = await c4.newPage();
-  const e4 = []; q.on('pageerror', e => e4.push(e.message));
-  await q.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
-  await q.waitForTimeout(900);
-
-  /* Перемикача в шапці більше немає — вибір схеми живе тільки в акаунті.
-     Перевіряємо саме відсутність: якщо кнопка колись повернеться сюди
-     випадково, це має впасти, а не «просто зʼявитись». */
-  ok('кнопки схеми в шапці немає', await q.locator('.nav__scheme').count() === 0,
-     String(await q.locator('.nav__scheme').count()));
-  ok('у шапці немає жодного перемикача схеми',
-     await q.locator('[data-scheme-toggle]').count() === 0);
-
-  /* Схема все одно мусить застосовуватись і переживати перезавантаження —
-     тепер через API, яким користується сторінка акаунта. */
-  await q.evaluate(() => window.App.setScheme('light')); await q.waitForTimeout(400);
-  ok('setScheme вмикає світлу схему',
-     await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === 'light');
-
-  await q.reload({ waitUntil: 'load' }); await q.waitForTimeout(800);
-  ok('схема пережила перезавантаження',
-     await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === 'light');
-  ok('схема записалась у профіль',
-     (await q.evaluate(async () => (await window.Store.getProfile()).scheme)) === 'light');
-
-  await q.evaluate(() => window.App.setScheme('dark')); await q.waitForTimeout(400);
-  ok('setScheme повертає темну схему',
-     await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === null);
-
-  ok('головна без JS-помилок', e4.length === 0, e4.join(' | '));
-  await c4.close();
-}
-
-/* ---- Вибір оформлення на сторінці акаунта ---- */
+/* ------------------------------------------------------------------ */
+/* 4. Сторінка акаунта: вибору немає, сторінка жива                     */
+/* ------------------------------------------------------------------ */
 {
   const c2 = await adultContext(b, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const q = await c2.newPage();
@@ -242,67 +194,20 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
   await q.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
   await q.waitForTimeout(1000);
 
-  const btns = await q.locator('.theme-btn').count();
-  /* Монохром + сім кольорових акцентів. «Бурштин» прибраний — якщо він
-     повернеться в список без CSS-блоку, плашок стане девʼять і це впаде. */
-  ok('у виборі акцентів девʼять плашок', btns === 9, String(btns));
-
-  const names0 = await q.evaluate(() =>
-    [...document.querySelectorAll('.themes .theme-btn span')].map(s => s.textContent.trim()));
-  ok('монохром перший у списку', names0[0] === 'Монохром', names0[0]);
-  ok('«Бурштин» прибраний зі списку', !names0.includes('Бурштин'), names0.join(', '));
-
-  const names = await q.evaluate(() =>
-    [...document.querySelectorAll('.themes .theme-btn span')].map(s => s.textContent.trim()));
-  ok('назви акцентів не повторюються', new Set(names).size === names.length, names.join(', '));
-
-  const swatches = await q.evaluate(() => [...document.querySelectorAll('.theme-btn')]
-    .map(x => [...x.querySelectorAll('i')].map(i => i.style.background).join('/')));
-  ok('у кожної плашки два кружки кольору', swatches.every(s => s.split('/').length === 2));
-  ok('кружки не повторюються між акцентами', new Set(swatches).size === swatches.length,
-     swatches.length - new Set(swatches).size + ' дублів');
-
-  /* Тиснемо кольорову плашку як людина — «Океан» лежить останнім. */
-  const pick = q.locator('.themes .theme-btn', { hasText: 'Океан' });
-  ok('плашка «Океан» на місці', await pick.count() === 1);
-  await pick.scrollIntoViewIfNeeded(); await pick.click(); await q.waitForTimeout(700);
-  const after = await q.evaluate(async () => ({
-    attr: document.documentElement.getAttribute('data-theme'),
-    pressed: document.querySelector('.themes .theme-btn[data-theme-pick="graphite-ocean"]')
-      .getAttribute('aria-pressed'),
-    saved: (await window.Store.getProfile()).theme
-  }));
-  ok('клік по плашці застосував акцент', after.attr === 'graphite-ocean', String(after.attr));
-  ok('плашка позначена активною', after.pressed === 'true', after.pressed);
-  ok('акцент записаний у профіль', after.saved === 'graphite-ocean', String(after.saved));
-
-  /* Повертаємось на монохром: він базовий :root, тож атрибут знімається. */
-  const mono = q.locator('.themes .theme-btn', { hasText: 'Монохром' });
-  await mono.scrollIntoViewIfNeeded(); await mono.click(); await q.waitForTimeout(700);
-  ok('монохром знімає data-theme',
-     await q.evaluate(() => document.documentElement.getAttribute('data-theme')) === null);
-
-  /* перемикач схеми на самій сторінці */
-  const sw = q.locator('#p-scheme');
-  ok('перемикач світлої теми на місці', await sw.count() === 1);
-  await sw.scrollIntoViewIfNeeded();
-  await sw.check({ force: true }); await q.waitForTimeout(600);
-  ok('перемикач вмикає світлу схему',
-     await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === 'light');
-  const relit = await q.evaluate(() =>
-    [...document.querySelectorAll('.theme-btn i')].map(i => i.style.background)[0]);
-  ok('свотчі перемалювались під світлу схему', /26|246/.test(relit), relit);
-
-  await q.reload({ waitUntil: 'load' }); await q.waitForTimeout(800);
-  ok('палітра і схема пережили перезавантаження',
-     await q.evaluate(() => document.documentElement.getAttribute('data-theme')) === null &&
-     await q.evaluate(() => document.documentElement.getAttribute('data-scheme')) === 'light');
-
+  ok('плашок вибору акценту немає', await q.locator('.theme-btn').count() === 0);
+  ok('перемикача світлої теми немає', await q.locator('#p-scheme').count() === 0);
+  ok('контейнера #theme немає', await q.locator('#theme').count() === 0);
+  /* Сторінка мусить лишитись робочою: блоки, які стояли поруч із вибором
+     оформлення, нікуди не поділись. */
+  ok('решта акаунта на місці', await q.locator('#profile').count() === 1 &&
+                               await q.locator('#mode').count() === 1);
   ok('сторінка акаунта без JS-помилок', e2.length === 0, e2.join(' | '));
   await c2.close();
 }
 
-/* ---- Імпорт профілю з оформленням ---- */
+/* ------------------------------------------------------------------ */
+/* 5. Імпорт профілю зі старим оформленням                              */
+/* ------------------------------------------------------------------ */
 {
   const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
   const c3 = await adultContext(b, { viewport: { width: 1280, height: 900 } });
@@ -312,15 +217,10 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
   await q.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
   await q.waitForTimeout(700);
 
-  /* Кожен файл — у своєму чистому контексті: імпорт ЗЛИВАЄ поля з наявним
-     профілем, тож після відкинутої теми лишається попередня, і перевірка
-     «стало null» була б неправдою про поведінку, а не про баг. */
-  for (const [theme, expect] of [['graphite-moss', 'graphite-moss'],
-                                 ['ocean', 'ocean'],          /* старий id зберігається як є… */
-                                 ['вигадана', null],
-                                 ['<script>', null]]) {
+  for (const theme of ['graphite-moss', 'ocean', 'вигадана']) {
     const f = path.join(os.tmpdir(), 'theme-' + Buffer.from(theme).toString('hex') + '.json');
-    fs.writeFileSync(f, JSON.stringify({ version: 5, birthDate:'1990-06-15', weight: 80, theme: theme }));
+    fs.writeFileSync(f, JSON.stringify({ version: 5, birthDate: '1990-06-15', weight: 80,
+                                         theme: theme, scheme: 'light' }));
     await q.evaluate((birth) => {
       try {
         localStorage.clear();
@@ -332,38 +232,13 @@ for (const [oldId, newId] of Object.entries(LEGACY)) {
     await q.waitForTimeout(1200);
     const got = await q.evaluate(async () => {
       const pr = await window.Store.getProfile();
-      return { theme: pr.theme, weight: pr.weight,
-               attr: document.documentElement.getAttribute('data-theme') };
+      return { weight: pr.weight,
+               attrT: document.documentElement.getAttribute('data-theme'),
+               attrS: document.documentElement.getAttribute('data-scheme') };
     });
-    ok('імпорт теми «' + theme + '» → ' + (expect === null ? 'відкинуто' : expect),
-       (got.theme || null) === expect, String(got.theme));
-    /* …але НА ЕКРАНІ старий id мусить показатись чинним акцентом */
-    if (expect && LEGACY[expect]) {
-      ok('імпорт «' + theme + '»: на екрані вже ' + LEGACY[expect],
-         got.attr === LEGACY[expect], String(got.attr));
-    }
-    ok('імпорт «' + theme + '»: решта профілю не постраждала', got.weight === 80, String(got.weight));
-  }
-
-  /* схема так само їде через імпорт */
-  {
-    const f = path.join(os.tmpdir(), 'scheme-light.json');
-    fs.writeFileSync(f, JSON.stringify({ version: 7, birthDate: '1990-06-15', weight: 80, scheme: 'light' }));
-    await q.evaluate((birth) => {
-      try {
-        localStorage.clear();
-        localStorage.setItem('ib.profile', JSON.stringify({ version: 6, birthDate: birth }));
-      } catch (_) {}
-    }, '1990-06-15');
-    await q.reload({ waitUntil: 'load' }); await q.waitForTimeout(700);
-    await q.setInputFiles('#p-import-file', f);
-    await q.waitForTimeout(1200);
-    const got = await q.evaluate(async () => ({
-      scheme: (await window.Store.getProfile()).scheme,
-      attr: document.documentElement.getAttribute('data-scheme')
-    }));
-    ok('імпорт світлої схеми застосувався', got.scheme === 'light' && got.attr === 'light',
-       JSON.stringify(got));
+    ok('імпорт профілю з темою «' + theme + '»: решта полів ціла', got.weight === 80, String(got.weight));
+    ok('імпорт профілю з темою «' + theme + '»: нічого не перефарбувалось',
+       got.attrT === null && got.attrS === null, JSON.stringify(got));
   }
 
   ok('імпорт без JS-помилок', e3.length === 0, e3.join(' | '));

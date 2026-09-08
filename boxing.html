@@ -121,7 +121,12 @@
 <script defer src="js/age-core.js"></script>
 <script defer src="js/onboarding-core.js"></script>
 <script defer src="js/app.js"></script>
-<!-- Профіль: тема й бейдж рівня в шапці (у локальному режимі — без мережі) -->
+<!-- Контекстна довідка: один механізм на весь сайт, вміст залежить від
+     сторінки. Вміст іде ПЕРЕД механізмом — інакше help.js на швидкому
+     кеші не знайшов би розділу й сховав би кнопку назавжди. -->
+<script defer src="js/help-content.js"></script>
+<script defer src="js/help.js"></script>
+<!-- Профіль: бейдж рівня в шапці (у локальному режимі — без мережі) -->
 <script defer src="js/store.js"></script>
 <script defer src="js/elo-core.js"></script>
 <script defer src="js/elo-api.js"></script>

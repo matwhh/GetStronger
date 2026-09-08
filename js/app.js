@@ -492,6 +492,9 @@
    * обведенням (він так намальований), але з важчою лінією — поруч із
    * суцільними тонкий контур читався б блідим.
    */
+  /* Контур половини книги (js/app.js — єдине місце, де він живе). */
+  const BOOK = 'M3079 9106 c-2 -2 -101 -11 -219 -20 -767 -59 -1557 -260 -2170 -554 -129 -62 -243 -216 -276 -372 -30 -147 -15 -7160 16 -7240 91 -232 286 -375 530 -387 121 -7 181 12 429 137 441 220 786 345 1171 424 332 67 599 96 895 96 800 0 1581 -210 2226 -601 244 -148 383 -189 638 -189 141 0 141 0 141 3866 0 3678 -1 3866 -17 3859 -121 -52 -129 -49 -345 94 -685 455 -1670 802 -2428 856 -47 4 -152 13 -234 21 -138 13 -347 19 -357 10z m517 -776 c783 -80 1368 -280 2024 -690 244 -152 310 -209 328 -282 16 -61 17 -5184 2 -5239 -30 -106 -85 -107 -302 -4 -1350 640 -2917 664 -4212 63 -159 -74 -215 -75 -253 -5 -27 48 -28 5664 -1 5712 43 78 103 109 401 209 640 214 1379 300 2013 236z';
+
   const TAB_ICONS = {
     today: { vb: '-20.24 -5.24 284.48 284.48',
       d: '<path fill="currentColor" fill-rule="evenodd" d="M122 10 L234 122 L234 264 L157 264 L157 172 L87 172 L87 264 L10 264 L10 122 Z"/>' },
@@ -504,6 +507,27 @@
        заводити другу, і два джерела знаків розійшлися б. */
     account: { vb: '-20.86 -5.36 286.72 286.72',
       d: '<path fill="currentColor" fill-rule="evenodd" d="M122.5 10 L235 122.5 L235 266 L10 266 L10 122.5 Z M122.5 79 A35.5 35.5 0 1 0 122.5 150 A35.5 35.5 0 1 0 122.5 79 Z M108.5 164 H136.5 A42 42 0 0 1 178.5 206 V232 A8 8 0 0 1 170.5 240 H74.5 A8 8 0 0 1 66.5 232 V206 A42 42 0 0 1 108.5 164 Z"/>' },
+    /*
+     * Розгорнута книжка — знак довідки в шапці.
+     *
+     * Малюнок свій, а не з чужого набору: решта знаків тут — важка
+     * геометрія без заокруглень (силует ковадла, будинок, стійка), і
+     * тонкий контурний значок із icon-паку читався б як чужий елемент.
+     * Дві сторінки з проміжком посередині: проміжок і є корінцем, тому
+     * окремої лінії для нього не треба.
+     */
+    /*
+     * Довідка — відкрита книга з набору проєкту (іконки SVG/06-guide.svg).
+     * Полотно й контур узяті з файлу без змін; прибрано лише чорний
+     * прямокутник фону й білу заливку — колір дає currentColor, як у
+     * решти знаків. Права половина не окремий контур, а дзеркало лівої:
+     * саме так вона намальована в оригіналі (симетрія 0,9996 по IoU),
+     * і зберігати її другим набором координат означало б дати їм
+     * розійтися при першому ж правленні.
+     */
+    help: { vb: '0 -158 1268 1268',
+      d: '<g transform="translate(0 952) scale(.1 -.1)"><path d="' + BOOK + '"/></g>' +
+         '<g transform="translate(1268 0) scale(-1 1)">' + '<g transform="translate(0 952) scale(.1 -.1)"><path d="' + BOOK + '"/></g>' + '</g>' },
     progress: { vb: '-5.05 -6.8 308 308',
       d: '<g fill="none" stroke="currentColor" stroke-width="22.0" stroke-linecap="round" stroke-linejoin="round"><path d="M24.01 166.98 A126.5 126.5 0 1 1 46.94 222.00 L90.7 165.6 L144.9 202.2 L201.4 111.5"/><path d="M152 122.1 L201.4 111.5 L216 157.8"/></g>' }
   };
@@ -828,6 +852,20 @@
             '<span>' + esc(CFG.siteName || 'FORGE') + '</span>' +
           '</span>' +
           '<div class="nav__actions">' +
+            /*
+             * Кнопка довідки. Одна на весь сайт — вміст залежить від
+             * поточної сторінки (js/help-content.js). Стоїть у шапці
+             * ліворуч від решти дій: до неї тягнуться, коли не розуміють
+             * екран, тобто раніше, ніж до синхронізації чи меню.
+             *
+             * hidden доти, доки js/help.js не переконався, що для цієї
+             * сторінки розділ довідки взагалі є: кнопка, яка відкриває
+             * порожнє вікно, гірша за її відсутність.
+             */
+            '<button class="nav__help" type="button" data-help-open hidden ' +
+                    'aria-label="Довідка про цей розділ" title="Довідка">' +
+              navIcon('help', 'nav__ico') +
+            '</button>' +
             '<a class="nav__sync" href="account.html" hidden>' +
               '<span class="nav__sync-dot" aria-hidden="true"></span>' +
               '<span class="nav__sync-txt">Не синхронізовано</span>' +
@@ -928,6 +966,10 @@
         // тоді placeRatingBadge() переносить значок сюди, щоб він не
         // зникав із шапки разом із меню.
         '<div class="nav__actions">' +
+          '<button class="nav__help" type="button" data-help-open hidden ' +
+                  'aria-label="Довідка про цей розділ" title="Довідка">' +
+            navIcon('help', 'nav__ico') +
+          '</button>' +
           // Стан синхронізації. За звичайних умов його НЕМАЄ взагалі —
           // зʼявляється лише коли є що досилати (див. renderSyncBadge).
           '<a class="nav__sync" href="account.html" hidden>' +
@@ -1461,150 +1503,33 @@
     return d.getDate() + ' ' + months[d.getMonth()];
   }
 
-  /**
-   * Акценти. Поверхні спільні для всіх — різниця лише в хроматиці.
-   *
-   * Кольорові сімʼї (де тон заходив і в поверхні: рожевий фон, деревʼяний,
-   * фіолетовий) прибрані з дизайну. Їхні id лишились у профілях людей, тому
-   * тут є таблиця переїзду: старий id → найближчий графітовий акцент. Без неї
-   * збережена «pink» перестала б знаходитись у списку й мовчки скидалась на
-   * типову — людина побачила б чужий колір і не зрозуміла чому.
-   */
-  const THEMES = [
-    'graphite', 'graphite-navy', 'graphite-pink', 'graphite-violet',
-    'graphite-crimson', 'graphite-moss', 'graphite-emerald', 'graphite-ocean'
-  ];
-
-  /* Бурштин прибраний: обидва його id (короткий і повний) свідомо НЕ
-     перекладаються ні на що — normTheme поверне null, тобто монохром. */
-  const THEME_MIGRATE = {
-    pink: 'graphite-pink', wood: 'graphite', violet: 'graphite-violet',
-    crimson: 'graphite-crimson', moss: 'graphite-moss',
-    emerald: 'graphite-emerald', ocean: 'graphite-ocean'
-  };
-
-  /** Старий id → чинний; невідоме → null (монохром). */
-  function normTheme(id) {
-    if (!id) return null;
-    if (THEMES.indexOf(id) !== -1) return id;
-    return THEME_MIGRATE[id] || null;
-  }
-
-  /**
-   * Застосувати акцент і запамʼятати вибір.
-   *
-   * Порядок сховищ важливий: localStorage читається інлайн-скриптом у head
-   * ДО завантаження CSS — це прибирає блимання типової теми при переході
-   * між сторінками. Профіль — щоб вибір переїхав у хмару, якщо вона є.
-   * null означає монохром: атрибут знімається, змінні повертаються з :root.
-   */
-  function setTheme(id, opts) {
-    const t = normTheme(id);
-    if (t) document.documentElement.dataset.theme = t;
-    else delete document.documentElement.dataset.theme;
-    try {
-      if (t) localStorage.setItem('forge.theme', t);
-      else localStorage.removeItem('forge.theme');
-    } catch (_) {}
-
-    /*
-     * { save: false } — застосувати, не записуючи в профіль.
-     *
-     * Потрібне там, де тема ПРИЙШЛА з профілю (вхід на новому пристрої,
-     * імпорт JSON): без цього прапорця виходив цикл «прочитали -> застосували
-     * -> зберегли -> onChange -> прочитали», який на кожному завантаженні
-     * марно ганяв запис у хмару.
-     */
-    if (opts && opts.save === false) return;
-
-    if (window.Store) {
-      window.Store.saveProfile({ theme: t }).catch(function (e) {
-        // Мовчазний catch тут ховав відмову RLS і 500 від сервера: тема
-        // мінялась на екрані, у хмару не доїжджала, і людина дізнавалась
-        // про це лише на іншому пристрої.
-        if (e && e.queued) return;   // офлайн — уже в черзі, це не помилка
-        toast('Тему не збережено: ' + e.message, 'err');
-      });
-    }
-  }
-
   /* ------------------------------------------------------------------ */
-  /* Схема: світло / темрява                                             */
+  /* Оформлення                                                          */
   /* ------------------------------------------------------------------ */
   /*
-   * Друга вісь оформлення, незалежна від акценту. Темрява — типова: сайт
-   * задуманий як графітовий, і саме її людина бачить першою.
+   * ВИБОРУ ОФОРМЛЕННЯ БІЛЬШЕ НЕМАЄ. Одна монохромна темна основа, і все.
    *
-   * Схема НЕ вгадується з системних налаштувань. Спокуса поставити
-   * prefers-color-scheme була, але вона зробила б типовий вигляд сайту
-   * лотереєю: у половини людей світло стоїть у системі цілодобово, і вони
-   * побачили б папір там, де задумано графіт. Системна тема лишається
-   * підказкою для браузера (color-scheme у CSS), а не рішенням за людину.
-   */
-  const SCHEMES = ['dark', 'light'];
-
-  function currentScheme() {
-    return document.documentElement.getAttribute('data-scheme') === 'light' ? 'light' : 'dark';
-  }
-
-  /**
-   * Застосувати схему й запамʼятати вибір.
+   * Було вісім хроматичних акцентів (graphite, -navy, -pink, -violet,
+   * -crimson, -moss, -emerald, -ocean) і друга вісь «світло / темрява».
+   * Разом — шістнадцять комбінацій, кожну з яких доводилось тримати в
+   * межах контрасту (4,5:1 для тексту, 3:1 для елементів) і перевіряти
+   * машиною. Прибрано на вимогу власника: колір тут ніколи не ніс сенсу
+   * — стан елемента показує ЯСКРАВІСТЬ, а не тон, — тож шістнадцять
+   * палітр коштували підтримки й не давали нічого, крім вибору заради
+   * вибору.
    *
-   * Дзеркало setTheme: той самий порядок сховищ (localStorage читає
-   * інлайн-скрипт у head, профіль везе вибір у хмару) і той самий
-   * { save: false } для випадку «схема прийшла з профілю».
-   */
-  function setScheme(id, opts) {
-    const v = SCHEMES.indexOf(id) !== -1 ? id : 'dark';
-    if (v === 'light') document.documentElement.dataset.scheme = 'light';
-    else delete document.documentElement.dataset.scheme;
-
-    /*
-     * Колір системної смуги браузера. Він живе в <meta>, а не в CSS, тому
-     * єдиний спосіб тримати його в парі зі схемою — переписати руками.
-     * Без цього на телефоні шапка Safari лишалась би графітовою над білою
-     * сторінкою.
-     */
-    try {
-      const m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', v === 'light' ? '#e7e7e7' : '#0b0b0b');
-    } catch (_) {}
-
-    try {
-      if (v === 'light') localStorage.setItem('forge.scheme', 'light');
-      else localStorage.removeItem('forge.scheme');
-    } catch (_) {}
-
-    document.dispatchEvent(new CustomEvent('forge:scheme', { detail: { scheme: v } }));
-
-    if (opts && opts.save === false) return;
-
-    if (window.Store) {
-      window.Store.saveProfile({ scheme: v }).catch(function (e) {
-        if (e && e.queued) return;
-        toast('Схему не збережено: ' + e.message, 'err');
-      });
-    }
-  }
-
-  function toggleScheme() {
-    setScheme(currentScheme() === 'light' ? 'dark' : 'light');
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Схема                                                               */
-  /* ------------------------------------------------------------------ */
-  /*
-   * Перемикача в шапці НЕМАЄ. Він там був — міркування було «схему міняють
-   * посеред дня, дорога через акаунт задовга», — але кнопка стояла в
-   * кожній шапці поруч зі значком рівня й бургером і читалась як ще один
-   * розділ, а не як налаштування. Єдине місце вибору — Акаунт →
-   * Оформлення, там же, де акцент: схема й палітра — одне рішення.
+   * ЩО СТАЛОСЬ ІЗ ЧУЖИМИ ПРОФІЛЯМИ. Ключі theme і scheme лишились у
+   * профілі й у localStorage, і в цьому вся хитрість тихого переходу:
+   * жодного правила html[data-theme=…] у CSS більше немає, атрибути ніхто
+   * не ставить, отже збережена 'graphite-ocean' просто не знаходить собі
+   * правила й бере монохром із :root. Ніякої міграції даних, ніякого
+   * скидання — сторонні значення стають безпечно неактивними.
    *
-   * Подія forge:scheme лишається: її слухає сторінка акаунта, щоб
-   * перемалювати свотчі під діючу схему.
+   * App.setTheme / setScheme / normTheme / themes / currentScheme /
+   * toggleScheme прибрані з публічного API. Якщо десь лишиться виклик,
+   * він упаде помітно (TypeError у консолі), а не тихо перефарбує пів
+   * сайту — саме тому тут немає заглушок-пустушок.
    */
-
 
   /* ------------------------------------------------------------------ */
   /* Service worker                                                      */
@@ -1653,52 +1578,13 @@
     flashDone: flashDone,
     busy: busy,
     dateLabel: dateLabel,
-    setTheme: setTheme,
     levelIcon: levelIcon,
     lockScroll: lockScroll,
     onDayChange: onDayChange,
-    normTheme: normTheme,
-    themes: THEMES,
-    setScheme: setScheme,
-    currentScheme: currentScheme,
-    toggleScheme: toggleScheme,
     whenReady: whenReady
   };
 
   /* ------------------------------------------------------------------ */
-
-  /**
-   * Підтягнути тему з профілю.
-   *
-   * setTheme писав тему і в localStorage, і в профіль — але з профілю її
-   * ніхто ніколи не читав. Через це вибір не переїжджав між пристроями:
-   * обрав фіолетову на ноутбуці, зайшов з телефона під тим самим акаунтом —
-   * базова navy. Локальний вибір має пріоритет (він уже застосований
-   * інлайн-скриптом у head і належить саме цьому браузеру); профіль
-   * використовується лише тоді, коли локально нічого не обрано.
-   */
-  function adoptProfileTheme() {
-    if (!window.Store) return;
-
-    /* Схема має власний ключ і власну перевірку: людина могла обрати світло
-       на цьому пристрої, не чіпаючи акцент, — тоді акцент їде з профілю, а
-       схема лишається локальною (і навпаки). */
-    let localScheme = null;
-    try { localScheme = localStorage.getItem('forge.scheme'); } catch (_) {}
-    if (!localScheme) {
-      window.Store.getProfile().then(function (p) {
-        if (p && p.scheme) setScheme(p.scheme, { save: false });
-      }, function () {});
-    }
-
-    let local = null;
-    try { local = localStorage.getItem('forge.theme'); } catch (_) {}
-    if (local) return;
-
-    window.Store.getProfile().then(function (p) {
-      if (p && p.theme) setTheme(p.theme, { save: false });
-    }, function () {});
-  }
 
   /**
    * Показати вміст, що б не сталося.
@@ -1756,7 +1642,7 @@
      */
     [buildNav, buildFooter, function () { initReveal(document); }, injectCanonical,
      function () { initAccordions(document); }, initCardGlow, injectJsonLd,
-     adoptProfileTheme, warnCorruptProfile]
+     warnCorruptProfile]
       .forEach(function (step) {
         try { step(); } catch (e) { console.error('[app] крок ініціалізації впав:', e); }
       });

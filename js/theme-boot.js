@@ -9,21 +9,17 @@
  * файл нічого не міняє для людини й прибирає 'unsafe-inline' зі script-src.
  *
  * ЧОМУ САМЕ ТУТ І БЕЗ defer. Позначка js на <html> вмикає CSS-анімацію
- * появи (без неї сторінка без JS лишилась би порожньою), а тема й схема
- * мають стояти ДО першого малювання — інакше при кожному переході блимає
- * типова графітова темна перед обраною.
+ * появи: без неї сторінка без JS лишилась би порожньою, тож ставити її
+ * треба ДО першого малювання, а не після завантаження решти скриптів.
+ *
+ * ТЕМИ Й СХЕМИ ТУТ БІЛЬШЕ НЕМАЄ. Раніше цей файл читав forge.theme і
+ * forge.scheme із localStorage і ставив data-theme / data-scheme, щоб на
+ * кожному переході не блимала типова палітра перед обраною. Оформлення
+ * тепер одне (див. блок «Оформлення» в js/app.js), правил під ці атрибути
+ * у CSS немає — читати нічого й блимати нічому.
  */
 'use strict';
 document.documentElement.className='js';
-try{var _r=document.documentElement,
-_m={pink:'graphite-pink',wood:'graphite',violet:'graphite-violet',crimson:'graphite-crimson',
-moss:'graphite-moss',emerald:'graphite-emerald',ocean:'graphite-ocean'},
-_t=localStorage.getItem('forge.theme');
-_t=_m[_t]||_t;if(_t==='graphite-amber')_t='';
-if(_t&&_t.indexOf('graphite')===0)_r.setAttribute('data-theme',_t);
-if(localStorage.getItem('forge.scheme')==='light'){_r.setAttribute('data-scheme','light');
-var _c=document.querySelector('meta[name=theme-color]');if(_c)_c.setAttribute('content','#e7e7e7');}
-}catch(e){}
 
 /*
  * Шрифти: асинхронне підвантаження без inline-обробника.

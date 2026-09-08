@@ -35,24 +35,23 @@ function seedScript() {
     sessionLog, workLog, bodyLog, weightLog, mealLog:{}, measureLog:{}, trackerLog:{} }));
 }
 
+/* Схема одна: світлої більше немає, і FORGE_THEME теж — оформлення в
+   проєкті рівно одне (див. js/app.js). Префікс dark_ в іменах лишений
+   навмисно: на нього посилаються старі звіти аудиту в docs/. */
 const browser = await chromium.launch();
-for (const scheme of ['dark', 'light']) {
+{
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   await ctx.route(/^https?:\/\//, r => r.abort());
   const boot = await ctx.newPage();
   await boot.goto(ROOT + 'welcome.html', { waitUntil: 'load' });
   await boot.evaluate(seedScript);
-  await boot.evaluate(s => localStorage.setItem('forge.scheme', s), scheme);
-  if (process.env.FORGE_THEME) {
-    await boot.evaluate(t => localStorage.setItem('forge.theme', t), process.env.FORGE_THEME);
-  }
   await boot.close();
   for (const p of PAGES) {
     const page = await ctx.newPage();
     await page.goto(ROOT + p, { waitUntil: 'load' });
     await page.waitForTimeout(900);
     const name = p.replace(/[^a-z0-9]+/gi, '_');
-    await page.screenshot({ path: `${OUT}/${scheme}_${name}.png` });
+    await page.screenshot({ path: `${OUT}/dark_${name}.png` });
     await page.close();
   }
   await ctx.close();

@@ -12,7 +12,7 @@
  *   D. SWAP CHAOS — заміна вправ спамом: без дублів, без перевищення стелі.
  *   E. WEIGHT INPUT CHAOS — сміття в поле ваги, persist ∈ {null} ∪ [0..500].
  *   F. TOGGLE-EDIT SPAM ×200 — вхід/вихід із режиму правки без росту вузлів/слухачів.
- *   G. THEME ×1000 — регрес фризу тем: без росту DOM-вузлів і слухачів (themeWired).
+ *   G. PROFILE SAVE ×1000 — регрес фризу: без росту вузлів і слухачів (guard `wired`).
  *   H. NAVIGATION ×300 — реальні переходи між сторінками, 0 pageerror.
  *   I. IMPORT CHAOS — биті/величезні/сміттєві JSON у #p-import-file, сайт живий.
  *   J. DATA INTEGRITY — після всього хаосу профіль читається й структурно цілий.
@@ -60,7 +60,7 @@ async function freshCtx(vp = { width: 1100, height: 950 }) {
 }
 
 /* Інструментація протікання слухачів: рахуємо addEventListener ЛИШЕ на
-   ПОСТІЙНИХ цілях (document / window / #theme / #plan). Саме там жив фриз —
+   ПОСТІЙНИХ цілях (document / window / #profile / #plan). Саме там жив фриз —
    на вузлах, які НЕ замінюються ререндером. Слухачі на тимчасових вузлах
    (кнопки в перемальованій таблиці) — норма: вони гинуть разом із вузлом. */
 const PERSIST_PROBE = () => {
@@ -70,7 +70,7 @@ const PERSIST_PROBE = () => {
   proto.addEventListener = function () {
     try {
       if (this === document || this === window ||
-          (this && this.nodeType === 1 && (this.id === 'theme' || this.id === 'plan'))) {
+          (this && this.nodeType === 1 && (this.id === 'profile' || this.id === 'plan'))) {
         window.__persistAdds++;
       }
     } catch (_) {}
@@ -316,45 +316,51 @@ section('F. TOGGLE-EDIT SPAM ×200');
 await p.close(); await ctx.close();
 
 /* ------------------------------------------------------------------ */
-/* G. THEME ×1000 — регрес фризу тем (account.html)                     */
+/* G. PROFILE SAVE ×1000 — регрес фризу (guard `wired`)                 */
 /* ------------------------------------------------------------------ */
-section('G. THEME ×1000 — регрес фризу (themeWired)');
+/*
+ * Тут колись клікали по перемикачу тем: він писав у профіль на кожен клік
+ * і був найзручнішим способом розкрутити петлю
+ * saveProfile -> onChange -> renderAll -> +слухач.
+ *
+ * Перемикача більше немає (оформлення одне), а петля лишилась — і guard
+ * `wired` у wireProfileForm лишився єдиним, що її тримає. Тож б'ємо в саму
+ * петлю, без посередника-кнопки: тисяча записів у профіль підряд.
+ */
+section('G. PROFILE SAVE ×1000 — регрес фризу (wireProfileForm)');
 ctx = await freshCtx({ width: 480, height: 950 });
 p = await ctx.newPage();
 const errsAcc = []; p.on('pageerror', e => errsAcc.push(e.message));
 await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
 await p.waitForTimeout(1000);
 {
-  const picks = await p.$$eval('#theme [data-theme-pick]', els => els.map(e => e.dataset.themePick));
-  ok('перемикач тем присутній', picks.length >= 3, 'кнопок=' + picks.length);
-  await p.evaluate(() => {
-    window.__st = 0;
-    const o = window.App.setTheme;
-    window.App.setTheme = function () { window.__st++; return o.apply(this, arguments); };
-  });
+  ok('форма профілю присутня', await p.locator('#profile [data-p]').count() >= 3,
+     'полів=' + await p.locator('#profile [data-p]').count());
+  /* Фокус поза формою: renderAll свідомо не чіпає її, поки в ній друкують,
+     і з фокусом усередині петля просто не почалась би. */
+  await p.evaluate(() => { document.activeElement && document.activeElement.blur(); });
   await p.evaluate(PERSIST_PROBE);
   const nodes0 = await p.evaluate(() => document.querySelectorAll('*').length);
   const adds0 = await p.evaluate(() => window.__persistAdds);
   const t0 = Date.now();
-  for (let n = 0; n < 1000; n++) {
-    const id = picks[n % picks.length];
-    await p.evaluate((sel) => {
-      const el = document.querySelector('#theme [data-theme-pick="' + sel + '"]');
-      if (el) el.click();
-    }, id);
-    if (n % 100 === 0) await p.waitForTimeout(5);
-  }
+  await p.evaluate(async () => {
+    for (let n = 0; n < 1000; n++) await window.Store.saveProfile({ weight: 60 + (n % 40) });
+  });
   const dt = Date.now() - t0;
-  await p.waitForTimeout(150);
-  const st = await p.evaluate(() => window.__st);
+  await p.waitForTimeout(200);
   const nodes1 = await p.evaluate(() => document.querySelectorAll('*').length);
   const adds1 = await p.evaluate(() => window.__persistAdds);
-  ok('theme×1000: кожен клік = рівно один setTheme (1:1)', st === 1000, st + ' викликів на 1000 кліків');
-  ok('theme×1000: не зависло (< 40 с)', dt < 40000, dt + ' мс (' + (dt / 1000).toFixed(1) + ' мс/клік)');
-  ok('theme×1000: без розростання DOM (Δ вузлів < 40)', Math.abs(nodes1 - nodes0) < 40, 'Δ=' + (nodes1 - nodes0));
-  /* Ядро регресу фризу: 0 нових слухачів на #theme/document за 1000 кліків. */
-  ok('theme×1000: 0 нових слухачів на постійних вузлах (#theme/document)', (adds1 - adds0) === 0, 'нових persist-слухачів=' + (adds1 - adds0));
-  ok('theme×1000: без JS-помилок', errsAcc.length === 0, errsAcc.slice(0, 3).join(' | '));
+  const shown = await p.evaluate(() => {
+    const el = document.querySelector('#profile [data-p="weight"]');
+    return el ? Number(el.value) : null;
+  });
+  const saved = await p.evaluate(async () => (await window.Store.getProfile()).weight);
+  ok('save×1000: не зависло (< 40 с)', dt < 40000, dt + ' мс (' + (dt / 1000).toFixed(1) + ' с)');
+  ok('save×1000: без розростання DOM (Δ вузлів < 40)', Math.abs(nodes1 - nodes0) < 40, 'Δ=' + (nodes1 - nodes0));
+  /* Ядро регресу фризу: 0 нових слухачів на #profile/document за 1000 записів. */
+  ok('save×1000: 0 нових слухачів на постійних вузлах (#profile/document)', (adds1 - adds0) === 0, 'нових persist-слухачів=' + (adds1 - adds0));
+  ok('save×1000: форма показує останнє збережене', shown === Number(saved), 'у полі ' + shown + ', у профілі ' + saved);
+  ok('save×1000: без JS-помилок', errsAcc.length === 0, errsAcc.slice(0, 3).join(' | '));
 }
 
 /* ------------------------------------------------------------------ */
@@ -391,7 +397,7 @@ section('I. IMPORT CHAOS — биті/сміттєві JSON у #p-import-file');
         ver: prof && prof.version,
         weightsOk: prof && prof.weights ? Object.values(prof.weights).every(v => v === null || (Number.isFinite(v) && v >= 0 && v <= 500)) : true,
         ageOk: prof && (prof.age === undefined || (Number.isFinite(prof.age) && prof.age >= 0 && prof.age < 120)),
-        domAlive: !!document.querySelector('#theme')
+        domAlive: !!document.querySelector('#profile')
       };
     } catch (e) { return { ok: false, err: e.message }; }
   });
@@ -399,47 +405,10 @@ section('I. IMPORT CHAOS — биті/сміттєві JSON у #p-import-file');
   ok('import-хаос: профіль читається після серії битих файлів', alive.ok, 'ver=' + alive.ver);
   ok('import-хаос: ваги не забруднились нескінченностями/сміттям', alive.weightsOk === true, '');
   ok('import-хаос: вік лишився в межах або не встановлений', alive.ageOk === true, '');
-  ok('import-хаос: DOM живий (перемикач тем на місці)', alive.domAlive === true, '');
+  ok('import-хаос: DOM живий (форма профілю на місці)', alive.domAlive === true, '');
   ok('import-хаос: без JS-помилок', errsAcc.length === 0, errsAcc.slice(0, 3).join(' | '));
 }
 
-await p.close(); await ctx.close();
-
-/* ------------------------------------------------------------------ */
-/* K. SCHEME ×500 — світла/темна схема спамом (та сама родина фризу)    */
-/* ------------------------------------------------------------------ */
-section('K. SCHEME ×500 — перемикання світло/темно');
-ctx = await freshCtx({ width: 480, height: 950 });
-p = await ctx.newPage();
-const errsSch = []; p.on('pageerror', e => errsSch.push(e.message));
-await p.goto('file://' + ROOT + '/account.html', { waitUntil: 'load' });
-await p.waitForTimeout(900);
-{
-  const hasBox = await p.locator('#p-scheme').count();
-  ok('перемикач схеми присутній', hasBox === 1, 'знайдено=' + hasBox);
-  await p.evaluate(() => {
-    window.__sc = 0;
-    const o = window.App.setScheme;
-    window.App.setScheme = function () { window.__sc++; return o.apply(this, arguments); };
-  });
-  await p.evaluate(PERSIST_PROBE);
-  const adds0 = await p.evaluate(() => window.__persistAdds);
-  for (let n = 0; n < 500; n++) {
-    await p.evaluate(() => { const c = document.querySelector('#p-scheme'); if (c) c.click(); });
-    if (n % 100 === 0) await p.waitForTimeout(5);
-  }
-  await p.waitForTimeout(150);
-  const sc = await p.evaluate(() => window.__sc);
-  const adds1 = await p.evaluate(() => window.__persistAdds);
-  const schemeVal = await p.evaluate(() => {
-    const prof = window.Store.localProfile();
-    return prof.scheme;
-  });
-  ok('scheme×500: кожен клік = рівно один setScheme (1:1)', sc === 500, sc + ' викликів на 500 кліків');
-  ok('scheme×500: 0 нових слухачів на постійних вузлах', (adds1 - adds0) === 0, 'нових persist-слухачів=' + (adds1 - adds0));
-  ok('scheme×500: збережена схема валідна', schemeVal === 'light' || schemeVal === 'dark' || schemeVal == null, 'scheme=' + schemeVal);
-  ok('scheme×500: без JS-помилок', errsSch.length === 0, errsSch.slice(0, 3).join(' | '));
-}
 await p.close(); await ctx.close();
 
 /* ------------------------------------------------------------------ */

@@ -582,22 +582,6 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   -webkit-user-drag: none;
 }
 
-/*
- * Значок у СВІТЛІЙ схемі.
- *
- * Диск усередині файлу темний (#17181C→#0B0C0E) і таким лишається: це
- * предмет — жетон, — а не елемент інтерфейсу, що перевертається разом зі
- * схемою. Перефарбувати його CSS-фільтром не можна: invert зіпсував би
- * кольори шкали (зелений став би пурпуровим).
- *
- * Але на папері темний круг без обведення читається як діра. Тонке
- * світле кільце ставить його НА поверхню: та сама роль, що в неоморфної
- * білої грані на решті елементів світлої схеми.
- */
-html[data-scheme="light"] .lvl-ico {
-  box-shadow: 0 0 0 1px rgba(var(--tint-rgb), 0.10),
-              0 1px 2px rgba(var(--tint-rgb), 0.18);
-}
 
 /* У друку тло сторінки біле незалежно від схеми, тож кільце потрібне
    завжди. Сам малюнок — <img>, він друкується як є, на відміну від
@@ -2103,44 +2087,20 @@ main:focus:not(:focus-visible) { outline: none; }
 .group-title { font-size: 1rem; }
 
 /* ==========================================================================
-   ТЕМИ
+   ОФОРМЛЕННЯ
    ==========================================================================
-   Тем як «сімей» більше немає, і хроматичних акцентів теж: лишилась ОДНА
-   монохромна основа й одна вісь поверх неї:
-
-     СХЕМА   світло / темрява   html[data-scheme="light"], типово темна
+   Тема одна: монохромна темна. Ні хроматичних акцентів, ні світлої схеми,
+   ні перемикача — усе прибрано (докладніше в секції «ОФОРМЛЕННЯ — ОДНЕ»
+   нижче, там же й що сталось із чужими профілями).
 
    Роль, яку деінде виконує колір (кнопка, активний стан, смуга даних,
-   фокус), тут виконує ЯСКРАВІСТЬ. Старі значення data-theme у профілях
-   лишаються дійсними — відповідних правил просто немає, тож вони беруть
-   монохромні значення з :root.
+   фокус), тут виконує ЯСКРАВІСТЬ: єдиний набір змінних живе в :root на
+   початку файла, і більше ніде.
 
-   Вибір живе у localStorage('forge.theme' / 'forge.scheme') і в профілі.
-   Інлайн-скрипт у head ставить обидва атрибути ДО завантаження стилів —
-   інакше на кожному переході блимала б типова тема перед обраною.
-
-   Пороги контрасту ті самі в обох схемах і перевіряються машиною
-   (tools/verifythemes.mjs): текст ≥ 4,5:1, елементи інтерфейсу ≥ 3:1.
+   Пороги контрасту перевіряються машиною (tools/verifythemes.mjs): текст
+   ≥ 4,5:1, елементи інтерфейсу ≥ 3:1.
    ========================================================================== */
 
-/* Перемикач тем в акаунті: плашка з двома кружками кольорів теми */
-.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.theme-btn {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--line-2); border-radius: var(--r-sm);
-  background: var(--surface); color: var(--text);
-  cursor: pointer; text-align: left;
-  transition: border-color var(--t-fast);
-}
-.theme-btn:hover { border-color: var(--acc-line); }
-.theme-btn.is-active { border-color: var(--acc-ink); box-shadow: inset 0 0 0 1px var(--acc-ink); }
-.theme-btn i {
-  width: 16px; height: 16px; border-radius: 50%;
-  border: 1px solid rgba(var(--tint-rgb), 0.25);
-  flex-shrink: 0;
-}
-.theme-btn i + i { margin-left: -14px; }
 
 /* ==========================================================================
    ТАЙМЕР ВІДПОЧИНКУ
@@ -2268,21 +2228,31 @@ button.heatmap__cell--on:hover { background: var(--acc-ink); color: var(--on-acc
    теми перефарбовує календар сама). Той самий візуальний принцип, що
    й теплокарта вище, лише масштаб місяця.
    -------------------------------------------------------------------- */
+/* Розмір клітинки — фіксований, а не частка ширини картки.
+   З repeat(7, 1fr) плюс aspect-ratio календар роздувався разом з
+   карткою: на робочому столі клітинка виходила під сотню пікселів, і
+   місяць займав пів екрана заради тридцяти чисел. Тепер крок той самий,
+   що й у теплокарти тренувань вище (--hm-cell), і два календарі в межах
+   одного журналу нарешті одного масштабу. */
 .mcal {
+  --mc-cell: 30px;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(7, var(--mc-cell));
+  justify-content: start;
+  gap: 5px;
 }
 .mcal__dow {
+  width: var(--mc-cell);
   text-align: center;
   font-size: 0.72rem;
   color: var(--muted);
   padding: 2px 0 4px;
 }
 .mcal__cell {
-  aspect-ratio: 1;
+  width: var(--mc-cell);
+  height: var(--mc-cell);
   border: 0;
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -2290,7 +2260,7 @@ button.heatmap__cell--on:hover { background: var(--acc-ink); color: var(--on-acc
   background: rgba(var(--tint-rgb), 0.06);
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.74rem;
   font-style: normal;
   cursor: pointer;
   transition: background var(--t-fast), color var(--t-fast);
@@ -2310,8 +2280,9 @@ button.mcal__cell--on:hover { background: var(--acc-ink); color: var(--on-acc); 
   color: rgba(var(--tint-rgb), 0.22);
   cursor: default;
 }
+/* Мобільний: клітинка більша під палець — рівно як у теплокарти. */
 @media (max-width: 560px) {
-  .mcal { gap: 4px; }
+  .mcal { --mc-cell: 36px; gap: 4px; }
   .mcal__cell { border-radius: 8px; font-size: 0.78rem; }
 }
 
@@ -2456,337 +2427,28 @@ button.mcal__cell--on:hover { background: var(--acc-ink); color: var(--on-acc); 
 }
 
 /* ==========================================================================
-   АКЦЕНТИ
+   ОФОРМЛЕННЯ — ОДНЕ
    ==========================================================================
-   Усе вище — :root — це СПІЛЬНА основа: поверхні, лінії, тіні, декор.
-   Вона одна на весь сайт і написана рівно один раз. Нижче кожен варіант
-   задає ТІЛЬКИ акцент; жодного рядка про поверхні тут немає й бути не повинно.
+   Тут стояли вісім хроматичних акцентів (html[data-theme="graphite-…"]) і
+   вся світла схема (html[data-scheme="light"] плюс її вісім акцентів) —
+   близько 340 рядків і шістнадцять комбінацій, кожну з яких треба було
+   тримати в межах контрасту й перевіряти машиною.
 
-   Типовий вигляд — МОНОХРОМ (:root вище). Кольорові акценти лишаються як
-   ДОДАТКОВІ: жоден із них не чіпає поверхонь, кожен задає рівно десяток
-   рядків кольору. Дизайну вісім разів не існує — він один.
+   Прибрано на вимогу власника. Лишилась одна монохромна темна основа —
+   вона вся в :root вище, і роль, яку деінде виконує колір (кнопка,
+   активний стан, смуга даних, фокус), тут виконує ЯСКРАВІСТЬ.
 
-   Критерій добору той самий для всіх: текст на заливці ≥ 4,5:1 і сама
-   заливка ≥ 3:1 до картки. Картка тепер темніша (#171717), тому запас
-   контрасту в кожної пари більший, ніж був на #1e2022 — жодне значення не
-   довелось перебирати.
+   ЧОМУ ЦЕ БЕЗПЕЧНО ДЛЯ ЧУЖИХ ПРОФІЛІВ. Значення theme і scheme у профілях
+   і в localStorage лишились, але їх ніхто не читає й атрибутів на <html>
+   не ставить (js/app.js, js/theme-boot.js). Навіть якби поставив —
+   правил під ці селектори більше немає, тож будь-яке збережене значення
+   мовчки бере монохром із :root. Ніякої міграції даних не знадобилось.
 
-   --on-acc задає, ЯКИМ кольором пишеться текст на заливці. У монохромному
-   :root стоїть темний (заливка там майже біла), тому кожен акцент із
-   ТЕМНОЮ заливкою мусить повернути білий явно — інакше успадкує чорний
-   текст на чорному.
-
-   «Бурштин» прибраний на прохання: його id більше не чинний і профілі з
-   ним відкочуються на монохром (js/app.js, THEME_MIGRATE).
+   НЕ ПОВЕРТАЙТЕ СЮДИ КОЛІР ЧЕРЕЗ ОКРЕМІ СЕЛЕКТОРИ. Якщо акцент колись
+   знадобиться знову — це знову рівно десяток змінних на html[data-theme],
+   а не фарба по конкретних елементах: саме тому попередній варіант і
+   тримався вісім палітр без розсинхрону.
    ========================================================================== */
-
-/* --------------------------------------------------------------------------
-   Дерево — історичний id 'graphite'
-   --------------------------------------------------------------------------
-   Id лишився коротким, бо цей акцент зʼявився першим, до появи решти;
-   перейменування зламало б збережені профілі.
-   -------------------------------------------------------------------------- */
-html[data-theme="graphite"] {
-  --acc:      #93663e;   /* білий текст 4,99:1, заливка 3,28:1 до картки */
-  --acc-hi:   #7a5230;   /* наведення ТЕМНІШАЄ: світліший крок не тримає білий */
-  --acc-bar:  #bd9168;
-  --acc-ink:  #e4c3a1;
-  --acc-line: #ad7a4f;
-  --link:       #e4c3a1;
-  --link-hover: #f5dfc6;
-  --acc-rgb:     147, 102, 62;
-  --acc-ink-rgb: 228, 195, 161;
-  --on-acc: #ffffff;
-}
-
-/* --------------------------------------------------------------------------
-   Navy Blue
-   --------------------------------------------------------------------------
-   Єдиний кольоровий варіант, де заливка СВІТЛА. Причина в самій палітрі:
-   navy темна, і на графіті жоден її токен не тримає білий текст одночасно
-   з видимістю заливки:
-
-     --acc      #202f46   білий 13,49 — але заливка 1,21 до картки: кнопки не видно
-     --acc-hi   #2c4160   білий 10,33 — заливка 1,58: те саме
-     --acc-line #64809f   заливка 3,99 — але білий лише 4,09 при нормі 4,5
-     --acc-bar  #6685b6   заливка 4,35 — білий 3,75
-
-   Тому тут світла заливка з ТЕМНИМ текстом — для цього й існує --on-acc.
-   Наведення відповідно СВІТЛІШАЄ: рух завжди геть від поверхні.
-   -------------------------------------------------------------------------- */
-html[data-theme="graphite-navy"] {
-  --acc:      #6685b6;
-  --acc-hi:   #9eb9e1;
-  --acc-bar:  #6685b6;
-  --acc-ink:  #9eb9e1;
-  --acc-line: #64809f;
-  --link:       #9eb9e1;
-  --link-hover: #c8daf2;
-  --acc-rgb:     102, 133, 182;
-  --acc-ink-rgb: 158, 185, 225;
-
-  /* Текст на акцентній заливці — темний, а не білий */
-  --on-acc: #0b0b0b;
-}
-
-/* --------------------------------------------------------------------------
-   Рожевий
-   --------------------------------------------------------------------------
-   Найяскравіша палітра з набору, тому її «рідний» --acc проходить як є:
-   білий 4,91:1. На наведення береться темніший крок (#a93060, білий 6,40:1),
-   бо світліший --acc-hi (#d95789) тримає білий лише 3,70:1.
-   -------------------------------------------------------------------------- */
-html[data-theme="graphite-pink"] {
-  --acc:      #c43e72;
-  --acc-hi:   #a93060;
-  --acc-bar:  #e878a4;
-  --acc-ink:  #f0a3c0;
-  --acc-line: #df6694;
-  --link:       #f0a3c0;
-  --link-hover: #ffd0df;
-  --acc-rgb:     196, 62, 114;
-  --acc-ink-rgb: 240, 163, 192;
-  --on-acc: #ffffff;
-}
-
-html[data-theme="graphite-violet"] {
-  --acc:      #8063c7;
-  --acc-hi:   #6b4ab8;
-  --acc-bar:  #a28be0;
-  --acc-ink:  #d0c2f3;
-  --acc-line: #947ad4;
-  --link:       #d0c2f3;
-  --link-hover: #ece6ff;
-  --acc-rgb:     128, 99, 199;
-  --acc-ink-rgb: 208, 194, 243;
-  --on-acc: #ffffff;
-}
-
-html[data-theme="graphite-crimson"] {
-  --acc:      #db302a;
-  --acc-hi:   #c7231d;
-  --acc-bar:  #d97c79;
-  --acc-ink:  #efaba8;
-  --acc-line: #dd423d;
-  --link:       #efaba8;
-  --link-hover: #efd4d4;
-  --acc-rgb:     219, 48, 42;
-  --acc-ink-rgb: 239, 171, 168;
-  --on-acc: #ffffff;
-}
-
-html[data-theme="graphite-moss"] {
-  --acc:      #50802e;
-  --acc-hi:   #3a7410;
-  --acc-bar:  #71ad47;
-  --acc-ink:  #86cf51;
-  --acc-line: #5c8e38;
-  --link:       #86cf51;
-  --link-hover: #d1ecbe;
-  --acc-rgb:     80, 128, 46;
-  --acc-ink-rgb: 134, 207, 81;
-  --on-acc: #ffffff;
-}
-
-html[data-theme="graphite-emerald"] {
-  --acc:      #1f835e;
-  --acc-hi:   #1e7455;
-  --acc-bar:  #3bb085;
-  --acc-ink:  #66cfa8;
-  --acc-line: #33906e;
-  --link:       #66cfa8;
-  --link-hover: #bfeddc;
-  --acc-rgb:     31, 131, 94;
-  --acc-ink-rgb: 102, 207, 168;
-  --on-acc: #ffffff;
-}
-
-html[data-theme="graphite-ocean"] {
-  --acc:      #0d7e9a;
-  --acc-hi:   #296f81;
-  --acc-bar:  #31a8c5;
-  --acc-ink:  #5ecae5;
-  --acc-line: #34899e;
-  --link:       #5ecae5;
-  --link-hover: #cbe5eb;
-  --acc-rgb:     13, 126, 154;
-  --acc-ink-rgb: 94, 202, 229;
-  --on-acc: #ffffff;
-}
-
-/* ==========================================================================
-   СВІТЛА СХЕМА
-   ==========================================================================
-   Друга вісь поверх тієї самої основи. Це НЕ окрема тема: акцент лишається
-   тим, який обрала людина, змінюються тільки поверхні, текст і тіні.
-
-   Три речі, які не можна просто «інвертувати»:
-
-   1. ТІНТ. Сорок напівпрозорих підкладок у компонентах намальовані
-      rgba(var(--tint-rgb), α). У темряві тінт — світло, тут — чорний;
-      підкладки лишаються тими самими правилами, міняється один токен.
-
-   2. НЕОМОРФІЗМ. У темряві обʼєм дає чорна тінь плюс ледь світла грань.
-      У світлі навпаки: сіра тінь знизу-праворуч і ЩІЛЬНО БІЛА грань
-      зверху-ліворуч — саме вона й читається як опукла поверхня на сірому
-      папері. Тому нео-токени задані тут явно, а не через тінт.
-
-   3. АКЦЕНТ. У темряві заливка кнопки світла (навпроти графіту), у світлі —
-      темна (навпроти паперу). Тому кожен акцент має тут власний блок: беруться
-      темні кроки тієї самої палітри, --on-acc повертається на білий.
-
-   Усі пари перевірені машиною (tools/verifythemes.mjs) на тих самих порогах:
-   текст ≥ 4,5:1, елементи інтерфейсу ≥ 3:1.
-   -------------------------------------------------------------------------- */
-html[data-scheme="light"] {
-  color-scheme: light;
-
-  /* Поверхні. Порядок сходинок ТОЙ САМИЙ, що в темряві (поле — найглибше,
-     картка — найвище), просто шкала перевернута: папір, а не графіт. */
-  --bg:          #e7e7e7;
-  --bg-1:        #f0f0f0;
-  --card-1:      #f6f6f6;
-  --card-2:      #e9e9e9;
-  --surface:     #f6f6f6;
-  --surface-2:   #e9e9e9;
-  --field:       #e3e3e3;
-  --field-focus: #eeeeee;
-
-  /* Текст. Порог той самий 4,5:1, міряний на НАЙСВІТЛІШІЙ поверхні
-     (#f6f6f6) і в полі (#e3e3e3) — обидва проходять. */
-  --text:        #141414;   /* 16,7:1 */
-  --text-2:      #3c3c3c;   /*  9,4:1 */
-  --muted:       #5b5b5b;   /*  5,8:1 на картці, 5,0:1 у полі */
-  --placeholder: #646464;   /*  5,1:1 / 4,4:1 */
-
-  --g1:          #2a2a2a;
-  --g2:          #5b5b5b;
-  --g3:          #767676;   /* межа елемента: 3,9:1 */
-
-  /* Тінт перевертається на чорний — і всі 40 підкладок разом із ним */
-  --tint-rgb: 0, 0, 0;
-  --line:   rgba(var(--tint-rgb), 0.10);
-  --line-2: rgba(var(--tint-rgb), 0.17);
-
-  --glass:   rgba(240, 240, 240, 0.86);
-  --glass-2: rgba(240, 240, 240, 0.97);
-  --overlay: rgba(231, 231, 231, 0.97);
-
-  --grad-a: #f0f0f0;
-  --grad-b: #e7e7e7;
-  --grad-c: #dddddd;
-
-  /* Декор: на папері «світлові плями» мусять бути щільнішими, інакше їх
-     просто не видно — 3% білого на сірому не існує. */
-  --fx-rgb:  255, 255, 255;
-  --fx-a1:   0.70;
-  --fx-a2:   0.42;
-  --fx-card: 0.55;
-  --ink-grad-a: #131313;
-  --ink-grad-b: #555555;
-
-  /* Підвал на папері — трохи глибший за сторінку, а не чорний. Затемнення
-     під модалкою лишається темним у ОБОХ схемах: його робота — прибрати
-     сторінку з уваги, і світла плівка поверх світлої сторінки цього не
-     дає. Міняється лише щільність. */
-  --footer-bg: rgba(215, 215, 215, 0.82);
-  --backdrop:  rgba(20, 20, 20, 0.45);
-
-  /* Геометрія тіней НЕ змінена — лише знято синій підтон: колишні
-     rgba(16, 22, 34) і rgba(158, 166, 180) стали нейтральними
-     rgba(20, 20, 20) і rgba(166, 166, 166). */
-  --shadow:    0 18px 44px -20px rgba(20, 20, 20, 0.30);
-  --shadow-lg: 0 40px 84px -34px rgba(20, 20, 20, 0.34);
-
-  /* Нео-пара: сіра тінь + біла грань (див. п.2 у заголовку) */
-  --neo-raised:    18px 18px 34px rgba(166, 166, 166, 0.50), -12px -12px 28px rgba(255, 255, 255, 0.95);
-  --neo-raised-sm:  8px  8px 17px rgba(166, 166, 166, 0.44),  -6px  -6px 14px rgba(255, 255, 255, 0.92);
-  --neo-inset:     inset 8px 8px 16px rgba(166, 166, 166, 0.46), inset -6px -6px 14px rgba(255, 255, 255, 0.94);
-  --neo-inset-sm:  inset 4px 4px  9px rgba(166, 166, 166, 0.42), inset -3px -3px  6px rgba(255, 255, 255, 0.92);
-
-  --acc-raised:     7px 7px 16px rgba(20, 20, 20, 0.20);
-  --acc-raised-sm:  4px 4px 10px rgba(20, 20, 20, 0.17);
-  --acc-raised-hi: 10px 10px 24px rgba(20, 20, 20, 0.24);
-  --acc-raised-xs:  2px 2px  6px rgba(20, 20, 20, 0.15);
-
-  --ctl-raised:       6px 6px 15px rgba(166, 166, 166, 0.42), -5px -5px 13px rgba(255, 255, 255, 0.92);
-  --ctl-raised-hover: 9px 9px 22px rgba(166, 166, 166, 0.48), -7px -7px 18px rgba(255, 255, 255, 0.95);
-  --ctl-raised-press: 3px 3px  8px rgba(166, 166, 166, 0.38), -2px -2px  6px rgba(255, 255, 255, 0.88);
-  --ctl-raised-sm:    4px 4px 10px rgba(166, 166, 166, 0.38), -3px -3px  9px rgba(255, 255, 255, 0.90);
-
-  /* Акцент монохромний: на папері роль «кольору» бере ЧОРНЕ. Заливка
-     темна, текст на ній білий — дзеркально до темної схеми. Наведення
-     ТЕМНІШАЄ: рух так само геть від поверхні, лише поверхня тут світла. */
-  --acc:      #1a1a1a;   /* білий на заливці 16,0:1, заливка 15,3:1 до картки */
-  --acc-hi:   #000000;   /* наведення темнішає */
-  --acc-bar:  #3c3c3c;   /* смуга даних 9,3:1 до картки */
-  --acc-ink:  #141414;   /* як текст: 16,7:1 на картці */
-  --acc-line: #6a6a6a;
-  --link:       #141414;
-  --link-hover: #000000;
-  --acc-rgb:     26, 26, 26;
-  --acc-ink-rgb: 20, 20, 20;
-  --on-acc: #ffffff;
-}
-
-/* --------------------------------------------------------------------------
-   Світла схема: кольорові акценти
-   --------------------------------------------------------------------------
-   Той самий принцип для всіх: на заливку йде крок, де білий текст ≥ 4,5:1,
-   а сама заливка ≥ 3:1 до картки; на наведення — наступний ТЕМНІШИЙ;
-   як текст (--acc-ink, --link) — найтемніший крок палітри; на смуги й межі —
-   середній. Жодного нового відтінку не заведено: це ті самі палітри, що й
-   у темряві. --on-acc успадковується білим із блоку вище — у світлі всі
-   заливки темні, монохромна включно.
-   -------------------------------------------------------------------------- */
-html[data-scheme="light"][data-theme="graphite"] {            /* Дерево */
-  --acc: #7a5230; --acc-hi: #684226; --acc-bar: #93663e;
-  --acc-ink: #684226; --acc-line: #ad7a4f;
-  --link: #684226; --link-hover: #7a5230;
-  --acc-rgb: 122, 82, 48; --acc-ink-rgb: 104, 66, 38;
-}
-html[data-scheme="light"][data-theme="graphite-navy"] {
-  --acc: #2c4160; --acc-hi: #202f46; --acc-bar: #64809f;
-  --acc-ink: #202f46; --acc-line: #64809f;
-  --link: #202f46; --link-hover: #2c4160;
-  --acc-rgb: 44, 65, 96; --acc-ink-rgb: 32, 47, 70;
-}
-html[data-scheme="light"][data-theme="graphite-pink"] {
-  --acc: #c43e72; --acc-hi: #a93060; --acc-bar: #d95789;
-  --acc-ink: #a93060; --acc-line: #d95789;
-  --link: #a93060; --link-hover: #c43e72;
-  --acc-rgb: 196, 62, 114; --acc-ink-rgb: 169, 48, 96;
-}
-html[data-scheme="light"][data-theme="graphite-violet"] {
-  --acc: #6b4ab8; --acc-hi: #593d9b; --acc-bar: #8063c7;
-  --acc-ink: #593d9b; --acc-line: #947ad4;
-  --link: #593d9b; --link-hover: #6b4ab8;
-  --acc-rgb: 107, 74, 184; --acc-ink-rgb: 89, 61, 155;
-}
-html[data-scheme="light"][data-theme="graphite-crimson"] {
-  --acc: #c7231d; --acc-hi: #ad1813; --acc-bar: #db302a;
-  --acc-ink: #ad1813; --acc-line: #dd423d;
-  --link: #ad1813; --link-hover: #c7231d;
-  --acc-rgb: 199, 35, 29; --acc-ink-rgb: 173, 24, 19;
-}
-html[data-scheme="light"][data-theme="graphite-moss"] {
-  --acc: #3a7410; --acc-hi: #3b6120; --acc-bar: #50802e;
-  --acc-ink: #3b6120; --acc-line: #5c8e38;
-  --link: #3b6120; --link-hover: #3a7410;
-  --acc-rgb: 58, 116, 16; --acc-ink-rgb: 59, 97, 32;
-}
-html[data-scheme="light"][data-theme="graphite-emerald"] {
-  --acc: #1e7455; --acc-hi: #22624b; --acc-bar: #1f835e;
-  --acc-ink: #22624b; --acc-line: #33906e;
-  --link: #22624b; --link-hover: #1e7455;
-  --acc-rgb: 30, 116, 85; --acc-ink-rgb: 34, 98, 75;
-}
-html[data-scheme="light"][data-theme="graphite-ocean"] {
-  --acc: #296f81; --acc-hi: #1b5f70; --acc-bar: #0d7e9a;
-  --acc-ink: #1b5f70; --acc-line: #34899e;
-  --link: #1b5f70; --link-hover: #296f81;
-  --acc-rgb: 41, 111, 129; --acc-ink-rgb: 27, 95, 112;
-}
 
 body {
   background: var(--bg);
@@ -2947,7 +2609,6 @@ body {
 .btn,
 .icon-btn,
 .rest-btn,
-.theme-btn,
 .seg__item span,
 .chip {
   border-color: transparent;
@@ -2955,8 +2616,7 @@ body {
   box-shadow: var(--ctl-raised);
 }
 .btn,
-.rest-btn,
-.theme-btn { font-weight: 700; }
+.rest-btn { font-weight: 700; }
 
 /* Дрібні елементи сімʼї — та сама тінь, менший радіус розсіювання */
 .icon-btn,
@@ -3018,7 +2678,6 @@ body {
 .btn:hover,
 .icon-btn:hover:not(:disabled),
 .rest-btn:hover,
-.theme-btn:hover,
 .seg__item span:hover {
   transform: translateY(-1px);
   border-color: transparent;
@@ -3032,7 +2691,6 @@ body {
 .btn:active,
 .icon-btn:active:not(:disabled),
 .rest-btn:active,
-.theme-btn:active,
 .seg__item span:active {
   transform: translateY(1px);
   box-shadow: var(--ctl-raised-press);
@@ -3222,22 +2880,9 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.16); }
 .rest-timer { border-radius: 20px; }
 .toast { border-radius: 17px; }
 
-.theme-btn { border-radius: 16px; }
-/*
- * Обрана тема. Заливку тут навмисно НЕ роблю суцільно акцентною: усередині
- * кнопки лежать два кружки-свотчі, і суцільний акцент під ними перебивав би
- * саме те, що вони показують. Але вгнутість прибрана — вибір показується
- * піднятістю й акцентним контуром.
- */
-.theme-btn.is-active {
-  border-color: var(--acc);
-  background: var(--surface-2);
-  box-shadow: var(--acc-raised-sm), 0 0 0 1px var(--acc);
-}
 
 /* Посилання «до вмісту» — теж акцентна плашка, хай і видима лише з клавіатури */
 .skip-link { box-shadow: var(--acc-raised); }
-.theme-btn i { border-color: rgba(var(--tint-rgb), .2); box-shadow: 2px 2px 4px rgba(0, 0, 0, .28); }
 
 .footer {
   margin-top: 80px;
@@ -3336,7 +2981,6 @@ button.heatmap__cell::after {
   .btn:hover,
   .icon-btn:hover:not(:disabled),
   .rest-btn:hover,
-  .theme-btn:hover,
   .seg__item span:hover,
   .card--hover:hover {
     transform: none;
@@ -3470,8 +3114,7 @@ button.heatmap__cell::after {
      Майже кожен елемент ставить собі колір із --text/--muted/--line, тому
      перефарбувати самий body (як було) не давало нічого: текст лишався
      майже білим на білому. */
-  :root,
-  [data-theme] {
+  :root {
     --bg: #fff; --bg-1: #fff; --bg-2: #fff;
     --surface: #fff; --surface-2: #fff; --card-1: #fff; --card-2: #fff;
     --field: #fff; --field-focus: #fff; --overlay: #fff;
@@ -3915,4 +3558,162 @@ h1 > .h1-ico {
   vertical-align: -0.115em;
   margin-right: .3em;
   color: var(--acc-ink);
+}
+
+/* ============================================================================
+   КОНТЕКСТНА ДОВІДКА
+   ============================================================================
+   Одна кнопка в шапці, вміст залежить від сторінки (js/help-content.js).
+
+   Свого «дизайну довідки» тут немає навмисно: вікно — це .modal з тими
+   самими підкладкою, радіусом, тінню й анімацією, що й решта вікон сайту.
+   Нижче лише те, чого в системі ще не було: ширша коробка (у довідці є
+   таблиці), липка шапка вікна і власна прокрутка тіла.
+   ------------------------------------------------------------------------ */
+
+/* Кнопка в шапці. Виглядає як сусідня позначка синхронізації: те саме
+   коло, та сама висота, той самий колір — інакше вона читалася б як
+   чужий елемент, приклеєний зверху. */
+.nav__help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: rgba(var(--tint-rgb), 0.04);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.nav__help[hidden] { display: none; }
+.nav__help .nav__ico { width: 19px; height: 19px; }
+.nav__help:hover { color: var(--text); border-color: transparent; background: rgba(var(--acc-rgb), 0.18); }
+
+/* Вікно ширше за звичайне: у довідці є таблиці на три колонки, і в 460px
+   вони перетворюються на стовпчик із двох слів. */
+.help .help__box {
+  max-width: 760px;
+  max-height: min(90vh, 860px);
+  padding: 0;                 /* відступи роздані шапці й тілу */
+  overflow: hidden;           /* прокручується тіло, а не коробка */
+  display: flex; flex-direction: column;
+}
+
+/* Закриття: та сама анімація, що й відкриття, тільки навпаки. */
+.help.is-out { animation: help-out 0.18s var(--e-out) forwards; }
+@keyframes help-out { to { opacity: 0; } }
+
+.help__head {
+  flex-shrink: 0;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+  padding: 22px 24px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.help__title { margin: 0; font-size: clamp(1.3rem, 2.4vw, 1.6rem); }
+
+.help__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 24px 24px;
+}
+
+.help__lead { margin: 0 0 16px; color: var(--text); font-size: 1.02rem; }
+.help__h { margin: 22px 0 8px; font-size: 1.05rem; }
+.help__body > .help__h:first-of-type { margin-top: 6px; }
+.help__body .notice { margin: 14px 0; }
+
+/* «Що означає що»: термін і пояснення. Сітка, а не два абзаци, — так
+   око знаходить потрібний рядок, не читаючи всі. */
+.help__dl { margin: 0 0 14px; }
+.help__dl dt {
+  margin-top: 12px;
+  font-weight: 700; font-size: 0.92rem;
+  color: var(--text);
+}
+.help__dl dt:first-child { margin-top: 0; }
+.help__dl dd {
+  margin: 3px 0 0; padding-left: 14px;
+  border-left: 2px solid var(--line-2);
+  color: var(--text-2); font-size: 0.9rem; line-height: 1.6;
+}
+
+/* Таблиця зі своїм скролом: на 375px три колонки не вміщаються, а
+   горизонтальна прокрутка всього вікна ламала б жест закриття. */
+.help__tablewrap {
+  overflow-x: auto; overscroll-behavior-x: contain;
+  margin: 12px 0 16px;
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.help__table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+.help__table th,
+.help__table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+.help__table th {
+  font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); font-weight: 700;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.help__table td { border-bottom: 1px solid var(--line); color: var(--text-2); }
+.help__table tbody tr:last-child td { border-bottom: none; }
+.help__table td:first-child { color: var(--text); font-weight: 600; min-width: 168px; }
+.help__table td.num { white-space: nowrap; color: var(--text); }
+
+/* «Про Forge» — згорнутий хвіст. Потрібен рідко, але шукати його в
+   іншому місці ще гірше, ніж прогорнути донизу. */
+.help__about { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 14px; }
+.help__about > summary {
+  cursor: pointer; list-style: none;
+  font-weight: 700; font-size: 0.95rem;
+  padding: 6px 0;
+}
+.help__about > summary::-webkit-details-marker { display: none; }
+.help__about > summary::before { content: '＋ '; color: var(--muted); }
+.help__about[open] > summary::before { content: '－ '; }
+.help__about-in { padding-top: 6px; }
+
+@media (max-width: 640px) {
+  /* На телефоні довідка — аркуш від низу екрана: так її закривають тим
+     самим рухом, яким закривають решту аркушів системи. */
+  .help { padding: 0; align-items: flex-end; }
+  .help .help__box {
+    max-width: none;
+    max-height: 92vh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border-bottom: none;
+    animation: help-sheet-in 0.26s var(--e-out);
+  }
+  .help__head { padding: 18px 18px 12px; }
+  .help__body { padding: 16px 18px 28px; }
+  .help__table td:first-child { min-width: 132px; }
+}
+
+@keyframes help-sheet-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Менше руху — менше анімації. Вікно все одно зʼявляється й зникає,
+   просто без зсуву. */
+@media (prefers-reduced-motion: reduce) {
+  .help .help__box,
+  .help.is-out { animation-duration: 0.01ms; }
+}
+
+/* Кнопка довідки там, де шапки немає (екран входу). Той самий вигляд, що
+   й у шапці, тільки власним кутом: інакше на welcome.html — сторінці, де
+   людина вперше й питає «що це таке» — довідки не було б узагалі. */
+.help__fab {
+  position: fixed; z-index: 90;
+  right: 16px; bottom: 16px;
+  width: 42px; height: 42px; padding: 0;
+  display: grid; place-items: center;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: var(--bg-1); color: var(--text-2);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.help__fab svg { width: 19px; height: 19px; }
+.help__fab:hover { color: var(--text); border-color: transparent; background: rgba(var(--acc-rgb), 0.18); }
+@supports (padding: env(safe-area-inset-bottom)) {
+  .help__fab { bottom: calc(16px + env(safe-area-inset-bottom)); }
 }

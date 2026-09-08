@@ -87,8 +87,13 @@ ok('1. історія відкрилась одразу з #history', (await p.l
 ok('2. календар намальовано', (await p.locator('.mcal__cell').count()) > 27,
    String(await p.locator('.mcal__cell').count()) + ' клітинок');
 
-const onCells = await p.locator('.mcal__cell--on').count();
+/* Клас --on прибрано: клітинка тепер несе data-lvl, той самий, що й у
+   теплокарті (0 — без тренування, 1–4 — частка закритих підходів). */
+const onCells = await p.locator('.mcal__cell[data-lvl]:not([data-lvl="0"])').count();
 ok('3. дні з тренуванням зафарбовані', onCells === 3, onCells + ' з 3');
+const lvls = await p.locator('.mcal__cell[data-lvl]:not([data-lvl="0"])')
+  .evaluateAll(els => els.map(e => e.dataset.lvl).join(','));
+ok('3. рівень заливки той самий, що в теплокарті', /^[1-4](,[1-4])*$/.test(lvls), lvls);
 
 for (const [k, name] of [[K_GOOD, 'нормальна сесія'], [K_LEG, 'стара з t0=t1'], [K_OLD, 'без часу']]) {
   ok('4. день ' + k + ' клікабельний (' + name + ')',

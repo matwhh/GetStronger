@@ -185,12 +185,23 @@ const vars = () => p.evaluate((sel) => {
   const st = await q.evaluate(() => {
     const el = document.querySelector('#program-list .card--glass');
     const cs = getComputedStyle(el);
-    return { tr: cs.transform, bf: cs.backdropFilter || cs.webkitBackdropFilter };
+    const light = getComputedStyle(document.querySelector('.picker'), '::before');
+    return { tr: cs.transform, bf: cs.backdropFilter || cs.webkitBackdropFilter,
+             light: light.display };
   });
-  /* Нахиляти на дотику нічим (курсора немає), а backdrop-filter там —
-     найдорожчий ефект на найслабшому залізі. */
+  /*
+   * НА ДОТИКУ ВИМИКАЄТЬСЯ НАХИЛ, А НЕ СКЛО.
+   *
+   * Раніше тут стояло «розмиття вимкнене» — і ця перевірка закріплювала
+   * помилку: разом із нахилом гасились backdrop-filter і світло під
+   * сіткою, тобто на телефоні від скла лишалась напівпрозора плашка на
+   * чорному. Але скло не потребує курсора, воно потребує світла позаду.
+   * Курсора потребують рівно дві речі — нахил і блик, що за ним їде.
+   */
   ok('375px: нахилу немає', st.tr === 'none' || !/matrix3d/.test(st.tr), st.tr.slice(0, 30));
-  ok('375px: розмиття вимкнене', !st.bf || st.bf === 'none', String(st.bf));
+  ok('375px: розмиття лишається (скло не потребує курсора)',
+     /blur\(/.test(String(st.bf)), String(st.bf));
+  ok('375px: світло під сіткою лишається', st.light !== 'none', String(st.light));
   ok('375px: сторінка не поїхала вбік',
      await q.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
   ok('375px: без JS-помилок', e2.length === 0, e2.slice(0, 2).join(' | '));

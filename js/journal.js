@@ -1911,6 +1911,17 @@
     const todayK = todayKey();
     const isCurrentMonth = y === now.getFullYear() && m === now.getMonth();
 
+    /*
+     * КЛІТИНКА ТУТ — ТА САМА, ЩО В ТЕПЛОКАРТІ, І РІВЕНЬ РАХУЄТЬСЯ ТИМ САМИМ
+     * hmLevel.
+     *
+     * Раніше місяць знав лише «було / не було» і фарбував будь-яке
+     * тренування найяскравішою заливкою — тією, яка в теплокарті означає
+     * «закрито ВСІ підходи». Два календарі в одному журналі вчили читати
+     * себе по-різному, і однаковий колір означав у них різні речі.
+     * Тепер сходинка одна на обидва: глибина заливки скрізь означає, яку
+     * частину підходів закрито.
+     */
     let cells = '';
     for (let i = 0; i < startPad; i++) cells += '<i class="mcal__cell mcal__cell--pad" aria-hidden="true"></i>';
     for (let day = 1; day <= daysIn; day++) {
@@ -1919,12 +1930,12 @@
         cells += '<i class="mcal__cell mcal__cell--future">' + day + '</i>';
         continue;
       }
-      const on = trained(k);
+      const lvl = hmLevel(k);
       const sel = k === state.selDay;
-      cells += '<button type="button" class="mcal__cell' + (on ? ' mcal__cell--on' : '') +
-        (sel ? ' mcal__cell--sel' : '') + '" data-hday="' + k + '" ' +
+      cells += '<button type="button" class="mcal__cell' +
+        (sel ? ' mcal__cell--sel' : '') + '" data-lvl="' + lvl + '" data-hday="' + k + '" ' +
         'aria-pressed="' + sel + '" aria-label="' + esc(dateLabel(dateOf(k))) +
-        (on ? ': тренування було' : '') + '">' + day + '</button>';
+        ': ' + esc(HM_LEVEL_TEXT[lvl]) + '">' + day + '</button>';
     }
 
     const dow = DOW.map(function (n) { return '<span class="mcal__dow">' + n + '</span>'; }).join('');
@@ -1947,7 +1958,9 @@
         '<div class="mcal mt-2" role="group" aria-label="Календар ' + MONTHS_NOM[m] + ' ' + y + '">' +
           dow + cells +
         '</div>' +
-        '<p class="small muted mt-1 mb-0">Зафарбований день — тренування. Клік по дню — його підсумок нижче.</p>' +
+        '<p class="small muted mt-1 mb-0">Глибина заливки — частка закритих підходів, ' +
+          'як у теплокарті вище: контур — відмічено вручну, суцільна заливка — ' +
+          'закрито всі. Клік по дню — його підсумок нижче.</p>' +
       '</div>';
   }
 

@@ -2349,10 +2349,13 @@ main:focus:not(:focus-visible) { outline: none; }
    тому обрізає все, що з неї виступає, — включно з підказкою. */
 .heatmap-wrap { position: relative; }
 .heatmap {
-  --hm-cell: 30px;   /* сторона квадратика */
-  --hm-gap: 5px;     /* проміжок між квадратиками й колонками */
+  /* --cell і --cell-gap — СПІЛЬНІ токени клітинки дня (див. «СТАНДАРТНА
+     КЛІТИНКА ДНЯ» нижче). Їх оголошує кожен календар, а не сам блок
+     клітинки: розмір залежить від того, куди її поставили, а вигляд — ні. */
+  --cell: 30px;        /* сторона квадратика */
+  --cell-gap: 5px;     /* проміжок між квадратиками й колонками */
   --hm-label: 28px;  /* ширина стовпця підписів Пн…Нд */
-  display: flex; flex-direction: column; gap: var(--hm-gap);
+  display: flex; flex-direction: column; gap: var(--cell-gap);
   overflow-x: auto; padding-bottom: 6px;
   /* Прокрутка сітки не має тягнути за собою сторінку, коли дійшла до
      краю: на телефоні це головна причина «сторінка сама стрибнула». */
@@ -2368,9 +2371,9 @@ main:focus:not(:focus-visible) { outline: none; }
  * разом із ним — і підписи Пн…Нд зникають рівно там, де вони найпотрібніші.
  * З max-content блок-контейнер дорівнює всій прокручуваній ширині.
  */
-.heatmap__grid { display: flex; gap: var(--hm-gap); width: max-content; }
+.heatmap__grid { display: flex; gap: var(--cell-gap); width: max-content; }
 .heatmap__col { position: relative; }
-.heatmap__col { display: flex; flex-direction: column; gap: var(--hm-gap); }
+.heatmap__col { display: flex; flex-direction: column; gap: var(--cell-gap); }
 /*
  * Стовпець Пн…Нд ПРИЛИПАЄ до лівого краю.
  *
@@ -2385,7 +2388,7 @@ main:focus:not(:focus-visible) { outline: none; }
  */
 .heatmap__days {
   position: sticky; left: 0; z-index: 3;
-  display: flex; flex-direction: column; gap: var(--hm-gap);
+  display: flex; flex-direction: column; gap: var(--cell-gap);
   width: var(--hm-label); margin-right: 6px; flex: 0 0 auto;
   background: var(--card-1);
   /* Проміжок між підписами й першою колонкою теж має бути закритий —
@@ -2393,7 +2396,7 @@ main:focus:not(:focus-visible) { outline: none; }
   box-shadow: 6px 0 0 var(--card-1);
 }
 .heatmap__days span {
-  height: var(--hm-cell); line-height: var(--hm-cell);
+  height: var(--cell); line-height: var(--cell);
   font-size: 0.72rem; color: var(--muted);
 }
 /* Ряд місяців: перший слот-заглушка під ширину підписів днів, далі по
@@ -2418,7 +2421,7 @@ main:focus:not(:focus-visible) { outline: none; }
 }
 .heatmap__month {
   position: relative;
-  width: var(--hm-cell); margin-right: var(--hm-gap); flex: 0 0 auto;
+  width: var(--cell); margin-right: var(--cell-gap); flex: 0 0 auto;
   font-size: 0.7rem; color: var(--muted); white-space: nowrap;
 }
 /* Роздільник місяця: тонка лінія на всю висоту сітки перед першою
@@ -2442,21 +2445,38 @@ main:focus:not(:focus-visible) { outline: none; }
 .heatmap__col.is-month::before {
   content: '';
   position: absolute;
-  left: calc(var(--hm-gap) / -2 - 0.5px);
-  top: calc((var(--hm-mon) + var(--hm-gap)) * -1);
+  left: calc(var(--cell-gap) / -2 - 0.5px);
+  top: calc((var(--hm-mon) + var(--cell-gap)) * -1);
   bottom: 0;
   width: 1px;
   background: rgba(var(--tint-rgb), 0.16);
   pointer-events: none;
 }
 
-.heatmap__cell {
-  width: var(--hm-cell); height: var(--hm-cell); border-radius: 7px;
+/* ==========================================================================
+   СТАНДАРТНА КЛІТИНКА ДНЯ
+   ==========================================================================
+   Один вигляд на обидва календарі проєкту: теплокарту тренувань і місяць
+   в «Історії». Розмір, радіус, шрифт, наведення, фокус і — головне —
+   ЧОТИРИ СХОДИНКИ ЗАПОВНЕНОСТІ описані рівно тут, в одному місці.
+
+   Раніше кожен календар мав власну клітинку. Крок і радіус ще сяк-так
+   збігались, а от сенс заливки — ні: теплокарта показувала, СКІЛЬКИ
+   підходів закрито, а місяць — лише «було/не було», однією й тією ж
+   найяскравішою заливкою. Тобто два календарі одного журналу вчили читати
+   себе по-різному, і найяскравіший колір означав у них різні речі.
+
+   Будь-який новий календар бере ці класи, а не пише свої.
+   -------------------------------------------------------------------- */
+.heatmap__cell,
+.mcal__cell {
+  width: var(--cell); height: var(--cell); border-radius: 7px;
   border: 0; padding: 0; flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
   background: rgba(var(--tint-rgb), 0.06);
   font-family: var(--font-mono);
   font-size: 0.72rem;
+  font-style: normal;
   color: var(--muted);
   cursor: pointer;
   transition: background var(--t-fast), color var(--t-fast),
@@ -2472,22 +2492,31 @@ main:focus:not(:focus-visible) { outline: none; }
 /* ЧОТИРИ СХОДИНКИ ЗАПОВНЕНОСТІ.
    1 — відмічено вручну: підходів не записано, тому заливки немає, є лише
        контур. Так день видно, але він не бреше про обсяг. */
-.heatmap__cell[data-lvl="1"] {
+.heatmap__cell[data-lvl="1"],
+.mcal__cell[data-lvl="1"] {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px rgba(var(--acc-rgb), 0.55);
   color: var(--acc-ink);
 }
-.heatmap__cell[data-lvl="2"] { background: rgba(var(--acc-rgb), 0.30); color: var(--text); }
-.heatmap__cell[data-lvl="3"] { background: rgba(var(--acc-rgb), 0.60); color: var(--on-acc); }
-.heatmap__cell[data-lvl="4"] { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; }
+.heatmap__cell[data-lvl="2"],
+.mcal__cell[data-lvl="2"] { background: rgba(var(--acc-rgb), 0.30); color: var(--text); }
+.heatmap__cell[data-lvl="3"],
+.mcal__cell[data-lvl="3"] { background: rgba(var(--acc-rgb), 0.60); color: var(--on-acc); }
+.heatmap__cell[data-lvl="4"],
+.mcal__cell[data-lvl="4"] { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; }
 
-button.heatmap__cell:hover { transform: scale(1.18); z-index: 2; }
-button.heatmap__cell[data-lvl="0"]:hover { background: rgba(var(--tint-rgb), 0.16); color: var(--text); }
-button.heatmap__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; z-index: 2; }
+button.heatmap__cell:hover,
+button.mcal__cell:hover { transform: scale(1.18); z-index: 2; }
+button.heatmap__cell[data-lvl="0"]:hover,
+button.mcal__cell[data-lvl="0"]:hover { background: rgba(var(--tint-rgb), 0.16); color: var(--text); }
+button.heatmap__cell:focus-visible,
+button.mcal__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; z-index: 2; }
 
-.heatmap__cell--future {
+.heatmap__cell--future,
+.mcal__cell--future {
   background: transparent;
   box-shadow: inset 0 0 0 1px rgba(var(--tint-rgb), 0.05);
+  color: rgba(var(--tint-rgb), 0.22);
   cursor: default;
 }
 
@@ -2551,7 +2580,7 @@ button.heatmap__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-
 /* Квадратик у легенді дрібніший за клітинку сітки: він зразок, а не
    елемент керування сіткою. */
 .heatmap__key .heatmap__cell {
-  --hm-cell: 15px;
+  --cell: 15px;
   border-radius: 4px; cursor: inherit;
 }
 .heatmap__key--manual { font-size: 0.72rem; color: var(--muted); }
@@ -2587,59 +2616,40 @@ button.heatmap__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-
    З repeat(7, 1fr) плюс aspect-ratio календар роздувався разом з
    карткою: на робочому столі клітинка виходила під сотню пікселів, і
    місяць займав пів екрана заради тридцяти чисел. Тепер крок той самий,
-   що й у теплокарти тренувань вище (--hm-cell), і два календарі в межах
+   що й у теплокарти тренувань вище (--cell), і два календарі в межах
    одного журналу нарешті одного масштабу. */
 .mcal {
-  --mc-cell: 30px;
+  /* Ті самі токени, що й у теплокарти: клітинка одна на два календарі,
+     тож і крок у них один. Мобільне збільшення теж спільне — воно
+     живе там, де оголошено --cell для обох. */
+  --cell: 30px;
+  --cell-gap: 5px;
   display: grid;
-  grid-template-columns: repeat(7, var(--mc-cell));
+  grid-template-columns: repeat(7, var(--cell));
   justify-content: start;
-  gap: 5px;
+  gap: var(--cell-gap);
 }
 .mcal__dow {
-  width: var(--mc-cell);
+  width: var(--cell);
   text-align: center;
   font-size: 0.72rem;
   color: var(--muted);
   padding: 2px 0 4px;
 }
-.mcal__cell {
-  width: var(--mc-cell);
-  height: var(--mc-cell);
-  border: 0;
-  border-radius: 6px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(var(--tint-rgb), 0.06);
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  font-style: normal;
-  cursor: pointer;
-  transition: background var(--t-fast), color var(--t-fast);
-}
-button.mcal__cell:hover { background: rgba(var(--tint-rgb), 0.14); color: var(--text); }
-button.mcal__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 1px; }
-/* Тренувальний день: число мусить читатись на акцентній заливці */
-.mcal__cell--on { background: var(--acc-bar); color: var(--on-acc); font-weight: 700; }
-button.mcal__cell--on:hover { background: var(--acc-ink); color: var(--on-acc); }
-/* Обраний день: кільце всередині, щоб не зʼїдати сусідні відступи */
+/* Вигляд клітинки — у розділі «СТАНДАРТНА КЛІТИНКА ДНЯ». Тут лишається
+   тільки те, чого в теплокарті немає взагалі. */
+
+/* Обраний день: кільце ВСЕРЕДИНІ, щоб не з'їдати сусідні відступи.
+   На залитій клітинці кільце світле, на порожній — акцентне: інакше на
+   рівні 4 воно зливалося б із власною заливкою. */
 .mcal__cell--sel { box-shadow: inset 0 0 0 2px var(--acc-ink); color: var(--text); }
-.mcal__cell--on.mcal__cell--sel { box-shadow: inset 0 0 0 2px rgba(var(--tint-rgb), 0.55); color: var(--on-acc); }
-.mcal__cell--pad { background: transparent; cursor: default; }
-.mcal__cell--future {
-  background: transparent;
-  border: 1px dashed rgba(var(--tint-rgb), 0.07);
-  color: rgba(var(--tint-rgb), 0.22);
-  cursor: default;
+.mcal__cell--sel[data-lvl="3"],
+.mcal__cell--sel[data-lvl="4"] {
+  box-shadow: inset 0 0 0 2px rgba(var(--tint-rgb), 0.65);
+  color: var(--on-acc);
 }
-/* Мобільний: клітинка більша під палець — рівно як у теплокарти. */
-@media (max-width: 560px) {
-  .mcal { --mc-cell: 36px; gap: 4px; }
-  .mcal__cell { border-radius: 8px; font-size: 0.78rem; }
-}
+/* Порожні дні перед першим числом місяця: місце є, клітинки немає. */
+.mcal__cell--pad { background: transparent; box-shadow: none; cursor: default; }
 
 /* ==========================================================================
    ШАР ЗАСТОСУНКУ
@@ -3361,10 +3371,22 @@ body {
   inset: -6% 0;
   z-index: 0;
   pointer-events: none;
+  /*
+   * ЯСКРАВІШЕ, НІЖ БУЛО (0,075 / 0,055), І ЦЕ ВИПРАВЛЕННЯ ПОМИЛКИ.
+   *
+   * backdrop-filter розмиває те, що ПОЗАДУ. Позаду тут була майже рівна
+   * чорнота, а розмите ніщо — це те саме ніщо: ефект існував у коді й не
+   * існував на екрані. Скло видно рівно настільки, наскільки є що
+   * заломлювати, тож світло під сіткою — не декор, а сам матеріал.
+   */
   background:
-    radial-gradient(60% 70% at 28% 18%, rgba(var(--fx-rgb), 0.075), transparent 70%),
-    radial-gradient(55% 65% at 78% 82%, rgba(var(--fx-rgb), 0.055), transparent 72%);
-  filter: blur(6px);
+    radial-gradient(30% 46% at 18% 6%,  rgba(var(--fx-rgb), 0.44), transparent 68%),
+    radial-gradient(26% 40% at 62% 96%, rgba(var(--fx-rgb), 0.34), transparent 70%),
+    radial-gradient(22% 34% at 92% 24%, rgba(var(--fx-rgb), 0.26), transparent 70%);
+  /* Майже без попереднього розмиття: розмиває backdrop-filter самої
+     картки, і йому потрібен КРАЙ, який можна розмазати. Заздалегідь
+     розмите джерело віддає рівну сірість — тобто знову ніщо. */
+  filter: blur(2px);
 }
 .picker > * { position: relative; z-index: 1; }
 
@@ -3372,15 +3394,22 @@ body {
    саму вагу (0,2,0) і піднімало картку на 5px замість нахилу. Один зайвий
    клас у селекторі — і перевизначення чесно виграє вагою, а не порядком. */
 .card.card--glass {
-  /* Напівпрозора поверхня замість суцільної: під нею видно світло сітки,
-     і саме ця різниця читається як скло. */
-  background: rgba(var(--fx-rgb), 0.05);
+  /* Поверхня — ГРАДІЄНТ, а не рівна заливка. Рівна давала однакову
+     яскравість у кожній точці, тобто матовий пластик: скло світліше там,
+     куди падає світло, і темніше в тіні. Кут 158° збігається з напрямком
+     світла в .picker::before — верхній лівий кут яскравіший. */
+  background: linear-gradient(158deg,
+    rgba(var(--fx-rgb), 0.11) 0%,
+    rgba(var(--fx-rgb), 0.045) 46%,
+    rgba(var(--fx-rgb), 0.025) 100%);
   backdrop-filter: blur(16px) saturate(1.05);
   -webkit-backdrop-filter: blur(16px) saturate(1.05);
-  border-color: rgba(var(--fx-rgb), 0.11);
-  /* Світла грань зверху — єдине, що лишилось від об'ємної мови, і тут
-     вона на місці: на реальному склі світиться саме верхнє ребро. */
-  box-shadow: inset 0 1px 0 rgba(var(--fx-rgb), 0.10);
+  border-color: rgba(var(--fx-rgb), 0.15);
+  /* ДВІ ГРАНІ, А НЕ ОДНА. Світла зверху — там, де на склі світиться
+     ребро. Темна знизу — те, що дає панелі товщину: без неї картка
+     виглядає наклейкою, а не пластиною, і жоден блик цього не рятує. */
+  box-shadow: inset 0 1px 0 rgba(var(--fx-rgb), 0.18),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.40);
   /* Нахил рахує js/app.js; CSS лише збирає його з двох кутів. 900px
      перспективи — на самій картці, як у першоджерела: спільна перспектива
      на сітці нахиляла б крайні картки сильніше за середні. */
@@ -3416,8 +3445,11 @@ body {
 .card--glass > * { position: relative; z-index: 1; }
 
 .card.card--glass.is-hot {
-  border-color: rgba(var(--fx-rgb), 0.20);
-  background: rgba(var(--fx-rgb), 0.07);
+  border-color: rgba(var(--fx-rgb), 0.26);
+  background: linear-gradient(158deg,
+    rgba(var(--fx-rgb), 0.15) 0%,
+    rgba(var(--fx-rgb), 0.065) 46%,
+    rgba(var(--fx-rgb), 0.035) 100%);
 }
 /* Приглушення сусідів. Разом із бликом це і є «фокус»: у сітці з чотирьох
    карток видно, яку саме ти зараз розглядаєш. */
@@ -3430,7 +3462,8 @@ body {
 .card.card--glass.is-selected {
   border-color: rgba(var(--acc-ink-rgb), 0.42);
   box-shadow: inset 3px 0 0 var(--acc),
-              inset 0 1px 0 rgba(var(--fx-rgb), 0.10);
+              inset 0 1px 0 rgba(var(--fx-rgb), 0.18),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.40);
 }
 
 /*
@@ -3441,9 +3474,24 @@ body {
  * pointermove сперечався б. Тому весь ефект живе всередині цього
  * запиту — на телефоні лишається звичайна картка.
  */
+/*
+ * НА ДОТИКУ ВИМИКАЄТЬСЯ НАХИЛ, А НЕ СКЛО.
+ *
+ * Раніше цей запит гасив і backdrop-filter, і світло під сіткою — тобто
+ * на телефоні від усього ефекту лишалась напівпрозора плашка на чорному,
+ * і «скла» там не було взагалі. Але скло не потребує курсора: воно
+ * потребує світла позаду. Курсора потребують рівно дві речі — нахил і
+ * блик, що за ним їде. Їх і вимикаємо.
+ *
+ * Розмиття на дотику слабше (10px проти 16): менша площа екрана, менший
+ * бюджет GPU, і на 4 картках різниця у вигляді непомітна.
+ */
 @media not all and (hover: hover) and (pointer: fine) {
-  .card.card--glass { transform: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-  .picker::before { display: none; }
+  .card.card--glass {
+    transform: none;
+    backdrop-filter: blur(10px) saturate(1.05);
+    -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .card.card--glass { transform: none; transition: opacity 0.2s linear, border-color 0.2s linear; }
@@ -3752,8 +3800,10 @@ button.heatmap__cell::after {
 
   /* Мобільний: більший квадратик під палець. Решта (крок, ширина
      підписів, вирівнювання місяців) рахується з тих самих змінних. */
-  .heatmap { --hm-cell: 36px; --hm-label: 30px; }
-  .heatmap__cell { font-size: 0.8rem; }
+  .heatmap { --cell: 36px; --hm-label: 30px; }
+  .mcal { --cell: 36px; }
+  .heatmap__cell,
+  .mcal__cell { font-size: 0.8rem; border-radius: 8px; }
   .heatmap__days span { font-size: 0.78rem; }
 
   /* Текст, який НЕ дрібний шрифт, а самі дані: відсоток 1ПМ і повтори в

@@ -1912,33 +1912,44 @@
     const isCurrentMonth = y === now.getFullYear() && m === now.getMonth();
 
     /*
-     * КЛІТИНКА ТУТ — ТА САМА, ЩО В ТЕПЛОКАРТІ, І РІВЕНЬ РАХУЄТЬСЯ ТИМ САМИМ
-     * hmLevel.
+     * ВИГЛЯД — ТОЧНО ЯК У ТЕПЛОКАРТІ ТРЕНУВАНЬ.
      *
-     * Раніше місяць знав лише «було / не було» і фарбував будь-яке
-     * тренування найяскравішою заливкою — тією, яка в теплокарті означає
-     * «закрито ВСІ підходи». Два календарі в одному журналі вчили читати
-     * себе по-різному, і однаковий колір означав у них різні речі.
-     * Тепер сходинка одна на обидва: глибина заливки скрізь означає, яку
-     * частину підходів закрито.
+     * Не лише клітинка (вона спільна вже давно), а й РОЗКЛАДКА: підписи
+     * днів тижня стоять збоку колонкою, а тижні йдуть колонками вправо.
+     * Було навпаки — Пн…Нд згори, дні поточкою вправо, — і два календарі
+     * одного журналу читались у різних напрямках: у теплокарті погляд
+     * веде вниз по тижню, у місяці вів упоперек. Тепер обидва читаються
+     * однаково, і перехід між ними нічого не переучує.
+     *
+     * Рівень заливки рахує той самий hmLevel: глибина = частка закритих
+     * підходів.
      */
-    let cells = '';
-    for (let i = 0; i < startPad; i++) cells += '<i class="mcal__cell mcal__cell--pad" aria-hidden="true"></i>';
-    for (let day = 1; day <= daysIn; day++) {
-      const k = keyOf(new Date(y, m, day));
-      if (k > todayK) {
-        cells += '<i class="mcal__cell mcal__cell--future">' + day + '</i>';
-        continue;
+    const weeks = Math.ceil((startPad + daysIn) / 7);
+    let cols = '';
+    for (let w = 0; w < weeks; w++) {
+      let cells = '';
+      for (let r = 0; r < 7; r++) {
+        const day = w * 7 + r - startPad + 1;
+        if (day < 1 || day > daysIn) {
+          cells += '<i class="mcal__cell mcal__cell--pad" aria-hidden="true"></i>';
+          continue;
+        }
+        const k = keyOf(new Date(y, m, day));
+        if (k > todayK) {
+          cells += '<i class="mcal__cell mcal__cell--future">' + day + '</i>';
+          continue;
+        }
+        const lvl = hmLevel(k);
+        const sel = k === state.selDay;
+        cells += '<button type="button" class="mcal__cell' +
+          (sel ? ' mcal__cell--sel' : '') + '" data-lvl="' + lvl + '" data-hday="' + k + '" ' +
+          'aria-pressed="' + sel + '" aria-label="' + esc(dateLabel(dateOf(k))) +
+          ': ' + esc(HM_LEVEL_TEXT[lvl]) + '">' + day + '</button>';
       }
-      const lvl = hmLevel(k);
-      const sel = k === state.selDay;
-      cells += '<button type="button" class="mcal__cell' +
-        (sel ? ' mcal__cell--sel' : '') + '" data-lvl="' + lvl + '" data-hday="' + k + '" ' +
-        'aria-pressed="' + sel + '" aria-label="' + esc(dateLabel(dateOf(k))) +
-        ': ' + esc(HM_LEVEL_TEXT[lvl]) + '">' + day + '</button>';
+      cols += '<div class="mcal__col">' + cells + '</div>';
     }
 
-    const dow = DOW.map(function (n) { return '<span class="mcal__dow">' + n + '</span>'; }).join('');
+    const dow = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
 
     host.innerHTML =
       '<div class="card">' +
@@ -1956,7 +1967,8 @@
           '</div>' +
         '</div>' +
         '<div class="mcal mt-2" role="group" aria-label="Календар ' + MONTHS_NOM[m] + ' ' + y + '">' +
-          dow + cells +
+          '<div class="mcal__days" aria-hidden="true">' + dow + '</div>' +
+          cols +
         '</div>' +
         '<p class="small muted mt-1 mb-0">Глибина заливки — частка закритих підходів, ' +
           'як у теплокарті вище: контур — відмічено вручну, суцільна заливка — ' +

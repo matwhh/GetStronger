@@ -2618,23 +2618,35 @@ button.mcal__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-off
    місяць займав пів екрана заради тридцяти чисел. Тепер крок той самий,
    що й у теплокарти тренувань вище (--cell), і два календарі в межах
    одного журналу нарешті одного масштабу. */
+/* Розкладка — та сама, що в теплокарти: підписи днів тижня колонкою
+   зліва, тижні колонками вправо. Свій grid із Пн…Нд згори тут був, і
+   саме він робив два календарі одного журналу не схожими: у теплокарті
+   тиждень читається вниз, у місяці читався впоперек. */
 .mcal {
   /* Ті самі токени, що й у теплокарти: клітинка одна на два календарі,
      тож і крок у них один. Мобільне збільшення теж спільне — воно
      живе там, де оголошено --cell для обох. */
   --cell: 30px;
   --cell-gap: 5px;
-  display: grid;
-  grid-template-columns: repeat(7, var(--cell));
-  justify-content: start;
+  display: flex;
   gap: var(--cell-gap);
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  overscroll-behavior-x: contain;
 }
-.mcal__dow {
-  width: var(--cell);
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--muted);
-  padding: 2px 0 4px;
+.mcal__col { display: flex; flex-direction: column; gap: var(--cell-gap); }
+/* Підписи Пн…Нд: та сама колонка, що .heatmap__days, лише без
+   прилипання — місяць у ширину екрана вміщається завжди, прокручувати
+   під підписами нічого. */
+.mcal__days {
+  display: flex; flex-direction: column; gap: var(--cell-gap);
+  width: var(--hm-label, 28px); margin-right: 6px; flex: 0 0 auto;
+}
+.mcal__days span {
+  height: var(--cell); line-height: var(--cell);
+  font-size: 0.72rem; color: var(--muted);
 }
 /* Вигляд клітинки — у розділі «СТАНДАРТНА КЛІТИНКА ДНЯ». Тут лишається
    тільки те, чого в теплокарті немає взагалі. */
@@ -4204,6 +4216,71 @@ button.heatmap__cell::after {
 /* Місяць — на висоту цифри поруч, не менший: обидва живуть у тому
    самому рядку й мають важити однаково. */
 .tdy-day__moon { width: 1.5rem; height: 1.5rem; display: block; }
+
+/* ---- Плитки звичок ----------------------------------------------------
+   Дві картки в ряд: тренування і зважування. Тридцять квадратиків —
+   останні 30 днів. Шкала тут двійкова (є / немає), без сходинок обсягу:
+   плитка відповідає на питання «чи роблю я це регулярно». Кольору немає,
+   як і скрізь: заповнений день світлий, порожній — ледь помітний. */
+.hbts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.hbt {
+  display: flex; flex-direction: column;
+  padding: clamp(12px, 2.5vw, 16px);
+  color: var(--text); text-decoration: none;
+  min-width: 0;
+}
+.hbt__title { font-size: 1.05rem; font-weight: 700; line-height: 1.2; }
+.hbt__sub { margin-top: 2px; font-size: 0.76rem; color: var(--muted); }
+/* Десять на три. 1fr на колонку, а не фіксовані пікселі: дві картки
+   ділять ширину екрана, і на 320px квадратик має право стиснутись до
+   семи пікселів замість того, щоб виштовхнути сітку за край. */
+.hbt__grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  margin: 12px 0;
+}
+.hbt__cell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: rgba(var(--tint-rgb), 0.07);
+}
+.hbt__cell.is-on { background: var(--acc-bar); }
+.hbt__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 0.78rem; color: var(--muted);
+}
+.hbt__val { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.hbt__tail { min-width: 0; }
+.hbt__num { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+.hbt__go { width: 16px; height: 16px; flex: none; color: var(--muted); }
+.hbt:hover { border-color: var(--acc-line); }
+.hbt:hover .hbt__go { color: var(--acc-ink); }
+
+/* На вузькому екрані стрілка йде геть: дві картки ділять ширину навпіл,
+   і 16 пікселів під неї — це рівно те, через що «цього тижня» ламалось
+   на два рядки. Клікабельна вся картка, тож стрілка тут — прикраса, а
+   рядок під нею — дані. */
+@media (max-width: 460px) {
+  .hbt { padding: 12px 11px; }
+  .hbt__title { font-size: 0.92rem; }
+  .hbt__sub { font-size: 0.7rem; }
+  .hbt__go { display: none; }
+  .hbt__foot { font-size: 0.7rem; }
+  .hbt__num { font-size: 1.02rem; }
+  /* Число зверху, підпис під ним. Два рядки тут — задум, а не перенос:
+     дві картки ділять ширину екрана навпіл, і «1/3 цього тижня» в один
+     рядок туди не вміщається за жодного розумного кегля. */
+  .hbt__val { flex-direction: column; align-items: flex-start; gap: 0; }
+}
 
 /* ---- Віджет дня -------------------------------------------------------
    Прямокутна скляна картка під смугою: назва дня з плану або REST.

@@ -89,6 +89,27 @@
   }
 
   /**
+   * Чи був того дня факт тренування.
+   *
+   * Правило списане з теплокарти журналу (js/journal.js → trained): явний
+   * 0 у workLog знімає день навіть за наявної сесії, інакше рахується
+   * сесія з бодай одним закритим підходом або вправою. Тримаємо його в
+   * одному місці — від нього залежать і відлік тижнів, і плитка звички.
+   */
+  function trainedOn(key) {
+    const v = Number((state.profile.workLog || {})[key]);
+    if (Number.isFinite(v)) return v > 0;
+    const x = (state.profile.sessionLog || {})[key];
+    return !!x && typeof x === 'object' && (Number(x.done) > 0 || Number(x.doneSets) > 0);
+  }
+
+  /** Чи є того дня запис ваги тіла. */
+  function weighedOn(key) {
+    const v = Number((state.profile.bodyLog || {})[key]);
+    return Number.isFinite(v) && v > 0;
+  }
+
+  /**
    * Дата першого виконаного тренування, або ''.
    *
    * Правило «що вважається тренуванням» списане з теплокарти журналу
@@ -100,16 +121,11 @@
   function firstTrainedKey() {
     const wl = state.profile.workLog || {};
     const sl = state.profile.sessionLog || {};
-    const counts = function (x) {
-      return !!x && typeof x === 'object' && (Number(x.done) > 0 || Number(x.doneSets) > 0);
-    };
     let best = '';
     Object.keys(wl).concat(Object.keys(sl)).forEach(function (k) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
       if (best && k >= best) return;
-      const v = Number(wl[k]);
-      const on = Number.isFinite(v) ? v > 0 : counts(sl[k]);
-      if (on) best = k;
+      if (trainedOn(k)) best = k;
     });
     return best;
   }
@@ -274,10 +290,73 @@
       '</div>';
   }
 
+  /**
+   * ПЛИТКИ ЗВИЧОК: тренування і зважування.
+   *
+   * Тридцять квадратиків — останні 30 днів, найстаріший зліва зверху.
+   * Заповнений = того дня факт був. Це та сама шкала «є / немає», що в
+   * теплокарті журналу, лише без сходинок обсягу: плитка відповідає на
+   * питання «чи роблю я це регулярно», а не «скільки я зробив».
+   *
+   * Обидві ведуть у журнал — у той самий розділ, який показує повну
+   * історію того ж факту. Нових даних плитки не заводять: усе, що вони
+   * показують, уже лежить у профілі.
+   */
+  function habitCells(has) {
+    const today = new Date();
+    let out = '';
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      out += '<i class="hbt__cell' + (has(keyOf(d)) ? ' is-on' : '') + '"></i>';
+    }
+    return out;
+  }
+
+  function habitCard(href, title, has, footNum, footTail) {
+    return '<a class="card hbt" href="' + href + '">' +
+        '<span class="hbt__title">' + esc(title) + '</span>' +
+        '<span class="hbt__sub">Останні 30 днів</span>' +
+        '<span class="hbt__grid" aria-hidden="true">' + habitCells(has) + '</span>' +
+        '<span class="hbt__foot">' +
+          /* Число й підпис — ОКРЕМІ елементи, а не один рядок тексту:
+             на вузькому екрані вони стають двома рядками за задумом, а
+             не переносом посеред фрази. */
+          '<span class="hbt__val">' +
+            '<b class="hbt__num">' + esc(footNum) + '</b>' +
+            '<span class="hbt__tail">' + esc(footTail) + '</span>' +
+          '</span>' +
+          '<svg class="hbt__go" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>' +
+        '</span>' +
+      '</a>';
+  }
+
+  function habitsHtml() {
+    /* Тиждень — від понеділка, як і скрізь у проєкті. */
+    const mon = mondayOf(new Date());
+    let trainWeek = 0, weighWeek = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+      const k = keyOf(d);
+      if (trainedOn(k)) trainWeek++;
+      if (weighedOn(k)) weighWeek++;
+    }
+    /* Ціль тренувань — кількість днів обраного плану, як у журналі. Без
+       плану цілі немає, і вигадувати її нема з чого. */
+    const target = state.plan ? state.plan.length : 0;
+
+    return '<div class="hbts">' +
+      habitCard('journal.html#jr-train', 'Тренування', trainedOn,
+        target ? trainWeek + '/' + target : String(trainWeek), 'цього тижня') +
+      habitCard('journal.html#jr-weight', 'Зважування', weighedOn,
+        weighWeek + '/7', 'цього тижня') +
+    '</div>';
+  }
+
   function render() {
     const host = $('#today');
     if (!host) return;
-    host.innerHTML = headHtml() + weekHtml() + widgetHtml();
+    host.innerHTML = headHtml() + weekHtml() + widgetHtml() + habitsHtml();
     /* Нахил вішається на щойно створений віджет: initTilt позначає вже
        оброблені контейнери, тож повторний виклик безпечний. */
     if (window.App && window.App.initTilt) window.App.initTilt(host);

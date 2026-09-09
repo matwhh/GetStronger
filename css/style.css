@@ -5571,3 +5571,148 @@ h1 > .h1-ico {
 @supports (padding: env(safe-area-inset-bottom)) {
   .help__fab { bottom: calc(16px + env(safe-area-inset-bottom)); }
 }
+
+/* =====================================================================
+   КАРТКА НАГОРОДИ (розмітку будує js/award-core.js)
+
+   Двобічна: лицьовий бік відповідає «що це», зворотний — «за що». На
+   курсорі перевертається наведенням, на дотику — тапом (клас .is-flip
+   ставить js/season.js), з клавіатури — фокусом.
+
+   ЧОРНО-БІЛА НАВМИСНО. Колір у Forge означає дані й стан; нагорода —
+   ні те, ні інше. Вона тримається на світлі, як решта скла проєкту.
+   ===================================================================== */
+.awd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.awd {
+  /* Пропорція картки, а не фіксована висота: у сітці вона тягнеться по
+     ширині, і фіксована висота дала б різні поля на різних екранах. */
+  aspect-ratio: 5 / 6;
+  perspective: 900px;
+  cursor: default;
+  outline: none;
+}
+.awd:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 3px; border-radius: var(--r-lg); }
+
+/* Обертається саме ця обгортка. Обидві сторони лежать у ній обличчям у
+   різні боки — тому переворот один, а не два незалежні. */
+.awd__in {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.62s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* На дотику наведення не буває, тому клас; на курсорі — :hover; з
+   клавіатури — :focus-visible. Три входи, один результат. */
+.awd.is-flip .awd__in,
+.awd:focus-visible .awd__in { transform: rotateY(180deg); }
+@media (hover: hover) and (pointer: fine) {
+  .awd:hover .awd__in { transform: rotateY(180deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .awd__in { transition: none; }
+}
+
+.awd__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 16px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  /* Обидві сторони непрозорі: крізь прозору просвічувала б дзеркальна
+     копія тексту з протилежного боку. */
+  background: linear-gradient(168deg, #191919 0%, #101010 52%, #0c0c0c 100%);
+  box-shadow: inset 0 1px 0 rgba(var(--fx-rgb), 0.10),
+              0 10px 24px -14px rgba(0, 0, 0, 0.9);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.awd__face--back {
+  transform: rotateY(180deg);
+  justify-content: flex-start;
+  /* Місце під кутову кнопку. Без нього довгий текст затікає під неї, і
+     останній рядок читається крізь іконку. */
+  padding-bottom: 56px;
+}
+/* Те саме спереду: підпис не має підлазити під кнопку. */
+.awd__hint { padding-right: 44px; }
+
+/* Світло з глибини картки. Один радіальний градієнт, без анімації:
+   картка — предмет, а не індикатор, їй нема чого пульсувати. */
+.awd__glow {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 150%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: radial-gradient(closest-side,
+    rgba(var(--fx-rgb), 0.30) 0%,
+    rgba(var(--fx-rgb), 0.10) 34%,
+    rgba(var(--fx-rgb), 0.03) 58%,
+    rgba(var(--fx-rgb), 0) 72%);
+}
+
+.awd__eyebrow {
+  position: relative;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.awd__name {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 5.5vw, 2rem);
+  line-height: 1;
+  color: var(--text);
+}
+.awd__hint {
+  position: relative;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+.awd__text {
+  position: relative;
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-2);
+  /* Текст зворотного боку не має права виштовхувати картку: вона в
+     сітці, і одна висока картка розсунула б увесь ряд. Що не влізло —
+     обрізається трьома крапками, повний текст лишається в aria-label. */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+/* Кутова кнопка. Вона нічого не робить — вона ПОКАЗУЄ, що картка має
+   другий бік: без неї ніхто б не здогадався навести на неї курсор. */
+.awd__ico {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  color: var(--on-acc, #0b0b0b);
+  background: var(--acc);
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.9);
+}
+.awd__ico svg { width: 17px; height: 17px; }
+.awd__face--back .awd__ico { color: var(--text); background: rgba(var(--fx-rgb), 0.10); }

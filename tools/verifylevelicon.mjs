@@ -28,8 +28,8 @@
  *    звичайна річ. Однакові id означали б, що другий бере градієнти
  *    першого.
  *
- * 5. ПОВЕДІНКА. Під КУРСОРОМ кулька росте й по ній їде полиск. На
- *    дотику жетон статичний — так просив власник, і так правильно:
+ * 5. ПОВЕДІНКА. Під КУРСОРОМ кулька нахиляється до нього й трохи росте.
+ *    На дотику жетон статичний — так просив власник, і так правильно:
  *    :hover на дотику залипає після тапу.
  *
  * 6. МЕЖІ РІВНЯ. 0, 11, «сміття» не мають малювати порожню або
@@ -78,29 +78,32 @@ const glass = await p.evaluate(() => {
   return {
     bd: cs.backdropFilter || cs.webkitBackdropFilter,
     radius: cs.borderRadius,
-    bodyR: c.querySelector('.lvl-ico__body').getAttribute('r'),
-    glossR: c.querySelector('.lvl-ico__gloss').getAttribute('r')
+    bodyR: c.querySelector('.lvl-ico__body').getAttribute('r')
   };
 });
 ok('1. жетон розмиває те, що під ним', /blur\(/.test(glass.bd || ''), glass.bd);
 ok('1. розмиття обрізане колом', /50%/.test(glass.radius), glass.radius);
 ok('1. намальоване тіло збігається зі стовпом розмиття (r=50)',
-   glass.bodyR === '50' && glass.glossR === '50', JSON.stringify(glass));
+   glass.bodyR === '50', JSON.stringify(glass));
 
 /* Відтінки живуть у CSS, а не в презентаційних атрибутах: var() там
    підтримується не скрізь і падає мовчки — прозорим. */
 const stops = await p.evaluate(() => {
   const c = document.querySelector('#stand .lvl-circle');
   const get = (k) => getComputedStyle(c.querySelector('.lvl-ico__' + k)).stopColor;
-  return { b0: get('b0'), b1: get('b1'), g0: get('g0'), g1: get('g1') };
+  return { b0: get('b0'), b1: get('b1') };
 });
 const alpha = (v) => { const m = String(v).match(/[\d.]+/g) || []; return m.length > 3 ? Number(m[3]) : 1; };
 ok('1. зупинки градієнтів обчислюються з CSS (var() спрацював)',
    Object.values(stops).every((v) => alpha(v) > 0), JSON.stringify(stops));
 ok('1. тіло світліше згори, ніж унизу', alpha(stops.b0) > alpha(stops.b1),
    stops.b0 + ' / ' + stops.b1);
-ok('1. полиск згасає від верхнього лівого кута',
-   alpha(stops.g0) > alpha(stops.g1), stops.g0 + ' / ' + stops.g1);
+/* Полиску немає навмисно: радіальна пляма на кульці 39px читалась як
+   засвіт по всьому склу, а не як відблиск. Чисте скельце має край. */
+ok('1. полиску всередині немає',
+   await p.evaluate(() => !document.querySelector('#stand .lvl-ico__gloss')));
+ok('1. тіло майже прозоре — це скло, а не сіра пляма',
+   alpha(stops.b0) <= 0.12, stops.b0);
 
 /* ------------------------------------------------------------------ */
 /* 2. Геометрія шкали                                                  */
@@ -162,7 +165,7 @@ ok('2. канта в малюнку немає — його малює CSS', geo
 ok('2. край скла зібраний із багатьох шарів, а не з однієї лінії',
    await p.evaluate(() => {
      const sh = getComputedStyle(document.querySelector('#stand .lvl-ico')).boxShadow;
-     return (sh.match(/inset/g) || []).length >= 6;
+     return (sh.match(/inset/g) || []).length >= 5;
    }));
 ok('2. шкала не торкається канта',
    geo[0].r + geo[0].wTrack / 2 <= 46, String(geo[0].r + geo[0].wTrack / 2));
@@ -320,18 +323,22 @@ const hot = await p.evaluate(async () => {
      (1.007), і поріг «виріс» падав через раз. Чекаємо, доки скінчиться. */
   await new Promise((res) => setTimeout(res, 400));
   const on = cell.classList.contains('is-hot');
-  const sx = cell.style.getPropertyValue('--spot-x');
-  const sy = cell.style.getPropertyValue('--spot-y');
+  const rx = cell.style.getPropertyValue('--lvl-rx');
+  const ry = cell.style.getPropertyValue('--lvl-ry');
   const tr = getComputedStyle(cell.querySelector('.lvl-ico')).transform;
-  const m = (tr.match(/matrix\(([\d.]+)/) || [])[1];
+  const m = (tr.match(/matrix3?d?\(([\d.]+)/) || [])[1];
   /* Курсор іде геть — усе мусить повернутись. */
   fire(0, 0);
   await new Promise((res) => requestAnimationFrame(res));
-  return { on, sx, sy, tr, grew: Number(m) > 1.01, off: !cell.classList.contains('is-hot') };
+  return { on, rx, ry, tr, grew: Number(m) > 1.01, off: !cell.classList.contains('is-hot') };
 });
-ok('6. під курсором жетон підсвічується', hot.on === true, JSON.stringify(hot));
-ok('6. блик стоїть там, де курсор',
-   /%$/.test(hot.sx || '') && Math.abs(parseFloat(hot.sx) - 25) < 4, hot.sx + ' / ' + hot.sy);
+ok('6. під курсором жетон оживає', hot.on === true, JSON.stringify(hot));
+/* Курсор у лівій верхній чверті: кулька мусить нахилитись ВЕРХОМ ДО
+   нього — rotateX додатний, rotateY відʼємний. Знак важливіший за
+   величину: переплутані осі дають нахил у протилежний бік, і на око це
+   помітно не одразу. */
+ok('6. нахил спрямований на курсор',
+   parseFloat(hot.rx) > 1 && parseFloat(hot.ry) < -1, hot.rx + ' / ' + hot.ry);
 ok('6. під курсором кулька росте', hot.grew === true, hot.tr);
 ok('6. поза жетоном усе повертається', hot.off === true, String(hot.off));
 
@@ -355,17 +362,14 @@ ok('6. поза жетоном усе повертається', hot.off === tru
     document.body.appendChild(cell);
     cell.classList.add('is-hot');          /* навіть якщо клас якось поставлять */
     const ico = getComputedStyle(cell.querySelector('.lvl-ico'));
-    const after = getComputedStyle(cell, '::after');
     return {
       hoverMedia: window.matchMedia('(hover: hover) and (pointer: fine)').matches,
       tr: ico.transform,
-      bd: ico.backdropFilter || ico.webkitBackdropFilter,
-      spot: after.content
+      bd: ico.backdropFilter || ico.webkitBackdropFilter
     };
   });
   ok('6. контекст справді без курсора', st.hoverMedia === false, String(st.hoverMedia));
-  ok('6. на дотику кулька не росте', st.tr === 'none', st.tr);
-  ok('6. на дотику блику немає', st.spot === 'none', st.spot);
+  ok('6. на дотику кулька не рухається', st.tr === 'none', st.tr);
   ok('6. на дотику скло лишається', /blur\(/.test(String(st.bd)), String(st.bd));
   await m.close();
 }

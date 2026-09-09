@@ -12,6 +12,8 @@ docs/
 node_modules/
 README.md
 RELEASE.md
+AGENTS.md
+CLAUDE.md
 package.json
 *.command
 .github/

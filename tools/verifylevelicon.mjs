@@ -167,6 +167,42 @@ ok('2. край скла зібраний із багатьох шарів, а �
      const sh = getComputedStyle(document.querySelector('#stand .lvl-ico')).boxShadow;
      return (sh.match(/inset/g) || []).length >= 5;
    }));
+/*
+ * БОКОВА ГРАНЬ — це зсуви БЕЗ РОЗМИТТЯ. Різниця не косметична: розмитий
+ * шар читається як тінь на поверхні, чіткий — як торець самого предмета.
+ * Досить комусь додати сюди blur «щоб мʼякше», і грань зникне, а жоден
+ * інший тест цього не помітить.
+ */
+const facet = await p.evaluate(() => {
+  const sh = getComputedStyle(document.querySelector('#stand .lvl-ico')).boxShadow;
+  /* Кожен шар: "<колір> <x> <y> <blur> <spread>", inset — окремим словом.
+     Ділимо по комах ПОЗА дужками: усередині rgba() коми теж є. */
+  const layers = [];
+  let depth = 0, buf = '';
+  for (const ch of sh) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) { layers.push(buf.trim()); buf = ''; continue; }
+    buf += ch;
+  }
+  if (buf.trim()) layers.push(buf.trim());
+  /*
+   * Грань — зовнішній шар зі зсувом УНИЗ і НУЛЬОВИМ розмиттям.
+   *
+   * Колір знімається перед розбором навмисно: у rgba() свої числа, і
+   * регулярка по сирому рядку ловила «0px 0px 8px» як зсув по x —
+   * шар-ореол зараховувався в грань, і перевірка показувала 6 замість 4.
+   */
+  const nums = (l) => (l.replace(/rgba?\([^)]*\)/g, '')
+    .match(/-?[\d.]+px/g) || []).map(parseFloat);
+  const hard = layers.filter((l) => {
+    if (/inset/.test(l)) return false;
+    const n = nums(l);                 // [x, y, blur, spread]
+    return n.length >= 3 && n[1] > 0 && n[2] === 0;
+  });
+  return { total: layers.length, hard: hard.length, sample: hard[0] || '' };
+});
+ok('2. бокова грань є і вона НЕ розмита', facet.hard >= 3, JSON.stringify(facet));
 ok('2. шкала не торкається канта',
    geo[0].r + geo[0].wTrack / 2 <= 46, String(geo[0].r + geo[0].wTrack / 2));
 

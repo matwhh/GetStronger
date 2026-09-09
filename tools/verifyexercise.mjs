@@ -124,10 +124,12 @@ const seg = async (p, name, val) => { await p.locator(`input[name="${name}"][val
     const g = await p.$eval('#jr-exercise svg.exc', svg => {
       const bars=[...svg.querySelectorAll('.exc__bar')], dots=[...svg.querySelectorAll('.exc__dot')];
       let dx=0, dy=0;
+      /* Стовпчик — <path> зі скругленим верхом і прямим дном, тому міряємо
+         його геометричну рамку, а не атрибути x/y прямокутника. */
       for (let i=0;i<Math.min(bars.length,dots.length);i++){
-        const cx=+bars[i].getAttribute('x') + +bars[i].getAttribute('width')/2;
-        dx=Math.max(dx, Math.abs(cx - +dots[i].getAttribute('cx')));
-        dy=Math.max(dy, Math.abs(+bars[i].getAttribute('y') - +dots[i].getAttribute('cy')));
+        const bb=bars[i].getBBox();
+        dx=Math.max(dx, Math.abs(bb.x + bb.width/2 - +dots[i].getAttribute('cx')));
+        dy=Math.max(dy, Math.abs(bb.y - +dots[i].getAttribute('cy')));
       }
       return { bars:bars.length, dots:dots.length, dx:+dx.toFixed(2), dy:+dy.toFixed(2),
                right: svg.querySelectorAll('.exc__ylab--r').length };

@@ -286,10 +286,17 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
     const bars = [...svg.querySelectorAll('.exc__bar')];
     const dots = [...svg.querySelectorAll('.exc__dot')];
     let dx = 0, dy = 0;
+    /* Стовпчик — <path> зі скругленим верхом і прямим дном, тому міряємо
+       його геометричну рамку, а не атрибути x/y прямокутника. */
+    const vbW = +svg.getAttribute('viewBox').split(' ')[2];
+    let outside = 0;
     for (let i = 0; i < Math.min(bars.length, dots.length); i++) {
-      const cx = +bars[i].getAttribute('x') + +bars[i].getAttribute('width') / 2;
-      dx = Math.max(dx, Math.abs(cx - +dots[i].getAttribute('cx')));
-      dy = Math.max(dy, Math.abs(+bars[i].getAttribute('y') - +dots[i].getAttribute('cy')));
+      const bb = bars[i].getBBox();
+      dx = Math.max(dx, Math.abs(bb.x + bb.width / 2 - +dots[i].getAttribute('cx')));
+      dy = Math.max(dy, Math.abs(bb.y - +dots[i].getAttribute('cy')));
+      /* Крайні точки стоять на межах шкали часу — без інсету їхні
+         стовпчики зрізало рамкою навпіл, і ряд виглядав обрубаним. */
+      if (bb.x < 0 || bb.x + bb.width > vbW) outside++;
     }
     /* Рядки шкали мають іти РІВНИМ кроком: нерівна шкала (76·80·84·86)
        бреше про відстані сильніше, ніж зайва лінія сітки. */
@@ -299,10 +306,12 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
       if (Math.abs((ys[i] - ys[i - 1]) - (ys[1] - ys[0])) > 1e-6) even = false;
     }
     return { bars: bars.length, dots: dots.length, dx: +dx.toFixed(2), dy: +dy.toFixed(2),
-             grid: svg.querySelectorAll('.exc__grid').length, ys: ys, even: even };
+             grid: svg.querySelectorAll('.exc__grid').length, ys: ys, even: even,
+             outside: outside };
   });
   ok('24. стовпчик на кожне зважування', g.bars === seeded && g.dots === seeded, JSON.stringify(g));
   ok('24. вершини стовпчиків збігаються з крапками', g.dx <= 0.1 && g.dy <= 0.1, JSON.stringify(g));
+  ok('24. жоден стовпчик не зрізаний рамкою', g.outside === 0, String(g.outside));
   ok('24. є сітка й підписи шкали', g.grid >= 3 && g.ys.length >= 3, JSON.stringify(g.ys));
   ok('24. крок шкали рівний', g.even, JSON.stringify(g.ys));
 

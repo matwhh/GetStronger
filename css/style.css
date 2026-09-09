@@ -2395,22 +2395,19 @@ main:focus:not(:focus-visible) { outline: none; }
   font-variant-numeric: tabular-nums;
 }
 
-/* Стовпчик тепер несе те саме число, що й крапка над ним, тож він більше
-   не фон: заливка помітна, верх скруглений, межа тонка. Але й не герой —
-   героєм лишається лінія, інакше ряд із 90 тренувань стає частоколом. */
+/* Стовпчик несе те саме число, що й крапка над ним, тож він більше не
+   фон: заливка помітна, верх скруглений, дно пряме (див. barPath —
+   скруглений низ відривав ряд від осі). Заливки під лінією немає
+   навмисно: вона фарбувала ту саму площу вдруге, і графік перетворювався
+   на сіру пляму, у якій ні стовпчиків, ні лінії не було видно. */
 .exc__bar {
-  fill: rgba(var(--acc-rgb), 0.13);
-  stroke: rgba(var(--acc-rgb), 0.24);
+  fill: rgba(var(--acc-rgb), 0.16);
+  stroke: rgba(var(--acc-rgb), 0.3);
   stroke-width: 1;
   transform-box: fill-box;
   transform-origin: bottom;
   animation: exc-bar 0.5s var(--e-out) backwards;
 }
-.exc__area { fill: url(#exc-fill); animation: exc-fade 0.6s ease-out 0.25s backwards; }
-/* Той самий градієнт, свій id: два <defs> з однаковим id в одному
-   документі — невалідна розмітка, а обидва графіки живуть на одній
-   сторінці журналу. */
-.wc__area { fill: url(#wc-fill); animation: exc-fade 0.6s ease-out 0.25s backwards; }
 /* Коридор цілі: пунктир і прозорість кажуть «це модель, не вимір». */
 .wc__fc {
   fill: none; stroke: var(--g2); stroke-width: 1.5;
@@ -2469,7 +2466,7 @@ main:focus:not(:focus-visible) { outline: none; }
    реченням під графіком і підписом нижнього рядка шкали. */
 
 @media (prefers-reduced-motion: reduce) {
-  .exc__bar, .exc__area, .wc__area, .wc__fc, .exc__line, .exc__dot { animation: none; }
+  .exc__bar, .wc__fc, .exc__line, .exc__dot { animation: none; }
   .exc__line { stroke-dasharray: none; }
   .exc__dot { transition: none; }
 }

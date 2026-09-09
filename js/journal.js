@@ -227,6 +227,24 @@
     };
   }
 
+  /**
+   * Шлях стовпчика: скруглений ВЕРХ, пряме дно.
+   *
+   * rx у <rect> скруглює всі чотири кути, і низ стовпчика відривався від
+   * осі помітною щілиною — ряд виглядав так, ніби висить у повітрі.
+   * Дно стовпчика лежить на осі, тому воно має бути прямим.
+   */
+  function barPath(x, y, w, h, r) {
+    const rr = Math.max(0, Math.min(r, w / 2, h));
+    const x2 = x + w, y2 = y + h;
+    return 'M' + round(x, 1) + ' ' + round(y2, 1) +
+           'L' + round(x, 1) + ' ' + round(y + rr, 1) +
+           'Q' + round(x, 1) + ' ' + round(y, 1) + ' ' + round(x + rr, 1) + ' ' + round(y, 1) +
+           'L' + round(x2 - rr, 1) + ' ' + round(y, 1) +
+           'Q' + round(x2, 1) + ' ' + round(y, 1) + ' ' + round(x2, 1) + ' ' + round(y + rr, 1) +
+           'L' + round(x2, 1) + ' ' + round(y2, 1) + 'Z';
+  }
+
   /** Значення рядків шкали: від дна до стелі рівним кроком. */
   function chartRows(sc) {
     /* Лічильник, а не накопичення v += step: на кроці 0,1 сорок додавань
@@ -292,7 +310,28 @@
     if (hi - lo < 0.5) { const mid = (hi + lo) / 2; lo = mid - 0.25; hi = mid + 0.25; }
 
     const sc = chartScale(lo, hi);
-    const px = function (t) { return PAD.l + innerW * (t - t0) / Math.max(1, t1 - t0); };
+
+    /*
+     * ШИРИНА СТОВПЧИКА Й ІНСЕТ ПО КРАЯХ — одне рішення, тому рахуються
+     * разом і саме в такому порядку.
+     *
+     * Перша точка стоїть на t0, остання на t1 — рівно на межах поля.
+     * Доки малювались самі крапки, це було нормально. Зі стовпчиками
+     * краєві половинки зрізались рамкою, і ряд виглядав обрубаним з обох
+     * боків. Тому поле стискається на півширини стовпчика з кожного боку
+     * — а щоб знати ту півширину, спершу треба крок, і його беремо ще з
+     * НЕСТИСНУТОГО поля: різниця в кілька відсотків, зате без рекурсії.
+     */
+    const span = Math.max(1, t1 - t0);
+    let minDt = Infinity;
+    for (let i = 1; i < data.length; i++) {
+      minDt = Math.min(minDt, dateOf(data[i].key).getTime() - dateOf(data[i - 1].key).getTime());
+    }
+    const bw = Math.max(2, Math.min(14, (innerW * minDt / span) * 0.45));
+    const IN = bw / 2 + 1;
+    const px = function (t) {
+      return PAD.l + IN + (innerW - IN * 2) * (t - t0) / span;
+    };
     const py = function (kg) { return PAD.t + innerH * (1 - (kg - sc.base) / (sc.roof - sc.base)); };
     const fmtV = function (v) { return fmtNum.n(v, Math.min(sc.dec, 2)); };
 
@@ -309,29 +348,25 @@
     /* ---- стовпчики: одне зважування — один стовпчик до своєї крапки ---- */
     let gap = innerW;
     for (let i = 1; i < xs.length; i++) gap = Math.min(gap, xs[i] - xs[i - 1]);
-    /* 0.45 кроку, не більше: 31 зважування шириною по 12 px зливаються в
-       суцільний паркан, і стовпчики перестають бути стовпчиками. */
-    const bw = Math.max(2, Math.min(9, gap * 0.45));
-    /* Крапка теж міряється кроком: при 90 щоденних зважуваннях крок падає
-       до 4 px, і кружки радіусом 3,5 злипаються в суцільну гусеницю. */
+    /* Крапка міряється кроком: при 120 щоденних зважуваннях крок падає до
+       4 px, і кружки радіусом 3,5 злипаються в суцільну гусеницю. */
     const dr = Math.max(2, Math.min(3.5, gap * 0.34));
     const dsw = Math.max(1.2, Math.min(2, dr * 0.6));
     const bars = data.map(function (e, i) {
       const y = py(e.kg);
       const h = y0 - y;
       if (h <= 0.5) return '';
-      return '<rect class="exc__bar" x="' + round(xs[i] - bw / 2, 1) + '" y="' + round(y, 1) +
-             '" width="' + round(bw, 1) + '" height="' + round(h, 1) +
-             '" rx="' + round(Math.min(3, bw / 2), 1) +
+      return '<path class="exc__bar" d="' + barPath(xs[i] - bw / 2, y, bw, h, 3) +
              '" style="animation-delay:' + Math.min(i * 14, 300) + 'ms"/>';
     }).join('');
 
-    /* ---- заливка під середньою + сама середня ---- */
+    /* ---- лінія середньої ----
+       Заливки під нею немає навмисно: стовпчики вже зафарбовують ту саму
+       площу, і разом вони давали сіру пляму, у якій ні стовпчиків, ні
+       лінії не було видно. Одна площа — один шар фарби. */
     const dPts = data.map(function (e, i) {
       return round(xs[i], 1) + ' ' + round(py(e.avg), 1);
     });
-    const area = '<path class="wc__area" d="M' + round(xs[0], 1) + ' ' + y0 +
-                 'L' + dPts.join('L') + 'L' + round(xs[xs.length - 1], 1) + ' ' + y0 + 'Z"/>';
     const line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '"/>';
 
     /*
@@ -386,8 +421,11 @@
     const n = data.length;
     const idx = n > 2 ? [0, Math.floor((n - 1) / 2), n - 1] : [0, n - 1];
     const xlab = idx.filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (i) {
+      /* Підпис кріпиться до СВОГО стовпчика, а не до рамки поля: інакше
+         крайні дати відʼїжджають від своїх стовпчиків на півширини смуги
+         й графік читається перекошеним. */
       const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
-      const x = i === 0 ? PAD.l : (i === n - 1 ? W - PAD.r : xs[i]);
+      const x = i === 0 ? xs[i] - bw / 2 : (i === n - 1 ? xs[i] + bw / 2 : xs[i]);
       return '<text class="exc__xlab" x="' + round(x, 1) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '">' +
              esc(shortDate(data[i].key)) + '</text>';
     }).join('');
@@ -397,11 +435,7 @@
     return '<svg class="exc" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
              'aria-label="Графік ваги тіла: ' + n + ' ' +
                window.App.plural(n, 'зважування', 'зважування', 'зважувань') + '">' +
-             '<defs><linearGradient id="wc-fill" x1="0" y1="0" x2="0" y2="1">' +
-               '<stop offset="0" stop-color="rgb(var(--acc-rgb))" stop-opacity="0.16"/>' +
-               '<stop offset="1" stop-color="rgb(var(--acc-rgb))" stop-opacity="0"/>' +
-             '</linearGradient></defs>' +
-             grid + area + bars + line + corridor + cols + axis + xlab +
+             grid + bars + line + corridor + cols + axis + xlab +
            '</svg>';
   }
 
@@ -1459,21 +1493,17 @@
       const y = py(vals[i]);
       const h = y0 - y;
       if (h <= 0.5) return '';
-      return '<rect class="exc__bar" x="' + (px(i) - bw / 2).toFixed(1) + '" y="' + y.toFixed(1) +
-             '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, bw / 2).toFixed(1) +
+      return '<path class="exc__bar" d="' + barPath(px(i) - bw / 2, y, bw, h, 3) +
              '" style="animation-delay:' + Math.min(i * 16, 320) + 'ms"/>';
     }).join('');
 
-    /* ---- заливка під лінією + сама лінія ---- */
+    /* ---- лінія по вершинах стовпчиків ---- */
     const dPts = pts.map(function (p, i) {
       return px(i).toFixed(1) + ' ' + py(vals[i]).toFixed(1);
     });
-    let area = '', line = '';
-    if (n > 1) {
-      line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '" />';
-      area = '<path class="exc__area" d="M' + px(0).toFixed(1) + ' ' + y0 +
-             'L' + dPts.join('L') + 'L' + px(n - 1).toFixed(1) + ' ' + y0 + 'Z"/>';
-    }
+    /* Заливки під лінією немає: стовпчики вже фарбують ту саму площу. */
+    let line = '';
+    if (n > 1) line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '" />';
 
     /* ---- колонки: кружок, перехрестя, зона наведення ---- */
     const cols = pts.map(function (p, i) {
@@ -1506,8 +1536,11 @@
     /* ---- підписи дат: перша, середня, остання ---- */
     const idx = n > 2 ? [0, Math.floor((n - 1) / 2), n - 1] : (n > 1 ? [0, n - 1] : [0]);
     const xlab = idx.filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (i) {
+      /* Підпис кріпиться до СВОГО стовпчика, а не до рамки поля: точки
+         стоять по центрах смуг, тож притиснута до краю дата опинялась на
+         півсмуги збоку від свого стовпчика. */
       const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
-      const x = i === 0 ? PAD.l : (i === n - 1 ? W - PAD.r : px(i));
+      const x = i === 0 ? px(i) - bw / 2 : (i === n - 1 ? px(i) + bw / 2 : px(i));
       return '<text class="exc__xlab" x="' + x.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '">' +
              esc(shortDate(pts[i].d)) + '</text>';
     }).join('');
@@ -1516,11 +1549,7 @@
 
     return '<svg class="exc" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
              'aria-label="Прогрес: ' + esc(m.label) + ', ' + n + ' тренувань">' +
-             '<defs><linearGradient id="exc-fill" x1="0" y1="0" x2="0" y2="1">' +
-               '<stop offset="0" stop-color="rgb(var(--acc-rgb))" stop-opacity="0.18"/>' +
-               '<stop offset="1" stop-color="rgb(var(--acc-rgb))" stop-opacity="0"/>' +
-             '</linearGradient></defs>' +
-             grid + area + bars + line + cols + axis + xlab +
+             grid + bars + line + cols + axis + xlab +
            '</svg>';
   }
 

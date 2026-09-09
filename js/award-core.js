@@ -81,15 +81,29 @@
   /**
    * Одна картка.
    *
-   * @param {object} a  нагорода з сервера: { code, label, season }
+   * @param {object} a  нагорода з сервера: { kind, label, season }
    * @param {object} [o] { seasonLabel: fn }  — як назвати сезон людською
    * @returns {string} HTML
    */
   function html(a, o) {
     a = a || {};
     o = o || {};
-    var def = CODES[a.code] || null;
-    var name = def ? def.name : (a.label || a.code || '—');
+    /*
+     * ПОЛЕ НАЗИВАЄТЬСЯ kind, А НЕ code.
+     *
+     * Так його віддає сервер: elo_history збирає
+     * jsonb_build_object('season', season, 'kind', kind, 'label', label).
+     * Перша збірка читала a.code — воно завжди було undefined, кожна
+     * нагорода падала в гілку «невідомий код» і малювалась зіркою з
+     * сирим підписом. Помилка тиха: картка не ламається, вона просто
+     * ніколи не показує того, що мала.
+     *
+     * a.code лишається запасним варіантом: у тестах і в майбутньому
+     * коді зручніше писати code, і платити за це нічим.
+     */
+    var kind = a.kind || a.code || '';
+    var def = CODES[kind] || null;
+    var name = def ? def.name : (a.label || kind || '—');
     var hint = def ? def.hint : (a.label || '');
     var back = def ? def.back : 'Подробиць про цю нагороду ця версія сайту ще не знає.';
     var icon = ICONS[(def && def.icon) || 'star'];
@@ -105,7 +119,7 @@
      * aria-label збирає обидві сторони в один рядок: читалка не вміє
      * «перевертати», вона мусить отримати все одразу.
      */
-    return '<article class="awd' + (a.code ? ' awd--' + esc(a.code) : '') + '" tabindex="0"'
+    return '<article class="awd' + (kind ? ' awd--' + esc(kind) : '') + '" tabindex="0"'
          +   ' aria-label="' + esc(name + '. ' + hint + (when ? '. ' + when : '') + '. ' + back) + '">'
          +   '<div class="awd__in">'
          +     '<div class="awd__face awd__face--front">'

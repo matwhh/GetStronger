@@ -3,88 +3,82 @@
 -- =====================================================================
 --
 --  ЩО РОБИТЬ
---    1. Видає нагороду 'beta' кожному, хто ВЖЕ має акаунт.
---    2. Ставить тригер, щоб її отримували й ті, хто зареєструється
---       далі, — доки бета триває.
---    3. Дає рубильник, яким бету «закривають»: після нього тригер
---       мовчить, і картка стає такою, що більше не видається.
+--    1. Розширює білий список awards.kind новим значенням 'beta'.
+--    2. Видає нагороду кожному, хто ВЖЕ має акаунт.
+--    3. Ставить тригер, щоб її отримували й ті, хто зареєструється далі.
 --
 --  ЧОМУ СЕРВЕР, А НЕ ПРАПОРЕЦЬ У ПРОФІЛІ
---    Нагорода, яку можна собі домалювати в localStorage, не нагорода.
---    Джерело правди тут те саме, що й у решти нагород: таблиця awards,
---    куди клієнт не пише.
+--    Нагорода, яку можна домалювати собі в localStorage, не нагорода.
+--    Джерело правди те саме, що й у решти: таблиця awards, куди клієнт
+--    не пише.
 --
---  ЧОМУ БЕЗ СЕЗОНУ
+--  ЧОМУ БІЛИЙ СПИСОК РОЗШИРЮЄМО, А НЕ ЗНІМАЄМО
+--    awards_kind_check перелічує дозволені види нагород. Це структурний
+--    барʼєр: він не дає завести нагороду одруківкою в назві. Знімати
+--    його заради одного нового виду — міняти захист на зручність.
+--
+--  ЧОМУ СЕЗОН ПОРОЖНІЙ
 --    Решта нагород прив'язані до сезону — їх видає elo_close_season за
 --    підсумком. «Бета» не про сезон, а про час: людина була тут до
---    релізу. Тому season = '' — і картка підписується просто
---    «Нагорода», без сезону (js/award-core.js це вміє).
+--    релізу. season = '' і входить у первинний ключ (user_id, season,
+--    kind), тобто нагорода видається рівно один раз на людину.
 --
---  ІДЕМПОТЕНТНО
---    ON CONFLICT DO NOTHING скрізь: повторний прогін нічого не змінює й
---    нічого не дублює. Відкат — db/award-beta-rollback.sql.
+--  ЯК ЗАКРИТИ БЕТУ
+--    drop trigger trg_grant_beta on account_status;
+--    drop function grant_beta_award();
+--    Уже видані картки лишаються — у цьому й сенс. Прапорця в конфізі
+--    навмисно немає: elo_config тут — один рядок jsonb, дзеркало якого
+--    лежить у db/elo-config.json і звіряється тестом; зайвий ключ у
+--    ньому зламав би цю звірку заради речі, яка робиться одним drop.
 --
---  ПЕРЕВІРИТИ ПЕРЕД ЗАСТОСУВАННЯМ (нічого не змінює):
---    select count(*) from account_status;                  -- скільки акаунтів
---    select count(*) from awards where code = 'beta';      -- має бути 0
+--  ІДЕМПОТЕНТНО. Повторний прогін нічого не змінює й не дублює.
+--  Відкат — db/award-beta-rollback.sql.
 -- =====================================================================
 
-begin;
-
 -- --------------------------------------------------------------------
--- 1. Рубильник: чи триває бета.
---    Окремим рядком у elo_config, а не константою в коді: закрити бету
---    має бути одним update, без міграції й без деплою.
+-- 1. Білий список видів нагород: додаємо 'beta'.
+--    Решта значень збережена один в один зі стану бази до цієї зміни
+--    (див. award-beta-rollback.sql — там той самий перелік без 'beta').
 -- --------------------------------------------------------------------
-insert into elo_config (key, value)
-values ('beta_open', '1')
-on conflict (key) do nothing;
+alter table public.awards drop constraint if exists awards_kind_check;
+alter table public.awards add constraint awards_kind_check
+  check (kind = any (array[
+    'level5', 'level7', 'level8', 'level9', 'level10',
+    'elite', 'first', 'top3', 'top10', 'top100', 'top1000',
+    'top10pct', 'top5pct', 'top1pct',
+    'beta'
+  ]));
 
 -- --------------------------------------------------------------------
 -- 2. Тим, хто вже є.
 --    Джерело списку — account_status: рядок там з'являється рівно тоді,
---    коли людина подала заявку на акаунт. Саме це і є «зареєструвався».
+--    коли людина подала заявку на акаунт. Це і є «зареєструвався».
 -- --------------------------------------------------------------------
-insert into awards (user_id, season, code, label)
+insert into public.awards (user_id, season, kind, label)
 select s.user_id, '', 'beta', 'Бета'
-from account_status s
-on conflict do nothing;
+from public.account_status s
+on conflict (user_id, season, kind) do nothing;
 
 -- --------------------------------------------------------------------
 -- 3. Тим, хто зареєструється далі.
---    SECURITY DEFINER не потрібен: тригер працює від імені власника
---    таблиці, а не того, хто вставив рядок.
+--    SECURITY DEFINER не потрібен: тригер виконується від імені
+--    власника таблиці, а не того, хто вставив рядок.
 -- --------------------------------------------------------------------
-create or replace function grant_beta_award()
+create or replace function public.grant_beta_award()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
-declare
-  open_flag text;
 begin
-  select value into open_flag from elo_config where key = 'beta_open';
-  if coalesce(open_flag, '0') <> '1' then
-    return new;                       -- бета закрита: нічого не видаємо
-  end if;
-
-  insert into awards (user_id, season, code, label)
+  insert into public.awards (user_id, season, kind, label)
   values (new.user_id, '', 'beta', 'Бета')
-  on conflict do nothing;
-
+  on conflict (user_id, season, kind) do nothing;
   return new;
 end;
 $$;
 
-drop trigger if exists trg_grant_beta on account_status;
+drop trigger if exists trg_grant_beta on public.account_status;
 create trigger trg_grant_beta
-  after insert on account_status
+  after insert on public.account_status
   for each row
-  execute function grant_beta_award();
-
-commit;
-
--- =====================================================================
---  ЯК ЗАКРИТИ БЕТУ (коли настане час):
---    update elo_config set value = '0' where key = 'beta_open';
---  Уже видані картки лишаються — у цьому й сенс.
--- =====================================================================
+  execute function public.grant_beta_award();

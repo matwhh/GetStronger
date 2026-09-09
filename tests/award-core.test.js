@@ -22,7 +22,17 @@ import { loadModules } from './helpers.js';
 
 const { Award } = loadModules(['js/award-core.js']);
 
-test('картка знайомого коду бере назву й пояснення з довідника', () => {
+test('сервер віддає kind, а не code — картка мусить читати саме його', () => {
+  /* elo_history: jsonb_build_object('season', …, 'kind', kind, 'label', …).
+     Читання a.code давало undefined, і кожна нагорода малювалась як
+     невідома — тихо, без жодної помилки в консолі. */
+  const h = Award.html({ kind: 'beta', label: 'Бета' });
+  assert.match(h, /БЕТА/);
+  assert.match(h, /Учасник бета-версії/);
+  assert.match(h, /awd--beta/);
+});
+
+test('code лишається запасним варіантом', () => {
   const h = Award.html({ code: 'beta', label: 'Бета' });
   assert.match(h, /БЕТА/);
   assert.match(h, /Учасник бета-версії/);

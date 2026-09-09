@@ -1400,9 +1400,28 @@
        звідси clientLeft/clientTop (це і є її товщина). */
     seg.style.setProperty('--seg-w', r.width + 'px');
     seg.style.setProperty('--seg-h', r.height + 'px');
-    seg.style.setProperty('--seg-x', (r.left - b.left - seg.clientLeft) + 'px');
+    /* + scrollLeft: доріжка тепер прокручується вбік, а getBoundingClientRect
+       дає координати ВИДИМОЇ частини. Без доданку виділення лишалось би
+       стояти на місці, поки ряд під ним їде, — тобто підсвічувало б не той
+       крок. */
+    seg.style.setProperty('--seg-x', (r.left - b.left - seg.clientLeft + seg.scrollLeft) + 'px');
     seg.style.setProperty('--seg-y', (r.top - b.top - seg.clientTop) + 'px');
     seg.style.setProperty('--seg-on', '1');
+
+    /*
+     * Обраний крок мусить бути ВИДИМИМ. У прокручуваному ряду він легко
+     * опиняється за краєм — наприклад, «Рік» серед семи періодів на
+     * вузькому екрані. Підводимо ряд самі, а не через scrollIntoView:
+     * той тягне за собою й сторінку, і замість підсвітки кроку людина
+     * отримує стрибок усього екрана.
+     */
+    const pad = 12;
+    const left = r.left - b.left + seg.scrollLeft;
+    if (left < seg.scrollLeft + pad) {
+      seg.scrollLeft = Math.max(0, left - pad);
+    } else if (left + r.width > seg.scrollLeft + seg.clientWidth - pad) {
+      seg.scrollLeft = left + r.width - seg.clientWidth + pad;
+    }
 
     /* is-ready вмикає переходи — але тільки з НАСТУПНОГО кадру, інакше
        перший замір сам стане анімацією з лівого кута. */

@@ -45,38 +45,41 @@
    */
   var CODES = {
     beta: {
-      name: 'БЕТА',
-      hint: 'Учасник бета-версії',
-      back: 'Ти був тут, поки Forge ще збирався. Більше не видається.',
-      icon: 'gear'
+      name: 'BETA',
+      hint: 'Учасник бета-версії'
     },
-    level5:  { name: 'L5',  hint: 'Пʼятий рівень сезону',   back: 'Сезон закрито на пʼятому рівні.' },
-    level7:  { name: 'L7',  hint: 'Сьомий рівень сезону',   back: 'Сезон закрито на сьомому рівні.' },
-    level8:  { name: 'L8',  hint: 'Восьмий рівень сезону',  back: 'Сезон закрито на восьмому рівні.' },
-    level9:  { name: 'L9',  hint: 'Девʼятий рівень сезону', back: 'Сезон закрито на девʼятому рівні.' },
-    level10: { name: 'L10', hint: 'Десятий рівень сезону',  back: 'Сезон закрито на десятому рівні — вище немає.' },
-    elite:   { name: 'ELITE', hint: '2000+ ELO', back: 'Сезон закрито понад стелею рівнів.' },
-    first:   { name: '#1',  hint: 'Перше місце сезону',     back: 'Перше місце в таблиці лідерів за підсумком сезону.' },
-    top3:    { name: 'TOP 3', hint: 'Трійка сезону',        back: 'Місце в трійці за підсумком сезону.' }
+    level5:  { name: 'L5',  hint: 'Пʼятий рівень сезону' },
+    level7:  { name: 'L7',  hint: 'Сьомий рівень сезону' },
+    level8:  { name: 'L8',  hint: 'Восьмий рівень сезону' },
+    level9:  { name: 'L9',  hint: 'Девʼятий рівень сезону' },
+    level10: { name: 'L10', hint: 'Десятий рівень сезону' },
+    elite:   { name: 'ELITE', hint: '2000+ ELO' },
+    first:   { name: '#1',  hint: 'Перше місце сезону' },
+    top3:    { name: 'TOP 3', hint: 'Трійка сезону' }
   };
 
   /*
-   * Іконки — інлайном, а не файлами: їх дві, вони по 200 байт, і
-   * <img> у власному документі не дістає до кольору теми.
+   * ЗНАК FORGE — шестерня з бігуном.
+   *
+   * Це той самий знак, що лежить у 01-gear-runner-logo-black_8.svg;
+   * намальована «шестерня налаштувань» звідси прибрана. Причина не в
+   * красі: власний знак на нагороді каже, ХТО її видав, а типова
+   * шестерня з набору іконок не каже нічого — і збігається зі значком
+   * налаштувань у сотні інших застосунків.
+   *
+   * ІНЛАЙНОМ, А НЕ <img>: колір береться з currentColor, тобто знак
+   * світиться тим самим білим, що й текст картки. Файл цього не вміє —
+   * у власному документі він не дістає до теми.
+   *
+   * ID КЛІП-МАСКИ УНІКАЛЬНИЙ НА КОЖЕН ВИКЛИК. Усередині є clipPath, а
+   * карток на сторінці кілька: однакові id означали б, що другий знак
+   * бере маску першого. Лічильник, а не Math.random(): так його видно
+   * в тесті.
    */
-  var ICONS = {
-    gear:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
-      + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-      + '<circle cx="12" cy="12" r="3"/>'
-      + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
-      + '</svg>',
-    star:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
-      + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-      + '<path d="M12 3l2.6 5.6 6.1.8-4.5 4.2 1.2 6.1L12 16.8 6.6 19.7l1.2-6.1L3.3 9.4l6.1-.8z"/>'
-      + '</svg>'
-  };
+  var seq = 0;
+  function gearIcon() {
+    return '<svg viewBox="0 0 1022 1043"><clipPath id="__ID__"><path d="M1013.72 455.28 L1013.84 591.18 L929.07 629.35 L881.41 744.70 L914.51 831.57 L818.50 927.74 L731.57 894.79 L616.31 942.66 L578.29 1027.49 L442.39 1027.61 L404.22 942.84 L288.87 895.18 L202.00 928.28 L105.83 832.27 L138.78 745.34 L90.91 630.08 L6.08 592.06 L5.96 456.16 L90.73 417.99 L138.39 302.64 L105.29 215.77 L201.30 119.60 L288.23 152.55 L403.49 104.68 L441.51 19.85 L577.41 19.73 L615.58 104.50 L730.93 152.16 L817.80 119.06 L913.97 215.07 L881.02 302.00 L928.89 417.26 Z"/></clipPath><g fill="currentColor" stroke="none"><path fill-rule="evenodd" d="M1013.72 455.28 L1013.84 591.18 L929.07 629.35 L881.41 744.70 L914.51 831.57 L818.50 927.74 L731.57 894.79 L616.31 942.66 L578.29 1027.49 L442.39 1027.61 L404.22 942.84 L288.87 895.18 L202.00 928.28 L105.83 832.27 L138.78 745.34 L90.91 630.08 L6.08 592.06 L5.96 456.16 L90.73 417.99 L138.39 302.64 L105.29 215.77 L201.30 119.60 L288.23 152.55 L403.49 104.68 L441.51 19.85 L577.41 19.73 L615.58 104.50 L730.93 152.16 L817.80 119.06 L913.97 215.07 L881.02 302.00 L928.89 417.26 Z M483.20 154.61 A367.44 367.44 0 1 1 304.48 216.46 A103.75 103.75 0 0 1 483.20 154.61 Z"/><circle cx="407.80" cy="225.87" r="80.75"/></g><g clip-path="url(#__ID__)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path stroke-width="147.0" d="M494.44 376.17 L580.24 534.29"/><path stroke-width="80.0" stroke-linecap="butt" d="M552.85 514.01 L534.40 580.30 L294.40 900.30"/><path stroke-width="73.0" d="M551.75 519.68 L617.25 552.42"/><path stroke-width="73.0" d="M617.25 534.29 L617.25 714.00 L792.00 714.00"/><path stroke-width="60.0" d="M190.50 464.00 L329.09 466.31 L443.98 352.71 A127.5 127.5 0 0 1 531.20 315.90 L681.45 313.04 L753.90 443.20"/></g></svg>'.replace(/__ID__/g, 'awd-gear-' + (++seq));
+  }
 
   /**
    * Одна картка.
@@ -105,8 +108,6 @@
     var def = CODES[kind] || null;
     var name = def ? def.name : (a.label || kind || '—');
     var hint = def ? def.hint : (a.label || '');
-    var back = def ? def.back : 'Подробиць про цю нагороду ця версія сайту ще не знає.';
-    var icon = ICONS[(def && def.icon) || 'star'];
     var when = a.season
       ? (typeof o.seasonLabel === 'function' ? o.seasonLabel(a.season) : String(a.season))
       : '';
@@ -117,22 +118,26 @@
      * клавіатури. Без нього зворотний бік для нього не існує.
      *
      * aria-label збирає обидві сторони в один рядок: читалка не вміє
-     * «перевертати», вона мусить отримати все одразу.
+     * «перевертати», вона мусить отримати все одразу. Чорна діра для неї
+     * не існує взагалі — це чиста графіка, aria-hidden.
      */
     return '<article class="awd' + (kind ? ' awd--' + esc(kind) : '') + '" tabindex="0"'
-         +   ' aria-label="' + esc(name + '. ' + hint + (when ? '. ' + when : '') + '. ' + back) + '">'
+         +   ' aria-label="' + esc(name + '. ' + hint + (when ? '. ' + when : '')) + '">'
          +   '<div class="awd__in">'
+              /*
+               * ЛИЦЕ — тільки чорна діра. Ні назви, ні підпису: картку
+               * впізнають за нею самою, а що це — відповідає зворот.
+               * Порожнє лице тут не порожнеча, а привід перевернути.
+               */
          +     '<div class="awd__face awd__face--front">'
-         +       '<span class="awd__glow" aria-hidden="true"></span>'
-         +       '<span class="awd__eyebrow">' + (when ? esc(when) : 'Нагорода') + '</span>'
-         +       '<span class="awd__name">' + esc(name) + '</span>'
-         +       '<span class="awd__hint">' + esc(hint) + '</span>'
-         +       '<span class="awd__ico" aria-hidden="true">' + icon + '</span>'
+         +       '<span class="awd__hole" aria-hidden="true">'
+         +         '<i class="awd__ring"></i><i class="awd__ring"></i><i class="awd__ring"></i>'
+         +       '</span>'
          +     '</div>'
+              /* ЗВОРОТ — назва й знак. Більше нічого. */
          +     '<div class="awd__face awd__face--back">'
-         +       '<span class="awd__eyebrow">' + esc(name) + '</span>'
-         +       '<p class="awd__text">' + esc(back) + '</p>'
-         +       '<span class="awd__ico" aria-hidden="true">' + icon + '</span>'
+         +       '<span class="awd__mark" aria-hidden="true">' + gearIcon() + '</span>'
+         +       '<span class="awd__name">' + esc(name) + '</span>'
          +     '</div>'
          +   '</div>'
          + '</article>';
@@ -145,5 +150,5 @@
     return '<div class="awd-grid">' + arr.map(function (a) { return html(a, o); }).join('') + '</div>';
   }
 
-  window.Award = { html: html, grid: grid, CODES: CODES, ICONS: ICONS };
+  window.Award = { html: html, grid: grid, CODES: CODES, gearIcon: gearIcon };
 })();

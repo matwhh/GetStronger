@@ -27,14 +27,14 @@ test('сервер віддає kind, а не code — картка мусить
      Читання a.code давало undefined, і кожна нагорода малювалась як
      невідома — тихо, без жодної помилки в консолі. */
   const h = Award.html({ kind: 'beta', label: 'Бета' });
-  assert.match(h, /БЕТА/);
+  assert.match(h, /BETA/);
   assert.match(h, /Учасник бета-версії/);
   assert.match(h, /awd--beta/);
 });
 
 test('code лишається запасним варіантом', () => {
   const h = Award.html({ code: 'beta', label: 'Бета' });
-  assert.match(h, /БЕТА/);
+  assert.match(h, /BETA/);
   assert.match(h, /Учасник бета-версії/);
   assert.match(h, /awd--beta/);
 });
@@ -64,25 +64,42 @@ test('код нагороди теж екранується — з нього з
   assert.doesNotMatch(h, /<script>/);
 });
 
-test('обидва боки лежать в aria-label: читалка не вміє перевертати', () => {
+test('те, чого не видно очима, лежить в aria-label', () => {
+  /* Лице картки — чорна діра без жодного слова, зворот — знак і назва.
+     Читалка перевертати не вміє, тож мусить отримати все одразу. */
   const h = Award.html({ code: 'beta' });
   const m = h.match(/aria-label="([^"]*)"/);
   assert.ok(m, 'aria-label є');
-  assert.match(m[1], /БЕТА/);
+  assert.match(m[1], /BETA/);
   assert.match(m[1], /Учасник бета-версії/);
-  assert.match(m[1], /Forge ще збирався/);
 });
 
-test('картка має обидві сторони й кутову іконку', () => {
+test('лице — чорна діра, зворот — знак і назва, більше нічого', () => {
   const h = Award.html({ code: 'beta' });
   assert.match(h, /awd__face--front/);
   assert.match(h, /awd__face--back/);
-  assert.equal((h.match(/awd__ico/g) || []).length, 2, 'іконка на кожному боці');
+  assert.match(h, /awd__hole/, 'чорна діра на лиці');
+  assert.equal((h.match(/awd__ring/g) || []).length, 3, 'три кільця, що падають');
+  assert.match(h, /awd__mark/, 'знак на звороті');
+  /* Старі шари прибрані. Якщо котрийсь повернеться — картка перестане
+     бути тим, про що домовлялись. */
+  assert.doesNotMatch(h, /awd__eyebrow|awd__hint|awd__text|awd__ico|awd__glow/);
 });
 
-test('у бети саме шестерня, у решти — зірка', () => {
-  assert.ok(Award.html({ code: 'beta' }).includes('<circle cx="12" cy="12" r="3"/>'));
-  assert.ok(!Award.html({ code: 'first' }).includes('<circle cx="12" cy="12" r="3"/>'));
+test('знак Forge, а не типова шестерня з набору іконок', () => {
+  const h = Award.html({ code: 'beta' });
+  /* viewBox знака — 1022×1043; будь-яка «іконка налаштувань» із набору
+     була б 24×24. */
+  assert.match(h, /viewBox="0 0 1022 1043"/);
+  assert.match(h, /currentColor/, 'колір із теми, а не зашитий чорний');
+});
+
+test('кліп-маски знака унікальні: інакше другий візьме маску першого', () => {
+  const a = Award.html({ code: 'beta' });
+  const b = Award.html({ code: 'first' });
+  const ids = (a + b).match(/awd-gear-\d+/g) || [];
+  assert.ok(ids.length >= 4, 'id є в кожній картці двічі: defs і посилання');
+  assert.equal(new Set(ids).size, 2, 'по одному унікальному id на картку');
 });
 
 test('сезон підписується переданою функцією, а не сирим кодом', () => {
@@ -92,9 +109,8 @@ test('сезон підписується переданою функцією, �
   assert.doesNotMatch(h, /AUTUMN-2026/);
 });
 
-test('без сезону надпис не порожній', () => {
-  const h = Award.html({ code: 'beta' });
-  assert.match(h, /Нагорода/);
+test('назва потрапляє на зворот', () => {
+  assert.match(Award.html({ code: 'beta' }), /class="awd__name">BETA</);
 });
 
 test('порожній список нагород не малює порожньої сітки', () => {

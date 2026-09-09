@@ -150,12 +150,103 @@
     return rollCache.out;
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Спільна геометрія графіків                                          */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЧОМУ СТОВПЧИКИ ДОХОДЯТЬ РІВНО ДО КРАПОК.
+   *
+   * Раніше на графіку вправи жили дві серії з двома шкалами: лінія
+   * метрики зліва й стовпчики обʼєму справа. Формально це чесно, але
+   * читалось як брехня — око читає складений графік так, ніби стовпчик
+   * і крапка над ним про одне й те саме число, а вони були про різні.
+   * Права шкала цього не рятувала: її треба СВІДОМО помітити.
+   *
+   * Тепер стовпчик і крапка — одне значення на одній шкалі: стовпчик
+   * росте від дна поля до тієї самої висоти, де стоїть крапка. Обʼєм не
+   * зник, він переїхав у підказку й у таблицю, де його читають числом, а
+   * не порівнюють оком.
+   *
+   * ЦІНА РІШЕННЯ, ЯКУ ТРЕБА НАЗВАТИ ВГОЛОС: дно поля — не нуль. Для ваги
+   * тіла й для 1RM нуль не має сенсу (графік від нуля перетворив би
+   * 82,1→82,9 кг на рівний паркан). Тому висоти стовпчиків НЕ
+   * пропорційні значенням: удвічі вищий стовпчик не означає удвічі
+   * більше число. Щоб це не читалось як обман, дно підписане: нижній
+   * рядок шкали — це реальне значення, від якого починається відлік.
+   */
+
+  /** Крок шкали «1 / 2 / 5 × 10ⁿ» для діапазону значень. */
+  function niceStep(range) {
+    const raw = Math.abs(range || 1) / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    return (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
+  }
+
+  /** Наступний крок того ж ряду: 1 → 2 → 5 → 10. */
+  function nextStep(step) {
+    const mag = Math.pow(10, Math.floor(Math.log10(step) + 1e-9));
+    const norm = Math.round(step / mag);
+    return (norm <= 1 ? 2 : norm <= 2 ? 5 : 10) * mag;
+  }
+
   /**
-   * Графік ваги за останні 90 днів: точки як є + лінія середньої за 7 днів.
+   * Дно, стеля й крок поля для діапазону даних lo…hi.
+   *
+   * 12% повітря зверху й знизу, потім округлення до кроку — щоб нижній
+   * рядок шкали був числом, яке не соромно показати («95», а не
+   * «94,73»). Якщо всі дані невідʼємні, а дно вийшло нижче нуля, дно
+   * стає нулем: тоді стовпчики чесні від початку й підпис не потрібен.
+   */
+  function chartScale(lo, hi) {
+    const spread = (hi - lo) || Math.max(Math.abs(hi) * 0.1, 1);
+    const air = (hi === lo) ? spread / 2 : spread * 0.12;
+    const min = lo - air, max = hi + air;
+    let step = niceStep(max - min);
+    let base = 0, roof = 0;
+    /* Крок піднімаємо доти, доки рядків не стане щонайбільше шість. Це
+       дешевше, ніж прорідити готовий ряд удвічі: прорідження ламає
+       рівність кроків (76·80·84·86 замість 75·80·85·90), а нерівна шкала
+       бреше сильніше за зайву лінію. */
+    for (let guard = 0; guard < 8; guard++) {
+      base = Math.floor(min / step) * step;
+      roof = Math.ceil(max / step) * step;
+      if (lo >= 0 && base < 0) base = 0;
+      if (roof <= base) roof = base + step;
+      if (Math.round((roof - base) / step) <= 5) break;
+      step = nextStep(step);
+    }
+    /* Хвіст плаваючої точки: 0.1*3 дає 0.30000000000000004, і це поповзе
+       в підпис осі. Округлення на два розряди точніше за крок. */
+    const dec = Math.max(0, -Math.floor(Math.log10(step)));
+    return {
+      base: Number(base.toFixed(dec + 2)),
+      roof: Number(roof.toFixed(dec + 2)),
+      step: step,
+      dec: dec
+    };
+  }
+
+  /** Значення рядків шкали: від дна до стелі рівним кроком. */
+  function chartRows(sc) {
+    /* Лічильник, а не накопичення v += step: на кроці 0,1 сорок додавань
+       дають 4.000000000000002, і останній рядок промахується повз стелю. */
+    const cnt = Math.max(1, Math.round((sc.roof - sc.base) / sc.step));
+    const out = [];
+    for (let i = 0; i <= cnt; i++) {
+      out.push(Number((sc.base + sc.step * i).toFixed(sc.dec + 2)));
+    }
+    return out;
+  }
+
+  /**
+   * Графік ваги: стовпчик і крапка на кожне зважування, лінія — ковзна
+   * середня за 7 днів, пунктир — коридор цілі.
+   *
+   * Шкала часу, а не порядкових номерів: пропущений тиждень має виглядати
+   * як пропущений тиждень, інакше графік ваги бреше про темп.
    *
    * SVG будується рядком без бібліотек, як і решта графіки сайту.
-   * Кольори — точки нейтральним g2, середня акцентом: дивитись треба
-   * саме на неї, тому вона і є кольоровою лінією.
    */
   function chartSvg(entries) {
     const all = rollingCached(entries);
@@ -166,7 +257,20 @@
       : all;
     if (data.length < 2) return '';
 
-    const W = 640, H = 220, PAD = { l: 44, r: 10, t: 12, b: 24 };
+    /* Полотно вужче на телефоні: viewBox стискає текст разом із графікою,
+       і 11 одиниць підпису на 640 px полотна стають 5 фізичними px. */
+    const narrow = (window.innerWidth || 1024) < 560;
+    const W = narrow ? 380 : 640, H = narrow ? 200 : 220;
+    const PAD = {
+      l: narrow ? 42 : 50,
+      r: narrow ? 12 : 14,
+      t: narrow ? 12 : 16,
+      b: narrow ? 26 : 30
+    };
+    const innerW = W - PAD.l - PAD.r;
+    const innerH = H - PAD.t - PAD.b;
+    const y0 = H - PAD.b;
+
     const t0 = dateOf(data[0].key).getTime();
     const t1 = dateOf(data[data.length - 1].key).getTime();
 
@@ -186,58 +290,118 @@
     // Мінімальний розмах пів кіло: інакше при стабільній вазі шум ±100 г
     // розтягується на всю висоту й виглядає як драма
     if (hi - lo < 0.5) { const mid = (hi + lo) / 2; lo = mid - 0.25; hi = mid + 0.25; }
-    const px = function (t) { return PAD.l + (W - PAD.l - PAD.r) * (t - t0) / Math.max(1, t1 - t0); };
-    const py = function (kg) { return PAD.t + (H - PAD.t - PAD.b) * (1 - (kg - lo) / (hi - lo)); };
 
-    const dots = data.map(function (e) {
-      return '<circle cx="' + round(px(dateOf(e.key).getTime()), 1) + '" cy="' + round(py(e.kg), 1) +
-             '" r="3" fill="var(--g2)"><title>' + esc(dateLabel(dateOf(e.key))) + ': ' + e.kg + ' кг</title></circle>';
+    const sc = chartScale(lo, hi);
+    const px = function (t) { return PAD.l + innerW * (t - t0) / Math.max(1, t1 - t0); };
+    const py = function (kg) { return PAD.t + innerH * (1 - (kg - sc.base) / (sc.roof - sc.base)); };
+    const fmtV = function (v) { return fmtNum.n(v, Math.min(sc.dec, 2)); };
+
+    const xs = data.map(function (e) { return px(dateOf(e.key).getTime()); });
+
+    /* ---- сітка й ліва шкала ---- */
+    const grid = chartRows(sc).map(function (v) {
+      const y = round(py(v), 1);
+      return '<line class="exc__grid" x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y + '"/>' +
+             '<text class="exc__ylab" x="' + (PAD.l - 8) + '" y="' + (y + 4) + '" text-anchor="end">' +
+             esc(fmtV(v)) + '</text>';
     }).join('');
 
-    const line = data.map(function (e, i) {
-      return (i ? 'L' : 'M') + round(px(dateOf(e.key).getTime()), 1) + ' ' + round(py(e.avg), 1);
-    }).join(' ');
-
-    // три горизонтальні позначки шкали
-    const ticks = [lo, (lo + hi) / 2, hi].map(function (kg) {
-      const y = round(py(kg), 1);
-      return '<line x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y +
-             '" stroke="rgba(var(--tint-rgb), 0.08)"/>' +
-             '<text x="' + (PAD.l - 6) + '" y="' + (y + 4) + '" text-anchor="end" ' +
-             'font-size="11" fill="var(--muted)">' + round(kg, 1) + '</text>';
+    /* ---- стовпчики: одне зважування — один стовпчик до своєї крапки ---- */
+    let gap = innerW;
+    for (let i = 1; i < xs.length; i++) gap = Math.min(gap, xs[i] - xs[i - 1]);
+    /* 0.45 кроку, не більше: 31 зважування шириною по 12 px зливаються в
+       суцільний паркан, і стовпчики перестають бути стовпчиками. */
+    const bw = Math.max(2, Math.min(9, gap * 0.45));
+    /* Крапка теж міряється кроком: при 90 щоденних зважуваннях крок падає
+       до 4 px, і кружки радіусом 3,5 злипаються в суцільну гусеницю. */
+    const dr = Math.max(2, Math.min(3.5, gap * 0.34));
+    const dsw = Math.max(1.2, Math.min(2, dr * 0.6));
+    const bars = data.map(function (e, i) {
+      const y = py(e.kg);
+      const h = y0 - y;
+      if (h <= 0.5) return '';
+      return '<rect class="exc__bar" x="' + round(xs[i] - bw / 2, 1) + '" y="' + round(y, 1) +
+             '" width="' + round(bw, 1) + '" height="' + round(h, 1) +
+             '" rx="' + round(Math.min(3, bw / 2), 1) +
+             '" style="animation-delay:' + Math.min(i * 14, 300) + 'ms"/>';
     }).join('');
+
+    /* ---- заливка під середньою + сама середня ---- */
+    const dPts = data.map(function (e, i) {
+      return round(xs[i], 1) + ' ' + round(py(e.avg), 1);
+    });
+    const area = '<path class="wc__area" d="M' + round(xs[0], 1) + ' ' + y0 +
+                 'L' + dPts.join('L') + 'L' + round(xs[xs.length - 1], 1) + ' ' + y0 + 'Z"/>';
+    const line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '"/>';
 
     /*
      * Прогноз проти факту — коридор цілі поверх графіка.
      *
      * Дві пунктирні межі від першої точки видимого періоду: де вага мала б
      * бути за обраної цілі (числа — ті самі діапазони, що написані словами
-     * в калькуляторі). Смуга між ними ледь тонована. Це модель, не
-     * обіцянка — тому пунктир і нейтральна прозорість, а не друга
-     * «справжня» лінія.
+     * в калькуляторі). Це модель, не обіцянка — тому пунктир і нейтральна
+     * прозорість, а не друга «справжня» лінія.
      */
     let corridor = '';
     if (fc) {
       const t0a = dateOf(fc.anchor.d).getTime();
       const steps = 24;
       const seg = function (f) {
-        const pts = [];
+        const out = [];
         for (let i = 0; i <= steps; i++) {
           const t = t0a + (t1 - t0a) * i / steps;
-          pts.push((pts.length ? 'L' : 'M') +
+          out.push((out.length ? 'L' : 'M') +
             round(px(t), 1) + ' ' + round(py(f((t - t0a) / 86400000)), 1));
         }
-        return pts.join('');
+        return out.join('');
       };
       corridor =
-        '<path d="' + seg(fc.hi) + '" fill="none" stroke="var(--g2)" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.7"/>' +
-        '<path d="' + seg(fc.lo) + '" fill="none" stroke="var(--g2)" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.7"/>';
+        '<path class="wc__fc" d="' + seg(fc.hi) + '"/>' +
+        '<path class="wc__fc" d="' + seg(fc.lo) + '"/>';
     }
 
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
-           'aria-label="Графік ваги тіла">' +
-             ticks + corridor + dots +
-             '<path d="' + line + '" fill="none" stroke="var(--acc-bar)" stroke-width="2.5"/>' +
+    /* ---- колонки: крапка, перехрестя, зона наведення ---- */
+    const cols = data.map(function (e, i) {
+      const cx = xs[i], cy = py(e.kg);
+      const left = i ? (xs[i - 1] + cx) / 2 : cx - gap / 2;
+      const right = i < xs.length - 1 ? (cx + xs[i + 1]) / 2 : cx + gap / 2;
+      const d = dateLabel(dateOf(e.key));
+      return '<g class="exc__col"' +
+               ' data-d="' + esc(d) + '"' +
+               ' data-v="' + esc(fmtNum.kg(e.kg) + ' кг') + '"' +
+               ' data-sub="' + esc('середня ' + fmtNum.kg(e.avg) + ' кг') + '">' +
+               '<title>' + esc(d + ': ' + fmtNum.kg(e.kg) + ' кг · середня ' + fmtNum.kg(e.avg) + ' кг') + '</title>' +
+               '<line class="exc__cross" x1="' + round(cx, 1) + '" y1="' + PAD.t + '" x2="' + round(cx, 1) + '" y2="' + y0 + '"/>' +
+               '<circle class="exc__dot" cx="' + round(cx, 1) + '" cy="' + round(cy, 1) +
+                 '" r="' + round(dr, 2) + '"' +
+                 ' style="stroke-width:' + round(dsw, 2) + 'px;animation-delay:' +
+                 Math.min(240 + i * 12, 520) + 'ms"/>' +
+               '<rect class="exc__hit" x="' + round(Math.max(PAD.l, left), 1) + '" y="' + PAD.t +
+                 '" width="' + round(Math.min(W - PAD.r, right) - Math.max(PAD.l, left), 1) +
+                 '" height="' + innerH + '"/>' +
+             '</g>';
+    }).join('');
+
+    /* ---- підписи дат: перша, середня, остання ---- */
+    const n = data.length;
+    const idx = n > 2 ? [0, Math.floor((n - 1) / 2), n - 1] : [0, n - 1];
+    const xlab = idx.filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (i) {
+      const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
+      const x = i === 0 ? PAD.l : (i === n - 1 ? W - PAD.r : xs[i]);
+      return '<text class="exc__xlab" x="' + round(x, 1) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '">' +
+             esc(shortDate(data[i].key)) + '</text>';
+    }).join('');
+
+    const axis = '<line class="exc__axis" x1="' + PAD.l + '" y1="' + y0 + '" x2="' + (W - PAD.r) + '" y2="' + y0 + '"/>';
+
+    return '<svg class="exc" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+             'aria-label="Графік ваги тіла: ' + n + ' ' +
+               window.App.plural(n, 'зважування', 'зважування', 'зважувань') + '">' +
+             '<defs><linearGradient id="wc-fill" x1="0" y1="0" x2="0" y2="1">' +
+               '<stop offset="0" stop-color="rgb(var(--acc-rgb))" stop-opacity="0.16"/>' +
+               '<stop offset="1" stop-color="rgb(var(--acc-rgb))" stop-opacity="0"/>' +
+             '</linearGradient></defs>' +
+             grid + area + bars + line + corridor + cols + axis + xlab +
            '</svg>';
   }
 
@@ -546,10 +710,15 @@
             '</div>'
           : '') +
 
-        (svg ? '<div class="wchart mt-2">' + svg + '</div>' +
+        (svg ? '<div class="wchart wchart--live mt-2" id="w-chart">' + svg +
+                 '<div class="chart-tip" id="w-tip" hidden></div>' +
+               '</div>' +
                weightPeriodLine() +
                forecastLine() +
-               '<p class="small muted mt-1">Сірі точки — зважування. Лінія — середня за 7 днів; дивіться на неї.' +
+               '<p class="small muted mt-1">Стовпчик і крапка — одне зважування. ' +
+               'Лінія — середня за 7 днів; дивіться на неї, а не на окремі дні. ' +
+               'Відлік іде від нижнього підпису шкали, а не від нуля: графік ваги від нуля ' +
+               'перетворив би реальні коливання на рівний паркан.' +
                (state.goal && window.ProgressCore && window.ProgressCore.GOAL_RATES[state.goal]
                  ? ' Пунктир — коридор обраної цілі: модель, не обіцянка.' : '') + '</p>'
              : '<p class="small muted mt-2">Два записи' + (state.period ? ' у цьому періоді' : '') + ' — і зʼявиться графік.</p>') +
@@ -573,6 +742,8 @@
             '</div>'
           : '') +
       '</div>';
+
+    wireChartTip('#w-chart', '#w-tip');
   }
 
   /* ------------------------------------------------------------------ */
@@ -1214,15 +1385,12 @@
   }
 
   /**
-   * СКЛАДЕНИЙ ГРАФІК: стовпчики обʼєму + лінія обраної метрики.
+   * СКЛАДЕНИЙ ГРАФІК: стовпчик + крапка на кожне тренування, лінія зверху.
    *
-   * Дві шкали, і це не прикраса. Обʼєм живе в тоннах (3 200 кг), вага
-   * снаряда — в десятках (30 кг). На спільній осі лінія прилипає до нуля
-   * і не показує нічого. Тому обʼєм має власну, праву шкалу, підписану
-   * максимумом: масштаб видно, а не вгадується.
-   *
-   * Коли обрана метрика — САМЕ обʼєм, стовпчики не малюються: це була б
-   * та сама серія двічі, і друга шкала збрехала б про незалежність.
+   * Одне значення — одна шкала. Стовпчик росте від дна поля рівно до
+   * крапки, крапки зшиті лінією, під лінією заливка. Обʼєм, який раніше
+   * жив тут другою серією на правій шкалі, переїхав у підказку й у
+   * таблицю: див. великий коментар про це біля chartScale().
    *
    * Точки стоять по центрах смуг (band scale), а не від краю до краю:
    * інакше перший і останній стовпчики наполовину виїжджають за поле.
@@ -1237,8 +1405,6 @@
     if (!vals.length) return '';
 
     const vols = pts.map(function (p) { return Number(p.vol) || 0; });
-    const maxVol = Math.max.apply(null, vols);
-    const withBars = metric !== 'vol' && maxVol > 0;
 
     /*
      * ШИРИНА ПОЛОТНА ЗАЛЕЖИТЬ ВІД ЕКРАНА, І ЦЕ НЕ КОСМЕТИКА.
@@ -1257,7 +1423,7 @@
     const W = narrow ? 380 : 640, H = narrow ? 200 : 220;
     const PAD = {
       l: narrow ? 44 : 54,
-      r: withBars ? (narrow ? 40 : 48) : 12,
+      r: narrow ? 12 : 14,
       t: narrow ? 12 : 16,
       b: narrow ? 26 : 30
     };
@@ -1270,46 +1436,33 @@
 
     const lo = Math.min.apply(null, vals);
     const hi = Math.max.apply(null, vals);
-    /* Плаский ряд (усі значення однакові) не має нульової висоти:
-       малюємо його посередині, інакше лінія злипається з віссю. */
-    const spread = (hi - lo) || Math.max(1, hi * 0.1);
-    /* 12% повітря згори й знизу: лінія не притискається до рамки, і
-       найвища точка не зрізається кружком удвічі більшим за неї. */
-    const base = (hi === lo) ? lo - spread / 2 : lo - spread * 0.12;
-    const roof = (hi === lo) ? hi + spread / 2 : hi + spread * 0.12;
-    const py = function (v) { return PAD.t + innerH * (1 - (v - base) / (roof - base)); };
+    const sc = chartScale(lo, hi);
+    const py = function (v) { return PAD.t + innerH * (1 - (v - sc.base) / (sc.roof - sc.base)); };
 
-    const fmtV = function (v) { return m.digits ? fmtNum.n(v, m.digits) : thou(v); };
+    const fmtV = function (v) {
+      return m.digits || sc.dec ? fmtNum.n(v, Math.max(m.digits || 0, Math.min(sc.dec, 2))) : thou(v);
+    };
 
     /* ---- сітка й ліва шкала ---- */
-    const rows = hi === lo ? [lo] : [lo, (lo + hi) / 2, hi];
-    const grid = rows.map(function (v) {
+    const grid = chartRows(sc).map(function (v) {
       const y = Math.round(py(v) * 10) / 10;
       return '<line class="exc__grid" x1="' + PAD.l + '" y1="' + y + '" x2="' + (W - PAD.r) + '" y2="' + y + '"/>' +
              '<text class="exc__ylab" x="' + (PAD.l - 8) + '" y="' + (y + 4) + '" text-anchor="end">' +
              esc(fmtV(v)) + '</text>';
     }).join('');
 
-    /* ---- стовпчики обʼєму (права шкала) ---- */
-    let bars = '', rightAxis = '';
-    if (withBars) {
-      const bw = Math.max(3, Math.min(16, slot * 0.55));
-      /* 0.78 висоти поля — стеля для стовпчиків. Верхня п'ята лишається
-         лінії: інакше найвищий стовпчик і пік лінії налазять один на
-         одного саме там, де обидва найцікавіші. */
-      const bh = function (v) { return innerH * 0.78 * (v / maxVol); };
-      bars = pts.map(function (p, i) {
-        const h = bh(vols[i]);
-        if (h <= 0) return '';
-        return '<rect class="exc__bar" x="' + (px(i) - bw / 2).toFixed(1) + '" y="' + (y0 - h).toFixed(1) +
-               '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, bw / 2).toFixed(1) +
-               '" style="animation-delay:' + Math.min(i * 16, 320) + 'ms"/>';
-      }).join('');
-      rightAxis =
-        '<text class="exc__ylab exc__ylab--r" x="' + (W - PAD.r + 8) + '" y="' + (PAD.t + innerH * 0.22 + 4).toFixed(1) + '">' +
-          esc(thou(maxVol)) + '</text>' +
-        '<text class="exc__ylab exc__ylab--r" x="' + (W - PAD.r + 8) + '" y="' + (y0 + 4) + '">0</text>';
-    }
+    /* ---- стовпчики: вершина кожного = крапка того ж тренування ---- */
+    const bw = Math.max(3, Math.min(14, slot * 0.42));
+    const dr = Math.max(2, Math.min(3.5, slot * 0.34));
+    const dsw = Math.max(1.2, Math.min(2, dr * 0.6));
+    const bars = pts.map(function (p, i) {
+      const y = py(vals[i]);
+      const h = y0 - y;
+      if (h <= 0.5) return '';
+      return '<rect class="exc__bar" x="' + (px(i) - bw / 2).toFixed(1) + '" y="' + y.toFixed(1) +
+             '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, bw / 2).toFixed(1) +
+             '" style="animation-delay:' + Math.min(i * 16, 320) + 'ms"/>';
+    }).join('');
 
     /* ---- заливка під лінією + сама лінія ---- */
     const dPts = pts.map(function (p, i) {
@@ -1341,8 +1494,10 @@
                ' data-vol="' + (vols[i] ? esc(thou(vols[i]) + ' кг') : '') + '">' +
                '<title>' + esc(ttl) + '</title>' +
                '<line class="exc__cross" x1="' + cx.toFixed(1) + '" y1="' + PAD.t + '" x2="' + cx.toFixed(1) + '" y2="' + y0 + '"/>' +
-               '<circle class="exc__dot" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="3.5"' +
-                 ' style="animation-delay:' + Math.min(240 + i * 14, 520) + 'ms"/>' +
+               '<circle class="exc__dot" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) +
+                 '" r="' + round(dr, 2) + '"' +
+                 ' style="stroke-width:' + round(dsw, 2) + 'px;animation-delay:' +
+                 Math.min(240 + i * 14, 520) + 'ms"/>' +
                '<rect class="exc__hit" x="' + (cx - slot / 2).toFixed(1) + '" y="' + PAD.t +
                  '" width="' + slot.toFixed(1) + '" height="' + innerH + '"/>' +
              '</g>';
@@ -1362,10 +1517,10 @@
     return '<svg class="exc" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
              'aria-label="Прогрес: ' + esc(m.label) + ', ' + n + ' тренувань">' +
              '<defs><linearGradient id="exc-fill" x1="0" y1="0" x2="0" y2="1">' +
-               '<stop offset="0" stop-color="rgb(var(--acc-rgb))" stop-opacity="0.30"/>' +
+               '<stop offset="0" stop-color="rgb(var(--acc-rgb))" stop-opacity="0.18"/>' +
                '<stop offset="1" stop-color="rgb(var(--acc-rgb))" stop-opacity="0"/>' +
              '</linearGradient></defs>' +
-             grid + bars + rightAxis + area + line + cols + axis + xlab +
+             grid + area + bars + line + cols + axis + xlab +
            '</svg>';
   }
 
@@ -1455,9 +1610,11 @@
         '</p>';
     } else {
       const trend = EC.trend(pts, metric);
-      /* Легенда потрібна рівно тоді, коли на полі справді дві серії:
-         умова повторює ту, за якою малюються стовпчики. */
-      const hasVol = metric !== 'vol' && st.points.some(function (p) { return Number(p.vol) > 0; });
+      /* Дно шкали графіка рахуємо тут ще раз тим самим chartScale, щоб
+         підписати його словами під графіком. Дублювання дешевше, ніж
+         повертати геометрію з функції, яка віддає рядок SVG. */
+      const exVals = st.points.map(function (p) { return EC.valueOf(p, metric); });
+      const exBase = chartScale(Math.min.apply(null, exVals), Math.max.apply(null, exVals)).base;
       const TREND = { up: '↑ Росте', down: '↓ Знижується', flat: '→ Стабільно' };
       const dTxt = st.delta === null
         ? 'перший запис'
@@ -1470,11 +1627,13 @@
           exChartSvg(st.points, metric) +
           '<div class="chart-tip" id="ex-tip" hidden></div>' +
         '</div>' +
-        (hasVol
-          ? '<div class="legend legend--chart mt-1">' +
-              '<span><i class="legend__line"></i>' + esc(m.label) + ' · ліва шкала</span>' +
-              '<span><i class="legend__bar"></i>Обʼєм за тренування · права шкала</span>' +
-            '</div>'
+        /* Легенди немає навмисно: на полі одна серія — стовпчик, крапка й
+           лінія показують ОДНЕ число. Пояснювати треба не «що є що», а
+           звідки починається відлік — і лише тоді, коли він не з нуля. */
+        (exBase > 0
+          ? '<p class="small muted mt-1 mb-0">Стовпчик і крапка — одне значення. ' +
+              'Відлік від ' + esc(exVal(exBase, m)) + ', а не від нуля: інакше різниця ' +
+              'між тренуваннями зникла б у висоті стовпчиків.</p>'
           : '') +
         '<div class="kpis mt-2">' +
           '<div class="kpi"><div class="kpi__val mono">' + exVal(st.current, m) + '</div>' +
@@ -1532,7 +1691,7 @@
         body +
       '</div>';
 
-    wireExChart();
+    wireChartTip('#ex-chart', '#ex-tip');
   }
 
   /*
@@ -1544,16 +1703,17 @@
    * (без секундної паузи) і спільне перехрестя, за яким видно, до якої
    * саме дати відноситься число.
    *
-   * Обробники висять на #ex-chart, а він перемальовується разом з усією
-   * карткою при кожній зміні вправи чи періоду — тому вішаємо їх заново
-   * після кожного рендера, а не один раз назавжди.
+   * Обробники висять на самій обгортці графіка, а вона перемальовується
+   * разом з усією карткою при кожній зміні вправи, дня чи періоду — тому
+   * вішаємо їх заново після кожного рендера, а не один раз назавжди.
+   * Тим самим кодом живуть обидва графіки сторінки: вправа й вага.
    *
    * Клавіатури тут немає навмисно: колонки не фокусні (див. коментар у
    * exChartSvg), а без миші ті самі числа дає таблиця нижче.
    */
-  function wireExChart() {
-    const box = $('#ex-chart');
-    const tip = $('#ex-tip');
+  function wireChartTip(boxSel, tipSel) {
+    const box = $(boxSel);
+    const tip = $(tipSel);
     if (!box || !tip) return;
 
     const show = function (g) {

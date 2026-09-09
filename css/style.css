@@ -2379,10 +2379,11 @@ main:focus:not(:focus-visible) { outline: none; }
 }
 .wchart svg { display: block; width: 100%; height: auto; }
 
-/* ---------- Складений графік вправи ------------------------------------
-   Дві серії на одному полі: стовпчики обʼєму (права шкала) і лінія
-   обраної метрики (ліва). Кольору немає — серії розрізняються ФОРМОЮ і
-   яскравістю, як і решта інтерфейсу. */
+/* ---------- Складений графік ------------------------------------------
+   Один візуальний словник на обидва графіки сторінки — прогрес вправи й
+   вагу тіла. Одне значення показане тричі: стовпчик від дна, крапка на
+   його вершині, лінія крізь крапки. Кольору немає — форма й яскравість
+   розрізняють шари, як і в решті інтерфейсу. */
 
 .wchart--live { position: relative; }
 
@@ -2393,22 +2394,29 @@ main:focus:not(:focus-visible) { outline: none; }
   font-size: 11px; fill: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-/* Права шкала підписана тим самим --muted, що й ліва: це такий самий
-   текст із таким самим правом бути прочитаним. Приглушувати його
-   «бо це другорядна серія» означало б завалити 4,5:1. */
-.exc__ylab--r { text-anchor: start; }
 
-/* Стовпчики — фон, а не герой: приглушена заливка й тонка верхня межа,
-   щоб ряд читався як гістограма, а не як суцільна пляма. */
+/* Стовпчик тепер несе те саме число, що й крапка над ним, тож він більше
+   не фон: заливка помітна, верх скруглений, межа тонка. Але й не герой —
+   героєм лишається лінія, інакше ряд із 90 тренувань стає частоколом. */
 .exc__bar {
-  fill: rgba(var(--tint-rgb), 0.11);
-  stroke: rgba(var(--tint-rgb), 0.16);
+  fill: rgba(var(--acc-rgb), 0.13);
+  stroke: rgba(var(--acc-rgb), 0.24);
   stroke-width: 1;
   transform-box: fill-box;
   transform-origin: bottom;
   animation: exc-bar 0.5s var(--e-out) backwards;
 }
 .exc__area { fill: url(#exc-fill); animation: exc-fade 0.6s ease-out 0.25s backwards; }
+/* Той самий градієнт, свій id: два <defs> з однаковим id в одному
+   документі — невалідна розмітка, а обидва графіки живуть на одній
+   сторінці журналу. */
+.wc__area { fill: url(#wc-fill); animation: exc-fade 0.6s ease-out 0.25s backwards; }
+/* Коридор цілі: пунктир і прозорість кажуть «це модель, не вимір». */
+.wc__fc {
+  fill: none; stroke: var(--g2); stroke-width: 1.5;
+  stroke-dasharray: 5 5; opacity: 0.7;
+  animation: exc-fade 0.6s ease-out 0.4s backwards;
+}
 .exc__line {
   fill: none; stroke: var(--acc-bar); stroke-width: 2.5;
   stroke-linejoin: round; stroke-linecap: round;
@@ -2451,24 +2459,17 @@ main:focus:not(:focus-visible) { outline: none; }
   pointer-events: none;
 }
 .chart-tip__v { font-size: 0.95rem; font-weight: 700; }
+/* display:flex вище перебиває вбудоване [hidden]{display:none} браузера,
+   і схована підказка лишалась на екрані порожньою бульбашкою в кутку
+   графіка. Атрибут має вимикати елемент, чим би він не був. */
+.chart-tip[hidden] { display: none; }
 
-/* Легенда під графіком: лінія і стовпчик — саме тими формами, якими вони
-   намальовані вище. Квадратик для обох не сказав би, де що. */
-.legend--chart { margin-top: 10px; font-size: 0.79rem; }
-/* Селектори з .legend попереду навмисно: правило .legend i вище задає
-   всім маркерам 10×10, і без цієї ваги воно перебило б і лінію, і
-   стовпчик — обидва перетворились би на однакові квадрати. */
-.legend .legend__line,
-.legend .legend__bar { display: inline-block; margin-right: 7px; vertical-align: middle; }
-.legend .legend__line { width: 16px; height: 2.5px; border-radius: 2px; background: var(--acc-bar); }
-.legend .legend__bar {
-  width: 9px; height: 12px; border-radius: 2px;
-  background: rgba(var(--tint-rgb), 0.11);
-  border: 1px solid rgba(var(--tint-rgb), 0.22);
-}
+/* Легенди під графіком немає: серія одна, і пояснювати «де що» нічого.
+   Що справді треба пояснити — звідки починається відлік — сказано
+   реченням під графіком і підписом нижнього рядка шкали. */
 
 @media (prefers-reduced-motion: reduce) {
-  .exc__bar, .exc__area, .exc__line, .exc__dot { animation: none; }
+  .exc__bar, .exc__area, .wc__area, .wc__fc, .exc__line, .exc__dot { animation: none; }
   .exc__line { stroke-dasharray: none; }
   .exc__dot { transition: none; }
 }

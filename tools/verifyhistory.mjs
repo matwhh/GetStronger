@@ -251,6 +251,76 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx3.close();
 }
 
+/* ---- 24. Графік ваги: той самий складений графік, що й у вправі -----
+   Раніше це була гола лінія з трьома позначками, без сітки, підказки й
+   стовпчиків — інший компонент для тієї самої задачі. Тепер обидва
+   графіки сторінки — один візуальний словник, і головне його правило
+   стережеться тут: стовпчик і крапка показують ОДНЕ число на ОДНІЙ
+   шкалі, тож вершина стовпчика лежить рівно в крапці. */
+{
+  const ctx4 = await adultContext(b, { viewport: { width: 1300, height: 1000 } });
+  const q = await ctx4.newPage();
+  const e6 = []; q.on('pageerror', (e) => e6.push(e.message));
+
+  /* Сіємо зважування прямо в сховище: adultContext досипає лише те, чого
+     бракує, тож наявний bodyLog переживе його посів. */
+  await q.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
+  const seeded = await q.evaluate(() => {
+    const pr = JSON.parse(localStorage.getItem('ib.profile') || '{}');
+    const log = {};
+    for (let i = 20; i >= 0; i -= 2) {
+      const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - i);
+      const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+                '-' + String(d.getDate()).padStart(2, '0');
+      log[k] = Math.round((82 - (20 - i) * 0.09) * 10) / 10;
+    }
+    pr.bodyLog = log;
+    localStorage.setItem('ib.profile', JSON.stringify(pr));
+    return Object.keys(log).length;
+  });
+  await q.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' });
+  await q.waitForTimeout(1500);
+
+  ok('24. графік ваги намальовано', await q.locator('#jr-weight svg.exc').count() === 1);
+  const g = await q.$eval('#jr-weight svg.exc', (svg) => {
+    const bars = [...svg.querySelectorAll('.exc__bar')];
+    const dots = [...svg.querySelectorAll('.exc__dot')];
+    let dx = 0, dy = 0;
+    for (let i = 0; i < Math.min(bars.length, dots.length); i++) {
+      const cx = +bars[i].getAttribute('x') + +bars[i].getAttribute('width') / 2;
+      dx = Math.max(dx, Math.abs(cx - +dots[i].getAttribute('cx')));
+      dy = Math.max(dy, Math.abs(+bars[i].getAttribute('y') - +dots[i].getAttribute('cy')));
+    }
+    /* Рядки шкали мають іти РІВНИМ кроком: нерівна шкала (76·80·84·86)
+       бреше про відстані сильніше, ніж зайва лінія сітки. */
+    const ys = [...svg.querySelectorAll('.exc__ylab')].map((t) => +t.textContent.replace(',', '.').replace(/\s/g, ''));
+    let even = ys.length > 2;
+    for (let i = 2; i < ys.length; i++) {
+      if (Math.abs((ys[i] - ys[i - 1]) - (ys[1] - ys[0])) > 1e-6) even = false;
+    }
+    return { bars: bars.length, dots: dots.length, dx: +dx.toFixed(2), dy: +dy.toFixed(2),
+             grid: svg.querySelectorAll('.exc__grid').length, ys: ys, even: even };
+  });
+  ok('24. стовпчик на кожне зважування', g.bars === seeded && g.dots === seeded, JSON.stringify(g));
+  ok('24. вершини стовпчиків збігаються з крапками', g.dx <= 0.1 && g.dy <= 0.1, JSON.stringify(g));
+  ok('24. є сітка й підписи шкали', g.grid >= 3 && g.ys.length >= 3, JSON.stringify(g.ys));
+  ok('24. крок шкали рівний', g.even, JSON.stringify(g.ys));
+
+  const tip0 = await q.$eval('#w-tip', (el) => {
+    const r = el.getBoundingClientRect();
+    return { hidden: el.hasAttribute('hidden'), w: Math.round(r.width), h: Math.round(r.height) };
+  });
+  ok('24. схована підказка справді схована', tip0.hidden && tip0.w === 0 && tip0.h === 0, JSON.stringify(tip0));
+
+  await q.locator('#jr-weight .exc__hit').first().hover();
+  await q.waitForTimeout(200);
+  const tip1 = await q.$eval('#w-tip', (el) => ({ hidden: el.hasAttribute('hidden'), t: el.innerText }));
+  ok('24. наведення дає день, вагу й середню',
+     !tip1.hidden && /кг/.test(tip1.t) && /середня/.test(tip1.t), JSON.stringify(tip1));
+  ok('24. без JS-помилок', e6.length === 0, e6.join(' | '));
+  await ctx4.close();
+}
+
 await b.close();
 const bad = R.filter((r) => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок історії пройшло.');

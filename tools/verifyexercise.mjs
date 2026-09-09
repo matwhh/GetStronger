@@ -112,6 +112,47 @@ const seg = async (p, name, val) => { await p.locator(`input[name="${name}"][val
   ok('11. без JS-помилок', errs.length===0, errs.join(' | '));
   await ctx.close();
 }
+{ /* 12. Складений графік: стовпчик і крапка — ОДНЕ значення.
+     Раніше стовпчики були обʼємом на власній правій шкалі, тож їх
+     вершини принципово не могли збігатися з крапками лінії. Око читає
+     складений графік так, ніби стовпчик і крапка над ним про одне й те
+     саме число — і воно читало неправду. Ця перевірка сторожить рівно
+     це: одна шкала на обидві форми. */
+  const { ctx, p, errs } = await open(PROFILE);
+  for (const metric of ['kg','vol','reps','e1rm']) {
+    await seg(p, 'ex-metric', metric);
+    const g = await p.$eval('#jr-exercise svg.exc', svg => {
+      const bars=[...svg.querySelectorAll('.exc__bar')], dots=[...svg.querySelectorAll('.exc__dot')];
+      let dx=0, dy=0;
+      for (let i=0;i<Math.min(bars.length,dots.length);i++){
+        const cx=+bars[i].getAttribute('x') + +bars[i].getAttribute('width')/2;
+        dx=Math.max(dx, Math.abs(cx - +dots[i].getAttribute('cx')));
+        dy=Math.max(dy, Math.abs(+bars[i].getAttribute('y') - +dots[i].getAttribute('cy')));
+      }
+      return { bars:bars.length, dots:dots.length, dx:+dx.toFixed(2), dy:+dy.toFixed(2),
+               right: svg.querySelectorAll('.exc__ylab--r').length };
+    });
+    ok('12. ['+metric+'] стовпчик на кожну крапку', g.bars===5 && g.dots===5, JSON.stringify(g));
+    ok('12. ['+metric+'] вершини збігаються з крапками', g.dx<=0.1 && g.dy<=0.1, JSON.stringify(g));
+    ok('12. ['+metric+'] другої шкали немає', g.right===0, String(g.right));
+  }
+  /* .chart-tip має display:flex, а він перебиває вбудоване
+     [hidden]{display:none} — схована підказка лишалась порожньою
+     бульбашкою в кутку графіка. */
+  const tip = await p.$eval('#ex-tip', el => {
+    const r = el.getBoundingClientRect();
+    return { hidden: el.hasAttribute('hidden'), w: Math.round(r.width), h: Math.round(r.height) };
+  });
+  ok('12. схована підказка справді схована', tip.hidden && tip.w===0 && tip.h===0, JSON.stringify(tip));
+
+  await p.locator('#jr-exercise .exc__hit').first().hover();
+  await p.waitForTimeout(200);
+  const shown = await p.$eval('#ex-tip', el => ({ hidden: el.hasAttribute('hidden'), t: el.innerText }));
+  ok('12. наведення показує число й обʼєм', !shown.hidden && /95/.test(shown.t) && /обʼєм/.test(shown.t),
+     JSON.stringify(shown));
+  ok('12. без JS-помилок', errs.length===0, errs.join(' | '));
+  await ctx.close();
+}
 await b.close();
 const bad=R.filter(r=>!r[1]).length;
 console.log('\n'+(R.length-bad)+'/'+R.length+' перевірок прогресу вправи.');

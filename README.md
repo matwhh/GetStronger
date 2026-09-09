@@ -204,8 +204,8 @@ npm run build:meta    # canonical, og:url і sitemap.xml із домену в co
 ```
 
 Публікація: `git push` у `main` → Vercel збирає статику. На Mac для цього
-є кнопка — подвійний клік по
-[`tools/publish.command`](tools/publish.command): тести → коміт → пуш.
+є кнопка — подвійний клік по «Опублікувати.command» у корені теки
+релізу: тести → коміт → пуш.
 Червоні тести означають, що нічого не відправлено. Див.
 [`AGENTS.md`](AGENTS.md) §6.
 

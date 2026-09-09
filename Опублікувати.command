@@ -52,6 +52,38 @@ else
   git remote add origin "$REPO_URL" || fail "не вдалося додати origin"
 fi
 
+# --- 2.5. Ворота: тести ---------------------------------------------------
+#
+# Публікація без тестів — це публікація наосліп. Раніше ворота стояли в
+# автопублікації (tools/auto-publish.sh); її вирізали, і разом з нею
+# зникла єдина перевірка перед пушем. Тепер вони тут.
+#
+# Червоні тести або гігієна = НІЧОГО не відправлено. Це навмисно: краще
+# кнопка, яка відмовила з поясненням, ніж зламаний сайт у продакшені.
+#
+# ~12 секунд на 721 тест. Це дешевше за один відкат.
+if ! command -v node >/dev/null 2>&1; then
+  fail "node не знайдено — без тестів не публікуємо. Постав: brew install node"
+fi
+
+say "· тести…"
+if ! node --test tests/*.test.js > /tmp/forge-tests.log 2>&1; then
+  echo
+  tail -n 25 /tmp/forge-tests.log
+  echo
+  fail "ТЕСТИ ЧЕРВОНІ — нічого не відправлено. Повний вивід: /tmp/forge-tests.log"
+fi
+grep -E '^# (tests|pass|fail)' /tmp/forge-tests.log | sed 's/^/  /'
+
+say "· гігієна…"
+if ! node tools/ci-hygiene.mjs > /tmp/forge-hygiene.log 2>&1; then
+  echo
+  tail -n 20 /tmp/forge-hygiene.log
+  echo
+  fail "ГІГІЄНА ЧЕРВОНА — нічого не відправлено."
+fi
+tail -n 1 /tmp/forge-hygiene.log | sed 's/^/  /'
+
 # --- 3. Що саме відправляємо ---------------------------------------------
 [ -f .gitignore ] || cat > .gitignore <<'IGN'
 node_modules/

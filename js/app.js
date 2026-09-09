@@ -656,21 +656,93 @@
   /* Значок рівня                                                        */
   /* ------------------------------------------------------------------ */
   /*
-   * Десять готових малюнків (icons/levels/lvl-1..10.svg): диск зі шкалою,
-   * яка заповнюється з рівнем, і числом усередині. Раніше рівень малювався
-   * кружком із цифрою на CSS — тепер цифра вже всередині файлу, тож
-   * обгортка не мусить малювати ні рамки, ні фону, інакше вийде коло в колі.
+   * ЖЕТОН РІВНЯ: скляна кулька, дуга-шкала й число всередині.
    *
-   * <img>, а не inline SVG: малюнок один на всі місця, і браузер кешує
-   * його між сторінками. Розмір задається обгорткою.
+   * Влаштований просто, і саме тому малюється кодом, а не лежить десятьма
+   * файлами (як було: icons/levels/lvl-1..10.svg). Десять майже однакових
+   * малюнків розходяться при першій же правці — досить поміняти товщину
+   * дуги в дев’яти з них.
+   *
+   * ГЕОМЕТРІЯ. Коло, всередині нього дуга, що повторює коло, з розривом
+   * УНИЗУ приблизно на пʼяту частину (72°). Дуга заповнюється й міняє
+   * колір із рівнем; у центрі — число рівня.
+   *
+   * Дуга — це штрих кола зі stroke-dasharray, а не <path> з командою A:
+   * так довжину видно числом (частка від 288°), і не треба рахувати
+   * координати кінців. Поворот на 126° ставить початок дуги на лівий
+   * край розриву, тож заповнення йде за годинниковою від низу вліво —
+   * як у спідометра.
+   *
+   * ЯК ЗРОБЛЕНЕ СКЛО. Тут — тільки ТІЛО й ПОЛИСК: два градієнти, які
+   * дають товщу скла. Край скла (фаска, внутрішнє світіння, зовнішня
+   * тінь) малює CSS багатошаровим inset box-shadow — див. .lvl-ico в
+   * style.css. Кант, намальований дугою в SVG, звідси прибрано: коло,
+   * задане border-radius:50%, рівне завжди, а дуга-кант залежала від
+   * градієнта й читалася як крива.
+   *
+   * ЧОМУ ТІЛО НА ВЕСЬ viewBox (r = 50). Стовп розмиття обрізається
+   * border-radius: 50% по межі елемента. Менший радіус лишав би по краю
+   * кільце розмиття без скла над ним.
+   *
+   * ІНЛАЙН, А НЕ <img>. Малюнок залежить від змінних теми (--lvl-tone,
+   * --tint-rgb), а <img> у власному документі до них не дістає. Ціна —
+   * розмітка в кожному місці показу; місць три.
+   *
+   * КОЛІР — У CSS, НЕ В АТРИБУТАХ. У розмітці лишилася сама геометрія;
+   * усі відтінки — на класах у style.css. Причина не в охайності: var()
+   * у презентаційних атрибутах SVG (stop-color="rgba(var(--x),.1)")
+   * працює не в кожному рушії, тоді як stop-color у таблиці стилів —
+   * звичайна CSS-властивість і працює скрізь.
    */
   const LEVEL_MIN = 1, LEVEL_MAX = 10;
+  /* Розрив унизу — пʼята частина кола. Дуга, отже, 288°. */
+  const LVL_ARC = 288;
+  const LVL_R = 38;
+  const LVL_C = 2 * Math.PI * LVL_R;
+  /* Лічильник, а не Math.random(): ідентифікатори градієнтів мають бути
+     різні в межах документа (інакше другий жетон візьме градієнти
+     першого) і водночас передбачувані — інакше їх не перевірити тестом. */
+  let lvlSeq = 0;
 
   function levelIcon(level, label) {
     const n = Math.min(LEVEL_MAX, Math.max(LEVEL_MIN, Math.round(Number(level) || LEVEL_MIN)));
-    return '<img class="lvl-ico" src="icons/levels/lvl-' + n + '.svg" ' +
-           'width="512" height="512" alt="' + esc(label || ('Level ' + n)) + '" ' +
-           'draggable="false">';
+    const track = LVL_C * LVL_ARC / 360;
+    /* Рівень 1 — це вже пройдений перший крок зі свого діапазону, а не
+       нуль: порожня шкала на першому рівні читалась би як «нічого немає»,
+       хоч акаунт уже в сезоні. */
+    const done = track * (n / LEVEL_MAX);
+    const dash = function (len) {
+      return ' stroke-dasharray="' + len.toFixed(2) + ' ' + (LVL_C - len).toFixed(2) + '"';
+    };
+    const id = 'lvl' + (++lvlSeq);
+
+    return '<svg class="lvl-ico is-l' + n + (n > 9 ? ' is-wide' : '') + '" viewBox="0 0 100 100" '
+         +      'role="img" aria-label="' + esc(label || ('Level ' + n)) + '">'
+         +   '<defs>'
+              /* Тіло скла: згори світліше, донизу темніше. */
+         +     '<linearGradient id="' + id + 'b" x1="0" y1="0" x2="0" y2="1">'
+         +       '<stop class="lvl-ico__b0" offset="0"/>'
+         +       '<stop class="lvl-ico__b1" offset="1"/>'
+         +     '</linearGradient>'
+              /* Полиск — одне джерело світла зверху-ліворуч, як усюди. */
+         +     '<radialGradient id="' + id + 'g" cx="0.32" cy="0.18" r="0.68">'
+         +       '<stop class="lvl-ico__g0" offset="0"/>'
+         +       '<stop class="lvl-ico__g1" offset="0.55"/>'
+         +       '<stop class="lvl-ico__g2" offset="1"/>'
+         +     '</radialGradient>'
+         +   '</defs>'
+         +   '<circle class="lvl-ico__body" cx="50" cy="50" r="50" fill="url(#' + id + 'b)"/>'
+         +   '<circle class="lvl-ico__gloss" cx="50" cy="50" r="50" fill="url(#' + id + 'g)"/>'
+              /* Поворот на 126° ставить нуль шкали на лівий край розриву. */
+         +   '<g transform="rotate(126 50 50)">'
+         +     '<circle class="lvl-ico__track" cx="50" cy="50" r="' + LVL_R + '" fill="none"'
+         +       dash(track) + '/>'
+         +     '<circle class="lvl-ico__fill" cx="50" cy="50" r="' + LVL_R + '" fill="none"'
+         +       dash(done) + '/>'
+         +   '</g>'
+         +   '<text class="lvl-ico__n" x="50" y="50" text-anchor="middle" '
+         +     'dominant-baseline="central">' + n + '</text>'
+         + '</svg>';
   }
 
   /* ------------------------------------------------------------------ */
@@ -1248,6 +1320,68 @@
       pending = { card: card, x: e.clientX, y: e.clientY };
       if (!frame) frame = requestAnimationFrame(flush);
     }, { passive: true });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Світло на жетоні рівня                                              */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Жетон зроблений з того самого скла, що картка «Сьогодні», і світло
+   * на ньому мусить жити так само: під вказівником диск світлішає, а
+   * блик стоїть там, де вказівник. Без цього скло залишається малюнком
+   * скла — воно однакове під будь-яким кутом, а справжнє так не робить.
+   *
+   * ЧОГО ТУТ НЕМАЄ. Нахилу. На картці 300px сім градусів видно, на
+   * жетоні 39px далекий край зміщується на два пікселі — це не ефект, а
+   * тремтіння. Ще й нахилений <a> у шапці читався б як «кнопка
+   * поїхала».
+   *
+   * Механіка та сама, що в initCardGlow: один делегований слухач,
+   * getBoundingClientRect рівно раз на кадр, повне вимкнення там, де
+   * наводити нічим (дотик) або де просили спокою.
+   */
+  const BADGE_SEL = '.nav__rating, .lvl-circle';
+
+  function initBadgeGlass() {
+    const fine = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!fine || calm) return;
+
+    let hot = null;
+    let pending = null;
+    let frame = 0;
+
+    const flush = function () {
+      frame = 0;
+      if (!pending || !hot) { pending = null; return; }
+      const x = pending.x, y = pending.y;
+      pending = null;
+      const r = hot.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      hot.style.setProperty('--spot-x', ((x - r.left) / r.width * 100).toFixed(1) + '%');
+      hot.style.setProperty('--spot-y', ((y - r.top) / r.height * 100).toFixed(1) + '%');
+    };
+
+    const cool = function () {
+      if (!hot) return;
+      hot.classList.remove('is-hot');
+      hot.style.removeProperty('--spot-x');
+      hot.style.removeProperty('--spot-y');
+      hot = null;
+    };
+
+    document.addEventListener('pointermove', function (e) {
+      const el = e.target.closest ? e.target.closest(BADGE_SEL) : null;
+      if (!el) { cool(); return; }
+      if (el !== hot) { cool(); hot = el; el.classList.add('is-hot'); }
+      pending = { x: e.clientX, y: e.clientY };
+      if (!frame) frame = requestAnimationFrame(flush);
+    }, { passive: true });
+
+    /* Вказівник може піти зі сторінки, не пройшовши по ній: тоді
+       pointermove більше не прилетить, і жетон лишився б підсвіченим. */
+    document.addEventListener('pointerleave', cool, { passive: true });
+    window.addEventListener('blur', cool, { passive: true });
   }
 
   /* ------------------------------------------------------------------ */
@@ -1989,7 +2123,7 @@
      */
     [buildNav, buildFooter, function () { initReveal(document); }, injectCanonical,
      function () { initAccordions(document); }, initSegWatch,
-     function () { initTilt(document); }, initCardGlow, injectJsonLd,
+     function () { initTilt(document); }, initCardGlow, initBadgeGlass, injectJsonLd,
      warnCorruptProfile]
       .forEach(function (step) {
         try { step(); } catch (e) { console.error('[app] крок ініціалізації впав:', e); }

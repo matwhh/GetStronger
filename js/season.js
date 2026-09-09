@@ -408,7 +408,10 @@
       '</div>' +
       '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
         '<span class="small">Початок: <b>' + esc(human(startK, true)) + '</b></span>' +
-        '<span class="small">Кінець: <b>' + esc(human(endK, true)) + '</b></span>' +
+        /* Кінець завжди неділя — це не випадковість, а правило, і воно
+           варте одного слова: людина планує тиждень, а не квартал. */
+        '<span class="small">Кінець: <b>' + esc(human(endK, true)) + '</b>' +
+          '<span class="muted"> — неділя</span></span>' +
         '<span class="small">Лишилось: <b class="mono">' + (day.total - day.passed) + '</b> ' +
           esc(window.App.plural(day.total - day.passed, 'день', 'дні', 'днів')) + '</span>' +
       '</div>' +

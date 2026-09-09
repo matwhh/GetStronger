@@ -63,11 +63,23 @@ const SHAPE = (sel) => {
       titles: filled.map((c) => c.getAttribute('title') || ''),
       sel: root.querySelectorAll('.mcal__cell--sel').length,
       future: root.querySelectorAll('.mcal__cell--future').length,
-      buttons: root.querySelectorAll('button').length
+      buttons: root.querySelectorAll('button').length,
+      /* Скільки днів у сезоні за самим ядром — з ним і звіряємо сітку. */
+      spanDays: (function () {
+        const EC = window.EloCore;
+        const r = EC.seasonRange(EC.seasonOf(new Date()));
+        return Math.round((r[1] - r[0]) / 86400000) + 1;
+      })()
     };
   });
-  /* Сезон — квартал: 90–92 дні залежно від кварталу й року. */
-  ok('1. у сітці рівно стільки днів, скільки в сезоні', m.cells >= 89 && m.cells <= 93, String(m.cells));
+  /*
+   * Сезон більше не дорівнює кварталу: він закінчується в неділю, тож
+   * довжина плаває від 84 до 98 днів (12–14 тижнів). Перехідна осінь-2026
+   * — 97 днів. Головне не число, а те, що сітка показує РІВНО стільки
+   * днів, скільки їх у межах сезону.
+   */
+  ok('1. у сітці рівно стільки днів, скільки в сезоні',
+     m.cells === m.spanDays, m.cells + ' клітинок проти ' + m.spanDays + ' днів у межах');
   ok('1. залито РІВНО дві клітинки — початок і кінець', m.filled === 2, JSON.stringify(m.titles));
   ok('1. і обидві підписані як межі сезону',
      /Початок сезону/.test(m.titles[0] || '') && /Кінець сезону/.test(m.titles[1] || ''),

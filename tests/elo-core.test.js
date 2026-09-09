@@ -16,7 +16,9 @@ describe('ELO: сезони', () => {
     assert.equal(E.seasonOf(new Date(2026, 4, 31)), 'SPRING-2026');
     assert.equal(E.seasonOf(new Date(2026, 5, 1)), 'SUMMER-2026');
     assert.equal(E.seasonOf(new Date(2026, 8, 15)), 'AUTUMN-2026');
-    assert.equal(E.seasonOf(new Date(2026, 11, 1)), 'WINTER-2026');
+    /* 1 грудня 2026 — вівторок, тобто ще осінь: зима починається в
+       понеділок 7-го (див. «сезон закінчується в неділю» нижче). */
+    assert.equal(E.seasonOf(new Date(2026, 11, 7)), 'WINTER-2026');
   });
 
   it('зима належить року свого грудня', () => {
@@ -24,10 +26,118 @@ describe('ELO: сезони', () => {
     assert.equal(E.seasonOf(new Date(2027, 1, 28)), 'WINTER-2026');
   });
 
-  it('межі сезону обіймають рівно свої місяці', () => {
+  it('межі сезону обіймають свої місяці, з поправкою на тиждень', () => {
     const [a, b] = E.seasonRange('WINTER-2026');
     assert.equal(a.getMonth(), 11); assert.equal(a.getFullYear(), 2026);
     assert.equal(b.getMonth(), 1); assert.equal(b.getFullYear(), 2027);
+  });
+});
+
+/* =========================================================================
+   МЕЖА СЕЗОНУ = МЕЖА ТИЖНЯ
+
+   Сезон рахує ТИЖНЕВІ цілі, а календарний квартал у тижні не ділиться:
+   1 вересня 2026 — вівторок, і перший тиждень сезону виходив обрубком, за
+   який людина отримувала повний тижневий штраф. Тому кінець сезону —
+   найближча неділя на або після останнього дня кварталу, а початок —
+   наступний понеділок.
+
+   Правило введене НЕ заднім числом: осінь-2026 уже йшла з 1 вересня, і за
+   1–6 вересня вже нараховано ELO. Зсунути її початок означало б викинути
+   ці дні з поточного сезону. Тому осінь лишається з 1 вересня, але
+   закінчується в неділю 6 грудня — а з зими-2026 кожен сезон є цілим
+   числом тижнів.
+   ========================================================================= */
+describe('ELO: сезон закінчується в неділю', () => {
+  const f = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+                   '-' + String(d.getDate()).padStart(2, '0');
+  /* 0 = неділя в getDay() */
+  const isSunday = (d) => d.getDay() === 0;
+  const isMonday = (d) => d.getDay() === 1;
+
+  it('перехідна осінь-2026: старт не зсувається, кінець — у неділю', () => {
+    const [a, b] = E.seasonRange('AUTUMN-2026');
+    assert.equal(f(a), '2026-09-01', 'старт мусить лишитись, інакше ELO за 1–6 вересня зникає');
+    assert.equal(f(b), '2026-12-06');
+    assert.ok(isSunday(b));
+  });
+
+  it('з зими-2026 кожен сезон — понеділок…неділя', () => {
+    for (const code of ['WINTER-2026', 'SPRING-2027', 'SUMMER-2027', 'AUTUMN-2027', 'WINTER-2027']) {
+      const [a, b] = E.seasonRange(code);
+      assert.ok(isMonday(a), code + ' починається не в понеділок: ' + f(a));
+      assert.ok(isSunday(b), code + ' закінчується не в неділю: ' + f(b));
+      const days = Math.round((b - a) / 86400000) + 1;
+      assert.equal(days % 7, 0, code + ' не ціле число тижнів: ' + days);
+    }
+  });
+
+  it('сезони стикуються без дірок і без нахлесту', () => {
+    const chain = ['AUTUMN-2026', 'WINTER-2026', 'SPRING-2027', 'SUMMER-2027', 'AUTUMN-2027'];
+    for (let i = 1; i < chain.length; i++) {
+      const prevEnd = E.seasonRange(chain[i - 1])[1];
+      const start = E.seasonRange(chain[i])[0];
+      assert.equal(Math.round((start - prevEnd) / 86400000), 1,
+        chain[i - 1] + ' → ' + chain[i] + ': ' + f(prevEnd) + ' / ' + f(start));
+    }
+  });
+
+  /*
+   * Таблиця звірена з БОЙОВОЮ базою 2026-09-09: та сама десятка сезонів,
+   * порахована серверною season_bounds після міграції
+   * db/season-week-bounds.sql, збіглась із цими числами день у день.
+   * Тут вона лежить як запобіжник від розходження: клієнт і сервер
+   * рахують сезон незалежно, і розбіжність у межах не помітна на око —
+   * обидва просто показують свій «день N із M», а закривається сезон за
+   * серверним.
+   */
+  it('межі збігаються з тими, що рахує сервер', () => {
+    const table = [
+      ['WINTER-2026', '2026-12-07', '2027-02-28', 84],
+      ['SPRING-2027', '2027-03-01', '2027-06-06', 98],
+      ['SUMMER-2027', '2027-06-07', '2027-09-05', 91],
+      ['AUTUMN-2027', '2027-09-06', '2027-12-05', 91],
+      ['WINTER-2027', '2027-12-06', '2028-03-05', 91],
+      ['SPRING-2028', '2028-03-06', '2028-06-04', 91],
+      ['SUMMER-2028', '2028-06-05', '2028-09-03', 91],
+      ['AUTUMN-2028', '2028-09-04', '2028-12-03', 91],
+      ['WINTER-2028', '2028-12-04', '2029-03-04', 91],
+      ['SPRING-2029', '2029-03-05', '2029-06-03', 91]
+    ];
+    for (const [code, a, b, days] of table) {
+      const r = E.seasonRange(code);
+      assert.equal(f(r[0]), a, code + ' початок');
+      assert.equal(f(r[1]), b, code + ' кінець');
+      assert.equal(Math.round((r[1] - r[0]) / 86400000) + 1, days, code + ' днів');
+    }
+  });
+
+  it('старі сезони не зсунуті: правило діє лише з 2026-09-01', () => {
+    assert.equal(f(E.seasonRange('SUMMER-2026')[1]), '2026-08-31');
+    assert.equal(f(E.seasonRange('SPRING-2026')[1]), '2026-05-31');
+  });
+
+  it('seasonOf узгоджений із межами на самих стиках', () => {
+    const cases = [
+      ['2026-08-31', 'SUMMER-2026'], ['2026-09-01', 'AUTUMN-2026'],
+      ['2026-11-30', 'AUTUMN-2026'], ['2026-12-06', 'AUTUMN-2026'],
+      ['2026-12-07', 'WINTER-2026'], ['2027-02-28', 'WINTER-2026'],
+      ['2027-03-01', 'SPRING-2027'], ['2027-06-06', 'SPRING-2027'],
+      ['2027-06-07', 'SUMMER-2027']
+    ];
+    for (const [iso, code] of cases) {
+      const p = iso.split('-').map(Number);
+      assert.equal(E.seasonOf(new Date(p[0], p[1] - 1, p[2])), code, iso);
+    }
+  });
+
+  it('кожен день року потрапляє рівно в той сезон, чиї межі його містять', () => {
+    for (let i = 0; i < 900; i++) {
+      const d = new Date(2026, 0, 1 + i);
+      const code = E.seasonOf(d);
+      const [a, b] = E.seasonRange(code);
+      assert.ok(d >= a && d <= b, f(d) + ' → ' + code + ' (' + f(a) + '…' + f(b) + ')');
+    }
   });
 });
 
@@ -211,22 +321,24 @@ describe('ELO: день сезону', () => {
     }
   });
 
-  it('осінь має 91 день (вер 30 + жов 31 + лис 30)', () => {
-    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 8, 1)).total, 91);
+  /* 97, а не 91: перехідна осінь тягнеться до неділі 6 грудня. */
+  it('осінь-2026 має 97 днів — до неділі 6 грудня', () => {
+    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 8, 1)).total, 97);
   });
 
   it('другий день — рівно 2, останній — total', () => {
     assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 8, 2, 23, 59)).passed, 2);
-    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 10, 30, 1)).passed, 91);
+    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 11, 6, 1)).passed, 97);
   });
 
   it('поза межами сезону значення затиснуті, а не відʼємні', () => {
     assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 7, 20)).passed, 1);
-    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 11, 25)).passed, 91);
+    assert.equal(E.seasonDay('AUTUMN-2026', new Date(2026, 11, 25)).passed, 97);
   });
 
   it('зима переходить через рік і рахується так само', () => {
-    assert.equal(E.seasonDay('WINTER-2026', new Date(2026, 11, 1, 15)).passed, 1);
-    assert.equal(E.seasonDay('WINTER-2026', new Date(2027, 0, 1, 15)).passed, 32);
+    /* Зима-2026 починається 7 грудня: 1-й день — 7-е, 1 січня — 26-й. */
+    assert.equal(E.seasonDay('WINTER-2026', new Date(2026, 11, 7, 15)).passed, 1);
+    assert.equal(E.seasonDay('WINTER-2026', new Date(2027, 0, 1, 15)).passed, 26);
   });
 });

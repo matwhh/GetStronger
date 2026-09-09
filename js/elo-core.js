@@ -26,23 +26,118 @@
 
   /* ---------------- Сезони ---------------- */
 
-  function seasonOf(d) {
-    const m = d.getMonth() + 1, y = d.getFullYear();
-    if (m >= 3 && m <= 5) return 'SPRING-' + y;
-    if (m >= 6 && m <= 8) return 'SUMMER-' + y;
-    if (m >= 9 && m <= 11) return 'AUTUMN-' + y;
-    return 'WINTER-' + (m === 12 ? y : y - 1);
+  /*
+   * СЕЗОН ЗАКІНЧУЄТЬСЯ В НЕДІЛЮ, НАСТУПНИЙ ПОЧИНАЄТЬСЯ В ПОНЕДІЛОК.
+   *
+   * Сезон рахує ТИЖНЕВІ цілі: бюджет тижня, штраф за незакритий тиждень,
+   * «чистий тиждень». Календарний квартал у тижні не ділиться — 1 вересня
+   * 2026 випадає на вівторок, — тож перший і останній тижні сезону
+   * виходили обрубками: людина отримувала повний тижневий штраф за три
+   * дні, які встигла в сезон. Тепер межа сезону збігається з межею тижня.
+   *
+   * ПРАВИЛО. Кінець сезону — найближча НЕДІЛЯ на або після останнього дня
+   * його кварталу. Початок — наступний день після кінця попереднього,
+   * тобто завжди понеділок. Якщо квартал уже закінчується в неділю,
+   * нічого не зсувається.
+   *
+   * ДАТА ВВЕДЕННЯ. Правило діє для сезонів, чий квартал закінчується
+   * 2026-09-01 або пізніше (RULE_FROM). Це не примха, а вимога до вже
+   * записаних даних: осінь-2026 стартувала 1 вересня й за 1–6 вересня вже
+   * нараховано ELO. Якби правило діяло «заднім числом», ці дні поїхали б
+   * у літо-2026 — тобто зникли б із поточного рахунку й таблиці лідерів.
+   * Тому осінь-2026 лишається з 1 вересня, але закінчиться в неділю
+   * 6 грудня, а зима почнеться в понеділок 7 грудня. З неї й далі кожен
+   * сезон — ціле число тижнів.
+   *
+   * ЦЕ САМЕ ПРАВИЛО МУСИТЬ ЖИТИ Й НА СЕРВЕРІ (db/season-week-bounds.sql).
+   * Розходження клієнта й сервера тут не помітне на око: обидва
+   * показуватимуть свій «день N із M», а закриється сезон тоді, коли
+   * вирішить сервер. Тому парність стереже tests/elo-parity.test.js.
+   */
+  const RULE_FROM = Date.UTC(2026, 8, 1);        // 2026-09-01
+
+  /** Найближча неділя на або після дати (понеділок = 0 у нашому тижні). */
+  function toSunday(d) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    /* getDay(): неділя = 0. Скільки днів лишилось до неділі — 0, якщо це
+       вже неділя. */
+    const add = (7 - x.getDay()) % 7;
+    x.setDate(x.getDate() + add);
+    return x;
+  }
+
+  /** Останній день КВАРТАЛУ сезону, без урахування правила тижня. */
+  function nominalEnd(code) {
+    const p = String(code).split('-');
+    const y = Number(p[1]);
+    switch (p[0]) {
+      case 'SPRING': return new Date(y, 5, 0);        // 31 травня
+      case 'SUMMER': return new Date(y, 8, 0);        // 31 серпня
+      case 'AUTUMN': return new Date(y, 11, 0);       // 30 листопада
+      default:       return new Date(y + 1, 2, 0);    // 28/29 лютого
+    }
+  }
+
+  /** Код сезону, що йде перед даним. */
+  function prevCode(code) {
+    const p = String(code).split('-');
+    const y = Number(p[1]);
+    switch (p[0]) {
+      case 'SPRING': return 'WINTER-' + (y - 1);
+      case 'SUMMER': return 'SPRING-' + y;
+      case 'AUTUMN': return 'SUMMER-' + y;
+      default:       return 'AUTUMN-' + y;            // WINTER-y ← AUTUMN-y
+    }
+  }
+
+  /** Кінець сезону з урахуванням правила: неділя, якщо правило вже діє. */
+  function endOf(code) {
+    const nom = nominalEnd(code);
+    return nom.getTime() >= RULE_FROM ? toSunday(nom) : nom;
   }
 
   /** Межі сезону за його кодом: [перший день, останній день]. */
   function seasonRange(code) {
+    const end = endOf(code);
+    const prevEnd = endOf(prevCode(code));
+    const start = new Date(prevEnd.getFullYear(), prevEnd.getMonth(), prevEnd.getDate() + 1);
+    return [start, end];
+  }
+
+  function seasonOf(d) {
+    const m = d.getMonth() + 1, y = d.getFullYear();
+    let code;
+    if (m >= 3 && m <= 5) code = 'SPRING-' + y;
+    else if (m >= 6 && m <= 8) code = 'SUMMER-' + y;
+    else if (m >= 9 && m <= 11) code = 'AUTUMN-' + y;
+    else code = 'WINTER-' + (m === 12 ? y : y - 1);
+
+    /*
+     * Квартальна відповідь — лише перше наближення: межа зсунута максимум
+     * на шість днів, тож дата біля стику може належати сусідньому сезону.
+     * Двох кроків вистачає з запасом (зсув менший за півмісяця), але цикл
+     * лишається обмеженим — нескінченний тут коштував би зависанням
+     * сторінки, а не помилкою в консолі.
+     */
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    for (let i = 0; i < 4; i++) {
+      const r = seasonRange(code);
+      if (day < r[0]) { code = prevCode(code); continue; }
+      if (day > r[1]) { code = nextCode(code); continue; }
+      break;
+    }
+    return code;
+  }
+
+  /** Код сезону, що йде після даного. */
+  function nextCode(code) {
     const p = String(code).split('-');
     const y = Number(p[1]);
     switch (p[0]) {
-      case 'SPRING': return [new Date(y, 2, 1), new Date(y, 5, 0)];
-      case 'SUMMER': return [new Date(y, 5, 1), new Date(y, 8, 0)];
-      case 'AUTUMN': return [new Date(y, 8, 1), new Date(y, 11, 0)];
-      default:       return [new Date(y, 11, 1), new Date(y + 1, 2, 0)];
+      case 'SPRING': return 'SUMMER-' + y;
+      case 'SUMMER': return 'AUTUMN-' + y;
+      case 'AUTUMN': return 'WINTER-' + y;
+      default:       return 'SPRING-' + (y + 1);
     }
   }
 

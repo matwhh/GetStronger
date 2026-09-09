@@ -33,6 +33,7 @@
     exPeriod: 90,    // період графіка вправи, днів; 0 = весь час
     exSet: 0,        // підхід у графіку вправи: 0 = усі разом, 1..N — один
     view: 'overview',// 'overview' | 'history'
+    wDay: '',        // день, у який пишеться вага (за замовчуванням сьогодні)
     hcalY: 0,        // рік/місяць календаря історії
     hcalM: 0,
     selDay: '',      // обраний день історії 'YYYY-MM-DD'
@@ -382,13 +383,107 @@
     '</p>';
   }
 
+  /**
+   * КАЛЕНДАР ЗВАЖУВАНЬ — та сама сітка, що в теплокарті тренувань.
+   *
+   * Розмітка й класи спільні (.mcal), тож вигляд однаковий без жодного
+   * дубля стилів: підписи днів колонкою зліва, тижні колонками вправо,
+   * підписи місяців над ними, роздільник у проміжку.
+   *
+   * ШКАЛА ТУТ ДВІЙКОВА, і це не спрощення. У теплокарті глибина заливки
+   * означає частку закритих підходів — у ваги такої величини не існує:
+   * зважування або було, або ні. Фарбувати клітинку за самим числом
+   * (важчий день — темніший) означало б показати шкалу, у якої немає
+   * нуля й немає межі; графік вище відповідає на це питання чесно.
+   *
+   * Клік по дню не пише нічого сам — він ОБИРАЄ день, у який піде
+   * наступний запис. Мовчазна правка ваги за минулий четвер одним тапом
+   * була б надто легкою для даних, які потім рахують тренд.
+   */
+  function weightCalHtml() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth() - (HM_MONTHS - 1), 1);
+    const todayK = todayKey();
+    const firstK = keyOf(firstDay);
+    const start = mondayOf(firstDay);
+    const weeks = Math.floor((mondayOf(now) - start) / 604800000) + 1;
+
+    const colMonth = [];
+    const colFirst = [];
+    {
+      let prev = -1;
+      for (let w = 0; w < weeks; w++) {
+        const thu = new Date(start);
+        thu.setDate(start.getDate() + w * 7 + 3);
+        let k = keyOf(thu);
+        if (k > todayK) k = todayK;
+        if (k < firstK) k = firstK;
+        const mm = Number(k.slice(5, 7)) - 1;
+        colMonth[w] = mm;
+        colFirst[w] = (w === 0 || mm !== prev);
+        prev = mm;
+      }
+    }
+
+    let cols = '';
+    for (let w = 0; w < weeks; w++) {
+      let cells = '';
+      for (let r = 0; r < 7; r++) {
+        const day = new Date(start);
+        day.setDate(start.getDate() + w * 7 + r);
+        const k = keyOf(day);
+        if (k < firstK) {
+          cells += '<i class="mcal__cell mcal__cell--pad" aria-hidden="true"></i>';
+          continue;
+        }
+        if (k > todayK) {
+          cells += '<i class="mcal__cell mcal__cell--future">' + day.getDate() + '</i>';
+          continue;
+        }
+        const kg = Number(state.bodyLog[k]);
+        const has = Number.isFinite(kg) && kg > 0;
+        const sel = k === weightDay();
+        cells += '<button type="button" class="mcal__cell' + (sel ? ' mcal__cell--sel' : '') + '" ' +
+          'data-lvl="' + (has ? 4 : 0) + '" data-wday="' + k + '" ' +
+          'aria-pressed="' + sel + '" aria-label="' + esc(dateLabel(dateOf(k))) +
+          (has ? ': ' + fmtNum.kg(kg) + ' кг' : ': запису немає') + '. Натисніть, щоб вписати вагу за цей день">' +
+          '<span>' + day.getDate() + '</span></button>';
+      }
+      cols += '<div class="mcal__col' + (colFirst[w] && w > 0 ? ' is-month' : '') + '">' + cells + '</div>';
+    }
+
+    let months = '<span class="mcal__months-pad" aria-hidden="true"></span>';
+    for (let w = 0; w < weeks; w++) {
+      months += '<span class="mcal__month">' + (colFirst[w] ? MON[colMonth[w]] : '') + '</span>';
+    }
+    const dow = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
+
+    return '<div class="mcal mt-2" role="group" aria-label="Календар зважувань за ' + HM_MONTHS + ' місяців">' +
+             '<div class="mcal__months" aria-hidden="true">' + months + '</div>' +
+             '<div class="mcal__grid">' +
+               '<div class="mcal__days" aria-hidden="true">' + dow + '</div>' +
+               cols +
+             '</div>' +
+           '</div>';
+  }
+
+  /** День, у який пишеться вага. Порожній або майбутній → сьогодні. */
+  function weightDay() {
+    const k = state.wDay;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(k || '')) || k > todayKey()) return todayKey();
+    return k;
+  }
+
   function renderWeight() {
     const host = $('#jr-weight');
     if (!host) return;
 
     const entries = weightEntries();
     const today = todayKey();
-    const todayVal = state.bodyLog[today];
+    /* Пишемо не обовʼязково в сьогодні: календар нижче обирає день. */
+    const day = weightDay();
+    const isToday = day === today;
+    const todayVal = state.bodyLog[day];
     const last = entries.slice(-10).reverse();
     const withAvg = rollingCached(entries);
     const avgNow = withAvg.length ? withAvg[withAvg.length - 1].avg : null;
@@ -420,7 +515,9 @@
 
         '<div class="row mt-2" style="gap:10px;align-items:flex-end;flex-wrap:wrap">' +
           '<div class="field" style="margin:0">' +
-            '<label class="field__label" for="w-kg">Сьогодні, кг</label>' +
+            '<label class="field__label" for="w-kg">' +
+              (isToday ? 'Сьогодні, кг' : esc(dateLabel(dateOf(day))) + ', кг') +
+            '</label>' +
             '<input class="input mono" type="text" inputmode="decimal" id="w-kg" style="width:130px" ' +
               'min="' + W_MIN + '" max="' + W_MAX + '" step="0.1" ' +
               'value="' + (todayVal != null ? esc(todayVal) : '') + '" placeholder="82.4">' +
@@ -428,7 +525,16 @@
           '<button class="btn btn--primary btn--sm" type="button" id="w-add">' +
             (todayVal != null ? 'Оновити' : 'Записати') +
           '</button>' +
-          '<span class="small muted">Найкраще — щоранку після туалету, до їжі. Однакові умови важливіші за точність ваг.</span>' +
+          /* Повернутись у «сьогодні» має бути видно одразу: інакше людина,
+             що глянула минулий тиждень, потім мовчки перезапише не той
+             день. Кнопка є лише тоді, коли обрано НЕ сьогодні. */
+          (isToday ? '' :
+            '<button class="btn btn--ghost btn--sm" type="button" id="w-today">Сьогодні</button>') +
+          '<span class="small muted">' +
+            (isToday
+              ? 'Найкраще — щоранку після туалету, до їжі. Однакові умови важливіші за точність ваг.'
+              : 'Запис піде в цей день. Календар нижче — щоб дописати пропущене.') +
+          '</span>' +
         '</div>' +
 
         (entries.length >= 2
@@ -447,6 +553,10 @@
                (state.goal && window.ProgressCore && window.ProgressCore.GOAL_RATES[state.goal]
                  ? ' Пунктир — коридор обраної цілі: модель, не обіцянка.' : '') + '</p>'
              : '<p class="small muted mt-2">Два записи' + (state.period ? ' у цьому періоді' : '') + ' — і зʼявиться графік.</p>') +
+
+        weightCalHtml() +
+        '<p class="small muted mt-1 mb-0">Зафарбований день — є запис ваги. ' +
+          'Клік по дню — вписати або виправити вагу за нього.</p>' +
 
         (last.length
           ? '<div class="mt-2">' +
@@ -2264,7 +2374,10 @@
         }
         // Пів кроку побутових ваг: 0,1 кг. Точніші цифри — ілюзія точності.
         const kg = Math.round(v * 10) / 10;
-        const day = todayKey();
+        /* День беремо з календаря, а не з годинника: людина могла обрати
+           пропущений четвер. weightDay() сам відкочується на сьогодні,
+           якщо обране зіпсоване або в майбутньому. */
+        const day = weightDay();
         state.bodyLog[day] = kg;
         /* Патч — функція (SYN-011): дописуємо один день на актуальному
            профілі, а не надсилаємо весь журнал, зчитаний колись. Інакше
@@ -2275,7 +2388,25 @@
           return { bodyLog: out };
         });
         keepFocus(renderWeight);
-        toast('Записано', 'ok');
+        toast(day === todayKey() ? 'Записано' : 'Записано за ' + dateLabel(dateOf(day)), 'ok');
+        return;
+      }
+
+      /* Вибір дня в календарі ваги. Клік нічого не пише — він лише
+         переводить поле вводу на цей день; запис робить «Записати». */
+      const wcell = e.target.closest('[data-wday]');
+      if (wcell) {
+        state.wDay = wcell.dataset.wday;
+        keepFocus(renderWeight);
+        /* Фокус у поле: людина натиснула день саме щоб вписати число, і
+           зайвий тап по полю після цього — зайвий. */
+        const f = $('#w-kg');
+        if (f) { try { f.focus(); f.select(); } catch (_) {} }
+        return;
+      }
+      if (e.target.closest('#w-today')) {
+        state.wDay = todayKey();
+        keepFocus(renderWeight);
         return;
       }
       const del = e.target.closest('[data-w-del]');

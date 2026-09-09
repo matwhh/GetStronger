@@ -83,15 +83,18 @@ await p.evaluate(async (s) => { await window.Store.saveProfile(s); }, SEED);
 await p.goto('file://' + ROOT + '/journal.html#history');
 await p.waitForTimeout(1200);
 
-ok('1. історія відкрилась одразу з #history', (await p.locator('.mcal').count()) === 1);
-ok('2. календар намальовано', (await p.locator('.mcal__cell').count()) > 27,
-   String(await p.locator('.mcal__cell').count()) + ' клітинок');
+/* Календарів на сторінці тепер ДВА: історія і зважування у блоці ваги.
+   Обидва — той самий компонент .mcal, тож рахуємо всередині свого
+   контейнера, а не по всій сторінці. */
+ok('1. історія відкрилась одразу з #history', (await p.locator('#jr-hcal .mcal').count()) === 1);
+ok('2. календар намальовано', (await p.locator('#jr-hcal .mcal__cell').count()) > 27,
+   String(await p.locator('#jr-hcal .mcal__cell').count()) + ' клітинок');
 
 /* Клас --on прибрано: клітинка тепер несе data-lvl, той самий, що й у
    теплокарті (0 — без тренування, 1–4 — частка закритих підходів). */
-const onCells = await p.locator('.mcal__cell[data-lvl]:not([data-lvl="0"])').count();
+const onCells = await p.locator('#jr-hcal .mcal__cell[data-lvl]:not([data-lvl="0"])').count();
 ok('3. дні з тренуванням зафарбовані', onCells === 3, onCells + ' з 3');
-const lvls = await p.locator('.mcal__cell[data-lvl]:not([data-lvl="0"])')
+const lvls = await p.locator('#jr-hcal .mcal__cell[data-lvl]:not([data-lvl="0"])')
   .evaluateAll(els => els.map(e => e.dataset.lvl).join(','));
 ok('3. рівень заливки той самий, що в теплокарті', /^[1-4](,[1-4])*$/.test(lvls), lvls);
 
@@ -134,10 +137,10 @@ ok('15. без часу: чесно сказано, чому немає цифр
 ok('16. без часу: показано «4 з 6 вправ»', /4 з 6 вправ/.test(txt));
 
 /* ---- перемикання місяців ---- */
-const monthBefore = await p.locator('.mcal').locator('xpath=../..').locator('b.mono').first().innerText();
+const monthBefore = await p.locator('#jr-hcal .mcal').locator('xpath=../..').locator('b.mono').first().innerText();
 await p.locator('[data-hnav="-1"]').click();
 await p.waitForTimeout(400);
-const monthAfter = await p.locator('.mcal').locator('xpath=../..').locator('b.mono').first().innerText();
+const monthAfter = await p.locator('#jr-hcal .mcal').locator('xpath=../..').locator('b.mono').first().innerText();
 ok('17. попередній місяць перемикається', monthBefore !== monthAfter, monthBefore + ' → ' + monthAfter);
 await p.locator('[data-hnav="1"]').click();
 await p.waitForTimeout(400);
@@ -196,6 +199,56 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
   }
   ok('22. переходи з плиток без JS-помилок', e4.length === 0, e4.join(' | '));
   await ctx2.close();
+}
+
+/* ---- 23. Календар зважувань: вибір дня й запис у нього --------------
+   Той самий компонент, що в історії, але з іншою роллю: клік не пише
+   нічого сам, він переводить поле вводу на обраний день. Стережемо саме
+   це — щоб «Записати» не почало мовчки писати в сьогодні. */
+{
+  const ctx3 = await adultContext(b, { viewport: { width: 1300, height: 1000 } });
+  const q = await ctx3.newPage();
+  const e5 = []; q.on('pageerror', (e) => e5.push(e.message));
+  await q.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' });
+  await q.waitForTimeout(1500);
+
+  ok('23. у блоці ваги є календар', await q.locator('#jr-weight .mcal').count() === 1);
+  ok('23. поле пише в сьогодні за замовчуванням',
+     /Сьогодні/.test(await q.locator('#jr-weight label[for="w-kg"]').innerText()));
+
+  /* Беремо позавчора: він точно в минулому й точно в вікні календаря. */
+  const back = await q.evaluate(() => {
+    const d = new Date(); d.setDate(d.getDate() - 2);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  });
+  await q.locator('#jr-weight [data-wday="' + back + '"]').click();
+  await q.waitForTimeout(600);
+  ok('23. клік по дню переводить поле на цей день',
+     !/Сьогодні/.test(await q.locator('#jr-weight label[for="w-kg"]').innerText()),
+     await q.locator('#jr-weight label[for="w-kg"]').innerText());
+  ok('23. зʼявилась кнопка повернення в сьогодні', await q.locator('#w-today').count() === 1);
+
+  await q.fill('#w-kg', '77,7');
+  await q.click('#w-add');
+  await q.waitForTimeout(900);
+  const saved = await q.evaluate(async (k) => {
+    const pr = await window.Store.getProfile();
+    return { at: (pr.bodyLog || {})[k], today: (pr.bodyLog || {})[
+      new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') +
+      '-' + String(new Date().getDate()).padStart(2, '0')] };
+  }, back);
+  ok('23. запис пішов у ОБРАНИЙ день, а не в сьогодні',
+     saved.at === 77.7 && saved.today === undefined, JSON.stringify(saved));
+  ok('23. клітинка того дня стала заповненою',
+     (await q.locator('#jr-weight [data-wday="' + back + '"]').getAttribute('data-lvl')) === '4');
+
+  await q.locator('#w-today').click();
+  await q.waitForTimeout(600);
+  ok('23. «Сьогодні» повертає поле назад',
+     /Сьогодні/.test(await q.locator('#jr-weight label[for="w-kg"]').innerText()));
+  ok('23. без JS-помилок', e5.length === 0, e5.join(' | '));
+  await ctx3.close();
 }
 
 await b.close();

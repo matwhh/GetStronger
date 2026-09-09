@@ -100,7 +100,9 @@ const b = await chromium.launch();
     document.querySelector('[data-hnav="-1"]').click();
     return new Promise(r => setTimeout(() => r({
       month: (document.querySelector('#jr-hcal b.mono') || {}).textContent || '',
-      trained: document.querySelectorAll('.mcal__cell[data-lvl]:not([data-lvl="0"])').length
+      /* Селектор через #jr-hcal: календарів на сторінці два — історія
+         і зважування в блоці ваги, обидва на тому самому компоненті. */
+      trained: document.querySelectorAll('#jr-hcal .mcal__cell[data-lvl]:not([data-lvl="0"])').length
     }), 300));
   });
   ok('історія доступна до сезону (серпень)', /Серпень/.test(h.month), h.month);

@@ -62,29 +62,46 @@
 
 const VOLUME_CAP = { large: 14, small: 12 };
 
+/*
+ * РЕГІОН — це не нова класифікація мʼязів, а спосіб їх ПОКАЗАТИ.
+ *
+ * Груп девʼятнадцять. Дати кожній свій відтінок неможливо: девʼятнадцять
+ * кольорів не розрізнить ніхто, а на темному тлі половина з них ще й не
+ * набере контрасту. Регіонів чотири — і саме ними людина думає про
+ * тренування: «жим», «тяга», «ноги», «корпус».
+ *
+ * Поле довідкове: обсяг, межі й підбір вправ його не читають. Воно
+ * потрібне рівно для кольору смуги в «Підходах на тиждень» — і лежить
+ * тут, а не в стилях, бо це властивість МʼЯЗА, а не оформлення.
+ *
+ *   push — усе, що штовхає: груди, передні й середні дельти, трицепс
+ *   pull — усе, що тягне: спина, трапеції, задні дельти, біцепс, передпліччя
+ *   legs — ноги повністю
+ *   core — корпус і шия
+ */
 const MUSCLES = [
-  { id: 'frontDelts', name: 'Передні дельти',        size: 'small' },
-  { id: 'sideDelts',  name: 'Середні дельти',        size: 'small' },
-  { id: 'rearDelts',  name: 'Задні дельти',          size: 'small' },
-  { id: 'back',       name: 'Спина',                 size: 'large' },
-  { id: 'traps',      name: 'Трапеції',              size: 'small' },
-  { id: 'chest',      name: 'Груди',                 size: 'large' },
-  { id: 'biceps',     name: 'Біцепс',                size: 'small' },
-  { id: 'triceps',    name: 'Трицепс',               size: 'small' },
+  { id: 'frontDelts', name: 'Передні дельти',        size: 'small', region: 'push' },
+  { id: 'sideDelts',  name: 'Середні дельти',        size: 'small', region: 'push' },
+  { id: 'rearDelts',  name: 'Задні дельти',          size: 'small', region: 'pull' },
+  { id: 'back',       name: 'Спина',                 size: 'large', region: 'pull' },
+  { id: 'traps',      name: 'Трапеції',              size: 'small', region: 'pull' },
+  { id: 'chest',      name: 'Груди',                 size: 'large', region: 'push' },
+  { id: 'biceps',     name: 'Біцепс',                size: 'small', region: 'pull' },
+  { id: 'triceps',    name: 'Трицепс',               size: 'small', region: 'push' },
   /* Передпліччя розділені на три групи: це різні мʼязи з різними вправами.
      Разом вони давали 24 підходи на тиждень і виглядали як грубе перевищення,
      хоча насправді навантаження розкладене на три незалежні мішені. */
-  { id: 'brachiorad', name: 'Брахіорадіаліс',        size: 'small' },
-  { id: 'wristFlex',  name: 'Згиначі запʼястя',      size: 'small' },
-  { id: 'wristExt',   name: 'Розгиначі запʼястя',    size: 'small' },
-  { id: 'quads',      name: 'Квадрицепс',            size: 'large' },
-  { id: 'hamstrings', name: 'Біцепс стегна',         size: 'large' },
-  { id: 'glutes',     name: 'Сідниці',               size: 'large' },
-  { id: 'adductors',  name: 'Привідні мʼязи стегна', size: 'small' },
-  { id: 'abductors',  name: 'Відвідні мʼязи стегна', size: 'small' },
-  { id: 'calves',     name: 'Ікри',                  size: 'small' },
-  { id: 'neck',       name: 'Шия',                   size: 'small' },
-  { id: 'abs',        name: 'Прес',                  size: 'small' }
+  { id: 'brachiorad', name: 'Брахіорадіаліс',        size: 'small', region: 'pull' },
+  { id: 'wristFlex',  name: 'Згиначі запʼястя',      size: 'small', region: 'pull' },
+  { id: 'wristExt',   name: 'Розгиначі запʼястя',    size: 'small', region: 'pull' },
+  { id: 'quads',      name: 'Квадрицепс',            size: 'large', region: 'legs' },
+  { id: 'hamstrings', name: 'Біцепс стегна',         size: 'large', region: 'legs' },
+  { id: 'glutes',     name: 'Сідниці',               size: 'large', region: 'legs' },
+  { id: 'adductors',  name: 'Привідні мʼязи стегна', size: 'small', region: 'legs' },
+  { id: 'abductors',  name: 'Відвідні мʼязи стегна', size: 'small', region: 'legs' },
+  { id: 'calves',     name: 'Ікри',                  size: 'small', region: 'legs' },
+  { id: 'neck',       name: 'Шия',                   size: 'small', region: 'core' },
+  { id: 'abs',        name: 'Прес',                  size: 'small', region: 'core' }
 ].map(function (m) {
   // Межа виводиться з розміру групи, щоб її не можна було випадково
   // розсинхронізувати з VOLUME_CAP при правці списку. Явно заданий cap

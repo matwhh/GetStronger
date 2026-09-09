@@ -118,9 +118,61 @@
   --acc-3-rgb:   var(--acc-ink-rgb);
   --acc-text-rgb: var(--acc-ink-rgb);
 
-  /* Статуси — без кольору. Розрізняються яскравістю рамки та іконкою. */
-  --ok:    var(--acc-ink);
-  --warn:  var(--g1);
+  /* ======================================================================
+     СЕМАНТИЧНА ПАЛІТРА
+     ======================================================================
+     ПРАВИЛО, ЯКЕ ТУТ ГОЛОВНЕ: колір позначає ДАНІ Й СТАН, а не оздоблює
+     інтерфейс. Поверхні, текст, межі, кнопки, посилання, календарі
+     лишаються монохромними — вони й далі тримаються на яскравості. Колір
+     з'являється лише там, де він відповідає на питання «це що?» або «це
+     добре чи погано»: макронутрієнти, групи мʼязів, стани.
+
+     Чому саме так, а не «розфарбувати сайт». Колір, який щось означає,
+     читається як інформація; колір на кнопках і рамках читається як
+     декор і знецінює перший. Тому список нижче — не тема, а СЛОВНИК: у
+     кожного відтінку є значення, і без значення він не вживається.
+
+     КОНТРАСТ. Кожен відтінок перевірено на трьох поверхнях проєкту
+     (#0b0b0b сторінка, #131313 картка, #1b1b1b контрол): мінімум 4,5:1,
+     тобто вони придатні і як заливка, і як ТЕКСТ. Це не «на око»:
+     значення підібрані розрахунком і стережуться tools/verifythemes.mjs.
+
+     ДАЛЬТОНІЗМ. Червоний і зелений стоять поруч лише там, де в елемента
+     Є ПІДПИС СЛОВАМИ (назва групи мʼязів, назва нутрієнта, текст чипа).
+     Колір ніде не єдиний носій сенсу — він прискорює читання, а не
+     замінює його. */
+  --c-green:   #58A061;  --c-green-rgb:   88, 160, 97;
+  --c-red:     #DE5F53;  --c-red-rgb:     222, 95, 83;
+  --c-amber:   #E5B442;  --c-amber-rgb:   229, 180, 66;
+  --c-blue:    #448CE6;  --c-blue-rgb:    68, 140, 230;
+  --c-violet:  #9970D8;  --c-violet-rgb:  153, 112, 216;
+  --c-orange:  #E6802B;  --c-orange-rgb:  230, 128, 43;
+  --c-pink:    #D863A0;  --c-pink-rgb:    216, 99, 160;
+
+  /* --- Значення відтінків --------------------------------------------
+     Аліаси, а не прямі кольори в правилах: коли зміниться відтінок,
+     міняється один рядок, а не двадцять місць. */
+
+  /* Стани */
+  --ok:    var(--c-green);
+  --warn:  var(--c-amber);
+  --bad:   var(--c-red);
+
+  /* Макронутрієнти. Відтінки взято максимально рознесені по колу:
+     синій (213°) ↔ помаранчевий (28°), фіолетовий (265°) ↔ зелений
+     (128°). Клітковина нарешті має свій колір замість штриховки. */
+  --m-protein: var(--c-blue);
+  --m-fat:     var(--c-violet);
+  --m-carb:    var(--c-orange);
+  --m-fiber:   var(--c-green);
+
+  /* Групи мʼязів — за РЕГІОНОМ, а не поштучно: груп девʼятнадцять, і
+     девʼятнадцять відтінків не розрізнить ніхто. Регіонів чотири, і саме
+     ними людина думає про тренування. */
+  --mg-push: var(--c-red);
+  --mg-pull: var(--c-blue);
+  --mg-legs: var(--c-green);
+  --mg-core: var(--c-amber);
 
   /* Шрифти. Archivo Black — важкий гротеск із квадратними формами
      та єдиною вагою (400 = максимальна). Тільки для словесного знака
@@ -985,8 +1037,12 @@ a.card > .btn {
   font-size: 0.78rem; font-weight: 500; color: var(--text-2);
 }
 .chip--acc { border-color: var(--acc); background: rgba(var(--acc-rgb), 0.18); color: var(--text); }
-.chip--ok   { border-color: var(--acc); background: rgba(var(--acc-rgb), 0.18); color: var(--acc-ink); }
-.chip--warn { border-color: rgba(var(--tint-rgb), 0.34); background: rgba(var(--tint-rgb), 0.07); color: var(--g1); }
+/* Стани — кольором, і це той випадок, де він несе сенс: «в нормі» і
+   «увага» відрізняються не яскравістю рамки, а значенням. Текст лишається
+   самим відтінком на ледь тонованому тлі: так контраст тексту тримається
+   вище 4,5:1, чого заливка кольором не дала б. */
+.chip--ok   { border-color: rgba(var(--c-green-rgb), 0.45); background: rgba(var(--c-green-rgb), 0.14); color: var(--ok); }
+.chip--warn { border-color: rgba(var(--c-amber-rgb), 0.45); background: rgba(var(--c-amber-rgb), 0.13); color: var(--warn); }
 
 .lead { font-size: clamp(1.02rem, 1.7vw, 1.16rem); color: var(--text-2); max-width: 62ch; }
 .muted { color: var(--muted); }
@@ -1350,19 +1406,17 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
    карткою. Явна лінія знімає питання незалежно від контрасту заливок. */
 .macrobar > span { transition: width 0.6s var(--e-out); box-shadow: 1px 0 0 var(--bg-1); }
 .macrobar > span:last-child { box-shadow: none; }
-.macrobar__p { background: var(--acc-bar); }
-.macrobar__f { background: var(--g1); }
-.macrobar__c { background: var(--g3); }
-/* Клітковина — четвертий сегмент, і він мусить читатись поруч з
-   вуглеводами. Розсунути їх по яскравості вже нікуди: #7f7f7f —
-   найтемніше, що ще дає 3:1 до тла. Тому не яскравість, а ФАКТУРА:
-   штриховка тим самим сірим. Заразом вона чесно каже, що це не
-   така сама «їжа», як решта — 2 ккал/г, і ті вже зняті з вуглеводів. */
-.macrobar__fib {
-  background: repeating-linear-gradient(45deg,
-    var(--g3) 0 3px,
-    rgba(var(--tint-rgb), 0.16) 3px 6px);
-}
+/* Чотири нутрієнти — чотири відтінки. Раніше їх було три сірих плюс
+   штрихована клітковина, і це був обхід, а не рішення: сусідні заливки
+   давали 2,8:1 одна до одної при нормі 3:1, розсунути їх по яскравості
+   було нікуди (#7f7f7f — найтемніше, що ще тримає 3:1 до тла), а
+   четвертому сегменту місця в шкалі не лишалось узагалі. Колір знімає
+   питання: відтінки рознесені по колу, і жоден не залежить від того,
+   наскільки він світлий. */
+.macrobar__p   { background: var(--m-protein); }
+.macrobar__f   { background: var(--m-fat); }
+.macrobar__c   { background: var(--m-carb); }
+.macrobar__fib { background: var(--m-fiber); }
 /* ---------- Смуги даних: спільна поведінка -----------------------------
  *
  * ЩО САМЕ АНІМУЄМО І ЧОМУ САМЕ ТАК.
@@ -1395,12 +1449,9 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
    однією заливкою — це градієнт ПОВЕРХ кольору, тому стани (.vol--full,
    .vol--over) не втрачають свою заливку, вона просто отримує той самий
    блік. */
-/* Штрихований сегмент клітковини виключено навмисно: у нього ВЛАСНИЙ
-   background-image, і блік, поставлений тут (селектор важчий), просто
-   стер би штриховку. */
 .vol__bar i,
 .qi-bar__track i,
-.macrobar > span:not(.macrobar__fib),
+.macrobar > span,
 .split i {
   background-image: linear-gradient(180deg,
     rgba(var(--tint-rgb), 0.16) 0%,
@@ -1689,10 +1740,12 @@ body.has-rest-timer { --rest-h: 86px; }
 .notice {
   display: flex; gap: 13px; align-items: flex-start;
   padding: 15px 18px;
-  /* Попередження без кольору: виділяється світлою рамкою та смугою зліва */
+  /* Попередження — бурштинова смуга зліва й такий самий значок. Текст
+     лишається звичайним: фарбувати весь абзац означало б зробити його
+     гірше читаним заради того, що вже сказано смугою й значком. */
   border: 1px solid rgba(var(--tint-rgb), 0.22); border-radius: var(--r);
-  border-left: 3px solid var(--g1);
-  background: rgba(var(--tint-rgb), 0.045);
+  border-left: 3px solid var(--warn);
+  background: rgba(var(--c-amber-rgb), 0.06);
   font-size: 0.88rem; color: var(--text-2);
 }
 .notice svg { flex: 0 0 19px; width: 19px; height: 19px; margin-top: 2px; color: var(--warn); }
@@ -1928,8 +1981,12 @@ body.has-rest-timer { --rest-h: 86px; }
   background: rgba(var(--tint-rgb), 0.08);
 }
 .split i { display: block; height: 100%; }
-.split__lean { background: var(--acc-ink); box-shadow: 1px 0 0 var(--bg-1); }
-.split__fat  { background: var(--g3); }
+/* Мʼязи й жир — різні речі, а не «більше й менше»: раніше вони
+   відрізнялись лише яскравістю, і смуга читалась як шкала, а не як
+   склад. Зелений тут не «добре», а «мʼязова маса»; бурштиновий не
+   «погано», а «жир» — обидва підписані словами поруч. */
+.split__lean { background: var(--c-green); box-shadow: 1px 0 0 var(--bg-1); }
+.split__fat  { background: var(--c-amber); }
 
 /* Перехід одразу до вмісту. Видно лише при навігації з клавіатури:
    мишею його ніхто не побачить, а Tab на першому кроці покаже. */
@@ -2858,17 +2915,34 @@ button.mcal__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-off
   -webkit-text-fill-color: transparent; color: transparent;
 }
 
-/* Смуга обʼєму на межі: рівна акцентна заливка замість переходу в сірий.
-   Стан «група заповнена» читається за кольором смуги, а не за градієнтом. */
-.vol--full .vol__bar i { background: var(--acc-bar); }
+/* Смуги обʼєму — за регіоном мʼяза. Порядок правил тут значущий: ці
+   стоять ПЕРЕД станами, тож «на межі» й «вище межі» перефарбовують
+   смугу поверх регіону. Так і має бути — перебір важливіший за те, який
+   це мʼяз, а назва групи однаково написана словами поруч. */
+.vol--r-push .vol__bar i { background: var(--mg-push); }
+.vol--r-pull .vol__bar i { background: var(--mg-pull); }
+.vol--r-legs .vol__bar i { background: var(--mg-legs); }
+.vol--r-core .vol__bar i { background: var(--mg-core); }
 
-/* Перевищення межі: діагональна штриховка лишається — вона несе СТАН, а не
-   оформлення, і без неї «на межі» й «за межею» стали б однаковими смугами. */
+/* Смуги нутрієнтів у «Раціоні» — ті самі відтінки, що в смузі макросів.
+   Селектор важчий за .vol--full/.vol--over навмисно НЕ робимо: коли
+   норму перебрано, важливіше побачити перебір, ніж який це нутрієнт. */
+.vol--m-p   .vol__bar i { background: var(--m-protein); }
+.vol--m-f   .vol__bar i { background: var(--m-fat); }
+.vol--m-c   .vol__bar i { background: var(--m-carb); }
+.vol--m-fib .vol__bar i { background: var(--m-fiber); }
+
+/* Смуга обʼєму на межі — зелена: група набрала свою норму. */
+.vol--full .vol__bar i { background: var(--ok); }
+
+/* Перевищення межі — червона зі штриховкою. Колір каже, що це перебір, а
+   штриховка лишається: вона працює і для тих, хто червоного не бачить, і
+   без неї «на межі» й «за межею» відрізнялись би лише відтінком. */
 .vol--over .vol__bar i {
   background: repeating-linear-gradient(
     45deg,
-    var(--acc-bar) 0 6px,
-    var(--surface-2) 6px 12px
+    var(--bad) 0 6px,
+    rgba(var(--c-red-rgb), 0.35) 6px 12px
   );
 }
 
@@ -3304,10 +3378,18 @@ body {
 .week,
 .acc,
 .table-wrap,
-.wchart,
-.notice {
+.wchart {
   border: 1px solid var(--line);
   background: var(--card-1);
+  border-radius: var(--r-box);
+  box-shadow: none;
+}
+/* .notice тут окремо: спільне правило вище скидало його бурштинову
+   смугу зліва разом із тлом, і попередження ставало звичайною карткою. */
+.notice {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warn);
+  background: rgba(var(--c-amber-rgb), 0.06);
   border-radius: var(--r-box);
   box-shadow: none;
 }
@@ -3657,7 +3739,10 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.10); }
 .week { border-radius: var(--r-box); }
 .rest-day { border: 1px solid var(--line); background: var(--field); box-shadow: none; }
 
-.notice { border-left: 0; border-radius: var(--r-box); }
+/* Смуга зліва ЛИШАЄТЬСЯ (було border-left: 0). Вона тепер не декор
+   «об'ємної мови», а позначка стану — єдине, що відрізняє попередження
+   від звичайної картки з першого погляду. */
+.notice { border-left: 3px solid var(--warn); border-radius: var(--r-box); }
 .notice--acc { border-color: rgba(var(--acc-ink-rgb), 0.22); background: rgba(var(--acc-rgb), 0.08); }
 
 /* Посилання «до вмісту» — акцентна плашка, видима лише з клавіатури */

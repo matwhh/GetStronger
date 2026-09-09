@@ -184,7 +184,7 @@
         else if (sets === m.cap) { state = 'full'; label = 'на межі'; }
         else                     { state = 'ok';   label = 'у межах'; }
         return {
-          id: m.id, name: m.name, size: m.size,
+          id: m.id, name: m.name, size: m.size, region: m.region || '',
           sets: sets, cap: m.cap,
           state: state, label: label
         };
@@ -205,7 +205,12 @@
       const scale = Math.max(r.cap, r.sets);
       const fill = r.sets / scale * 100;
       return '' +
-        '<div class="vol vol--' + r.state + '" title="' + esc(r.label) + '">' +
+        /* Регіон іде класом, а не стилем: відтінок належить темі, а не
+           цьому рядку розмітки. Стани (на межі, вище межі) фарбують смугу
+           поверх регіону — перебір важливіший за те, який це мʼяз. */
+        '<div class="vol vol--' + r.state +
+          (r.region ? ' vol--r-' + r.region : '') +
+          '" title="' + esc(r.label) + '">' +
           '<span class="vol__name">' + esc(r.name) + '</span>' +
           '<span class="vol__bar"><i style="width:' + fill + '%"></i></span>' +
           '<span class="vol__num mono">' + r.sets +

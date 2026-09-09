@@ -770,13 +770,26 @@
   /* 3. День                                                             */
   /* ------------------------------------------------------------------ */
 
+  /*
+   * Колір смуги — за нутрієнтом, ті самі чотири відтінки, що в смузі
+   * макросів на «Плані харчування» (--m-protein і далі). Дві сторінки
+   * говорять про одні й ті самі чотири речі, і людина не має щоразу
+   * заново з'ясовувати, що тут синє, а що помаранчеве. Калорії кольору
+   * не мають: це не нутрієнт, а сума всіх чотирьох.
+   */
+  const MACRO_HUE = {
+    'Білок': 'p', 'Жири': 'f', 'Вуглеводи': 'c', 'Клітковина': 'fib'
+  };
+
   function progressRow(label, got, need, unit) {
     if (!need) return '';
     const pct = clamp(got / need * 100, 0, 100);
     const over = got > need * 1.05;
     const left = need - got;
+    const hue = MACRO_HUE[label];
     return '' +
-      '<div class="vol vol--' + (over ? 'over' : (got >= need * 0.95 ? 'ok' : 'under')) + '">' +
+      '<div class="vol vol--' + (over ? 'over' : (got >= need * 0.95 ? 'ok' : 'under')) +
+        (hue ? ' vol--m-' + hue : '') + '">' +
         '<span class="vol__name">' + esc(label) + '</span>' +
         '<span class="vol__bar"><i style="width:' + pct + '%"></i></span>' +
         '<span class="vol__num mono">' + round(got, 0) +

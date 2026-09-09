@@ -129,7 +129,108 @@ ok('межі акценту ≥ 3', base.line >= 3, base.line.toFixed(2));
       });
     return bad;
   });
-  ok('палітра справді монохромна (R=G=B у кожного токена)', grey.length === 0, grey.join(' | '));
+  ok('основа справді монохромна (R=G=B у кожного токена)', grey.length === 0, grey.join(' | '));
+}
+
+/*
+ * СЕМАНТИЧНА ПАЛІТРА: колір є, і він читабельний.
+ *
+ * Основа лишається монохромною (перевірка вище), а поверх неї живе
+ * словник відтінків для ДАНИХ і СТАНІВ: макронутрієнти, регіони мʼязів,
+ * «в нормі / увага». Кожен відтінок вживається і як заливка, і як текст
+ * (чипи), тож поріг для всіх один — 4,5:1, і на всіх трьох поверхнях
+ * проєкту: сторінка, картка, контрол.
+ *
+ * Друга умова, не менш важлива: відтінки мають відрізнятись ОДИН ВІД
+ * ОДНОГО. Смуга макросів ставить чотири заливки впритул, і пара, надто
+ * близька за тоном, зводить нанівець весь сенс переходу на колір — саме
+ * через це сірі й довелось міняти.
+ */
+{
+  const pal = await p.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const px = n => cs.getPropertyValue(n).trim();
+    const rgb = h => { const d = document.createElement('i'); d.style.color = h;
+      document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove();
+      return c.match(/\d+/g).slice(0, 3).map(Number); };
+    const names = ['green', 'red', 'amber', 'blue', 'violet', 'orange', 'pink'];
+    const out = {};
+    names.forEach(n => { out[n] = rgb(px('--c-' + n)); });
+    return out;
+  });
+
+  const L = ([r, g, b]) => {
+    const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const CR = (a, b) => { const x = L(a), y = L(b); const hi = Math.max(x, y), lo = Math.min(x, y);
+    return (hi + 0.05) / (lo + 0.05); };
+  const SURF = { сторінка: [11, 11, 11], картка: [19, 19, 19], контрол: [27, 27, 27] };
+
+  const weak = [];
+  Object.keys(pal).forEach(function (n) {
+    Object.keys(SURF).forEach(function (sn) {
+      const c = CR(pal[n], SURF[sn]);
+      if (c < 4.5) weak.push('--c-' + n + ' на ' + sn + ' = ' + c.toFixed(2));
+    });
+  });
+  ok('кожен відтінок палітри ≥ 4,5 на всіх поверхнях', weak.length === 0, weak.join(' | '));
+
+  /*
+   * ВІДМІННІСТЬ ВІДТІНКІВ МІРЯЄТЬСЯ ΔE, А НЕ КОНТРАСТОМ.
+   *
+   * Перша версія цієї перевірки рахувала той самий коефіцієнт контрасту,
+   * що й для тексту, — і чесно провалила blue↔violet із 1,08. Але
+   * контраст WCAG міряє РІЗНИЦЮ ЯСКРАВОСТІ: два різні кольори однакової
+   * світлоти дають 1,0 і при цьому чудово розрізняються оком. Для
+   * «чи видно, що це різні заливки» потрібна перцептивна відстань — ΔE
+   * у просторі Lab.
+   *
+   * Поріг 25 — для великих плям (смуга макросів, смуги обʼєму) це
+   * впевнено «різні кольори». Міряються ВСІ пари, а не лише сусідні:
+   * набір малий, а завтра поруч може стати будь-яка пара.
+   */
+  const lab = function (rgb) {
+    const f = function (c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const r = f(rgb[0]), g = f(rgb[1]), b = f(rgb[2]);
+    const X = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+    const Y = (r * 0.2126 + g * 0.7152 + b * 0.0722);
+    const Z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+    const t = function (v) { return v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116; };
+    const fx = t(X), fy = t(Y), fz = t(Z);
+    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+  };
+  const dE = function (a, b) {
+    const p1 = lab(a), p2 = lab(b);
+    return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2) + Math.pow(p1[2] - p2[2], 2));
+  };
+  const names = Object.keys(pal);
+  const close = [];
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const d = dE(pal[names[i]], pal[names[j]]);
+      if (d < 25) close.push(names[i] + '↔' + names[j] + ' ΔE=' + d.toFixed(1));
+    }
+  }
+  ok('усі відтінки відрізняються між собою (ΔE ≥ 25)', close.length === 0,
+     close.length ? close.join(' | ') : names.length * (names.length - 1) / 2 + ' пар');
+
+  /* Палітра не має протікати в основу: якщо колір колись з'явиться на
+     кнопці чи в тексті, це має зламати саме цю перевірку, а не смак. */
+  const bleed = await p.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const rgb = h => { const d = document.createElement('i'); d.style.color = h;
+      document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove();
+      return c.match(/\d+/g).slice(0, 3).map(Number); };
+    const bad = [];
+    ['--acc', '--acc-ink', '--acc-bar', '--acc-line', '--link', '--on-acc', '--text', '--muted']
+      .forEach(function (n) {
+        const [r, g, b] = rgb(cs.getPropertyValue(n).trim());
+        if (Math.max(r, g, b) - Math.min(r, g, b) > 6) bad.push(n);
+      });
+    return bad;
+  });
+  ok('палітра не протекла в основу (кнопки, текст, посилання)', bleed.length === 0, bleed.join(', '));
 }
 
 /* ------------------------------------------------------------------ */

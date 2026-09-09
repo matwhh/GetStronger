@@ -781,6 +781,11 @@
     'Білок': 'p', 'Жири': 'f', 'Вуглеводи': 'c', 'Клітковина': 'fib'
   };
 
+  /* Номер рядка для хвилі появи (див. --i у css/style.css). Лічильник
+     скидається на кожному рендері блоку — інакше затримка накопичувалась
+     би між перемальовками й смуги з часом виїжджали б усе пізніше. */
+  let volSeq = 0;
+
   function progressRow(label, got, need, unit) {
     if (!need) return '';
     const pct = clamp(got / need * 100, 0, 100);
@@ -789,7 +794,7 @@
     const hue = MACRO_HUE[label];
     return '' +
       '<div class="vol vol--' + (over ? 'over' : (got >= need * 0.95 ? 'ok' : 'under')) +
-        (hue ? ' vol--m-' + hue : '') + '">' +
+        (hue ? ' vol--m-' + hue : '') + '" style="--i:' + (volSeq++) + '">' +
         '<span class="vol__name">' + esc(label) + '</span>' +
         '<span class="vol__bar"><i style="width:' + pct + '%"></i></span>' +
         '<span class="vol__num mono">' + round(got, 0) +
@@ -921,7 +926,7 @@
             '</div>'
           : '') +
         (t
-          ? '<div class="vol-list mt-2">' +
+          ? '<div class="vol-list mt-2">' + (volSeq = 0, '') +
               progressRow('Калорії',   got.kcal,  t.kcal,    'ккал') +
               progressRow('Білок',     got.p,     t.protein, 'г') +
               progressRow('Жири',      got.f,     t.fat,     'г') +
@@ -1697,6 +1702,18 @@
         const host = $('#day');
         const bars = host.querySelector('.vol-list');
         if (t && bars) {
+          /*
+           * ТУТ АНІМАЦІЯ ПОЯВИ ВИМИКАЄТЬСЯ, І ЦЕ ГОЛОВНЕ В ЦЬОМУ МІСЦІ.
+           *
+           * Цей шлях спрацьовує на КОЖНУ правку грамів у полі. Смуги
+           * перемальовуються цілком, тож без is-still вони заново
+           * виїжджали б з нуля й давали пробіг світла на кожен
+           * натиснутий символ — рух там, де людина просто набирає число.
+           * Поява має грати, коли блок ЗʼЯВЛЯЄТЬСЯ, а не коли міняється
+           * значення в ньому.
+           */
+          bars.classList.add('is-still');
+          volSeq = 0;
           bars.innerHTML =
             progressRow('Калорії',    got.kcal,  t.kcal,    'ккал') +
             progressRow('Білок',      got.p,     t.protein, 'г') +

@@ -293,10 +293,10 @@
         // рівно на її частку (≈3%) — і виглядало це як обрив, а не як
         // «решта калорій десь там».
         '<div class="macrobar">' +
-          '<span class="macrobar__p" style="width:' + pP + '%"></span>' +
-          '<span class="macrobar__f" style="width:' + pF + '%"></span>' +
-          '<span class="macrobar__c" style="width:' + pC + '%"></span>' +
-          '<span class="macrobar__fib" style="width:' + pFib + '%"></span>' +
+          '<span class="macrobar__p"   style="width:' + pP + '%;--i:0"></span>' +
+          '<span class="macrobar__f"   style="width:' + pF + '%;--i:1"></span>' +
+          '<span class="macrobar__c"   style="width:' + pC + '%;--i:2"></span>' +
+          '<span class="macrobar__fib" style="width:' + pFib + '%;--i:3"></span>' +
         '</div>' +
         '<div class="legend">' +
           '<span><i class="macrobar__p"></i>Білок ' + round(pP, 0) + '%</span>' +

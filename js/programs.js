@@ -199,7 +199,7 @@
 
     const over = v.rows.filter(function (r) { return r.state === 'over'; });
 
-    const bars = v.rows.map(function (r) {
+    const bars = v.rows.map(function (r, i) {
       // Шкала завжди до межі: повна смуга = стеля. Так видно саме те,
       // що потрібно, — скільки ще лишилось запасу.
       const scale = Math.max(r.cap, r.sets);
@@ -208,9 +208,11 @@
         /* Регіон іде класом, а не стилем: відтінок належить темі, а не
            цьому рядку розмітки. Стани (на межі, вище межі) фарбують смугу
            поверх регіону — перебір важливіший за те, який це мʼяз. */
+        /* --i — номер рядка. З нього CSS рахує затримку появи, тож
+           список проявляється хвилею зверху вниз, а не стрибком. */
         '<div class="vol vol--' + r.state +
           (r.region ? ' vol--r-' + r.region : '') +
-          '" title="' + esc(r.label) + '">' +
+          '" style="--i:' + i + '" title="' + esc(r.label) + '">' +
           '<span class="vol__name">' + esc(r.name) + '</span>' +
           '<span class="vol__bar"><i style="width:' + fill + '%"></i></span>' +
           '<span class="vol__num mono">' + r.sets +

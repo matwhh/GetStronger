@@ -1413,10 +1413,10 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
    четвертому сегменту місця в шкалі не лишалось узагалі. Колір знімає
    питання: відтінки рознесені по колу, і жоден не залежить від того,
    наскільки він світлий. */
-.macrobar__p   { background: var(--m-protein); }
-.macrobar__f   { background: var(--m-fat); }
-.macrobar__c   { background: var(--m-carb); }
-.macrobar__fib { background: var(--m-fiber); }
+.macrobar__p   { background-color: var(--m-protein); }
+.macrobar__f   { background-color: var(--m-fat); }
+.macrobar__c   { background-color: var(--m-carb); }
+.macrobar__fib { background-color: var(--m-fiber); }
 /* ---------- Смуги даних: спільна поведінка -----------------------------
  *
  * ЩО САМЕ АНІМУЄМО І ЧОМУ САМЕ ТАК.
@@ -1440,26 +1440,114 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
  */
 @keyframes bar-sweep { from { clip-path: inset(0 100% 0 0); } }
 
+/*
+ * ПОЯВА СМУГ — ХВИЛЕЮ, А НЕ ВСІХ ОДРАЗУ.
+ *
+ * У списку обʼєму по групах смуг буває пʼятнадцять. Коли всі вони
+ * виїжджають одночасно, це читається як стрибок розмітки: рух є, а
+ * напрямку немає. Затримка від номера рядка (--i, ставить розмітка)
+ * робить із цього одну хвилю зверху вниз — і заразом показує, що список
+ * упорядкований, а не є купою.
+ *
+ * Крок 45 мс і стеля 540 мс: на пʼятнадцяти рядках уся хвиля вкладається
+ * у пів секунди, а на сорока — не перетворюється на очікування.
+ */
 .macrobar,
 .split { animation: bar-sweep 0.55s var(--e-out); }
 .vol__bar i,
-.qi-bar__track i { animation: bar-sweep 0.55s var(--e-out); }
+.qi-bar__track i {
+  animation: bar-sweep 0.6s var(--e-out) backwards;
+  animation-delay: calc(min(var(--i, 0) * 45ms, 540ms));
+}
 
-/* Обʼєм світла зверху: смуга перестає бути плоскою плашкою, але лишається
-   однією заливкою — це градієнт ПОВЕРХ кольору, тому стани (.vol--full,
-   .vol--over) не втрачають свою заливку, вона просто отримує той самий
-   блік. */
+/* Сегменти смуги макросів виїжджають один за одним у тому ж порядку, у
+   якому лежать: білок → жири → вуглеводи → клітковина. */
+.macrobar > span {
+  animation: bar-sweep 0.5s var(--e-out) backwards;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+/*
+ * ОБʼЄМ СМУГИ — ТРИ ШАРИ ПОВЕРХ ОДНОГО КОЛЬОРУ.
+ *
+ * Усе це градієнти ПОВЕРХ background-color, тому стани (.vol--full,
+ * .vol--over) і відтінки нутрієнтів лишаються собою — вони просто
+ * отримують ту саму фактуру. Один колір із трьома шарами дешевший за
+ * три токени на кожен відтінок і не розсинхронізується з палітрою.
+ *
+ *   1. блік зверху          — смуга перестає бути плоскою плашкою;
+ *   2. тінь на лівому кінці — початок смуги трохи темніший, і вона
+ *                             читається як обʼєм, а не як наклейка;
+ *   3. світло на кінці      — саме туди дивиться око, коли читає
+ *                             значення, і саме там світліше.
+ */
 .vol__bar i,
 .qi-bar__track i,
 .macrobar > span,
 .split i {
-  background-image: linear-gradient(180deg,
-    rgba(var(--tint-rgb), 0.16) 0%,
-    rgba(var(--tint-rgb), 0) 62%);
+  background-image:
+    linear-gradient(90deg, rgba(var(--tint-rgb), 0) 0%, rgba(var(--tint-rgb), 0.34) 100%),
+    linear-gradient(180deg,
+      rgba(var(--tint-rgb), 0.34) 0%,
+      rgba(var(--tint-rgb), 0.06) 46%,
+      rgba(0, 0, 0, 0.14) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0) 30%);
+  background-repeat: no-repeat;
+  background-size: 22px 100%, 100% 100%, 100% 100%;
+  background-position: right center, left center, left center;
 }
 
+/*
+ * ПРОБІГ СВІТЛА ПІСЛЯ ЗАПОВНЕННЯ.
+ *
+ * Один раз, одразу після того, як смуга доїхала: вузька світла смужка
+ * проходить уздовж і згасає. Це не «блискітки» — це підтвердження, що
+ * значення стало на місце, той самий жест, яким банківський застосунок
+ * підтверджує списання. Тому й грає РІВНО раз, а не циклом.
+ *
+ * Живе на ::after самої заливки, тож обмежене її шириною: короткій смузі
+ * дістається короткий пробіг, і довжина світла сама каже про величину.
+ */
+.vol__bar i { position: relative; overflow: hidden; }
+.vol__bar i::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(105deg,
+    rgba(var(--tint-rgb), 0) 38%,
+    rgba(var(--tint-rgb), 0.45) 50%,
+    rgba(var(--tint-rgb), 0) 62%);
+  transform: translateX(-100%);
+  animation: bar-shine 0.9s ease-out backwards;
+  animation-delay: calc(min(var(--i, 0) * 45ms, 540ms) + 0.35s);
+}
+@keyframes bar-shine {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/*
+ * ПЕРЕВИЩЕННЯ МЕЖІ ПОВІЛЬНО ПОВЗЕ.
+ *
+ * Штриховка «вище межі» рухається — дуже повільно, 6 секунд на цикл.
+ * Це єдина безкінечна анімація в проєкті, і вона тут заслужена: перебір
+ * обʼєму — стан, який має ЗАЛИШАТИСЬ помітним, поки його не виправлять,
+ * а не блимнути раз при завантаженні сторінки.
+ */
+@keyframes bar-crawl { to { background-position: 17px center; } }
+
+/* Список, який перемальовується на кожну правку числа, просить тиші:
+   ставить його сам код (js/meals.js), і тоді смуги міняють ширину
+   плавним transition, без появи з нуля. */
+.vol-list.is-still .vol__bar i { animation: none; }
+.vol-list.is-still .vol__bar i::after { display: none; }
+
 @media (prefers-reduced-motion: reduce) {
-  .macrobar, .split, .vol__bar i, .qi-bar__track i { animation: none; }
+  .macrobar, .macrobar > span, .split,
+  .vol__bar i, .qi-bar__track i,
+  .vol--over .vol__bar i { animation: none; }
+  .vol__bar i::after { display: none; }
 }
 
 .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 0.83rem; color: var(--text-2); }
@@ -1480,9 +1568,16 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .vol__name { font-size: 0.89rem; color: var(--text-2); }
 .vol__bar {
   position: relative;
-  height: 10px;
+  /* 12px, а не 10: на десяти пікселях вертикальний блік займає шість, і
+     на насиченій заливці його просто не видно — смуга лишається плоскою
+     плашкою попри всі шари. Два пікселі вирішують, читається обʼєм чи ні. */
+  height: 12px;
   border-radius: 999px;
   background: rgba(var(--tint-rgb), 0.08);
+  /* Доріжка трохи заглиблена — рівно на один піксель темряви зверху.
+     Це не повернення обʼємної мови: заливка від цього не «висить», а
+     жолоб перестає зливатися з карткою на світліших поверхнях. */
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 .vol__bar i {
   display: block; height: 100%;
@@ -1985,8 +2080,8 @@ body.has-rest-timer { --rest-h: 86px; }
    відрізнялись лише яскравістю, і смуга читалась як шкала, а не як
    склад. Зелений тут не «добре», а «мʼязова маса»; бурштиновий не
    «погано», а «жир» — обидва підписані словами поруч. */
-.split__lean { background: var(--c-green); box-shadow: 1px 0 0 var(--bg-1); }
-.split__fat  { background: var(--c-amber); }
+.split__lean { background-color: var(--c-green); box-shadow: 1px 0 0 var(--bg-1); }
+.split__fat  { background-color: var(--c-amber); }
 
 /* Перехід одразу до вмісту. Видно лише при навігації з клавіатури:
    мишею його ніхто не побачить, а Tab на першому кроці покаже. */
@@ -2919,31 +3014,46 @@ button.mcal__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-off
    стоять ПЕРЕД станами, тож «на межі» й «вище межі» перефарбовують
    смугу поверх регіону. Так і має бути — перебір важливіший за те, який
    це мʼяз, а назва групи однаково написана словами поруч. */
-.vol--r-push .vol__bar i { background: var(--mg-push); }
-.vol--r-pull .vol__bar i { background: var(--mg-pull); }
-.vol--r-legs .vol__bar i { background: var(--mg-legs); }
-.vol--r-core .vol__bar i { background: var(--mg-core); }
+/* background-COLOR, а не скорочення background: скорочення скидає
+   background-image, тобто зняло б із смуги всі три шари обʼєму (блік,
+   тінь на початку, світло на кінці) — вони описані спільним правилом і
+   мають легшу вагу. Це стосується всіх правил нижче, які задають смузі
+   колір: вони міняють ЛИШЕ колір. */
+.vol--r-push .vol__bar i { background-color: var(--mg-push); }
+.vol--r-pull .vol__bar i { background-color: var(--mg-pull); }
+.vol--r-legs .vol__bar i { background-color: var(--mg-legs); }
+.vol--r-core .vol__bar i { background-color: var(--mg-core); }
 
 /* Смуги нутрієнтів у «Раціоні» — ті самі відтінки, що в смузі макросів.
    Селектор важчий за .vol--full/.vol--over навмисно НЕ робимо: коли
    норму перебрано, важливіше побачити перебір, ніж який це нутрієнт. */
-.vol--m-p   .vol__bar i { background: var(--m-protein); }
-.vol--m-f   .vol__bar i { background: var(--m-fat); }
-.vol--m-c   .vol__bar i { background: var(--m-carb); }
-.vol--m-fib .vol__bar i { background: var(--m-fiber); }
+.vol--m-p   .vol__bar i { background-color: var(--m-protein); }
+.vol--m-f   .vol__bar i { background-color: var(--m-fat); }
+.vol--m-c   .vol__bar i { background-color: var(--m-carb); }
+.vol--m-fib .vol__bar i { background-color: var(--m-fiber); }
 
 /* Смуга обʼєму на межі — зелена: група набрала свою норму. */
-.vol--full .vol__bar i { background: var(--ok); }
+.vol--full .vol__bar i { background-color: var(--ok); }
 
-/* Перевищення межі — червона зі штриховкою. Колір каже, що це перебір, а
-   штриховка лишається: вона працює і для тих, хто червоного не бачить, і
-   без неї «на межі» й «за межею» відрізнялись би лише відтінком. */
+/* Перевищення межі — червона зі штриховкою, яка ПОВІЛЬНО ПОВЗЕ. Колір
+   каже, що це перебір; штриховка лишається й без кольору (працює для тих,
+   хто червоного не бачить, і відрізняє «на межі» від «за межею»); рух
+   тримає стан помітним, поки його не виправлять, — на відміну від появи,
+   яка блимає раз і зникає. 7 секунд на цикл: помітно краєм ока, але не
+   тягне погляд зі сторінки. */
 .vol--over .vol__bar i {
-  background: repeating-linear-gradient(
+  background-color: var(--bad);
+  background-image: repeating-linear-gradient(
     45deg,
-    var(--bad) 0 6px,
-    rgba(var(--c-red-rgb), 0.35) 6px 12px
+    rgba(0, 0, 0, 0.28) 0 6px,
+    rgba(0, 0, 0, 0) 6px 12px
   );
+  background-size: 17px 100%;
+  background-position: left center;
+  background-repeat: repeat;
+  animation: bar-sweep 0.6s var(--e-out) backwards,
+             bar-crawl 7s linear infinite;
+  animation-delay: calc(min(var(--i, 0) * 45ms, 540ms)), 0s;
 }
 
 /* Світлова пляма під курсором картки: світло, а не колір. */
@@ -3721,12 +3831,16 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.10); }
 
 /* ---- Смуги даних ------------------------------------------------------
    Доріжка — просто темніша поверхня, без втоплення. */
+/* Доріжка: межа плюс один піксель темряви зверху. box-shadow тут не
+   «висота», а жолоб — без нього смуга й картка зливаються на світліших
+   поверхнях. Правило нижче раніше гасило його цілком (box-shadow: none),
+   тож заглиблення з попереднього блоку не доживало сюди. */
 .macrobar,
 .vol__bar,
 .split {
   border: 1px solid var(--line);
   background: var(--field);
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 .macrobar > span { box-shadow: 1px 0 0 rgba(0,0,0,.28); }
 .vol__bar i { box-shadow: none; }

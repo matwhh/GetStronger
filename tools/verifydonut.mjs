@@ -163,6 +163,60 @@ for (const w of [320, 390]) {
   await ctx.close();
 }
 
+/* ---- 5. Те саме кільце в НОРМІ на «Плані харчування» ----------------
+ * План і факт мусять виглядати однаково — інакше порівняти їх оком
+ * неможливо. Тут перевіряється, що на нормі стоїть той самий компонент і
+ * діють ті самі два правила: три сектори без клітковини, і число в дучці
+ * збігається з великою цифрою калорій угорі картки.
+ *
+ * Плюс окреме: смуги макросів там БІЛЬШЕ НЕМАЄ. Якщо вона повернеться,
+ * на сторінці буде дві картинки про одне й те саме.
+ */
+{
+  const ctx = await adultContext(b, { viewport: { width: 1280, height: 1000 } });
+  const p = await ctx.newPage();
+  const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+  await p.goto('file://' + ROOT + '/nutrition.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1500);
+  /* Вік у формі не заповнюється з профілю, а без нього розрахунку немає —
+     тому вводимо так само, як людина. */
+  await p.fill('#n-age', '31');
+  await p.fill('#n-weight', '82');
+  await p.waitForTimeout(900);
+
+  const m = await p.evaluate(() => {
+    const ring = document.querySelector('.macro-ring');
+    if (!ring) return null;
+    const li = [...ring.querySelectorAll('.macro-ring__legend li')];
+    const big = (document.querySelector('.gradient-text') || {}).textContent || '';
+    return {
+      bar: !!document.querySelector('.macrobar'),
+      slices: ring.querySelectorAll('.donut__slice[data-dash]').length,
+      center: ring.querySelector('.donut__val').textContent,
+      big: big.replace(/[^\d]/g, ''),
+      names: li.map((x) => x.querySelector('.macro-ring__name').textContent).join(','),
+      pctSum: li.reduce((a, x) => a + Number(x.querySelector('b').textContent.replace('%', '')), 0),
+      carbTitle: [...ring.querySelectorAll('title')].map((t) => t.textContent)
+        .find((t) => /^Вуглеводи/.test(t)) || '',
+      note: (ring.querySelector('.macro-ring__note') || {}).textContent || ''
+    };
+  });
+  ok('5. кільце на «Плані харчування» намальоване', !!m && m.slices === 3,
+     JSON.stringify(m && { slices: m.slices }));
+  ok('5. смуги макросів більше немає', m && !m.bar);
+  ok('5. три сектори без клітковини', m && m.names === 'Білок,Жири,Вуглеводи', m && m.names);
+  ok('5. число в дучці = велика цифра калорій угорі', m && m.center === m.big,
+     m && ('дучка ' + m.center + ', угорі ' + m.big));
+  ok('5. частки складаються в 100%', m && Math.abs(m.pctSum - 100) <= 1, m && String(m.pctSum));
+  ok('5. клітковина названа у вуглеводах', m && /клітковин/i.test(m.carbTitle), m && m.carbTitle);
+  /* Таблиця нижче показує вуглеводи БЕЗ клітковини, тобто менший відсоток,
+     ніж кільце. Розбіжність мусить пояснювати сама сторінка. */
+  ok('5. підпис пояснює, чому в таблиці інший відсоток',
+     m && /у таблиці нижче вона окремим рядком/.test(m.note), m && m.note.slice(0, 120));
+  ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter((r) => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок кільця КБЖВ пройшло.');

@@ -95,16 +95,32 @@
          Панель уже має власний падінг, тому віднімається (K − pad). */
       pill.style.width = (itemW - (K - pad) * 2) + 'px';
       lens.style.width = lensW + 'px';
-
-      if (!glass && window.LiquidGlass) {
-        var h = lens.getBoundingClientRect().height;
-        if (h) {
-          var o = { radius: h / 2 };
-          for (var k in LENS) o[k] = LENS[k];
-          glass = window.LiquidGlass.attach(lens, o);
-        }
-      }
       return true;
+    }
+
+    /*
+     * СКЛО БУДУЄТЬСЯ НА ПЕРШИЙ ДОТИК, А НЕ НА ЗАВАНТАЖЕННІ.
+     *
+     * Ціна побудови — canvas на кілька тисяч пікселів, toDataURL і
+     * SVG-фільтр у документі. Але дорожче інше: шість шарів лінзи, з яких
+     * два несуть власний backdrop-filter (один із них — SVG-фільтр
+     * зміщення, найдорожчий вид backdrop-filter узагалі). Вони висіли на
+     * КОЖНІЙ сторінці з першої секунди, хоч лінзу видно лише поки палець
+     * на панелі.
+     *
+     * Тепер до першого дотику панель — звичайна скляна капсула, і на
+     * прокрутці телефон малює один backdrop-filter замість трьох.
+     * Побудова на pointerdown встигає до першого руху пальця: карта
+     * розміром 116×75 будується за одиниці мілісекунд і далі кешується
+     * (див. mapCache у js/liquid-glass.js).
+     */
+    function ensureGlass() {
+      if (glass || !window.LiquidGlass) return;
+      var h = lens.getBoundingClientRect().height;
+      if (!h) return;
+      var o = { radius: h / 2 };
+      for (var k in LENS) o[k] = LENS[k];
+      glass = window.LiquidGlass.attach(lens, o);
     }
 
     function centerOf(i) { return pad + itemW * (i + 0.5); }
@@ -118,8 +134,21 @@
       return best;
     }
 
+    /*
+     * ПІД ПАЛЬЦЕМ ЛІНЗА ЙДЕ БЕЗ ПЕРЕХОДУ — і це головне в цьому файлі.
+     *
+     * Перша збірка малювала кожен рух із CSS-переходом 0,42 с. Виглядало
+     * це так, ніби лінза не їде за пальцем, а НАЗДОГАНЯЄ його: палець уже
+     * над сусіднім розділом, а скло десь позаду. На екрані 120 Гц це ще
+     * можна прийняти за «плавність», на звичайному телефоні це просто
+     * гальмує, і рухати лінзу довільно вліво-вправо неможливо.
+     *
+     * Тому перехід лишається тільки там, де він і має бути: доїзд до
+     * найближчого пункту після відпускання й згасання. Живий рух —
+     * завжди 1:1 із пальцем.
+     */
     function paintLens(animate) {
-      lens.style.transition = animate === false ? 'none' : '';
+      lens.style.transition = animate ? '' : 'none';
       var open = lensX != null;
       var x = (open ? lensX : centerOf(selected)) - lensW / 2;
       var s = open ? 1 : 0.86;
@@ -143,21 +172,30 @@
     /* Коротке розтягнення на переїзді — те, від чого рух читається як
        рідкий, а не як переставляння плитки. 170 мс: довше вже помітно
        як окрема анімація. */
-    function stretch() {
+    /*
+     * Коротке розтягнення на переїзді через межу пункту — те, від чого рух
+     * читається як рідкий, а не як переставляння плитки. Саме воно, і
+     * тільки воно, анімується під пальцем: це зміна ФОРМИ, а не позиції,
+     * тож із рухом за пальцем не конкурує.
+     */
+    function stretch(animate) {
       clearTimeout(stretchTimer);
-      sx = 1.05; sy = 0.95; paintLens(true);
-      stretchTimer = setTimeout(function () { sx = 1; sy = 1; paintLens(true); }, 170);
+      sx = 1.06; sy = 0.94; paintLens(animate);
+      stretchTimer = setTimeout(function () { sx = 1; sy = 1; paintLens(animate); }, 170);
     }
 
-    function moveTo(x) {
+    function moveTo(x, animate) {
       var before = lensX == null ? -1 : nearest(lensX);
       /* Центр лінзи ходить лише між центрами крайніх пунктів. Сама лінза
          ширша за пункт, тож над крайнім вона законно вилазить за край
          панелі — так і в оригіналі. */
       lensX = Math.max(centerOf(0), Math.min(centerOf(items.length - 1), x));
       var after = nearest(lensX);
-      paintLens(true); paintPill(); mark();
-      if (before !== -1 && before !== after) stretch();
+      /* animate передається далі: під пальцем — false (рух 1:1), на
+         фокусі з клавіатури — true (там стрибок без переходу виглядав би
+         як миготіння). */
+      paintLens(animate === true); paintPill(); mark();
+      if (before !== -1 && before !== after) stretch(animate === true);
     }
 
     function close() { lensX = null; paintLens(true); paintPill(); mark(); }
@@ -167,8 +205,9 @@
     bar.addEventListener('pointerdown', function (ev) {
       if (ev.button != null && ev.button !== 0) return;
       clearTimeout(closeTimer);
+      ensureGlass();
       dragging = true; moved = false; startX = ev.clientX;
-      moveTo(localX(ev));
+      moveTo(localX(ev), false);
       /*
        * НІ preventDefault, НІ setPointerCapture на цьому етапі — і те, й
        * те ламає звичайний дотик по посиланню.
@@ -190,7 +229,7 @@
            вести лінзу треба й за межами панелі. */
         if (bar.setPointerCapture) { try { bar.setPointerCapture(ev.pointerId); } catch (e) {} }
       }
-      moveTo(localX(ev));
+      moveTo(localX(ev), false);
     });
 
     function release(ev) {
@@ -230,16 +269,32 @@
     bar.addEventListener('pointercancel', function () {
       dragging = false; moved = false; close();
     });
-    /* Втрата захоплення = кінець жесту. Без цього після системного
-       перехоплення лишався б dragging: true, і наступний дотик по
-       сусідньому розділу читався б як продовження протягу. */
-    bar.addEventListener('lostpointercapture', function () {
+    /*
+     * Втрата захоплення = кінець жесту. Без цього після системного
+     * перехоплення лишався б dragging: true, і наступний дотик по
+     * сусідньому розділу читався б як продовження протягу.
+     *
+     * ПЕРЕВІРКА target ОБОВʼЯЗКОВА — без неї жест ламався на ПЕРШОМУ Ж
+     * русі пальця, і саме так воно й було в першій збірці.
+     *
+     * У дотику браузер дає НЕЯВНЕ захоплення: усі події цього пальця
+     * йдуть у той елемент, на якому сталось torkання, тобто в <a>. Коли
+     * ми на восьмому пікселі беремо захоплення собі (на панель), <a> своє
+     * втрачає — і браузер шле lostpointercapture. Ця подія СПЛИВАЄ, тож
+     * приходить на панель, і обробник глушив рівно той жест, який щойно
+     * почався. На миші цього не видно взагалі: там неявного захоплення
+     * немає, і подія не виникає.
+     */
+    bar.addEventListener('lostpointercapture', function (ev) {
+      if (ev.target !== bar) return;
       if (dragging) { dragging = false; moved = false; close(); }
     });
 
     /* Клавіатура: лінза йде за фокусом, перехід робить сам <a> по Enter. */
     items.forEach(function (a, i) {
-      a.addEventListener('focus', function () { clearTimeout(closeTimer); moveTo(centerOf(i)); });
+      a.addEventListener('focus', function () {
+        clearTimeout(closeTimer); ensureGlass(); moveTo(centerOf(i), true);
+      });
       a.addEventListener('blur', function () { if (!dragging) close(); });
     });
 

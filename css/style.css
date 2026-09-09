@@ -158,12 +158,22 @@
   --warn:  var(--c-amber);
   --bad:   var(--c-red);
 
-  /* Макронутрієнти. Відтінки взято максимально рознесені по колу:
-     синій (213°) ↔ помаранчевий (28°), фіолетовий (265°) ↔ зелений
-     (128°). Клітковина нарешті має свій колір замість штриховки. */
-  --m-protein: var(--c-blue);
-  --m-fat:     var(--c-violet);
-  --m-carb:    var(--c-orange);
+  /*
+   * Макронутрієнти. Три відтінки рознесені по колу — фіолетовий (265°) і
+   * синій (213°) — плюс білий на вуглеводи, четвертий (зелений, 128°)
+   * лишається клітковині.
+   *
+   * ЧОМУ ВУГЛЕВОДИ БІЛІ. Це найбільша частка майже в будь-якому раціоні:
+   * пів кільця й пів таблиці. Хроматичний колір такого розміру починає
+   * керувати всією сторінкою — око читає його як стан («помаранчеве =
+   * увага»), хоч половина вуглеводів у нормі не означає нічого
+   * тривожного. Білий такої конотації не має: він просто найбільший.
+   * Заразом це знімає питання контрасту — найбільший сегмент більше не
+   * бореться за помітність із сусідами.
+   */
+  --m-protein: var(--c-violet);
+  --m-fat:     var(--c-blue);
+  --m-carb:    var(--text);
   --m-fiber:   var(--c-green);
 
   /* Групи мʼязів — за РЕГІОНОМ, а не поштучно: груп девʼятнадцять, і
@@ -292,12 +302,20 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   display: flex;
   align-items: center;
 
-  /* Матове скло: сильне розмиття + підняття насиченості того, що під ним.
-     Саме друге дає ефект «живої» панелі — без saturate фон під нею
-     виглядає просто сірим, а не приглушеним кольором сторінки. */
+  /*
+   * Матове скло: розмиття + підняття насиченості того, що під ним. Саме
+   * друге дає ефект «живої» панелі — без saturate фон під нею виглядає
+   * просто сірим, а не приглушеним кольором сторінки.
+   *
+   * РАДІУС 16, А НЕ 24. Шапка прилипла до верху, тобто вона висить над
+   * контентом, що прокручується, — і кожен кадр прокрутки відеокарта
+   * розмиває смугу під нею наново. Ціна розмиття росте з радіусом, а на
+   * телефоні під цим ще й друга така смуга внизу (панель розділів). 16px
+   * лишає матовість читабельною, а не «трохи мутним склом», і водночас
+   * знімає з кожного кадру третину роботи. */
   background: var(--glass);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
   border-bottom: 1px solid var(--line);
   transition: background var(--t-fast);
 }
@@ -1017,16 +1035,35 @@ a.card > .btn {
   letter-spacing: 0.13em; text-transform: uppercase;
   color: var(--text);
 }
+/*
+ * ПУЛЬС РОБИТЬСЯ transform-ом, А НЕ box-shadow.
+ *
+ * Було: нескінченна анімація box-shadow. Кожен кадр такої анімації — це
+ * ПЕРЕМАЛЬОВКА, бо тінь рахується на боці процесора, і робиться вона
+ * вічно, на кожній сторінці, де є цей значок. На телефоні це рівно той
+ * клас витрат, який ні на що не видно й ні на що не потрібен.
+ *
+ * Стало: кільце — окремий шар (::after), і росте воно scale-ом разом із
+ * opacity. Обидві властивості composited: браузер віддає їх відеокарті й
+ * не перемальовує нічого. Вигляд той самий.
+ */
 .eyebrow__dot {
+  position: relative;
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--acc-3);
-  box-shadow: 0 0 0 0 rgba(var(--acc-3-rgb), 0.7);
+}
+.eyebrow__dot::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--acc-3-rgb), 0.6);
   animation: pulse 2.4s infinite;
+  will-change: transform, opacity;
 }
 @keyframes pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(var(--acc-3-rgb), 0.6); }
-  70%  { box-shadow: 0 0 0 9px rgba(var(--acc-3-rgb), 0); }
-  100% { box-shadow: 0 0 0 0 rgba(var(--acc-3-rgb), 0); }
+  0%   { transform: scale(1);   opacity: 0.75; }
+  70%  { transform: scale(4);   opacity: 0; }
+  100% { transform: scale(4);   opacity: 0; }
 }
 
 .chip {
@@ -1479,15 +1516,12 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
   .donut__slice { transition: stroke-width 0.18s linear; }
 }
 
-.macrobar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
-/* Розділювач кольором тла між сегментами.
-   Причина не косметична: сусідні заливки дають 2,8:1 (білок ↔ жири) при
-   нормі 3:1, і межа між ними ледь читається. Розсунути три сірих далі по
-   яскравості на темному тлі неможливо — найтемніший тоді зіллється вже з
-   карткою. Явна лінія знімає питання незалежно від контрасту заливок. */
-.macrobar > span { transition: width 0.6s var(--e-out); box-shadow: 1px 0 0 var(--bg-1); }
-.macrobar > span:last-child { box-shadow: none; }
-/* Чотири нутрієнти — чотири відтінки. Раніше їх було три сірих плюс
+/* Смуги макросів більше немає — її замінило кільце (js/donut-core.js).
+   Класи .macrobar__* лишились: вони фарбують маркери в таблиці
+   нутрієнтів і в підписах кільця, тобто джерело кольору для нутрієнта
+   на сторінці лишається одне.
+
+   Чотири нутрієнти — чотири відтінки. Раніше їх було три сірих плюс
    штрихована клітковина, і це був обхід, а не рішення: сусідні заливки
    давали 2,8:1 одна до одної при нормі 3:1, розсунути їх по яскравості
    було нікуди (#7f7f7f — найтемніше, що ще тримає 3:1 до тла), а
@@ -1533,19 +1567,11 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
  * Крок 45 мс і стеля 540 мс: на пʼятнадцяти рядках уся хвиля вкладається
  * у пів секунди, а на сорока — не перетворюється на очікування.
  */
-.macrobar,
 .split { animation: bar-sweep 0.55s var(--e-out); }
 .vol__bar i,
 .qi-bar__track i {
   animation: bar-sweep 0.6s var(--e-out) backwards;
   animation-delay: calc(min(var(--i, 0) * 45ms, 540ms));
-}
-
-/* Сегменти смуги макросів виїжджають один за одним у тому ж порядку, у
-   якому лежать: білок → жири → вуглеводи → клітковина. */
-.macrobar > span {
-  animation: bar-sweep 0.5s var(--e-out) backwards;
-  animation-delay: calc(var(--i, 0) * 90ms);
 }
 
 /*
@@ -1564,7 +1590,6 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
  */
 .vol__bar i,
 .qi-bar__track i,
-.macrobar > span,
 .split i {
   background-image:
     linear-gradient(90deg, rgba(var(--tint-rgb), 0) 0%, rgba(var(--tint-rgb), 0.34) 100%),
@@ -1616,7 +1641,9 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
  * обʼєму — стан, який має ЗАЛИШАТИСЬ помітним, поки його не виправлять,
  * а не блимнути раз при завантаженні сторінки.
  */
-@keyframes bar-crawl { to { background-position: 17px center; } }
+/* Період штриховки — 17px, тож зсув рівно на нього повертає малюнок
+   сам у себе: рух безшовний і без стрибка на межі циклу. */
+@keyframes bar-crawl { to { transform: translateX(17px); } }
 
 /* Список, який перемальовується на кожну правку числа, просить тиші:
    ставить його сам код (js/meals.js), і тоді смуги міняють ширину
@@ -1625,10 +1652,14 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .vol-list.is-still .vol__bar i::after { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .macrobar, .macrobar > span, .split,
+  .split,
   .vol__bar i, .qi-bar__track i,
-  .vol--over .vol__bar i { animation: none; }
+  .vol--over .vol__bar i,
+  /* Штриховка перебору лишається видимою, але перестає повзти: сенс
+     несе сам малюнок, рух лише привертає до нього увагу. */
+  .vol--over .vol__bar i::before { animation: none; }
   .vol__bar i::after { display: none; }
+  .eyebrow__dot::after { animation: none; opacity: 0.5; transform: none; }
 }
 
 .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 0.83rem; color: var(--text-2); }
@@ -2468,7 +2499,7 @@ main:focus:not(:focus-visible) { outline: none; }
    частка від нуля й тому завжди бреше про пропорції. Причина розписана
    повністю біля chartScale() у js/journal.js.
 
-   Горизонтальні смуги прогресу (.vol__bar, .macrobar, .qi-bar__track)
+   Горизонтальні смуги прогресу (.vol__bar, .qi-bar__track)
    під це правило НЕ підпадають: там нуль реальний, і смуга справді
    означає частку від цілого. Смуга ≠ графік.
 
@@ -3138,17 +3169,34 @@ button.mcal__cell:focus-visible { outline: 2px solid var(--acc-ink); outline-off
    тягне погляд зі сторінки. */
 .vol--over .vol__bar i {
   background-color: var(--bad);
+  animation: bar-sweep 0.6s var(--e-out) backwards;
+  animation-delay: calc(min(var(--i, 0) * 45ms, 540ms));
+}
+/*
+ * ШТРИХОВКА ПОВЗЕ transform-ом, А НЕ background-position.
+ *
+ * Було: нескінченна анімація background-position просто на смузі. Кожен
+ * кадр — перемальовка градієнта, і так вічно, доки на екрані є хоч одна
+ * смуга з перебором. Саме такі «непомітні» анімації і з'їдають телефон:
+ * побачити їх на десктопі неможливо, а на слабкому пристрої вони
+ * забирають кадри в прокрутки.
+ *
+ * Стало: штриховка живе на власному шарі, ширшому на один період (17px),
+ * і їде translateX-ом рівно на цей період. Малюнок ідентичний —
+ * повторюваний градієнт після зсуву на період збігається сам із собою, —
+ * але transform віддається відеокарті й нічого не перемальовує.
+ */
+.vol--over .vol__bar i::before {
+  content: '';
+  position: absolute; inset: 0 -17px 0 0;
   background-image: repeating-linear-gradient(
     45deg,
     rgba(0, 0, 0, 0.28) 0 6px,
     rgba(0, 0, 0, 0) 6px 12px
   );
-  background-size: 17px 100%;
-  background-position: left center;
-  background-repeat: repeat;
-  animation: bar-sweep 0.6s var(--e-out) backwards,
-             bar-crawl 7s linear infinite;
-  animation-delay: calc(min(var(--i, 0) * 45ms, 540ms)), 0s;
+  animation: bar-crawl 7s linear infinite;
+  will-change: transform;
+  pointer-events: none;
 }
 
 /* Світлова пляма під курсором картки: світло, а не колір. */
@@ -3930,14 +3978,12 @@ tr.tbl__band td { background: rgba(var(--acc-rgb), 0.10); }
    «висота», а жолоб — без нього смуга й картка зливаються на світліших
    поверхнях. Правило нижче раніше гасило його цілком (box-shadow: none),
    тож заглиблення з попереднього блоку не доживало сюди. */
-.macrobar,
 .vol__bar,
 .split {
   border: 1px solid var(--line);
   background: var(--field);
   box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.35);
 }
-.macrobar > span { box-shadow: 1px 0 0 rgba(0,0,0,.28); }
 .vol__bar i { box-shadow: none; }
 
 /* ---- Акордеон --------------------------------------------------------- */

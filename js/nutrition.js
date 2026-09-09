@@ -51,6 +51,66 @@
    *   «Частка» рахуються від ВЕРХУ діапазону — саме він іде в баланс
    *   калорійності, тому сума рядків, як і раніше, сходиться з ціллю.
    */
+  /*
+   * КІЛЬЦЕ МАКРОСІВ: три сектори й калорії в дучці.
+   *
+   * Той самий компонент, що в дні на «Харчуванні» (js/donut-core.js) —
+   * і це не економія коду, а те, заради чого компонент виносився: план і
+   * факт мають виглядати однаково, інакше порівняти їх оком неможливо.
+   * Різниця лише в тому, ЩО ділиться: тут — ціль, там — з'їдене.
+   *
+   * Клас кольору спільний із маркерами в таблиці нижче (.macrobar__p і
+   * далі): синє скрізь на сторінці має означати білок.
+   */
+  function macroRing(target, m, pP, pF, pC, pCarbOnly, pFib) {
+    if (!window.Donut) return '';
+    const KF = window.NutritionCalc.KCAL_FIBER;
+    const g = function (v) { return round(v, 0); };
+    const slices = [
+      { label: 'Білок', value: pP, cls: 'donut__slice--p',
+        title: 'Білок: ' + g(m.protein) + ' г · ' + g(m.protein * KCAL.protein) +
+               ' ккал · ' + g(pP) + '% енергії' },
+      { label: 'Жири', value: pF, cls: 'donut__slice--f',
+        title: 'Жири: ' + g(m.fat) + ' г · ' + g(m.fat * KCAL.fat) +
+               ' ккал · ' + g(pF) + '% енергії' },
+      { label: 'Вуглеводи', value: pC, cls: 'donut__slice--c',
+        title: 'Вуглеводи: ' + g(m.carb) + ' г + ' + g(m.fiber) + ' г клітковини · ' +
+               g(m.carb * KCAL.carb + m.fiber * KF) + ' ккал · ' + g(pC) + '% енергії' }
+    ];
+    const grams = [m.protein, m.fat, m.carb];
+
+    return '<div class="macro-ring mt-2">' +
+      window.Donut.html({
+        slices: slices,
+        center: round(target, 0),
+        sub: 'ккал на добу',
+        label: 'Склад норми за енергією'
+      }) +
+      '<div class="macro-ring__side">' +
+        '<ul class="macro-ring__legend">' +
+          slices.map(function (s, i) {
+            return '<li><i class="' + s.cls + '"></i>' +
+              '<span class="macro-ring__name">' + esc(s.label) + '</span>' +
+              '<b class="mono">' + g(s.value) + '%</b>' +
+              '<span class="muted mono">' + g(grams[i]) + ' г</span>' +
+            '</li>';
+          }).join('') +
+        '</ul>' +
+        /*
+         * Останнє речення — не багатослівність, а закриття питання, яке
+         * інакше виникне. У таблиці нижче клітковина стоїть окремим
+         * рядком зі своєю часткою, тож «Вуглеводи» там менші, ніж у
+         * кільці. Два різні числа під одним словом на одному екрані
+         * зобовʼязані пояснити самі себе — інакше далі не вірять жодному.
+         */
+        '<p class="small muted macro-ring__note">Частки — за енергією, а не за вагою: ' +
+          'грам жиру несе 9 ккал, грам білка — 4. Клітковина (' + g(m.fiber) + ' г) ' +
+          'порахована тут у вуглеводах; у таблиці нижче вона окремим рядком — ' +
+          g(pCarbOnly) + '% плюс ' + g(pFib) + '% і дають ці ' + g(pC) + '%.</p>' +
+      '</div>' +
+    '</div>';
+  }
+
   function macroRow(name, grams, kcalPerG, totalKcal, colorClass, low) {
     const kcal = grams * kcalPerG;
     const pct = totalKcal > 0 ? kcal / totalKcal * 100 : 0;
@@ -241,10 +301,25 @@
      * суперечила сама собі. Тепер сума макросів гарантовано дорівнює цілі
      * (див. macros у ядрі), тож нормувати на ціль і чесно, і безпечно.
      */
+    /*
+     * ТРИ ЧАСТКИ, А НЕ ЧОТИРИ: клітковина всередині вуглеводів.
+     *
+     * Вона і є вуглевод — окремим рядком її тримає довідник продуктів,
+     * бо засвоюється вона як 2 ккал/г, а не 4. Але в картині «з чого
+     * складається доба» четвертий сектор перетворював КБЖВ на КБЖВК, і
+     * найдрібніша частка (≈3%) з'їдала стільки ж уваги, скільки жири.
+     *
+     * Сума трьох часток рівно 100%: ядро гарантує, що макроси складаються
+     * в ціль (див. macros у js/nutrition-core.js), а калорійність
+     * клітковини вже відняте з вуглеводів — тож повертаючи її туди, ми
+     * відновлюємо ту саму суму, а не додаємо зайве.
+     */
+    const kcalFiber = m.fiber * window.NutritionCalc.KCAL_FIBER;
     const pP = m.protein * KCAL.protein / target * 100;
     const pF = m.fat * KCAL.fat / target * 100;
-    const pC = m.carb * KCAL.carb / target * 100;
-    const pFib = m.fiber * window.NutritionCalc.KCAL_FIBER / target * 100;
+    const pCarbOnly = m.carb * KCAL.carb / target * 100;
+    const pFib = kcalFiber / target * 100;
+    const pC = pCarbOnly + pFib;
 
     out.innerHTML = '' +
       '<div class="card">' +
@@ -287,23 +362,15 @@
         '<hr class="divider">' +
 
         '<h3>Макронутрієнти</h3>' +
-        // Клітковина — ЧЕТВЕРТИЙ сегмент, а не заокруглення.
-        // Її 2 ккал/г уже відняті з вуглеводів і стоять окремим рядком у
-        // таблиці нижче, тож без свого сегмента смуга не доходила до кінця
-        // рівно на її частку (≈3%) — і виглядало це як обрив, а не як
-        // «решта калорій десь там».
-        '<div class="macrobar">' +
-          '<span class="macrobar__p"   style="width:' + pP + '%;--i:0"></span>' +
-          '<span class="macrobar__f"   style="width:' + pF + '%;--i:1"></span>' +
-          '<span class="macrobar__c"   style="width:' + pC + '%;--i:2"></span>' +
-          '<span class="macrobar__fib" style="width:' + pFib + '%;--i:3"></span>' +
-        '</div>' +
-        '<div class="legend">' +
-          '<span><i class="macrobar__p"></i>Білок ' + round(pP, 0) + '%</span>' +
-          '<span><i class="macrobar__f"></i>Жири ' + round(pF, 0) + '%</span>' +
-          '<span><i class="macrobar__c"></i>Вуглеводи ' + round(pC, 0) + '%</span>' +
-          '<span><i class="macrobar__fib"></i>Клітковина ' + round(pFib, 0) + '%</span>' +
-        '</div>' +
+        /*
+         * Кільце замість смуги. Смуга відповідала на те саме питання, але
+         * гірше: на 3% клітковини лишалась риска в два пікселі, а межі
+         * між сегментами доводилось малювати лінією тла, бо сусідні
+         * заливки не тримали 3:1 одна до одної. У кільці частки читаються
+         * кутом, який не залежить від контрасту сусідів, а калорії стоять
+         * у центрі — вони ж і є те ціле, яке ділиться.
+         */
+        macroRing(target, m, pP, pF, pC, pCarbOnly, pFib) +
 
         '<div class="table-wrap mt-2">' +
           '<table class="tbl">' +
@@ -384,6 +451,11 @@
           '</div>' +
         '</div>' +
       '</div>';
+
+    /* Розгортання кільця робиться ПІСЛЯ вставки: розмітка вже несе
+       кінцеві сектори, тож без цього виклику діаграма просто стоїть
+       намальованою (див. Donut.animate). */
+    window.Donut && window.Donut.animate(out);
   }
 
   /* ------------------------------------------------------------------ */

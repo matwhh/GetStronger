@@ -52,7 +52,11 @@ for (const w of [320, 390, 430]) {
       lensIsSibling: !!zone.querySelector(':scope > .tabbar__lens'),
       lensInsideBar: !!bar.querySelector('.tabbar__lens'),
       pill: !!bar.querySelector('.tabbar__pill'),
+      /* До першого дотику шарів скла НЕМАЄ навмисно: два з них несуть
+         власний backdrop-filter, і висіти на кожній сторінці з першої
+         секунди їм нема за що. Будуються вони на pointerdown. */
       layers: zone.querySelectorAll('.tabbar__lens > .lg-l').length,
+      filters: document.querySelectorAll('svg filter[id^="lg-"]').length,
       /* Підпис не має обрізатись навіть на 320 px */
       clipped: items.filter((a) => {
         const l = a.querySelector('.tabbar__lbl');
@@ -73,7 +77,8 @@ for (const w of [320, 390, 430]) {
   ok(w + 'px: плашка активного є', m.pill);
   ok(w + 'px: лінза — сусід панелі, не її дитина',
      m.lensIsSibling && !m.lensInsideBar, JSON.stringify([m.lensIsSibling, m.lensInsideBar]));
-  ok(w + 'px: шість шарів матеріалу на лінзі', m.layers === 6, String(m.layers));
+  ok(w + 'px: до дотику скла лінзи ще немає — воно не коштує нічого',
+     m.layers === 0 && m.filters === 0, JSON.stringify([m.layers, m.filters]));
   ok(w + 'px: рідне перетягування посилань вимкнене', m.draggable === 4, String(m.draggable));
   ok(w + 'px: без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
@@ -132,6 +137,78 @@ for (const w of [320, 390, 430]) {
   await p.waitForTimeout(1400);
   ok('2. протяг веде в найближчий розділ', page(p) === 'journal.html', page(p));
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 2б. ПАЛЬЦЕМ, а не мишею ------------------------------------------
+ * Миша й дотик ідуть різними шляхами, і саме дотиковий ламався
+ * невидимо для всіх попередніх перевірок.
+ *
+ * У дотику браузер дає НЕЯВНЕ захоплення вказівника: усі події пальця
+ * йдуть у той елемент, на якому сталось торкання, тобто в <a>. Коли жест
+ * визнається протягом і ми беремо захоплення собі, <a> своє втрачає —
+ * і lostpointercapture СПЛИВАЄ на панель, де обробник глушив рівно той
+ * жест, який щойно почався. Лінза стрибала на один крок і поверталась,
+ * протяг не працював. На миші неявного захоплення немає, тому там усе
+ * виглядало справним.
+ *
+ * Друге, що тут міряється, — що лінза йде за пальцем 1:1, а не
+ * наздоганяє його CSS-переходом. Перехід під час протягу означає, що
+ * скло їде позаду пальця; на телефоні це читається як гальмо.
+ */
+{
+  const ctx = await adultContext(b, {
+    viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true
+  });
+  const p = await ctx.newPage();
+  const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+  await p.goto(file('index.html'), { waitUntil: 'load' });
+  await p.waitForTimeout(1800);
+
+  const cdp = await ctx.newCDPSession(p);
+  const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', {
+    type: type, touchPoints: type === 'touchEnd' ? [] : [{ x: x, y: y, id: 1 }]
+  });
+
+  const from = await p.locator('#tabbar a[href="index.html"]').boundingBox();
+  const to = await p.locator('#tabbar a[href="meals.html"]').boundingBox();
+  const y = from.y + from.height / 2;
+
+  await touch('touchStart', from.x + from.width / 2, y);
+  await p.waitForTimeout(60);
+  const lensX = () => p.evaluate(() => {
+    const l = document.querySelector('.tabbar__lens');
+    const m = /translate3d\((-?[\d.]+)px/.exec(l.style.transform);
+    return { x: m ? Math.round(+m[1]) : null, open: l.classList.contains('is-open'),
+             tr: l.style.transition };
+  });
+  ok('2б. дотик відкриває лінзу', (await lensX()).open);
+  /* І САМЕ ДОТИК будує скло: до нього шарів немає, після — шість. */
+  const built = await p.evaluate(() => ({
+    layers: document.querySelectorAll('.tabbar__lens > .lg-l').length,
+    filters: document.querySelectorAll('svg filter[id^="lg-"]').length
+  }));
+  ok('2б. дотик будує шість шарів матеріалу й фільтр',
+     built.layers === 6 && built.filters === 1, JSON.stringify(built));
+
+  const track = [];
+  for (let i = 1; i <= 10; i++) {
+    await touch('touchMove', from.x + from.width / 2 + (to.x - from.x) * i / 10, y);
+    await p.waitForTimeout(28);
+    track.push((await lensX()).x);
+  }
+  /* Слід має РОСТИ монотонно. Якщо жест глушиться, лінза повертається на
+     початкову позицію й далі стоїть — саме це й було. */
+  const grows = track.every((v, i) => i === 0 || v >= track[i - 1]);
+  ok('2б. лінза їде за пальцем, а не зривається на першому русі',
+     grows && track[track.length - 1] - track[0] > 100, JSON.stringify(track));
+  ok('2б. під пальцем переходу немає — рух 1:1',
+     (await lensX()).tr === 'none', (await lensX()).tr);
+
+  await touch('touchEnd', 0, 0);
+  await p.waitForTimeout(1400);
+  ok('2б. пальцем протяг доводить до розділу', page(p) === 'meals.html', page(p));
+  ok('2б. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 

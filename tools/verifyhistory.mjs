@@ -159,6 +159,45 @@ ok('20. timeStats більше не «замало даних»', st.stats !== n
 
 ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
 
+/* ---- 22. Плитки «Сьогодні» влучають у блок вводу ---------------------
+   Блоки журналу — порожні <div> у розмітці, вміст малює js/journal.js
+   після читання профілю. Браузер стрибає по якорю ДО того, як вміст
+   зʼявився, тож без власної доводки (focusHash) посилання з плитки
+   лишало людину на початку сторінки. Міряємо те саме, що видно оком:
+   де опинився блок відносно прилиплої шапки. */
+{
+  const ctx2 = await adultContext(b, { viewport: { width: 1200, height: 900 } });
+  const q = await ctx2.newPage();
+  const e4 = []; q.on('pageerror', (e) => e4.push(e.message));
+
+  for (const [href, id, name] of [
+    ['journal.html#jr-train',  'jr-train',  'Тренування'],
+    ['journal.html#jr-weight', 'jr-weight', 'Зважування']
+  ]) {
+    await q.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+    await q.waitForTimeout(1300);
+    const tile = q.locator('a[href="' + href + '"]');
+    ok('22. плитка «' + name + '» є на «Сьогодні»', await tile.count() === 1);
+    await tile.click();
+    await q.waitForTimeout(2200);
+    const m = await q.evaluate((blockId) => {
+      const el = document.getElementById(blockId);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const nav = document.querySelector('#site-nav');
+      const navH = nav ? nav.getBoundingClientRect().height : 0;
+      return { top: Math.round(r.top), navH: Math.round(navH), h: Math.round(r.height) };
+    }, id);
+    /* Верх блоку має бути ПІД шапкою й у межах першого екрана: інакше
+       людина дивиться або на шапку, або на сусідній блок. */
+    ok('22. плитка «' + name + '» влучає в блок вводу',
+       !!m && m.h > 0 && m.top >= m.navH && m.top < m.navH + 60,
+       m ? 'top=' + m.top + ' шапка=' + m.navH : 'блока немає');
+  }
+  ok('22. переходи з плиток без JS-помилок', e4.length === 0, e4.join(' | '));
+  await ctx2.close();
+}
+
 await b.close();
 const bad = R.filter((r) => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок історії пройшло.');

@@ -1796,6 +1796,22 @@ tr.tbl__band:hover td { background: rgba(var(--acc-rgb), 0.14); }
   .js .reveal { opacity: 1; transform: none; transition: none; }
 }
 .reveal[data-d="1"] { transition-delay: 0.08s; }
+
+/* Куди привело посилання. Після довгої прокрутки блок має себе назвати,
+   інакше він губиться серед однакових карток. Дві секунди — рівно
+   стільки, щоб око встигло дійти до нього після плавної прокрутки, і
+   замало, щоб підсвітка стала частиною оформлення. */
+.is-target > .card,
+.card.is-target {
+  animation: target-glow 2s var(--e-out);
+}
+@keyframes target-glow {
+  0%, 55% { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+  100%    { border-color: var(--line); box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-target > .card, .card.is-target { animation: none; border-color: var(--acc); }
+}
 .reveal[data-d="2"] { transition-delay: 0.16s; }
 .reveal[data-d="3"] { transition-delay: 0.24s; }
 .reveal[data-d="4"] { transition-delay: 0.32s; }

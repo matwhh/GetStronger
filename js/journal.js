@@ -2321,6 +2321,71 @@
     });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Перехід за якорем                                                    */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЧОМУ ЦЕ РОБИТЬ КОД, А НЕ БРАУЗЕР.
+   *
+   * Блоки журналу — порожні <div> у розмітці; усе, що в них є, малює цей
+   * файл після читання профілю. Браузер стрибає по якорю ОДРАЗУ на
+   * завантаженні, коли #jr-weight ще нульової висоти й стоїть відразу під
+   * заголовком, — і людина, що прийшла з плитки «Зважування», опиняється
+   * на початку сторінки. Далі приїжджає вміст, штовхає блок на кілька
+   * екранів униз, і виглядає це так, ніби посилання нікуди не веде.
+   *
+   * Тому: після рендера самі знаходимо блок, ПРОЯВЛЯЄМО його (.reveal
+   * тримає ще не показані блоки прозорими й зсунутими на 22px — інакше
+   * прокрутили б до невидимого) і прокручуємо. Відступ під прилиплу шапку
+   * вже враховує scroll-padding-top у CSS.
+   *
+   * requestAnimationFrame — щоб розкладка встигла злягтись після
+   * innerHTML: без нього координати були б із попереднього кадру.
+   */
+  const HASH_BLOCKS = ['jr-overview', 'jr-adherence', 'jr-weight', 'jr-train',
+                       'jr-lifts', 'jr-exercise', 'jr-prs', 'jr-food', 'jr-trackers'];
+
+  function focusHash() {
+    const id = String(location.hash || '').replace(/^#/, '');
+    if (HASH_BLOCKS.indexOf(id) < 0) return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    requestAnimationFrame(function () {
+      el.classList.add('is-in');
+      /*
+       * Прокручуємо вручну, а не scrollIntoView.
+       *
+       * Відступ під прилиплу шапку заданий у CSS через scroll-padding-top
+       * і константу --nav-h (80px), але шапка з логотипом і кнопками
+       * реально вища — 86px на десктопі. Різницю видно: верхні вісім
+       * пікселів картки лишались під шапкою. Тому беремо ВИМІРЯНУ висоту
+       * шапки й додаємо 16px повітря — тоді картка починається рівно там,
+       * де око її шукає, за будь-якого розміру шапки.
+       */
+      const nav = document.querySelector('#site-nav');
+      const navH = nav ? nav.getBoundingClientRect().height : 0;
+      /*
+       * Позицію беремо з offsetTop, а не з getBoundingClientRect.
+       *
+       * Rect враховує ТРАНСФОРМИ, а блок, який щойно проявляється,
+       * зсунутий на 22px униз (.reveal). Отже rect бреше рівно на ці
+       * 22px, ми прокручуємо на стільки ж далі — і картка зупиняється
+       * під шапкою замість того, щоб стати під нею. offsetTop — це
+       * розкладка, трансформи його не чіпають.
+       */
+      let top = 0;
+      for (let node = el; node; node = node.offsetParent) top += node.offsetTop;
+      const y = top - navH - 16;
+      try { window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' }); }
+      catch (_) { window.scrollTo(0, Math.max(0, y)); }
+      /* Коротка підсвітка: після довгої прокрутки має бути видно, КУДИ
+         саме привело посилання, інакше блок губиться серед сусідніх
+         карток. Клас знімає сам себе — стан у розмітці не лишається. */
+      el.classList.add('is-target');
+      setTimeout(function () { el.classList.remove('is-target'); }, 2000);
+    });
+  }
+
   async function init() {
     if (!$('#jr-weight')) return;
 
@@ -2359,8 +2424,12 @@
     // Вигляд з URL: #history відкриває історію одразу (посилання з меню
     // й акаунта). silent — hash уже правильний, не чіпаємо його.
     setView(location.hash === '#history' ? 'history' : 'overview', { silent: true });
+    /* Якір із зовнішнього посилання доводиться відпрацьовувати самим —
+       браузерний перехід уже стався, коли блоків ще не існувало. */
+    focusHash();
     window.addEventListener('hashchange', function () {
       setView(location.hash === '#history' ? 'history' : 'overview', { silent: true });
+      focusHash();
     });
 
     // Перемикач періоду живе всередині блоку ваги й перемальовується

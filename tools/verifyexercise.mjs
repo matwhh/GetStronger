@@ -112,30 +112,27 @@ const seg = async (p, name, val) => { await p.locator(`input[name="${name}"][val
   ok('11. без JS-помилок', errs.length===0, errs.join(' | '));
   await ctx.close();
 }
-{ /* 12. Складений графік: стовпчик і крапка — ОДНЕ значення.
-     Раніше стовпчики були обʼємом на власній правій шкалі, тож їх
-     вершини принципово не могли збігатися з крапками лінії. Око читає
-     складений графік так, ніби стовпчик і крапка над ним про одне й те
-     саме число — і воно читало неправду. Ця перевірка сторожить рівно
-     це: одна шкала на обидві форми. */
+{ /* 12. Графік — ЛІНІЯ, а не стовпчики (стандарт графіків Forge).
+     Стовпчики тут уже стояли: спершу обʼємом на власній правій шкалі,
+     потім метрикою від дна поля. Обидва рази вони брехали про пропорції,
+     бо жоден показник Forge не має осмисленого нуля в масштабі свого
+     графіка. Правило зафіксоване біля chartScale() у js/journal.js, а ця
+     перевірка не дає йому тихо зникнути. */
   const { ctx, p, errs } = await open(PROFILE);
   for (const metric of ['kg','vol','reps','e1rm']) {
     await seg(p, 'ex-metric', metric);
-    const g = await p.$eval('#jr-exercise svg.exc', svg => {
-      const bars=[...svg.querySelectorAll('.exc__bar')], dots=[...svg.querySelectorAll('.exc__dot')];
-      let dx=0, dy=0;
-      /* Стовпчик — <path> зі скругленим верхом і прямим дном, тому міряємо
-         його геометричну рамку, а не атрибути x/y прямокутника. */
-      for (let i=0;i<Math.min(bars.length,dots.length);i++){
-        const bb=bars[i].getBBox();
-        dx=Math.max(dx, Math.abs(bb.x + bb.width/2 - +dots[i].getAttribute('cx')));
-        dy=Math.max(dy, Math.abs(bb.y - +dots[i].getAttribute('cy')));
-      }
-      return { bars:bars.length, dots:dots.length, dx:+dx.toFixed(2), dy:+dy.toFixed(2),
-               right: svg.querySelectorAll('.exc__ylab--r').length };
-    });
-    ok('12. ['+metric+'] стовпчик на кожну крапку', g.bars===5 && g.dots===5, JSON.stringify(g));
-    ok('12. ['+metric+'] вершини збігаються з крапками', g.dx<=0.1 && g.dy<=0.1, JSON.stringify(g));
+    const g = await p.$eval('#jr-exercise svg.exc', svg => ({
+      rects: svg.querySelectorAll('rect:not(.exc__hit)').length,
+      bars:  svg.querySelectorAll('.exc__bar').length,
+      dots:  svg.querySelectorAll('.exc__dot').length,
+      line:  svg.querySelectorAll('.exc__line').length,
+      area:  svg.querySelectorAll('.exc__area').length,
+      grid:  svg.querySelectorAll('.exc__grid').length,
+      right: svg.querySelectorAll('.exc__ylab--r').length
+    }));
+    ok('12. ['+metric+'] стовпчиків немає жодного', g.bars===0 && g.rects===0, JSON.stringify(g));
+    ok('12. ['+metric+'] є лінія, заливка й сітка', g.line===1 && g.area===1 && g.grid>=3, JSON.stringify(g));
+    ok('12. ['+metric+'] крапка на кожне тренування', g.dots===5, JSON.stringify(g));
     ok('12. ['+metric+'] другої шкали немає', g.right===0, String(g.right));
   }
   /* .chart-tip має display:flex, а він перебиває вбудоване

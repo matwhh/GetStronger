@@ -182,7 +182,16 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
     const tile = q.locator('a[href="' + href + '"]');
     ok('22. плитка «' + name + '» є на «Сьогодні»', await tile.count() === 1);
     await tile.click();
-    await q.waitForTimeout(2200);
+    /* Чекаємо, доки плавна прокрутка САМА зупиниться, а не фіксовану
+       паузу: на завантаженій машині 2,2 с інколи не вистачало, і
+       перевірка падала на 8 пікселях недоїханої анімації. Флак у тесті
+       гірший за відсутній тест — він вчить не вірити червоному. */
+    await q.waitForFunction(() => {
+      const y = window.scrollY;
+      if (window.__lastY === y) { return (window.__same = (window.__same || 0) + 1) >= 3; }
+      window.__lastY = y; window.__same = 0; return false;
+    }, null, { timeout: 8000, polling: 120 }).catch(() => {});
+    await q.waitForTimeout(200);
     const m = await q.evaluate((blockId) => {
       const el = document.getElementById(blockId);
       if (!el) return null;
@@ -283,21 +292,6 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
 
   ok('24. графік ваги намальовано', await q.locator('#jr-weight svg.exc').count() === 1);
   const g = await q.$eval('#jr-weight svg.exc', (svg) => {
-    const bars = [...svg.querySelectorAll('.exc__bar')];
-    const dots = [...svg.querySelectorAll('.exc__dot')];
-    let dx = 0, dy = 0;
-    /* Стовпчик — <path> зі скругленим верхом і прямим дном, тому міряємо
-       його геометричну рамку, а не атрибути x/y прямокутника. */
-    const vbW = +svg.getAttribute('viewBox').split(' ')[2];
-    let outside = 0;
-    for (let i = 0; i < Math.min(bars.length, dots.length); i++) {
-      const bb = bars[i].getBBox();
-      dx = Math.max(dx, Math.abs(bb.x + bb.width / 2 - +dots[i].getAttribute('cx')));
-      dy = Math.max(dy, Math.abs(bb.y - +dots[i].getAttribute('cy')));
-      /* Крайні точки стоять на межах шкали часу — без інсету їхні
-         стовпчики зрізало рамкою навпіл, і ряд виглядав обрубаним. */
-      if (bb.x < 0 || bb.x + bb.width > vbW) outside++;
-    }
     /* Рядки шкали мають іти РІВНИМ кроком: нерівна шкала (76·80·84·86)
        бреше про відстані сильніше, ніж зайва лінія сітки. */
     const ys = [...svg.querySelectorAll('.exc__ylab')].map((t) => +t.textContent.replace(',', '.').replace(/\s/g, ''));
@@ -305,13 +299,27 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
     for (let i = 2; i < ys.length; i++) {
       if (Math.abs((ys[i] - ys[i - 1]) - (ys[1] - ys[0])) > 1e-6) even = false;
     }
-    return { bars: bars.length, dots: dots.length, dx: +dx.toFixed(2), dy: +dy.toFixed(2),
-             grid: svg.querySelectorAll('.exc__grid').length, ys: ys, even: even,
-             outside: outside };
+    /* Крапки не повинні виїжджати за полотно: крайні стоять рівно на
+       межах шкали часу, тому поле має інсет. */
+    const vbW = +svg.getAttribute('viewBox').split(' ')[2];
+    let outside = 0;
+    svg.querySelectorAll('.exc__dot').forEach((d) => {
+      const cx = +d.getAttribute('cx'), r = +d.getAttribute('r');
+      if (cx - r < 0 || cx + r > vbW) outside++;
+    });
+    return { bars: svg.querySelectorAll('.exc__bar').length,
+             rects: svg.querySelectorAll('rect:not(.exc__hit)').length,
+             dots: svg.querySelectorAll('.exc__dot').length,
+             line: svg.querySelectorAll('.exc__line').length,
+             area: svg.querySelectorAll('.wc__area').length,
+             grid: svg.querySelectorAll('.exc__grid').length,
+             ys: ys, even: even, outside: outside };
   });
-  ok('24. стовпчик на кожне зважування', g.bars === seeded && g.dots === seeded, JSON.stringify(g));
-  ok('24. вершини стовпчиків збігаються з крапками', g.dx <= 0.1 && g.dy <= 0.1, JSON.stringify(g));
-  ok('24. жоден стовпчик не зрізаний рамкою', g.outside === 0, String(g.outside));
+  ok('24. стовпчиків немає жодного (стандарт: графік — це лінія)',
+     g.bars === 0 && g.rects === 0, JSON.stringify(g));
+  ok('24. лінія, заливка й крапка на кожне зважування',
+     g.line === 1 && g.area === 1 && g.dots === seeded, JSON.stringify(g));
+  ok('24. жодна крапка не зрізана рамкою', g.outside === 0, String(g.outside));
   ok('24. є сітка й підписи шкали', g.grid >= 3 && g.ys.length >= 3, JSON.stringify(g.ys));
   ok('24. крок шкали рівний', g.even, JSON.stringify(g.ys));
 
@@ -328,6 +336,65 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
      !tip1.hidden && /кг/.test(tip1.t) && /середня/.test(tip1.t), JSON.stringify(tip1));
   ok('24. без JS-помилок', e6.length === 0, e6.join(' | '));
   await ctx4.close();
+}
+
+/* ---- 25. Якір не губиться, коли сторінка домальовується ------------
+ * Прокрутка до блоку рахується від висоти того, що ВЖЕ намальовано. Але
+ * сторінка домальовується й далі: шрифт замінює запасний і переносить
+ * рядки, картинки отримують розмір, графік перемальовується під ширину.
+ * Кожна така подія зсуває цільовий блок, і людина опиняється не там,
+ * куди цілилась.
+ *
+ * У житті це гонка: та сама сторінка то влучає, то ні. Тут вона зроблена
+ * ДЕТЕРМІНОВАНОЮ — після рендера журналу в початок сторінки вставляється
+ * блок на 600px, тобто рівно те, що робить шрифт, який доїхав пізніше.
+ * Без доводки (див. settle у js/journal.js) блок промахується на ці 600px
+ * у КОЖНОМУ прогоні.
+ */
+{
+  const ctx5 = await adultContext(b, { viewport: { width: 1200, height: 900 } });
+  await ctx5.addInitScript(() => {
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const top = document.querySelector('#jr-overview');
+        if (!top) return;
+        const pad = document.createElement('div');
+        pad.style.height = '600px';
+        pad.id = 'late-content';
+        top.parentNode.insertBefore(pad, top);
+      }, 600);
+    });
+  });
+  const q = await ctx5.newPage();
+  const e7 = []; q.on('pageerror', (e) => e7.push(e.message));
+  await q.goto('file://' + ROOT + '/journal.html#jr-weight', { waitUntil: 'load' });
+  await q.waitForTimeout(3000);
+  const m2 = await q.evaluate(() => {
+    const el = document.getElementById('jr-weight');
+    const nav = document.querySelector('#site-nav');
+    return {
+      top: Math.round(el.getBoundingClientRect().top),
+      navH: Math.round(nav ? nav.getBoundingClientRect().height : 0),
+      late: !!document.getElementById('late-content')
+    };
+  });
+  ok('25. пізній контент справді вставився', m2.late);
+  ok('25. якір доводиться після зсуву сторінки',
+     m2.top >= m2.navH && m2.top < m2.navH + 60,
+     'top=' + m2.top + ' шапка=' + m2.navH);
+
+  /* Доводка мусить негайно здаватись, щойно людина торкнулась прокрутки:
+     інтерфейс, який відбирає прокрутку назад, гірший за той, що просто
+     промахнувся. */
+  await q.evaluate(() => {
+    window.dispatchEvent(new WheelEvent('wheel', { deltaY: 10 }));
+    window.scrollTo(0, 0);
+  });
+  await q.waitForTimeout(900);
+  const back = await q.evaluate(() => Math.round(window.scrollY));
+  ok('25. після дотику до прокрутки доводка мовчить', back < 30, 'scrollY=' + back);
+  ok('25. без JS-помилок', e7.length === 0, e7.join(' | '));
+  await ctx5.close();
 }
 
 await b.close();

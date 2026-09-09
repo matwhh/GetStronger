@@ -183,13 +183,17 @@ for (const w of [320, 390, 430]) {
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
       tabs: items.length,
       small: small.length,
-      barBottom: bar ? Math.round(bar.getBoundingClientRect().bottom) : null,
+      barBottom: bar ? Math.round(bar.querySelector('.tabbar__bar').getBoundingClientRect().bottom) : null,
       vh: window.innerHeight,
       footerPad: parseInt(getComputedStyle(document.getElementById('site-footer')).paddingBottom, 10) || 0
     };
   });
   ok(w + 'px: без горизонтального переповнення', !m.overflow);
-  ok(w + 'px: панель розділів на місці й у зоні пальця', m.tabs === 4 && m.barBottom === m.vh,
+  /* Панель більше не приклеєна до низу: вона пливе капсулою з відступом,
+     як таб-бар iOS. Тому не «низ = висота вікна», а «низ у зоні пальця»:
+     від краю не далі 40 px і не впритул. */
+  ok(w + 'px: панель розділів на місці й у зоні пальця',
+     m.tabs === 4 && m.vh - m.barBottom >= 8 && m.vh - m.barBottom <= 40,
      m.tabs + ' пунктів, низ ' + m.barBottom + '/' + m.vh);
   ok(w + 'px: цілі дотику ≥ 44px', m.small === 0, m.small + ' дрібних');
   ok(w + 'px: футер не ховається під панеллю', m.footerPad >= 44, 'padding=' + m.footerPad);

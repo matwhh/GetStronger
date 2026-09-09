@@ -327,6 +327,98 @@
     });
   }
 
+  /* ---------------- Календар сезону ---------------- */
+  /*
+   * ВІДПОВІДАЄ НА ТРИ ПИТАННЯ ОДНИМ ПОГЛЯДОМ: коли сезон почався, коли
+   * закінчиться, скільки з нього лишилось. Рядок «день 9 із 91» у шапці
+   * дає те саме числом, але число не показує, що попереду ще два повні
+   * місяці — сітка показує.
+   *
+   * Сітка — стандартна (js/daycal-core.js), та сама, що в історії
+   * тренувань і в календарі зважувань.
+   *
+   * ЧОМУ МИНУЛІ ДНІ НЕ ЗАЛИТІ.
+   *
+   * Спокуса залити їх найяскравішим рівнем велика: одразу видно, скільки
+   * пройдено. Але в календарях журналу залита клітинка означає «цього дня
+   * я тренувався», і найяскравіший рівень — «закрив усі підходи». Якщо
+   * тут тим самим кольором позначити «день просто минув», одна й та сама
+   * плитка означатиме на сусідніх сторінках різні речі — рівно та
+   * помилка, заради усунення якої клітинку колись і звели в один клас.
+   *
+   * Тому кольору тут рівно два дні: перший і останній день сезону. Це і є
+   * те, що просили побачити. Минулі дні — звичайні клітинки, майбутні —
+   * бліді, сьогодні — кільце. Календар сезону нічого не стверджує про
+   * тренування, і не мусить: для цього є «Історія».
+   *
+   * Не залежить від акаунта: межі сезону — чиста арифметика календаря
+   * (EloCore.seasonRange), тому картка малюється і без входу. Людині без
+   * акаунта питання «а коли той сезон закінчується» цікаве не менше.
+   */
+  const HUMAN_MON = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
+                     'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'];
+
+  function human(k, withYear) {
+    const p = String(k).split('-').map(Number);
+    return p[2] + ' ' + HUMAN_MON[p[1] - 1] + (withYear ? ' ' + p[0] : '');
+  }
+
+  function renderSeasonCal() {
+    const host = $('#sz-cal');
+    const DC = window.DayCal;
+    if (!host || !DC || !EC) return;
+
+    const now = new Date();
+    const code = EC.seasonOf(now);
+    const range = EC.seasonRange(code);
+    const startK = DC.keyOf(range[0]);
+    const endK = DC.keyOf(range[1]);
+    const todayK = DC.keyOf(now);
+    /* Затискаємо «сьогодні» в межі сезону: у перший день нового сезону
+       сторінка могла відкритись із кешованим станом попереднього. */
+    const activeK = todayK < startK ? startK : (todayK > endK ? endK : todayK);
+    const day = EC.seasonDay(code, now);
+
+    const cal = DC.html({
+      from: startK,
+      to: activeK,
+      until: endK,
+      cls: 'mt-2',
+      label: 'Календар сезону ' + EC.seasonLabel(code),
+      cell: function (k, d, isFuture) {
+        if (k === startK) {
+          return { lvl: 4, label: 'Початок сезону: ' + human(k, true) };
+        }
+        if (k === endK) {
+          return { lvl: 4, label: 'Кінець сезону: ' + human(k, true) };
+        }
+        if (isFuture) return null;
+        return {
+          lvl: 0,
+          sel: k === todayK,
+          label: human(k, true) + (k === todayK ? ' — сьогодні' : '')
+        };
+      }
+    });
+
+    host.innerHTML = card(
+      '<div class="row row--split" style="align-items:baseline;gap:10px;flex-wrap:wrap">' +
+        '<h2 style="margin:0">Сезон ' + esc(EC.seasonLabel(code)) + '</h2>' +
+        '<span class="small muted mono">день ' + day.passed + ' із ' + day.total + '</span>' +
+      '</div>' +
+      '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
+        '<span class="small">Початок: <b>' + esc(human(startK, true)) + '</b></span>' +
+        '<span class="small">Кінець: <b>' + esc(human(endK, true)) + '</b></span>' +
+        '<span class="small">Лишилось: <b class="mono">' + (day.total - day.passed) + '</b> ' +
+          esc(window.App.plural(day.total - day.passed, 'день', 'дні', 'днів')) + '</span>' +
+      '</div>' +
+      cal +
+      '<p class="small muted mt-1 mb-0">Дві залиті клітинки — перший і останній день ' +
+        'сезону. Кільце — сьогодні, бліді дні — попереду. Цей календар ' +
+        '<b>не</b> показує тренування: заливка тут означає межу сезону, а не ' +
+        'закритий день. Тренування — у <a href="journal.html#history">історії</a>.</p>');
+  }
+
   /* ---------------- Оркестрація ---------------- */
 
   async function refresh() {
@@ -340,7 +432,12 @@
   }
 
   async function init() {
-    if (!$('#sz-header') || !EC || !Api) return;
+    if (!$('#sz-header') || !EC) return;
+    if (!Api) { renderSeasonCal(); return; }
+
+    /* Календар сезону малюється ПЕРШИМ і незалежно від акаунта: його
+       межі — арифметика календаря, а не серверний стан. */
+    renderSeasonCal();
 
     if (!Api.available()) { renderLocked(); return; }
 

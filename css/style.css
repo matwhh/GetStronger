@@ -1398,6 +1398,87 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .kpi__lbl { margin: 6px 0 0; font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
 
 /* Смуга макросів */
+/* ==========================================================================
+   КІЛЬЦЕВА ДІАГРАМА СКЛАДУ (js/donut-core.js)
+   ==========================================================================
+   Три сектори — білок, жири, вуглеводи — і сума в дучці. Це діаграма
+   СКЛАДУ, а не графік зміни: правило «графік — це лінія» (docs §14) її не
+   стосується, бо тут нуль справжній і частки складаються в ціле.
+
+   Кольори — ті самі --m-*, що в смузі макросів і в смугах дня. Три
+   сторінки говорять про одні й ті самі три речі, і синє скрізь має
+   означати білок.
+   -------------------------------------------------------------------- */
+
+.donut { position: relative; width: 100%; max-width: 190px; flex: 0 0 auto; }
+.donut__svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+/* Доріжка під секторами: показує саме кільце навіть там, де сектор
+   нульовий, і не дає діаграмі розсипатись на три уламки. */
+.donut__track { stroke: rgba(var(--tint-rgb), 0.07); }
+
+.donut__slice {
+  transition: stroke-dasharray 0.75s var(--e-out),
+              stroke-width 0.18s var(--e-out),
+              opacity 0.18s linear;
+}
+.donut__slice--p { stroke: var(--m-protein); }
+.donut__slice--f { stroke: var(--m-fat); }
+.donut__slice--c { stroke: var(--m-carb); }
+
+/* Наведення: сектор ТОВЩАЄ, а не від'їжджає від центру. Зсув сектора
+   ламає спільний контур кільця, і на трьох секторах це читається як
+   поламана діаграма, а не як підсвітка. */
+.donut__slice:hover { stroke-width: 19; }
+
+/* Дучка: сума всіх секторів. Абсолютна, по центру полотна — тому в
+   .donut є position: relative. */
+.donut__mid {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 1px; pointer-events: none; text-align: center;
+}
+.donut__val { font-size: clamp(1.15rem, 5.2vw, 1.5rem); font-weight: 800; letter-spacing: -0.02em; }
+.donut__sub { font-size: 0.68rem; color: var(--muted); }
+.donut--empty .donut__track { stroke-dasharray: 4 6; }
+.donut__empty { margin: 8px 0 0; text-align: center; }
+
+/* Кільце й підписи поруч на широкому, стовпчиком на вузькому. */
+.macro-ring {
+  display: flex; align-items: center; gap: clamp(14px, 4vw, 28px);
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+/* Стеля ширини обовʼязкова. Без неї на десктопі список розтягується на
+   всю картку, і між назвою нутрієнта та його числом лежить півекрана
+   порожнечі — око просто не звʼязує «Вуглеводи» з «51%». */
+.macro-ring__side { flex: 1 1 190px; min-width: 0; max-width: 340px; }
+.macro-ring__legend {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 10px;
+}
+.macro-ring__note { margin: 12px 0 0; }
+.macro-ring__legend li {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  align-items: center; gap: 10px;
+  font-size: 0.84rem;
+}
+.macro-ring__legend i {
+  width: 10px; height: 10px; border-radius: 3px; display: block;
+}
+/* Маркер бере колір із того самого класу, що й сектор: інакше два
+   джерела кольору для однієї речі розійшлися б при першій же правці. */
+.macro-ring__legend .donut__slice--p { background: var(--m-protein); }
+.macro-ring__legend .donut__slice--f { background: var(--m-fat); }
+.macro-ring__legend .donut__slice--c { background: var(--m-carb); }
+.macro-ring__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .donut__slice { transition: stroke-width 0.18s linear; }
+}
+
 .macrobar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
 /* Розділювач кольором тла між сегментами.
    Причина не косметична: сусідні заливки дають 2,8:1 (білок ↔ жири) при
@@ -2379,11 +2460,20 @@ main:focus:not(:focus-visible) { outline: none; }
 }
 .wchart svg { display: block; width: 100%; height: auto; }
 
-/* ---------- Складений графік ------------------------------------------
-   Один візуальний словник на обидва графіки сторінки — прогрес вправи й
-   вагу тіла. Одне значення показане тричі: стовпчик від дна, крапка на
-   його вершині, лінія крізь крапки. Кольору немає — форма й яскравість
-   розрізняють шари, як і в решті інтерфейсу. */
+/* ---------- Графік: лінія, сітка, крапки -------------------------------
+   СТАНДАРТ ГРАФІКІВ FORGE. Кожен графік сайту — лінія з крапками на
+   точках даних, сітка, підписана ліва шкала й заливка під лінією.
+   Стовпчиків на графіках немає ніде: жоден показник Forge не має
+   осмисленого нуля в масштабі свого графіка, а стовпчик читається як
+   частка від нуля й тому завжди бреше про пропорції. Причина розписана
+   повністю біля chartScale() у js/journal.js.
+
+   Горизонтальні смуги прогресу (.vol__bar, .macrobar, .qi-bar__track)
+   під це правило НЕ підпадають: там нуль реальний, і смуга справді
+   означає частку від цілого. Смуга ≠ графік.
+
+   Один словник на всі графіки сторінки: класи .exc__* спільні для
+   прогресу вправи й ваги тіла. */
 
 .wchart--live { position: relative; }
 
@@ -2395,19 +2485,11 @@ main:focus:not(:focus-visible) { outline: none; }
   font-variant-numeric: tabular-nums;
 }
 
-/* Стовпчик несе те саме число, що й крапка над ним, тож він більше не
-   фон: заливка помітна, верх скруглений, дно пряме (див. barPath —
-   скруглений низ відривав ряд від осі). Заливки під лінією немає
-   навмисно: вона фарбувала ту саму площу вдруге, і графік перетворювався
-   на сіру пляму, у якій ні стовпчиків, ні лінії не було видно. */
-.exc__bar {
-  fill: rgba(var(--acc-rgb), 0.16);
-  stroke: rgba(var(--acc-rgb), 0.3);
-  stroke-width: 1;
-  transform-box: fill-box;
-  transform-origin: bottom;
-  animation: exc-bar 0.5s var(--e-out) backwards;
-}
+/* Заливка під лінією. Свій id градієнта на кожен графік: два <defs> з
+   однаковим id в одному документі — невалідна розмітка, а обидва графіки
+   живуть на одній сторінці журналу. */
+.exc__area { fill: url(#exc-fill); animation: exc-fade 0.6s ease-out 0.25s backwards; }
+.wc__area  { fill: url(#wc-fill);  animation: exc-fade 0.6s ease-out 0.25s backwards; }
 /* Коридор цілі: пунктир і прозорість кажуть «це модель, не вимір». */
 .wc__fc {
   fill: none; stroke: var(--g2); stroke-width: 1.5;
@@ -2437,7 +2519,6 @@ main:focus:not(:focus-visible) { outline: none; }
 .exc__col:hover .exc__cross { opacity: 1; }
 .exc__col:hover .exc__dot { transform: scale(1.5); }
 
-@keyframes exc-bar  { from { transform: scaleY(0); } }
 @keyframes exc-fade { from { opacity: 0; } }
 @keyframes exc-pop  { from { opacity: 0; transform: scale(0.2); } }
 @keyframes exc-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
@@ -2466,7 +2547,7 @@ main:focus:not(:focus-visible) { outline: none; }
    реченням під графіком і підписом нижнього рядка шкали. */
 
 @media (prefers-reduced-motion: reduce) {
-  .exc__bar, .wc__fc, .exc__line, .exc__dot { animation: none; }
+  .exc__area, .wc__area, .wc__fc, .exc__line, .exc__dot { animation: none; }
   .exc__line { stroke-dasharray: none; }
   .exc__dot { transition: none; }
 }
@@ -4317,55 +4398,231 @@ button.heatmap__cell::after {
 .tabbar { display: none; }
 
 @media (max-width: 900px) {
+  /*
+   * ЗОНА панелі. Fixed, на всю ширину екрана з відступами — і НІЧОГО з
+   * переліку backdrop root на ній: ні opacity, ні filter, ні isolation,
+   * ні contain. Інакше скло всередині заломлюватиме порожнечу.
+   * Причина розписана в js/liquid-glass.js.
+   */
   .tabbar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 240;
-    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-    border-top: 1px solid var(--line);
-    background: var(--glass-2);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    /* Безпечна зона iPhone: без неї нижній ряд ховається під смугою
-       жестів, і по крайніх пунктах не влучити. */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* ---- геометрія (зняте з референсу iOS, поділене на 3) ---------- */
+    --tb-inset: 16px;      /* відступ від країв екрана */
+    --tb-bottom: 12px;     /* над смугою жестів; безпечна зона нижче */
+    --tb-h: 61.33px;       /* висота панелі */
+    --tb-r: 30.67px;       /* радіус = h / 2 → капсула */
+    --tb-pad: 3.97px;      /* внутрішній падінг */
+    --tb-pill-k: 6px;      /* відступ плашки від контуру з усіх боків */
+    --tb-icon: 21px;
+    --tb-label: 10.5px;
+    --tb-gap: 4px;
+    --tb-lens-ox: 13.7px;  /* наскільки лінза ширша за пункт */
+    --tb-lens-oy: 7px;     /* наскільки вища за панель */
+
+    /* ---- матеріал --------------------------------------------------- */
+    /*
+     * ЧИТАБЕЛЬНІСТЬ ТРИМАЄ brightness, А НЕ ЗАЛИВКА.
+     *
+     * Спокуса підняти --tb-fill до 30% велика: підписи одразу
+     * перестають боротися з фоном. Але тоді скло перетворюється на
+     * плашку, і сенс капсули зникає. Тому заливка лишається 8%, а
+     * світлий контент під панеллю гасить brightness(.92) усередині
+     * backdrop-filter.
+     *
+     * ЧОМУ 6px, А НЕ 20. Це виміряне значення з референсу iOS, і воно ж
+     * єдине, яке тут вдалося ПЕРЕВІРИТИ. Радіус понад ~10px у
+     * програмному растеризаторі Chromium тихо деградує: заміряна
+     * нормована різкість фону під панеллю 0,26 при 6px, 0,44 при 10px і
+     * 0,71 при 20px — тобто «сильніший» блюр давав НЕ розмитіший фон, а
+     * майже нерозмитий. На справжньому телефоні з GPU великі радіуси
+     * працюють, але покластися на неперевірене число гірше, ніж узяти
+     * виміряне. Сторожить tools/verifytabbar.mjs, блок 5.
+     */
+    --tb-fill: 0.08;
+    --tb-blur: 6px;
+    --tb-lift-top: 0.05;
+    --tb-lift-bottom: 0.025;
+    --tb-pill-fill: 0.1;
+
+    --tb-ease-pill: cubic-bezier(0.32, 1.15, 0.4, 1);
+    --tb-ease-lens: cubic-bezier(0.32, 1.25, 0.4, 1);
+
+    position: fixed;
+    left: var(--tb-inset);
+    right: var(--tb-inset);
+    /* Безпечна зона iPhone додається до відступу, а не замінює його:
+       на пристрої без вирізу лишається 12px, з вирізом — 12 + 34. */
+    bottom: calc(var(--tb-bottom) + env(safe-area-inset-bottom, 0px));
+    z-index: 240;
+    display: block;
   }
 
+  /* ---- сама капсула ------------------------------------------------- */
+  /*
+   * Три складові тримають форму над темним фоном, і жодну не прибрати:
+   *   1) заливка 8% — ледь підфарбовує;
+   *   2) білий градієнт зверху вниз — дає капсулі тіло;
+   *   3) brightness(.92) у backdrop-filter — гасить світлий контент, що
+   *      проїжджає під панеллю, щоб підписи вижили.
+   * Робити пункт 3 альфою НЕ можна: скло перетвориться на плашку.
+   */
+  .tabbar__bar {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--tb-n, 4), 1fr);
+    height: var(--tb-h);
+    border-radius: var(--tb-r);
+    padding: 0 var(--tb-pad);
+    /* pan-y: вертикальна прокрутка сторінки, що почалась на панелі,
+       лишається браузеру; горизонтальний жест — наш. */
+    touch-action: pan-y;
+    -webkit-tap-highlight-color: transparent;
+    /* Виділення тексту протягом по підписах перетворило б жест на
+       виділення й обірвало б його pointercancel-ом. */
+    -webkit-user-select: none;
+            user-select: none;
+    background:
+      linear-gradient(180deg,
+        rgba(255, 255, 255, var(--tb-lift-top)),
+        rgba(255, 255, 255, var(--tb-lift-bottom))),
+      rgba(18, 18, 20, var(--tb-fill));
+    -webkit-backdrop-filter: blur(var(--tb-blur)) saturate(170%) brightness(0.92);
+            backdrop-filter: blur(var(--tb-blur)) saturate(170%) brightness(0.92);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.13),
+      inset 0 0.6px 0 rgba(255, 255, 255, 0.22),
+      inset 0 -0.6px 0 rgba(255, 255, 255, 0.17),
+      0 10px 26px -10px rgba(0, 0, 0, 0.75);
+  }
+
+  /* ---- плашка активного розділу -------------------------------------- */
+  /* Капсула, КОНЦЕНТРИЧНА капсулі панелі: радіус — половина висоти, тож
+     зменшена на 2K капсула є контуром панелі, зміщеним усередину на K.
+     Зазор виходить однаковий і на прямих, і на дугах. Ширину рахує JS. */
+  .tabbar__pill {
+    position: absolute;
+    left: 0;
+    top: var(--tb-pill-k);
+    height: calc(var(--tb-h) - var(--tb-pill-k) * 2);
+    border-radius: calc((var(--tb-h) - var(--tb-pill-k) * 2) / 2);
+    background: rgba(255, 255, 255, var(--tb-pill-fill));
+    pointer-events: none;
+    transition:
+      transform 0.38s var(--tb-ease-pill),
+      width 0.38s var(--tb-ease-pill),
+      opacity 0.22s ease;
+  }
+
+  /* ---- пункт ---------------------------------------------------------- */
   .tabbar__item {
-    display: flex; align-items: center; justify-content: center;
-    /* 56px + безпечна зона — стандартна висота панелі розділів і водночас
-       ціль дотику з великим запасом понад 44px. Підпису під іконкою
-       більше немає, тому вся висота лишається малюнку. */
-    min-height: 56px;
-    padding: 8px 4px;
+    position: relative;
+    z-index: 2;               /* вище шарів скла, інакше попливе разом із фоном */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--tb-gap);
     color: var(--muted);
     text-decoration: none;
-    transition: color var(--t-fast);
+    touch-action: none;
     -webkit-tap-highlight-color: transparent;
+    transition: color var(--t-fast);
   }
-  /* Без підпису іконка лишається єдиним розпізнавальним знаком, тож вона
-     більша, ніж коли під нею стояло слово. */
-  .tabbar__ico { width: 26px; height: 26px; flex: none; }
-  /* Підпис не зникає, а стає невидимим: .sr-only лишає його читалкам
-     екрана й дає посиланню доступну назву. Прибрати текст зовсім —
-     означало б чотири посилання без назви. */
-
-  .tabbar__item.is-active { color: var(--acc-ink); }
-  .tabbar__item:active { color: var(--text); }
+  /* -webkit-user-drag разом із draggable="false" у розмітці: перший
+     потрібен Safari, другий — решті. Без них протяг по пункту запускає
+     рідне перетягування посилання, браузер забирає жест і шле
+     pointercancel — лінза гасне на першому ж русі пальця. */
+  .tabbar__item { -webkit-user-drag: none; }
+  .tabbar__ico { width: var(--tb-icon); height: var(--tb-icon); flex: none; display: block;
+                 pointer-events: none; }
+  /* Іконка й підпис не ловлять вказівник: інакше target подій стрибає
+     між <svg>, <span> і <a>, і closest('a') доводиться рахувати щоразу. */
+  .tabbar__lbl { pointer-events: none; }
+  .tabbar__lbl {
+    font-size: var(--tb-label);
+    line-height: 1;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    /* Найдовший підпис — «Тренування». На 320px пункт має 68px, підпису
+       вистачає; але якщо колись зʼявиться довший, він має обрізатись, а
+       не розсунути сітку. */
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tabbar__item.is-active { color: var(--acc-ink); font-weight: 600; }
+  .tabbar__item.is-active .tabbar__lbl { font-weight: 600; }
+  /* Пункт під лінзою: підсвічується, поки палець над ним. Це не вибір —
+     вибір станеться на відпусканні. */
+  .tabbar__item.is-lit { color: var(--text); }
   .tabbar__item:focus-visible {
-    outline: 2px solid var(--acc-ink); outline-offset: -3px; border-radius: var(--r-sm);
+    outline: 2px solid var(--acc-ink);
+    outline-offset: -4px;
+    border-radius: calc((var(--tb-h) - var(--tb-pill-k) * 2) / 2);
   }
 
-  /* Вміст сторінки не має ховатись під панеллю. Змінна, а не число:
-     той самий відступ потрібен тостам і таймеру відпочинку нижче. */
-  body.has-tabbar { --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  /* ---- лінза ---------------------------------------------------------- */
+  /* СУСІД панелі, не її дитина: у панелі власний backdrop-filter, тобто
+     вона backdrop root для своїх дітей, і всередині лінзі не було б чого
+     заломлювати. Ширину рахує JS: пункт + 2 × --tb-lens-ox. */
+  .tabbar__lens {
+    position: absolute;
+    left: 0;
+    top: calc(var(--tb-lens-oy) * -1);
+    height: calc(var(--tb-h) + var(--tb-lens-oy) * 2);
+    border-radius: calc((var(--tb-h) + var(--tb-lens-oy) * 2) / 2);
+    pointer-events: none;
+    z-index: 11;
+    transform-origin: 50% 50%;
+    transition: transform 0.42s var(--tb-ease-lens);
+  }
+  /* Прозорість живе на ШАРАХ, а не на самій лінзі: opacity < 1 зробило б
+     її backdrop root посеред анімації, і заломлення блимало б.
+
+     visibility на додачу до прозорості — заради телефона: шар із
+     opacity 0 усе одно лишається в композиції, а це другий
+     backdrop-filter із SVG-фільтром на кожному кадрі прокрутки. Схований
+     шар браузер не рахує взагалі. Перемикається з нульовою тривалістю,
+     але із затримкою на час згасання — інакше лінза зникала б миттєво,
+     не встигнувши згаснути. */
+  .tabbar__lens > * {
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.22s ease, visibility 0s linear 0.22s;
+  }
+  .tabbar__lens.is-open > * {
+    opacity: 1; visibility: visible;
+    transition: opacity 0.22s ease, visibility 0s linear 0s;
+  }
+  .tabbar__lens::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+      0 0 0 0.5px rgba(255, 255, 255, 0.1),
+      0 12px 28px -12px rgba(0, 0, 0, 0.85);
+    opacity: 0;
+    transition: opacity 0.22s ease;
+  }
+  .tabbar__lens.is-open::after { opacity: 1; }
+
+  /* ---- відступи для решти сторінки ------------------------------------ */
+  /* Панель більше не приклеєна до низу, тож місце під нею — це висота
+     плюс обидва відступи. Змінна, а не число: той самий запас потрібен
+     футеру, таймеру відпочинку й тостам. */
+  body.has-tabbar {
+    --tabbar-h: calc(var(--tb-h, 61.33px) + 12px + 14px + env(safe-area-inset-bottom, 0px));
+  }
   body.has-tabbar #site-footer { padding-bottom: var(--tabbar-h); }
+  body.has-tabbar .rest-timer { bottom: calc(10px + var(--tabbar-h)); }
+  body.has-tabbar .toasts { bottom: calc(10px + var(--rest-h, 0px) + var(--tabbar-h)); }
+  .nav__links.is-open { padding-bottom: calc(24px + var(--tabbar-h, 88px)); }
+}
 
-  /* Таймер відпочинку й тости піднімаються над панеллю, а не лягають під неї */
-  body.has-tabbar .rest-timer { bottom: calc(18px + var(--tabbar-h)); }
-  body.has-tabbar .toasts { bottom: calc(18px + var(--rest-h, 0px) + var(--tabbar-h)); }
-
-  /* Меню-накладка бургера відкривається над панеллю: інакше її нижні
-     пункти лягали б рівно під неї й не натискались. */
-  .nav__links.is-open { padding-bottom: calc(24px + var(--tabbar-h, 56px)); }
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+  .tabbar__pill,
+  .tabbar__lens,
+  .tabbar__lens > * { transition-duration: 0.01ms !important; }
 }
 
 /* Друк: панель — інтерфейс, на аркуші її немає */

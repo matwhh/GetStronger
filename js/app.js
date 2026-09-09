@@ -558,32 +558,98 @@
     return (group.children || []).some(function (c) { return c.href === page; });
   }
 
+  /*
+   * РОЗМІТКА ПАНЕЛІ: ЗОНА → КАПСУЛА → ПУНКТИ.
+   *
+   * Зайвий div навколо <nav> не декоративний. Панель має власний
+   * backdrop-filter, тобто вона backdrop root для своїх дітей — і лінза
+   * всередині неї заломлювала б порожнечу. Лінза мусить бути СУСІДОМ
+   * панелі, а сусідам потрібен спільний позиційований батько. Ним і є
+   * зона (див. js/liquid-glass.js, розділ про backdrop root).
+   *
+   * Підписи знову видимі. Раніше вони були sr-only, бо панель тягнулась
+   * на всю ширину й іконки стояли поодинці; у капсулі з плашкою активного
+   * підпис — частина форми: без нього плашка охоплює саму лише іконку й
+   * виглядає випадковою плямою.
+   */
   function buildTabBar(page) {
     const core = NAV_GROUPS.filter(function (g) { return g.core; });
     if (!core.length) return;
 
-    let bar = document.getElementById('tabbar');
-    if (!bar) {
-      bar = document.createElement('nav');
-      bar.id = 'tabbar';
-      bar.className = 'tabbar';
-      bar.setAttribute('aria-label', 'Основні розділи');
-      document.body.appendChild(bar);
+    let zone = document.getElementById('tabbar');
+    if (!zone) {
+      zone = document.createElement('div');
+      zone.id = 'tabbar';
+      zone.className = 'tabbar';
+      document.body.appendChild(zone);
     }
 
-    bar.innerHTML = core.map(function (g) {
+    const items = core.map(function (g) {
       const active = sectionOwns(g, page);
-      return '<a class="tabbar__item' + (active ? ' is-active' : '') + '" href="' + g.href + '"' +
+      /*
+       * draggable="false" — не косметика. Протяг по посиланню мишею
+       * запускає рідне перетягування <a>, браузер забирає жест собі й
+       * шле pointercancel — лінза гасне на першому ж русі, а перехід не
+       * відбувається. На тачскріні того самого ефекту не буде, але
+       * панель має працювати й під мишею (сенсорні ноутбуки, DevTools).
+       */
+      return '<a class="tabbar__item' + (active ? ' is-active' : '') + '" href="' + g.href +
+             '" draggable="false"' +
              (active ? ' aria-current="page"' : '') + '>' +
                tabIcon(g.icon) +
-               '<span class="tabbar__lbl sr-only">' + esc(g.label) + '</span>' +
+               '<span class="tabbar__lbl">' + esc(g.label) + '</span>' +
              '</a>';
     }).join('');
+
+    zone.innerHTML = '<nav class="tabbar__bar" aria-label="Основні розділи">' + items + '</nav>';
+    zone.style.setProperty('--tb-n', core.length);
 
     /* Панель перекриває низ сторінки, тому вміст отримує відступ рівно на
        її висоту. Клас на <body>, а не padding у CSS сторінки: висота
        залежить від безпечної зони iOS і живе в одній змінній. */
     document.body.classList.add('has-tabbar');
+
+    enhanceTabBar(zone);
+  }
+
+  /*
+   * СКЛО ВАНТАЖИТЬСЯ ЛИШЕ ТАМ, ДЕ ПАНЕЛЬ СПРАВДІ Є.
+   *
+   * Два файли оптики важать близько 25 КБ, і на десктопі вони не потрібні
+   * взагалі: там розділи стоять у шапці, а панелі немає (@media
+   * max-width: 900px). Тому вони не в <head> кожної з двадцяти трьох
+   * сторінок, а підвантажуються звідси — після того, як зʼясувалось, що
+   * панель видима. Тег <script src> із власного домену політика
+   * script-src 'self' дозволяє; inline-скриптів тут немає.
+   *
+   * Без цих файлів панель лишається робочою: капсула, плашка активного й
+   * підписи — звичайний CSS. Зникає тільки лінза. Тому помилка
+   * завантаження нічого не ламає й нічого не повідомляє.
+   */
+  let glassLoading = false;
+
+  function enhanceTabBar(zone) {
+    if (window.TabBarGlass) { window.TabBarGlass.init(zone); return; }
+    if (glassLoading) return;
+    /* getComputedStyle, а не matchMedia з тим самим числом: точка
+       перемикання живе в CSS, і другий її запис у JS розійшовся б із
+       першим при найближчій правці. */
+    if (getComputedStyle(zone).display === 'none') return;
+    glassLoading = true;
+
+    const add = function (src, next) {
+      const s = document.createElement('script');
+      s.src = src;
+      s.defer = true;
+      s.onload = next || null;
+      s.onerror = function () { glassLoading = false; };
+      document.head.appendChild(s);
+    };
+    add('js/liquid-glass.js', function () {
+      add('js/tabbar-glass.js', function () {
+        if (window.TabBarGlass) window.TabBarGlass.init(zone);
+      });
+    });
   }
 
   /* ------------------------------------------------------------------ */

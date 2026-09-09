@@ -1,0 +1,142 @@
+/**
+ * Стандартна сітка днів: геометрія тижнів, місяців і роздільників.
+ *
+ * НАЙВАЖЛИВІШЕ ТУТ — межа місяця. Тиждень майже завжди лежить у двох
+ * місяцях, і колонка підписується за своїм ЧЕТВЕРГОМ, тобто за місяцем,
+ * якому належить більшість її днів. Наївний варіант «за першим днем
+ * колонки» зсуває роздільник на тиждень для кожного місяця, що
+ * починається в четвер-неділю — тобто більш ніж у половині випадків.
+ *
+ * Другий за важливістю — локальні дати: ключ збирається з
+ * getFullYear/getMonth/getDate, а не з toISOString. У поясі схід від UTC
+ * після третьої ночі ISO-дата вже завтрашня, і сітка малювала б чужий
+ * день сьогоднішнім.
+ */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { loadModules } from './helpers.js';
+
+const { DayCal } = loadModules(['js/daycal-core.js']);
+
+/** Скільки колонок (тижнів) у виведеній сітці */
+const cols = (html) => (html.match(/class="mcal__col/g) || []).length;
+/** Скільки колонок позначені як початок місяця */
+const seps = (html) => (html.match(/mcal__col is-month/g) || []).length;
+/** Підписи місяців у порядку появи, без порожніх */
+const months = (html) =>
+  (html.match(/<span class="mcal__month">([^<]*)<\/span>/g) || [])
+    .map((s) => s.replace(/<[^>]+>/g, ''))
+    .filter(Boolean);
+
+describe('DayCal: ключі й межі тижня', () => {
+  it('keyOf бере ЛОКАЛЬНУ дату, не UTC', () => {
+    /* 23:30 за місцевим часом: у поясі +3 це вже завтра за UTC. */
+    const d = new Date(2026, 8, 9, 23, 30, 0);
+    assert.equal(DayCal.keyOf(d), '2026-09-09');
+  });
+
+  it('dateOf — обернена до keyOf', () => {
+    assert.equal(DayCal.keyOf(DayCal.dateOf('2026-02-29')), '2026-03-01'); // 2026 не високосний
+    assert.equal(DayCal.keyOf(DayCal.dateOf('2026-11-30')), '2026-11-30');
+  });
+
+  it('тиждень починається з понеділка, і для понеділка це він сам', () => {
+    // 2026-09-07 — понеділок
+    assert.equal(DayCal.keyOf(DayCal.mondayOf(new Date(2026, 8, 7))), '2026-09-07');
+    // неділя 2026-09-13 належить тижню, що почався 7-го
+    assert.equal(DayCal.keyOf(DayCal.mondayOf(new Date(2026, 8, 13))), '2026-09-07');
+  });
+});
+
+describe('DayCal: геометрія сітки', () => {
+  it('вересень 2026 — пʼять колонок', () => {
+    // 1 вересня — вівторок, 30 вересня — середа: тижні з 31.08 по 04.10
+    const h = DayCal.html({ from: '2026-09-01', to: '2026-09-30', cell: () => ({ lvl: 0 }) });
+    assert.equal(cols(h), 5);
+  });
+
+  it('кожна колонка має рівно сім клітинок', () => {
+    const h = DayCal.html({ from: '2026-09-01', to: '2026-09-30', cell: () => ({ lvl: 0 }) });
+    const perCol = h.split('class="mcal__col').slice(1)
+      /* Рахуємо саме `class="mcal__cell`, а не будь-яке входження назви:
+         бліда й порожня клітинки несуть її двічі (base + модифікатор). */
+      .map((c) => (c.match(/class="mcal__cell/g) || []).length);
+    assert.deepEqual(perCol, [7, 7, 7, 7, 7]);
+  });
+
+  it('дні поза вікном — порожні місця, а не клітинки з числами', () => {
+    const h = DayCal.html({ from: '2026-09-01', to: '2026-09-30', cell: () => ({ lvl: 0 }) });
+    // 31 серпня (понеділок) і 1–4 жовтня
+    assert.equal((h.match(/mcal__cell--pad/g) || []).length, 5);
+    // і жодне з тих місць не має числа
+    assert.ok(!/mcal__cell--pad[^>]*>\d/.test(h));
+  });
+});
+
+describe('DayCal: місяць колонки — за четвергом', () => {
+  it('роздільник стоїть на першому тижні НОВОГО місяця', () => {
+    const h = DayCal.html({ from: '2026-09-01', to: '2026-11-30', cell: () => ({ lvl: 0 }) });
+    assert.deepEqual(months(h), ['вер', 'жов', 'лис']);
+    assert.equal(seps(h), 2); // перша колонка роздільника не отримує
+  });
+
+  it('листопад 2026 починається в неділю — і місяць усе одно свій', () => {
+    /*
+     * Це і є той випадок, заради якого стоїть четвер. Тиждень 26.10–01.11
+     * містить один листопадовий день (неділю). За першим днем колонки він
+     * лишився б жовтневим — правильно; а от тиждень 02.11 за наївним
+     * правилом «перший день місяця в колонці» став би другим листопадовим
+     * підписом. Четвер 29.10 → жовтень, четвер 05.11 → листопад: рівно
+     * один роздільник, і він на місці.
+     */
+    const h = DayCal.html({ from: '2026-10-01', to: '2026-11-30', cell: () => ({ lvl: 0 }) });
+    assert.deepEqual(months(h), ['жов', 'лис']);
+  });
+});
+
+describe('DayCal: майбутні дні', () => {
+  it('дні після to — бліді, без атрибута рівня', () => {
+    const h = DayCal.html({
+      from: '2026-09-01', to: '2026-09-09', until: '2026-09-30',
+      cell: (k, d, isFuture) => (isFuture ? null : { lvl: 0 })
+    });
+    assert.ok(h.includes('mcal__cell--future'));
+    // 10–30 вересня = 21 день попереду
+    assert.equal((h.match(/mcal__cell--future/g) || []).length, 21);
+  });
+
+  it('колбек може перебити стандартний вигляд майбутнього дня', () => {
+    // так календар сезону підсвічує його останній день
+    const h = DayCal.html({
+      from: '2026-09-01', to: '2026-09-09', until: '2026-09-30',
+      cell: (k) => (k === '2026-09-30' ? { lvl: 4, label: 'кінець' } : null)
+    });
+    assert.ok(h.includes('data-lvl="4"'));
+    assert.equal((h.match(/mcal__cell--future/g) || []).length, 20);
+  });
+});
+
+describe('DayCal: інтерактивність і безпека', () => {
+  it('є attrs → кнопка; немає → нейтральний <i>', () => {
+    const btn = DayCal.html({ from: '2026-09-01', to: '2026-09-01',
+      cell: () => ({ lvl: 4, attrs: 'data-x="1"' }) });
+    assert.ok(btn.includes('<button type="button"'));
+    const plain = DayCal.html({ from: '2026-09-01', to: '2026-09-01', cell: () => ({ lvl: 4 }) });
+    assert.ok(!plain.includes('<button'));
+  });
+
+  it('підпис екранується — у ньому бувають лапки й дужки', () => {
+    const h = DayCal.html({ from: '2026-09-01', to: '2026-09-01',
+      cell: () => ({ lvl: 0, attrs: 'data-x="1"', label: '<img src=x onerror="alert(1)">' }) });
+    assert.ok(!h.includes('<img'));
+    assert.ok(h.includes('&lt;img'));
+  });
+
+  it('зіпсовані межі не валять сторінку, а дають порожній рядок', () => {
+    assert.equal(DayCal.html({ from: 'вчора', to: '2026-09-01' }), '');
+    assert.equal(DayCal.html({ from: '2026-09-10', to: '2026-09-01' }), '');
+    assert.equal(DayCal.html({}), '');
+    // вікно понад два роки — теж відмова, а не сітка в кілька екранів
+    assert.equal(DayCal.html({ from: '2020-01-01', to: '2026-09-01', cell: () => null }), '');
+  });
+});

@@ -154,25 +154,31 @@
   /* Спільна геометрія графіків                                          */
   /* ------------------------------------------------------------------ */
   /*
-   * ЧОМУ СТОВПЧИКИ ДОХОДЯТЬ РІВНО ДО КРАПОК.
+   * СТАНДАРТ ГРАФІКІВ FORGE: ЛІНІЯ, А НЕ СТОВПЧИКИ.
    *
-   * Раніше на графіку вправи жили дві серії з двома шкалами: лінія
-   * метрики зліва й стовпчики обʼєму справа. Формально це чесно, але
-   * читалось як брехня — око читає складений графік так, ніби стовпчик
-   * і крапка над ним про одне й те саме число, а вони були про різні.
-   * Права шкала цього не рятувала: її треба СВІДОМО помітити.
+   * Кожен графік сайту — це ЛІНІЯ з крапками на точках даних, сітка,
+   * підписана ліва шкала й заливка під лінією. Стовпчиків на графіках
+   * немає ніде: ні як другої серії, ні як «підпори» під крапками. Так
+   * малюють і графік ваги, і прогрес вправи, і спарклайни силових
+   * (lift__spark / lift__chart), і заміри тіла (js/measure.js), і
+   * прогноз маси (js/projection.js). Нові графіки роблять так само.
    *
-   * Тепер стовпчик і крапка — одне значення на одній шкалі: стовпчик
-   * росте від дна поля до тієї самої висоти, де стоїть крапка. Обʼєм не
-   * зник, він переїхав у підказку й у таблицю, де його читають числом, а
-   * не порівнюють оком.
+   * ЧОМУ. Стовпчик — це відстань ВІД ЧОГОСЬ, і читається він як частка
+   * від нуля. Але жоден показник Forge не має осмисленого нуля в
+   * масштабі свого графіка: вага тіла живе в діапазоні 80–85 кг, 1RM —
+   * 95–110. Графік від нуля перетворює всю різницю на плоский паркан, а
+   * графік від «зручного» дна робить висоти стовпчиків неправдивими —
+   * удвічі вищий стовпчик не означає удвічі більше число. Лінія такої
+   * проблеми не має: вона показує ЗМІНУ, а не частку, і зрізана шкала їй
+   * не шкодить, бо ніхто й не читає лінію як пропорцію.
    *
-   * ЦІНА РІШЕННЯ, ЯКУ ТРЕБА НАЗВАТИ ВГОЛОС: дно поля — не нуль. Для ваги
-   * тіла й для 1RM нуль не має сенсу (графік від нуля перетворив би
-   * 82,1→82,9 кг на рівний паркан). Тому висоти стовпчиків НЕ
-   * пропорційні значенням: удвічі вищий стовпчик не означає удвічі
-   * більше число. Щоб це не читалось як обман, дно підписане: нижній
-   * рядок шкали — це реальне значення, від якого починається відлік.
+   * Це не стосується горизонтальних смуг прогресу (.vol__bar,
+   * .macrobar, .qi-bar__track): там нуль реальний і смуга означає саме
+   * частку від цілого. Смуга ≠ графік.
+   *
+   * chartScale() і chartRows() — спільна арифметика шкали для всіх
+   * графіків: 12% повітря, крок 1/2/5×10ⁿ, дно й стеля округлені до
+   * кроку, не більше шести рядків сітки.
    */
 
   /** Крок шкали «1 / 2 / 5 × 10ⁿ» для діапазону значень. */
@@ -225,24 +231,6 @@
       step: step,
       dec: dec
     };
-  }
-
-  /**
-   * Шлях стовпчика: скруглений ВЕРХ, пряме дно.
-   *
-   * rx у <rect> скруглює всі чотири кути, і низ стовпчика відривався від
-   * осі помітною щілиною — ряд виглядав так, ніби висить у повітрі.
-   * Дно стовпчика лежить на осі, тому воно має бути прямим.
-   */
-  function barPath(x, y, w, h, r) {
-    const rr = Math.max(0, Math.min(r, w / 2, h));
-    const x2 = x + w, y2 = y + h;
-    return 'M' + round(x, 1) + ' ' + round(y2, 1) +
-           'L' + round(x, 1) + ' ' + round(y + rr, 1) +
-           'Q' + round(x, 1) + ' ' + round(y, 1) + ' ' + round(x + rr, 1) + ' ' + round(y, 1) +
-           'L' + round(x2 - rr, 1) + ' ' + round(y, 1) +
-           'Q' + round(x2, 1) + ' ' + round(y, 1) + ' ' + round(x2, 1) + ' ' + round(y + rr, 1) +
-           'L' + round(x2, 1) + ' ' + round(y2, 1) + 'Z';
   }
 
   /** Значення рядків шкали: від дна до стелі рівним кроком. */
@@ -311,24 +299,10 @@
 
     const sc = chartScale(lo, hi);
 
-    /*
-     * ШИРИНА СТОВПЧИКА Й ІНСЕТ ПО КРАЯХ — одне рішення, тому рахуються
-     * разом і саме в такому порядку.
-     *
-     * Перша точка стоїть на t0, остання на t1 — рівно на межах поля.
-     * Доки малювались самі крапки, це було нормально. Зі стовпчиками
-     * краєві половинки зрізались рамкою, і ряд виглядав обрубаним з обох
-     * боків. Тому поле стискається на півширини стовпчика з кожного боку
-     * — а щоб знати ту півширину, спершу треба крок, і його беремо ще з
-     * НЕСТИСНУТОГО поля: різниця в кілька відсотків, зате без рекурсії.
-     */
+    /* Інсет 4 px по краях: крайні крапки стоять рівно на межах шкали
+       часу, і без нього кружок наполовину зрізало рамкою поля. */
     const span = Math.max(1, t1 - t0);
-    let minDt = Infinity;
-    for (let i = 1; i < data.length; i++) {
-      minDt = Math.min(minDt, dateOf(data[i].key).getTime() - dateOf(data[i - 1].key).getTime());
-    }
-    const bw = Math.max(2, Math.min(14, (innerW * minDt / span) * 0.45));
-    const IN = bw / 2 + 1;
+    const IN = 4;
     const px = function (t) {
       return PAD.l + IN + (innerW - IN * 2) * (t - t0) / span;
     };
@@ -345,28 +319,19 @@
              esc(fmtV(v)) + '</text>';
     }).join('');
 
-    /* ---- стовпчики: одне зважування — один стовпчик до своєї крапки ---- */
+    /* Крапка міряється кроком між зважуваннями: при 120 щоденних записах
+       крок падає до 4 px, і кружки радіусом 3,5 злипаються в гусеницю. */
     let gap = innerW;
     for (let i = 1; i < xs.length; i++) gap = Math.min(gap, xs[i] - xs[i - 1]);
-    /* Крапка міряється кроком: при 120 щоденних зважуваннях крок падає до
-       4 px, і кружки радіусом 3,5 злипаються в суцільну гусеницю. */
     const dr = Math.max(2, Math.min(3.5, gap * 0.34));
     const dsw = Math.max(1.2, Math.min(2, dr * 0.6));
-    const bars = data.map(function (e, i) {
-      const y = py(e.kg);
-      const h = y0 - y;
-      if (h <= 0.5) return '';
-      return '<path class="exc__bar" d="' + barPath(xs[i] - bw / 2, y, bw, h, 3) +
-             '" style="animation-delay:' + Math.min(i * 14, 300) + 'ms"/>';
-    }).join('');
 
-    /* ---- лінія середньої ----
-       Заливки під нею немає навмисно: стовпчики вже зафарбовують ту саму
-       площу, і разом вони давали сіру пляму, у якій ні стовпчиків, ні
-       лінії не було видно. Одна площа — один шар фарби. */
+    /* ---- заливка під середньою + сама середня ---- */
     const dPts = data.map(function (e, i) {
       return round(xs[i], 1) + ' ' + round(py(e.avg), 1);
     });
+    const area = '<path class="wc__area" d="M' + round(xs[0], 1) + ' ' + y0 +
+                 'L' + dPts.join('L') + 'L' + round(xs[xs.length - 1], 1) + ' ' + y0 + 'Z"/>';
     const line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '"/>';
 
     /*
@@ -425,7 +390,7 @@
          крайні дати відʼїжджають від своїх стовпчиків на півширини смуги
          й графік читається перекошеним. */
       const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
-      const x = i === 0 ? xs[i] - bw / 2 : (i === n - 1 ? xs[i] + bw / 2 : xs[i]);
+      const x = i === 0 ? xs[i] - dr : (i === n - 1 ? xs[i] + dr : xs[i]);
       return '<text class="exc__xlab" x="' + round(x, 1) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '">' +
              esc(shortDate(data[i].key)) + '</text>';
     }).join('');
@@ -435,7 +400,11 @@
     return '<svg class="exc" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
              'aria-label="Графік ваги тіла: ' + n + ' ' +
                window.App.plural(n, 'зважування', 'зважування', 'зважувань') + '">' +
-             grid + bars + line + corridor + cols + axis + xlab +
+             '<defs><linearGradient id="wc-fill" x1="0" y1="0" x2="0" y2="1">' +
+               '<stop offset="0" stop-color="rgb(var(--acc-rgb))" stop-opacity="0.22"/>' +
+               '<stop offset="1" stop-color="rgb(var(--acc-rgb))" stop-opacity="0"/>' +
+             '</linearGradient></defs>' +
+             grid + area + line + corridor + cols + axis + xlab +
            '</svg>';
   }
 
@@ -600,69 +569,32 @@
    */
   function weightCalHtml() {
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth() - (HM_MONTHS - 1), 1);
-    const todayK = todayKey();
-    const firstK = keyOf(firstDay);
-    const start = mondayOf(firstDay);
-    const weeks = Math.floor((mondayOf(now) - start) / 604800000) + 1;
-
-    const colMonth = [];
-    const colFirst = [];
-    {
-      let prev = -1;
-      for (let w = 0; w < weeks; w++) {
-        const thu = new Date(start);
-        thu.setDate(start.getDate() + w * 7 + 3);
-        let k = keyOf(thu);
-        if (k > todayK) k = todayK;
-        if (k < firstK) k = firstK;
-        const mm = Number(k.slice(5, 7)) - 1;
-        colMonth[w] = mm;
-        colFirst[w] = (w === 0 || mm !== prev);
-        prev = mm;
-      }
-    }
-
-    let cols = '';
-    for (let w = 0; w < weeks; w++) {
-      let cells = '';
-      for (let r = 0; r < 7; r++) {
-        const day = new Date(start);
-        day.setDate(start.getDate() + w * 7 + r);
-        const k = keyOf(day);
-        if (k < firstK) {
-          cells += '<i class="mcal__cell mcal__cell--pad" aria-hidden="true"></i>';
-          continue;
-        }
-        if (k > todayK) {
-          cells += '<i class="mcal__cell mcal__cell--future">' + day.getDate() + '</i>';
-          continue;
-        }
+    const first = new Date(now.getFullYear(), now.getMonth() - (HM_MONTHS - 1), 1);
+    const today = todayKey();
+    return window.DayCal.html({
+      from: keyOf(first),
+      to: today,
+      label: 'Календар зважувань за ' + HM_MONTHS + ' місяців',
+      cls: 'mt-2',
+      cell: function (k, d, isFuture) {
+        if (isFuture) return null;
         const kg = Number(state.bodyLog[k]);
         const has = Number.isFinite(kg) && kg > 0;
         const sel = k === weightDay();
-        cells += '<button type="button" class="mcal__cell' + (sel ? ' mcal__cell--sel' : '') + '" ' +
-          'data-lvl="' + (has ? 4 : 0) + '" data-wday="' + k + '" ' +
-          'aria-pressed="' + sel + '" aria-label="' + esc(dateLabel(dateOf(k))) +
-          (has ? ': ' + fmtNum.kg(kg) + ' кг' : ': запису немає') + '. Натисніть, щоб вписати вагу за цей день">' +
-          '<span>' + day.getDate() + '</span></button>';
+        /* Шкала тут БІНАРНА (0 або 4), і це свідома відмінність від
+           календаря тренувань. Там рівень означає частку закритих
+           підходів; у зважуванні часток немає — вага або записана, або
+           ні. Малювати «наполовину зважений день» не було б чим. */
+        return {
+          lvl: has ? 4 : 0,
+          sel: sel,
+          attrs: 'data-wday="' + k + '"',
+          label: dateLabel(dateOf(k)) +
+            (has ? ': ' + fmtNum.kg(kg) + ' кг' : ': запису немає') +
+            '. Натисніть, щоб вписати вагу за цей день'
+        };
       }
-      cols += '<div class="mcal__col' + (colFirst[w] && w > 0 ? ' is-month' : '') + '">' + cells + '</div>';
-    }
-
-    let months = '<span class="mcal__months-pad" aria-hidden="true"></span>';
-    for (let w = 0; w < weeks; w++) {
-      months += '<span class="mcal__month">' + (colFirst[w] ? MON[colMonth[w]] : '') + '</span>';
-    }
-    const dow = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
-
-    return '<div class="mcal mt-2" role="group" aria-label="Календар зважувань за ' + HM_MONTHS + ' місяців">' +
-             '<div class="mcal__months" aria-hidden="true">' + months + '</div>' +
-             '<div class="mcal__grid">' +
-               '<div class="mcal__days" aria-hidden="true">' + dow + '</div>' +
-               cols +
-             '</div>' +
-           '</div>';
+    });
   }
 
   /** День, у який пишеться вага. Порожній або майбутній → сьогодні. */
@@ -749,10 +681,10 @@
                '</div>' +
                weightPeriodLine() +
                forecastLine() +
-               '<p class="small muted mt-1">Стовпчик і крапка — одне зважування. ' +
+               '<p class="small muted mt-1">Крапки — окремі зважування. ' +
                'Лінія — середня за 7 днів; дивіться на неї, а не на окремі дні. ' +
-               'Відлік іде від нижнього підпису шкали, а не від нуля: графік ваги від нуля ' +
-               'перетворив би реальні коливання на рівний паркан.' +
+               'Шкала починається з нижнього підпису, а не з нуля: від нуля реальні ' +
+               'коливання ваги стиснулись би в рівну смужку.' +
                (state.goal && window.ProgressCore && window.ProgressCore.GOAL_RATES[state.goal]
                  ? ' Пунктир — коридор обраної цілі: модель, не обіцянка.' : '') + '</p>'
              : '<p class="small muted mt-2">Два записи' + (state.period ? ' у цьому періоді' : '') + ' — і зʼявиться графік.</p>') +
@@ -1485,25 +1417,19 @@
              esc(fmtV(v)) + '</text>';
     }).join('');
 
-    /* ---- стовпчики: вершина кожного = крапка того ж тренування ---- */
-    const bw = Math.max(3, Math.min(14, slot * 0.42));
     const dr = Math.max(2, Math.min(3.5, slot * 0.34));
     const dsw = Math.max(1.2, Math.min(2, dr * 0.6));
-    const bars = pts.map(function (p, i) {
-      const y = py(vals[i]);
-      const h = y0 - y;
-      if (h <= 0.5) return '';
-      return '<path class="exc__bar" d="' + barPath(px(i) - bw / 2, y, bw, h, 3) +
-             '" style="animation-delay:' + Math.min(i * 16, 320) + 'ms"/>';
-    }).join('');
 
-    /* ---- лінія по вершинах стовпчиків ---- */
+    /* ---- заливка під лінією + сама лінія ---- */
     const dPts = pts.map(function (p, i) {
       return px(i).toFixed(1) + ' ' + py(vals[i]).toFixed(1);
     });
-    /* Заливки під лінією немає: стовпчики вже фарбують ту саму площу. */
-    let line = '';
-    if (n > 1) line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '" />';
+    let area = '', line = '';
+    if (n > 1) {
+      line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '" />';
+      area = '<path class="exc__area" d="M' + px(0).toFixed(1) + ' ' + y0 +
+             'L' + dPts.join('L') + 'L' + px(n - 1).toFixed(1) + ' ' + y0 + 'Z"/>';
+    }
 
     /* ---- колонки: кружок, перехрестя, зона наведення ---- */
     const cols = pts.map(function (p, i) {
@@ -1540,7 +1466,7 @@
          стоять по центрах смуг, тож притиснута до краю дата опинялась на
          півсмуги збоку від свого стовпчика. */
       const anchor = i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
-      const x = i === 0 ? px(i) - bw / 2 : (i === n - 1 ? px(i) + bw / 2 : px(i));
+      const x = i === 0 ? px(i) - dr : (i === n - 1 ? px(i) + dr : px(i));
       return '<text class="exc__xlab" x="' + x.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' + anchor + '">' +
              esc(shortDate(pts[i].d)) + '</text>';
     }).join('');
@@ -1549,7 +1475,11 @@
 
     return '<svg class="exc" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
              'aria-label="Прогрес: ' + esc(m.label) + ', ' + n + ' тренувань">' +
-             grid + bars + line + cols + axis + xlab +
+             '<defs><linearGradient id="exc-fill" x1="0" y1="0" x2="0" y2="1">' +
+               '<stop offset="0" stop-color="rgb(var(--acc-rgb))" stop-opacity="0.22"/>' +
+               '<stop offset="1" stop-color="rgb(var(--acc-rgb))" stop-opacity="0"/>' +
+             '</linearGradient></defs>' +
+             grid + area + line + cols + axis + xlab +
            '</svg>';
   }
 
@@ -1660,9 +1590,9 @@
            лінія показують ОДНЕ число. Пояснювати треба не «що є що», а
            звідки починається відлік — і лише тоді, коли він не з нуля. */
         (exBase > 0
-          ? '<p class="small muted mt-1 mb-0">Стовпчик і крапка — одне значення. ' +
-              'Відлік від ' + esc(exVal(exBase, m)) + ', а не від нуля: інакше різниця ' +
-              'між тренуваннями зникла б у висоті стовпчиків.</p>'
+          ? '<p class="small muted mt-1 mb-0">Шкала починається з ' + esc(exVal(exBase, m)) +
+              ', а не з нуля: інакше вся різниця між тренуваннями стиснулась би ' +
+              'у смужку заввишки кілька пікселів.</p>'
           : '') +
         '<div class="kpis mt-2">' +
           '<div class="kpi"><div class="kpi__val mono">' + exVal(st.current, m) + '</div>' +
@@ -2214,9 +2144,9 @@
      * Стрілки лишились, але тепер зсувають ВІКНО на місяць, а не гортають
      * місяці: історія глибша за сім місяців нікуди не поділась.
      *
-     * Розкладка — теплокартова: підписи днів колонкою зліва, тижні
-     * колонками вправо, підписи місяців над ними, роздільник у проміжку
-     * між місяцями. Клітинка спільна, рівень рахує той самий hmLevel.
+     * Саму сітку малює спільний DayCal — той самий, що в календарі
+     * зважувань і в календарі сезону. Тут лишається лише те, чого немає
+     * більше ніде: вікно з навігацією й рівень клітинки.
      */
     const now = new Date();
     const endY = state.hcalY, endM = state.hcalM;
@@ -2225,63 +2155,7 @@
     const firstDay = new Date(endY, endM - (HM_MONTHS - 1), 1);
     const lastOfMonth = new Date(endY, endM + 1, 0);
     const todayK = todayKey();
-    const firstK = keyOf(firstDay);
     const lastK = keyOf(lastOfMonth) > todayK ? todayK : keyOf(lastOfMonth);
-
-    const start = mondayOf(firstDay);
-    const lastD = dateOf(lastK);
-    const weeks = Math.floor((mondayOf(lastD) - start) / 604800000) + 1;
-
-    /* Місяць колонки — за її ЧЕТВЕРГОМ, затиснутим у вікно: та сама
-       арифметика, що в теплокарті, і з тієї ж причини (перший тиждень
-       може починатись хвостом попереднього місяця). */
-    const colMonth = [];
-    const colFirst = [];
-    {
-      let prev = -1;
-      for (let w = 0; w < weeks; w++) {
-        const thu = new Date(start);
-        thu.setDate(start.getDate() + w * 7 + 3);
-        let k = keyOf(thu);
-        if (k > lastK) k = lastK;
-        if (k < firstK) k = firstK;
-        const mm = Number(k.slice(5, 7)) - 1;
-        colMonth[w] = mm;
-        colFirst[w] = (w === 0 || mm !== prev);
-        prev = mm;
-      }
-    }
-
-    let cols = '';
-    for (let w = 0; w < weeks; w++) {
-      let cells = '';
-      for (let r = 0; r < 7; r++) {
-        const day = new Date(start);
-        day.setDate(start.getDate() + w * 7 + r);
-        const k = keyOf(day);
-        if (k < firstK) {
-          cells += '<i class="mcal__cell mcal__cell--pad" aria-hidden="true"></i>';
-          continue;
-        }
-        if (k > lastK) {
-          cells += '<i class="mcal__cell mcal__cell--future">' + day.getDate() + '</i>';
-          continue;
-        }
-        const lvl = hmLevel(k);
-        const sel = k === state.selDay;
-        cells += '<button type="button" class="mcal__cell' +
-          (sel ? ' mcal__cell--sel' : '') + '" data-lvl="' + lvl + '" data-hday="' + k + '" ' +
-          'aria-pressed="' + sel + '" aria-label="' + esc(dateLabel(dateOf(k))) +
-          ': ' + esc(HM_LEVEL_TEXT[lvl]) + '"><span>' + day.getDate() + '</span></button>';
-      }
-      cols += '<div class="mcal__col' + (colFirst[w] && w > 0 ? ' is-month' : '') + '">' +
-              cells + '</div>';
-    }
-
-    let months = '<span class="mcal__months-pad" aria-hidden="true"></span>';
-    for (let w = 0; w < weeks; w++) {
-      months += '<span class="mcal__month">' + (colFirst[w] ? MON[colMonth[w]] : '') + '</span>';
-    }
 
     /* Підпис — діапазон, а не один місяць. Рік пишемо двічі лише тоді,
        коли вікно його справді перетинає. */
@@ -2290,7 +2164,23 @@
       ? MON[m0] + ' — ' + MON[endM] + ' ' + endY
       : MON[m0] + ' ' + y0 + ' — ' + MON[endM] + ' ' + endY;
 
-    const dow = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
+    const cal = window.DayCal.html({
+      label: 'Календар тренувань: ' + range,
+      from: keyOf(firstDay),
+      to: lastK,
+      cls: 'mt-2',
+      cell: function (k, d, isFuture) {
+        if (isFuture) return null;
+        const lvl = hmLevel(k);
+        const sel = k === state.selDay;
+        return {
+          lvl: lvl,
+          sel: sel,
+          attrs: 'data-hday="' + k + '"',
+          label: dateLabel(dateOf(k)) + ': ' + HM_LEVEL_TEXT[lvl]
+        };
+      }
+    });
 
     host.innerHTML =
       '<div class="card">' +
@@ -2307,13 +2197,7 @@
             '</button>' +
           '</div>' +
         '</div>' +
-        '<div class="mcal mt-2" role="group" aria-label="Календар: ' + esc(range) + '">' +
-          '<div class="mcal__months" aria-hidden="true">' + months + '</div>' +
-          '<div class="mcal__grid">' +
-            '<div class="mcal__days" aria-hidden="true">' + dow + '</div>' +
-            cols +
-          '</div>' +
-        '</div>' +
+        cal +
         '<p class="small muted mt-1 mb-0">' + HM_MONTHS + ' місяців. Глибина заливки — ' +
           'частка закритих підходів, як у теплокарті вище: контур — відмічено вручну, ' +
           'суцільна заливка — закрито всі. Клік по дню — його підсумок нижче.</p>' +
@@ -2703,7 +2587,58 @@
          карток. Клас знімає сам себе — стан у розмітці не лишається. */
       el.classList.add('is-target');
       setTimeout(function () { el.classList.remove('is-target'); }, 2000);
+      settle(el, navH);
     });
+  }
+
+  /*
+   * ДОВОДКА ПІСЛЯ ПРОКРУТКИ: одного пострілу мало.
+   *
+   * Прокрутка рахується від висоти блоків, ЯКІ ВЖЕ НАМАЛЬОВАНІ. Але
+   * сторінка домальовується й далі: шрифт замінює запасний на Inter і
+   * переносить рядки, картинки рівнів отримують розмір, графік
+   * перемальовується під ширину. Кожна така подія зсуває цільовий блок
+   * на десятки, а то й сотні пікселів — і людина, що прийшла з плитки
+   * «Зважування», опиняється не там, куди цілилась. У прогоні перевірок
+   * це виглядало як блок на 655px замість 102px, і повторний запуск
+   * проходив: класична гонка, яку неможливо зловити оком.
+   *
+   * Тому півтори секунди після прокрутки стежимо за реальним місцем
+   * блоку й доводимо його, якщо він поїхав більше ніж на 4px.
+   *
+   * ДОВОДКА НЕГАЙНО ЗДАЄТЬСЯ, ЩОЙНО ЛЮДИНА ТОРКНУЛАСЬ ПРОКРУТКИ. Це не
+   * ввічливість, а обовʼязкова умова: інтерфейс, який відбирає прокрутку
+   * назад, гірший за той, що просто промахнувся.
+   */
+  function settle(el, navH) {
+    let alive = true;
+    const stop = function () {
+      if (!alive) return;
+      alive = false;
+      window.removeEventListener('wheel', stop);
+      window.removeEventListener('touchstart', stop);
+      window.removeEventListener('keydown', stop);
+      clearInterval(timer);
+      clearTimeout(end);
+    };
+    window.addEventListener('wheel', stop, { passive: true, once: true });
+    window.addEventListener('touchstart', stop, { passive: true, once: true });
+    window.addEventListener('keydown', stop, { once: true });
+
+    const fix = function () {
+      if (!alive || !el.isConnected) return stop();
+      let top = 0;
+      for (let node = el; node; node = node.offsetParent) top += node.offsetTop;
+      const want = Math.max(0, top - navH - 16);
+      /* window.scrollY дробовий на екранах із масштабом ≠ 1, тому поріг
+         у 4px, а не рівність. */
+      if (Math.abs(window.scrollY - want) > 4) {
+        try { window.scrollTo({ top: want, behavior: 'smooth' }); }
+        catch (_) { window.scrollTo(0, want); }
+      }
+    };
+    const timer = setInterval(fix, 250);
+    const end = setTimeout(stop, 1500);
   }
 
   async function init() {

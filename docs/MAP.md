@@ -257,4 +257,4 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 `pw.mjs` (шляхи до Chromium), `ci-offline.sh` (вішає Supabase і Sentry
 на 127.0.0.1), `ci-hygiene.mjs`, `build-meta.js`, `og.mjs`, `shot.mjs`,
 `simelo.mjs` (баланс ELO, має лишатись 6/6), `restore-backup.mjs`,
-`auto-publish.sh` і `*.command` для керування публікацією.
+`publish.command` (кнопка публікації: тести → коміт → пуш).

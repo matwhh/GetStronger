@@ -203,9 +203,11 @@ TZ=Europe/Kyiv npm test                 # частина логіки рахує
 npm run build:meta    # canonical, og:url і sitemap.xml із домену в config.js
 ```
 
-Публікація: `git push` у `main` → Vercel збирає статику. На Mac це робить
-[`tools/auto-publish.sh`](tools/auto-publish.sh) — див.
-[`RELEASE.md`](RELEASE.md).
+Публікація: `git push` у `main` → Vercel збирає статику. На Mac для цього
+є кнопка — подвійний клік по
+[`tools/publish.command`](tools/publish.command): тести → коміт → пуш.
+Червоні тести означають, що нічого не відправлено. Див.
+[`AGENTS.md`](AGENTS.md) §6.
 
 ---
 

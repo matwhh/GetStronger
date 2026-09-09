@@ -80,7 +80,10 @@
 
     var glass = null, pad = 0, itemW = 0, lensW = 0, K = 0;
     var lensX = null, dragging = false, moved = false, startX = 0;
-    var closeTimer = null, stretchTimer = null, sx = 1, sy = 1;
+    var closeTimer = null, sx = 1, sy = 1;
+    /* dir: −1 ліворуч, +1 праворуч, 0 стоїть. curS: поточне розтягнення.
+       pendingX: остання позиція пальця, ще не намальована. */
+    var dir = 0, curS = 0, pendingX = null, raf = 0;
 
     function measure() {
       var w = bar.getBoundingClientRect().width;
@@ -152,6 +155,22 @@
       var open = lensX != null;
       var x = (open ? lensX : centerOf(selected)) - lensW / 2;
       var s = open ? 1 : 0.86;
+      /*
+       * ТОЧКА ОПОРИ — НА ПЕРЕДНЬОМУ КРАЇ, тобто розтягнення виходить
+       * НАЗАД, за рухом.
+       *
+       * Спершу тут стояло symmetric scale від центру. Формально це теж
+       * «розтягнення», але воно однакове в обидва боки — і рух ліворуч
+       * виглядав точно так само, як рух праворуч. Око читає таку
+       * деформацію як пульсацію на місці, а не як інерцію: краплю, яку
+       * тягнуть, розтягує ПОЗАДУ, бо задній край відстає.
+       *
+       * transform-origin впливає лише на scale, не на translate, тож
+       * центр лінзи як стояв під пальцем, так і стоїть — назад виїжджає
+       * тільки надлишок довжини.
+       */
+      lens.style.transformOrigin =
+        dir > 0 ? '100% 50%' : (dir < 0 ? '0% 50%' : '50% 50%');
       lens.style.transform =
         'translate3d(' + x + 'px,0,0) scale(' + (s * sx) + ',' + (s * sy) + ')';
       lens.classList.toggle('is-open', open);
@@ -169,36 +188,90 @@
       });
     }
 
-    /* Коротке розтягнення на переїзді — те, від чого рух читається як
-       рідкий, а не як переставляння плитки. 170 мс: довше вже помітно
-       як окрема анімація. */
     /*
-     * Коротке розтягнення на переїзді через межу пункту — те, від чого рух
-     * читається як рідкий, а не як переставляння плитки. Саме воно, і
-     * тільки воно, анімується під пальцем: це зміна ФОРМИ, а не позиції,
-     * тож із рухом за пальцем не конкурує.
+     * ФОРМА ЛІНЗИ ЗАЛЕЖИТЬ ВІД ШВИДКОСТІ Й НАПРЯМКУ, А НЕ ВІД ПЕРЕТИНУ МЕЖІ.
+     *
+     * Було: на кожному перетині межі пункту вмикалось фіксоване
+     * розтягнення на 170 мс. Це «анімація події», і вона однакова
+     * незалежно від того, куди й як швидко їде палець, — тому рух
+     * праворуч і рух ліворуч виглядали ідентично, а повільний протяг
+     * смикався так само, як різкий.
+     *
+     * Стало: розтягнення пропорційне тому, наскільки лінза встигла
+     * проїхати за КАДР, і виходить назад за рухом. Повільно ведеш —
+     * форма майже не міняється; смикнув — крапля витягується й сама
+     * стягується назад, коли палець зупинився. Ніяких таймерів: усе
+     * зникає само, бо швидкість падає до нуля.
+     *
+     * MAX_S = 0.10 — стеля розтягнення. Вище скло починає ловити на собі
+     * власний фільтр і виглядає гумовим, а не рідким.
      */
-    function stretch(animate) {
-      clearTimeout(stretchTimer);
-      sx = 1.06; sy = 0.94; paintLens(animate);
-      stretchTimer = setTimeout(function () { sx = 1; sy = 1; paintLens(animate); }, 170);
+    var MAX_S = 0.10;
+
+    function shape(dxPerFrame) {
+      var was = dir;
+      if (Math.abs(dxPerFrame) > 0.4) dir = dxPerFrame > 0 ? 1 : -1;
+      /* Зміна напрямку скидає накопичену форму: інакше крапля, витягнута
+         вправо, стрибком перевертається опорою вліво, і це видно як ривок. */
+      if (was && dir && was !== dir) curS = 0;
+      var target = Math.min(MAX_S, Math.abs(dxPerFrame) / 90);
+      /* Наростає швидко, спадає повільніше — так поводиться інерція. */
+      curS += (target - curS) * (target > curS ? 0.5 : 0.16);
+      if (curS < 0.002) curS = 0;
+      sx = 1 + curS;
+      sy = 1 - curS * 0.7;
     }
 
     function moveTo(x, animate) {
-      var before = lensX == null ? -1 : nearest(lensX);
       /* Центр лінзи ходить лише між центрами крайніх пунктів. Сама лінза
          ширша за пункт, тож над крайнім вона законно вилазить за край
          панелі — так і в оригіналі. */
-      lensX = Math.max(centerOf(0), Math.min(centerOf(items.length - 1), x));
-      var after = nearest(lensX);
-      /* animate передається далі: під пальцем — false (рух 1:1), на
-         фокусі з клавіатури — true (там стрибок без переходу виглядав би
-         як миготіння). */
+      var next = Math.max(centerOf(0), Math.min(centerOf(items.length - 1), x));
+      if (animate === true) { dir = 0; curS = 0; sx = 1; sy = 1; }
+      else shape(lensX == null ? 0 : next - lensX);
+      lensX = next;
+      /* animate: під пальцем false (рух 1:1), на фокусі з клавіатури true
+         (там стрибок без переходу виглядав би як миготіння). */
       paintLens(animate === true); paintPill(); mark();
-      if (before !== -1 && before !== after) stretch(animate === true);
     }
 
-    function close() { lensX = null; paintLens(true); paintPill(); mark(); }
+    /*
+     * МАЛЮЄМО РАЗ НА КАДР, А НЕ РАЗ НА ПОДІЮ.
+     *
+     * pointermove на сучасному екрані шле до 120 подій за секунду, а
+     * малює браузер 60. Без цього циклу половина обчислень і записів у
+     * стиль викидалась би, а головне — «швидкість за подію» залежала б
+     * від частоти опитування сенсора, тобто форма лінзи на різних
+     * телефонах виходила б різною.
+     *
+     * ЦИКЛ ЖИВЕ, ДОКИ ТРИВАЄ ПРОТЯГ, а не доки надходять події — і це не
+     * дрібниця. Коли палець зупинився й стоїть, подій немає, але форма
+     * мусить стягнутись назад. Перша версія планувала наступний кадр
+     * лише після обробки нової позиції, тож на зупинці цикл помирав, і
+     * лінза лишалась витягнутою доти, доки палець не рушить знову.
+     */
+    function pump() {
+      if (!dragging) { raf = 0; return; }
+      if (pendingX != null) {
+        var x = pendingX;
+        pendingX = null;
+        moveTo(x, false);
+      } else if (curS > 0) {
+        /* Подій немає — швидкість нульова: форма розпрямляється сама. */
+        shape(0);
+        paintLens(false);
+      }
+      raf = requestAnimationFrame(pump);
+    }
+
+    function startPump() { if (!raf) raf = requestAnimationFrame(pump); }
+
+    function stopPump() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0; pendingX = null;
+    }
+
+    function queue(x) { pendingX = x; startPump(); }
 
     var localX = function (ev) { return ev.clientX - bar.getBoundingClientRect().left; };
 
@@ -207,7 +280,9 @@
       clearTimeout(closeTimer);
       ensureGlass();
       dragging = true; moved = false; startX = ev.clientX;
+      dir = 0; curS = 0;
       moveTo(localX(ev), false);
+      startPump();
       /*
        * НІ preventDefault, НІ setPointerCapture на цьому етапі — і те, й
        * те ламає звичайний дотик по посиланню.
@@ -229,12 +304,17 @@
            вести лінзу треба й за межами панелі. */
         if (bar.setPointerCapture) { try { bar.setPointerCapture(ev.pointerId); } catch (e) {} }
       }
-      moveTo(localX(ev), false);
+      queue(localX(ev));
     });
 
     function release(ev) {
       if (!dragging) return;
       dragging = false;
+      stopPump();
+      /* Форма розпрямляється разом із доїздом: лишити витягнуту краплю
+         на місці, куди вона щойно приїхала, було б видно як застиглий
+         ривок. */
+      dir = 0; curS = 0; sx = 1; sy = 1;
       var i = nearest(lensX == null ? centerOf(selected) : lensX);
       lensX = centerOf(i);
       paintLens(true); mark();
@@ -267,7 +347,9 @@
      * жест не завершувала.
      */
     bar.addEventListener('pointercancel', function () {
-      dragging = false; moved = false; close();
+      dragging = false; moved = false; stopPump();
+      dir = 0; curS = 0; sx = 1; sy = 1;
+      close();
     });
     /*
      * Втрата захоплення = кінець жесту. Без цього після системного
@@ -287,7 +369,11 @@
      */
     bar.addEventListener('lostpointercapture', function (ev) {
       if (ev.target !== bar) return;
-      if (dragging) { dragging = false; moved = false; close(); }
+      if (dragging) {
+        dragging = false; moved = false; stopPump();
+        dir = 0; curS = 0; sx = 1; sy = 1;
+        close();
+      }
     });
 
     /* Клавіатура: лінза йде за фокусом, перехід робить сам <a> по Enter. */

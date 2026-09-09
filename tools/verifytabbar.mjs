@@ -212,6 +212,78 @@ for (const w of [320, 390, 430]) {
   await ctx.close();
 }
 
+/* ---- 2в. Форма лінзи знає, куди й як швидко їде палець ---------------
+ * Перша версія вмикала фіксоване розтягнення на 170 мс при кожному
+ * перетині межі пункту. Це «анімація події»: вона однакова незалежно від
+ * напрямку й швидкості, тому рух ліворуч виглядав точно так само, як рух
+ * праворуч, — і власник це помітив одразу.
+ *
+ * Тепер форма — наслідок руху: розтягнення пропорційне тому, скільки
+ * лінза проїхала за кадр, а точка опори стоїть на ПЕРЕДНЬОМУ краї, тож
+ * надлишок довжини виїжджає назад, за рухом. Три речі, які через це
+ * мусять бути правдою й перевіряються тут.
+ */
+{
+  const ctx = await adultContext(b, {
+    viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true
+  });
+  const p = await ctx.newPage();
+  const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+  await p.goto(file('index.html'), { waitUntil: 'load' });
+  await p.waitForTimeout(1800);
+  const cdp = await ctx.newCDPSession(p);
+  const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', {
+    type: type, touchPoints: type === 'touchEnd' ? [] : [{ x: x, y: y, id: 1 }]
+  });
+  const shape = () => p.evaluate(() => {
+    const l = document.querySelector('.tabbar__lens');
+    const m = /scale\(([\d.]+),\s*([\d.]+)\)/.exec(l.style.transform);
+    return { origin: l.style.transformOrigin, sx: m ? +m[1] : null, sy: m ? +m[2] : null };
+  });
+
+  const a = await p.locator('#tabbar a[href="index.html"]').boundingBox();
+  const d = await p.locator('#tabbar a[href="journal.html"]').boundingBox();
+  const y = a.y + a.height / 2, x0 = a.x + a.width / 2, span = d.x - a.x;
+
+  /* Швидко праворуч */
+  await touch('touchStart', x0, y); await p.waitForTimeout(50);
+  for (let i = 1; i <= 4; i++) { await touch('touchMove', x0 + span * i / 4, y); await p.waitForTimeout(20); }
+  const fast = await shape();
+  /* Палець стоїть — форма мусить розпрямитись сама, без жодної події. */
+  await p.waitForTimeout(400);
+  const held = await shape();
+  await touch('touchEnd', 0, 0); await p.waitForTimeout(600);
+
+  /* Повільно праворуч */
+  await touch('touchStart', x0, y); await p.waitForTimeout(50);
+  for (let i = 1; i <= 20; i++) { await touch('touchMove', x0 + span * i / 20, y); await p.waitForTimeout(60); }
+  const slow = await shape();
+  await touch('touchEnd', 0, 0); await p.waitForTimeout(600);
+
+  ok('2в. праворуч — опора на правому краї, розтяг виїжджає назад',
+     fast.origin === '100% 50%', fast.origin);
+  ok('2в. різкий рух розтягує сильніше за повільний',
+     fast.sx > slow.sx + 0.008, 'різко ' + fast.sx + ' проти повільно ' + slow.sx);
+  ok('2в. розтяг у межах: скло не стає гумовим',
+     fast.sx <= 1.101 && fast.sy >= 0.929, JSON.stringify(fast));
+  ok('2в. палець зупинився — форма розпрямилась сама', held.sx === 1, String(held.sx));
+
+  /* А тепер у зворотний бік — опора мусить перестрибнути на лівий край. */
+  await p.goto(file('journal.html'), { waitUntil: 'load' });
+  await p.waitForTimeout(1800);
+  const a2 = await p.locator('#tabbar a[href="journal.html"]').boundingBox();
+  const d2 = await p.locator('#tabbar a[href="index.html"]').boundingBox();
+  const y2 = a2.y + a2.height / 2, x2 = a2.x + a2.width / 2, span2 = d2.x - a2.x;
+  await touch('touchStart', x2, y2); await p.waitForTimeout(50);
+  for (let i = 1; i <= 4; i++) { await touch('touchMove', x2 + span2 * i / 4, y2); await p.waitForTimeout(20); }
+  const left = await shape();
+  await touch('touchEnd', 0, 0); await p.waitForTimeout(400);
+  ok('2в. ліворуч — опора на лівому краї, тобто рух видно за формою',
+     left.origin === '0% 50%' && left.origin !== fast.origin, left.origin);
+  ok('2в. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 /* ---- 3. Панель працює і без скла ------------------------------------ */
 /*
  * Оптика вантажиться окремими файлами вже після рендера. Якщо вони не

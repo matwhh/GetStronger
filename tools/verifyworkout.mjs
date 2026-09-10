@@ -210,10 +210,48 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   const doneTxt = await p.locator('#wk-done').innerText();
 
   await tap(p.locator('#wk-finish'));
+  await p.waitForTimeout(600);
+  /*
+   * Підтвердження більше не системний confirm(), а вікно сайту: воно
+   * показує факти, наслідок і цитату, і дає ДВА виходи. Тому перевіряємо
+   * розмітку, а не dialogs — і заразом те, що системного вікна тут уже
+   * немає (інакше було б два підтвердження поспіль).
+   */
+  const box = p.locator('.modal__box:has(#wk-fin-end)');
+  ok('5. завершення питає вікном сайту, а не системним confirm',
+     await box.count() === 1 && dialogs.length === 0,
+     'вікон ' + await box.count() + ', системних ' + dialogs.length);
+  const txt5 = await box.innerText().catch(() => '');
+  ok('5. у вікні є факти виконання', /Виконано\s+\d+\s+з\s+\d+/.test(txt5), txt5.slice(0, 90));
+  ok('5. у вікні є наслідок — день не перепройти', /з понеділка/.test(txt5), txt5.slice(0, 140));
+  ok('5. у вікні є цитата', await p.evaluate(() =>
+     window.FinishCore.QUOTES.some(q => document.querySelector('.modal__box').innerText.includes(q.s))));
+  ok('5. дві таблетки — червона і синя',
+     await p.locator('#wk-fin-go.pill--red').count() === 1 &&
+     await p.locator('#wk-fin-end.pill--blue').count() === 1);
+  /* Фокус на «Продовжити»: випадковий Enter має лишати в тренуванні. */
+  ok('5. фокус стоїть на «Продовжити»',
+     await p.evaluate(() => document.activeElement && document.activeElement.id) === 'wk-fin-go');
+
+  /* Червона таблетка НЕ завершує: вікно зникає, кнопка лишається. */
+  await p.locator('#wk-fin-go').click();
+  await p.waitForTimeout(400);
+  ok('5. «Продовжити» закриває вікно й лишає тренування',
+     await box.count() === 0 && await p.locator('#wk-finish').count() === 1);
+
+  /* Escape — теж «продовжити»: завершення незворотне до понеділка. */
+  await tap(p.locator('#wk-finish'));
+  await p.waitForTimeout(400);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(400);
+  ok('5. Escape означає «продовжити», а не «завершити»',
+     await box.count() === 0 && await p.locator('#wk-finish').count() === 1);
+
+  /* І аж тепер — синя. */
+  await tap(p.locator('#wk-finish'));
+  await p.waitForTimeout(400);
+  await p.locator('#wk-fin-end').click();
   await p.waitForTimeout(1200);
-  ok('5. завершення питає підтвердження з фактами',
-     dialogs.some(d => /Завершити тренування\?/.test(d) && /з понеділка/.test(d)),
-     dialogs.join(' || ').slice(0, 140));
   ok('5. зʼявився статус завершення', await p.locator('#wk-ended').count() === 1,
      (await p.locator('#wk-ended').innerText().catch(() => '')).replace(/\n+/g, ' '));
   ok('5. кнопки завершення більше немає', await p.locator('#wk-finish').count() === 0);
@@ -254,16 +292,58 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await ctx.close();
 }
 
+/* ---- 5б. Повністю закритий день завершується без запитань ------------ */
+/*
+ * Це друга половина правила, і саме заради неї вікно й обмежили.
+ * Питати того, хто щойно закрив усі підходи, нема про що: людина, яку
+ * питають про очевидне, за тиждень навчається тиснути «так» не читаючи,
+ * і попередження перестає працювати там, де воно справді потрібне.
+ */
+{
+  const { ctx, p, errs, dialogs } = await open();
+  await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+
+  /* Останній кружечок у рядку закриває всі підходи вправи. */
+  const rows = p.locator('#workout .tdy-ex');
+  const n = await rows.count();
+  for (let i = 0; i < n; i++) {
+    const pips = rows.nth(i).locator('[data-set-ex]');
+    const c = await pips.count();
+    if (c) { await tap(pips.nth(c - 1)); await p.waitForTimeout(120); }
+  }
+  const done = await p.locator('#wk-done').innerText().catch(() => '');
+  const [d, t] = done.split('/').map((x) => parseInt(x, 10));
+  ok('5б. усі підходи справді закриті', d === t && d > 0, done);
+
+  await tap(p.locator('#wk-finish'));
+  await p.waitForTimeout(900);
+  ok('5б. повний день не питає нічого — ні вікна, ні confirm',
+     await p.locator('.modal__box:has(#wk-fin-end)').count() === 0 && dialogs.length === 0,
+     'вікон ' + await p.locator('.modal__box:has(#wk-fin-end)').count() + ', системних ' + dialogs.length);
+  ok('5б. і день одразу завершено', await p.locator('#wk-ended').count() === 1);
+
+  const rec = await p.evaluate(async k => (await window.Store.getProfile()).sessionLog[k], TODAY);
+  ok('5б. сесія записана завершеною', rec && rec.end === 1, JSON.stringify(rec).slice(0, 90));
+  ok('5б. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 /* ---- 6. Нульове завершення: чесне попередження, день використано ---- */
 {
   const { ctx, p, errs, dialogs } = await open();
   await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
   await tap(p.locator('#wk-finish'));
-  await p.waitForTimeout(1000);
+  await p.waitForTimeout(600);
+  const box6 = p.locator('.modal__box:has(#wk-fin-end)');
+  const txt6 = await box6.innerText().catch(() => '');
   ok('6. 0 підходів — окреме попередження про пропуск',
-     dialogs.some(d => /нульовим виконанням/.test(d) && /пропуск/.test(d)),
-     dialogs.join(' || ').slice(0, 140));
+     /Жодного підходу не закрито/.test(txt6) && /як пропуск/.test(txt6),
+     txt6.replace(/\n+/g, ' ').slice(0, 160));
+  ok('6. і це вікно сайту, а не системне', dialogs.length === 0, String(dialogs.length));
+  await p.locator('#wk-fin-end').click();
+  await p.waitForTimeout(1000);
   const rec = await p.evaluate(async k => (await window.Store.getProfile()).sessionLog[k], TODAY);
   ok('6. сесія 0/N записана завершеною', rec && rec.end === 1 && rec.doneSets === 0,
      JSON.stringify(rec).slice(0, 90));

@@ -410,26 +410,93 @@
   }
 
   /*
-   * «Завершити тренування». Можна в БУДЬ-який момент — 0/10 теж
-   * завершення, лише чесно попереджене: день стане використаним до
-   * понеділка, а тижнева оцінка ELO порахує його за фактом виконання
-   * (нуль підходів для неї — те саме, що пропуск).
+   * ВІКНО ДОСТРОКОВОГО ЗАВЕРШЕННЯ.
+   *
+   * Малює те, що вирішив js/finish-core.js. Влаштоване за зразком
+   * BmiCore.showWarnModal: та сама розмітка .modal, та сама пастка
+   * фокуса, те саме повернення фокуса на місце. Різниця одна — тут
+   * ДВА фокусовані елементи, тож Tab ходить між ними по колу, а не
+   * повертається в єдиний.
+   *
+   * ESCAPE І КЛІК ПО ПІДКЛАДЦІ ОЗНАЧАЮТЬ «ПРОДОВЖИТИ». Закриття вікна
+   * випадковим дотиком не має завершувати день: завершення незворотне
+   * до понеділка, а продовження не коштує нічого.
    */
-  function finishWorkout() {
-    if (!state.plan || locked()) return;
-    const day = state.plan[state.dayIdx];
-    const st = WC.dayStats(day, state.done);
+  function askFinish(st, onFinish) {
+    const FC = window.FinishCore;
+    const q = FC.pickQuote({
+      trackerLog: state.trackerLog, day: state.todayKey, rand: Math.random
+    });
 
-    let msg = 'Завершити тренування?\n\nВиконано ' + st.doneSets + ' з ' +
-      st.totalSets + ' підходів (' + st.doneEx + '/' + st.totalEx + ' вправ).' +
-      '\nПовторити цей день можна буде з понеділка.';
-    if (!st.doneSets) {
-      msg = 'Завершити з нульовим виконанням?\n\nЖодного підходу не закрито: ' +
-        'день буде використано до понеділка, а тижнева оцінка порахує його ' +
-        'як пропуск.';
+    const left = st.totalSets - st.doneSets;
+    const line = st.doneSets
+      ? 'Виконано ' + st.doneSets + ' з ' + st.totalSets + ' підходів (' +
+        st.doneEx + ' з ' + st.totalEx + ' вправ). Лишилось ' + left + '.'
+      : 'Жодного підходу не закрито.';
+    /* Наслідок той самий, що був у confirm(): він тут головне, а не
+       цитата. Людина мусить знати, що день не можна перепройти. */
+    const cost = st.doneSets
+      ? 'Якщо завершити зараз, повторити цей день можна буде з понеділка.'
+      : 'Якщо завершити зараз, день буде використано до понеділка, а тижнева ' +
+        'оцінка порахує його як пропуск.';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'modal';
+    wrap.innerHTML =
+      '<div class="modal__backdrop"></div>' +
+      '<div class="modal__box" role="alertdialog" aria-modal="true" aria-labelledby="wk-fin-t">' +
+        '<h3 id="wk-fin-t" style="margin:0">Тренування ще не закінчене</h3>' +
+        '<p class="small mt-1">' + esc(line) + '</p>' +
+        '<p class="lead mt-2" style="max-width:none">' + esc(q.s) + '</p>' +
+        '<p class="small muted mt-2">' + esc(cost) + '</p>' +
+        '<div class="pills mt-2">' +
+          '<button class="pill pill--red" type="button" id="wk-fin-go">Продовжити тренування</button>' +
+          '<button class="pill pill--blue" type="button" id="wk-fin-end">Завершити тренування</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+
+    const goBtn = wrap.querySelector('#wk-fin-go');
+    const endBtn = wrap.querySelector('#wk-fin-end');
+    const prevFocus = document.activeElement;
+    let closed = false;
+
+    try { window.App.lockScroll(true); } catch (_) {}
+
+    function close(done) {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('keydown', onKey, true);
+      wrap.remove();
+      try { window.App.lockScroll(false); } catch (_) {}
+      try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (_) {}
+      if (done) onFinish();
     }
-    if (!confirm(msg)) return;
 
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(false); return; }
+      if (e.key !== 'Tab') return;
+      /* Двоє фокусованих: Tab з останнього веде в перший, Shift+Tab з
+         першого — в останній. За межі box фокус не виходить. */
+      e.preventDefault();
+      const first = goBtn, last = endBtn;
+      const cur = document.activeElement;
+      if (e.shiftKey) (cur === first ? last : first).focus();
+      else (cur === last ? first : last).focus();
+    }
+
+    document.addEventListener('keydown', onKey, true);
+    goBtn.addEventListener('click', function () { close(false); });
+    endBtn.addEventListener('click', function () { close(true); });
+    const backdrop = wrap.querySelector('.modal__backdrop');
+    if (backdrop) backdrop.addEventListener('click', function () { close(false); });
+
+    /* Фокус на «Продовжити»: випадковий Enter має лишати в тренуванні. */
+    try { goBtn.focus(); } catch (_) {}
+  }
+
+  /** Власне завершення: запис сесії з ознакою end. */
+  function doFinish() {
     clearTimeout(sessionTimer);
     const log = window.HistoryCore
       ? window.HistoryCore.upsertSession(state.profile.sessionLog, state.todayKey, sessionRecord(true))
@@ -446,6 +513,36 @@
     }).catch(function (e) {
       if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err');
     });
+  }
+
+  /*
+   * «Завершити тренування». Можна в БУДЬ-який момент — 0/10 теж
+   * завершення, лише чесно попереджене: день стане використаним до
+   * понеділка, а тижнева оцінка ELO порахує його за фактом виконання
+   * (нуль підходів для неї — те саме, що пропуск).
+   *
+   * ПИТАЄМО ТІЛЬКИ ПРО НЕДОРОБЛЕНЕ. Раніше confirm() виринав щоразу —
+   * і в того, хто закрив усі підходи, теж. Людина, яку питають про
+   * очевидне, за тиждень навчається тиснути «так» не читаючи, і тоді
+   * попередження перестає працювати саме там, де воно потрібне.
+   */
+  function finishWorkout() {
+    if (!state.plan || locked()) return;
+    const day = state.plan[state.dayIdx];
+    const st = WC.dayStats(day, state.done);
+    const FC = window.FinishCore;
+
+    /* Без модуля (не завантажився) лишається стара поведінка: краще
+       системне вікно, ніж мовчазне завершення дня без попередження. */
+    if (!FC) {
+      if (!confirm('Завершити тренування?\n\nВиконано ' + st.doneSets + ' з ' +
+          st.totalSets + ' підходів.\nПовторити цей день можна буде з понеділка.')) return;
+      doFinish();
+      return;
+    }
+
+    if (!FC.shouldAsk(st)) { doFinish(); return; }
+    askFinish(st, doFinish);
   }
 
   /** Записати зміну трекера дня й одразу оновити екран */

@@ -1335,6 +1335,78 @@ a.card > .btn {
 .chip--ok   { border-color: rgba(var(--c-green-rgb), 0.45); background: rgba(var(--c-green-rgb), 0.14); color: var(--ok); }
 .chip--warn { border-color: rgba(var(--c-amber-rgb), 0.45); background: rgba(var(--c-amber-rgb), 0.13); color: var(--warn); }
 
+/*
+ * ТАБЛЕТКА — ВИБІР ІЗ ДВОХ, А НЕ ЩЕ ОДНА КНОПКА.
+ *
+ * Нічого нового тут не вигадано: форма взята з .chip (радіус 999px),
+ * поверхня — з того самого скляного рецепта, що в .card--glass, .kpi і
+ * .tile (див. розділ «Скло» нижче, куди .pill дописано п'ятим), розміри
+ * й переходи — з .btn. Це склейка наявного, а не новий елемент.
+ *
+ * ЧОМУ ВЗАГАЛІ СКЛО. У правилі сказано: скло позначає ПРЕДМЕТ, який
+ * можна взяти, а не будь-яку рамку з текстом. Вибір із двох таблеток —
+ * рівно предмет: його беруть, і саме в цьому весь сенс вікна.
+ *
+ * ЧОМУ ТУТ Є КОЛІР, ХОЧА КНОПКИ МОНОХРОМНІ.
+ * Це свідомий і поки що єдиний виняток із правила «колір позначає дані
+ * й стан, а не оздоблює інтерфейс». Дві таблетки — не оздоблення: колір
+ * тут і Є станом, у який людина переходить, і саме він робить вибір
+ * зчитуваним, не читаючи підписи. Виняток НЕ поширюється на решту
+ * кнопок сайту: якщо кольоровою стане будь-яка друга пара, це правило
+ * зникне, а разом із ним і сенс кольору деінде.
+ *
+ * ЯК ВЗЯТО КОЛІР. За рецептом .chip--ok / .chip--warn: тонована
+ * заливка, рамка того ж відтінку, а текст — сам відтінок. Заливка
+ * кольором «під зав'язку» дала б білий текст на середньому тоні й
+ * контраст нижче 4,5:1; так він тримається вище.
+ */
+.pill {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  flex: 1 1 0; min-width: 0;
+  padding: 14px 20px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 0.94rem; font-weight: 600; letter-spacing: 0.005em;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: transform var(--t-fast), background var(--t-fast),
+              box-shadow var(--t), border-color var(--t-fast), color var(--t-fast);
+}
+.pill:hover { transform: translateY(-2px); }
+.pill:active { transform: translateY(0); }
+
+/* Заливка кладеться ПОВЕРХ скляного градієнта, тому обидва фони
+   перелічені разом: інакше колірний шар стер би скло. */
+.pill--red,
+.pill--blue {
+  background:
+    linear-gradient(0deg, rgba(var(--pill-rgb), 0.14), rgba(var(--pill-rgb), 0.14)),
+    linear-gradient(158deg,
+      rgba(var(--fx-rgb), 0.11) 0%,
+      rgba(var(--fx-rgb), 0.045) 46%,
+      rgba(var(--fx-rgb), 0.025) 100%);
+  border-color: rgba(var(--pill-rgb), 0.45);
+  color: var(--pill-ink);
+}
+.pill--red  { --pill-rgb: var(--c-red-rgb);  --pill-ink: var(--c-red); }
+.pill--blue { --pill-rgb: var(--c-blue-rgb); --pill-ink: var(--c-blue); }
+
+.pill--red:hover,
+.pill--blue:hover {
+  border-color: rgba(var(--pill-rgb), 0.75);
+  box-shadow: 0 14px 34px -16px rgba(var(--pill-rgb), 0.9);
+}
+
+/* Дві таблетки в ряд, а на вузькому — стовпчиком: 44px цілі дотику
+   важливіші за симетрію. Той самий поріг, що в решті сайту. */
+.pills {
+  display: flex; gap: 12px; flex-wrap: wrap;
+}
+@media (max-width: 380px) {
+  .pills { flex-direction: column; }
+}
+
 .lead { font-size: clamp(1.02rem, 1.7vw, 1.16rem); color: var(--text-2); max-width: 62ch; }
 .muted { color: var(--muted); }
 .small { font-size: 0.86rem; }
@@ -4109,7 +4181,8 @@ body {
 .card.card--glass,
 .kpi,
 .tile,
-.twt {
+.twt,
+.pill {
   /* Блик — окремий шар (::after з inset: 0), тож поверхня мусить бути
      системою координат для нього. У .card це вже було, у плиток — ні. */
   position: relative;

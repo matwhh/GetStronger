@@ -262,48 +262,36 @@
          * не як сама річ: рядок однакових сірих капсул неможливо
          * прочитати як «я це заслужив». Компонент — js/award-core.js.
          */
+        /*
+         * Тут ПРЕВʼЮ, а розмова про нагороди — на awards.html. Тому
+         * картка веде туди, а не перевертається: тап не може означати
+         * одночасно «перевернути» і «перейти», і з двох значень корисніше
+         * друге — на сторінці нагород видно ще й те, чого в тебе немає.
+         */
         (awards.length
-          ? '<h3 class="card__title mt-2">Нагороди</h3>' +
+          ? '<div class="row row--split mt-2" style="align-items:baseline;gap:10px">' +
+              '<h3 class="card__title" style="margin:0">Нагороди</h3>' +
+              '<a class="small" href="awards.html">Усі нагороди</a>' +
+            '</div>' +
             (window.Award
-              ? window.Award.grid(awards, { seasonLabel: EC.seasonLabel })
+              ? window.Award.grid(awards, { seasonLabel: EC.seasonLabel, href: 'awards.html' })
               /* Модуль не завантажився — краще сірі капсули, ніж порожньо. */
               : '<div class="row mt-1" style="gap:8px;flex-wrap:wrap">' + awards.map(function (a) {
                   return '<span class="chip">' + esc(a.label) + ' · ' + esc(EC.seasonLabel(a.season)) + '</span>';
                 }).join('') + '</div>')
           : ''));
-      wireAwardFlip($('#sz-history'));
     } catch (_) { $('#sz-history').innerHTML = ''; }
   }
 
   /*
-   * ПЕРЕВОРОТ НА ДОТИКУ.
+   * ПЕРЕВОРОТ НА ДОТИКУ ЗВІДСИ ПРИБРАНО.
    *
-   * На курсорі картку перевертає :hover, з клавіатури — :focus-visible;
-   * і те, і те живе в CSS. На телефоні :hover ЗАЛИПАЄ після тапу —
-   * картка лишалась би перевернутою, доки не торкнешся іншого місця, і
-   * закрити її було б нічим. Тому там свій клас і свій тап.
-   *
-   * Слухач один на контейнер: карток буває десяток, і десять підписок
-   * довелось би знімати при кожній перемальовці історії.
+   * Картки нагород тут стали посиланнями на awards.html, і перевертати їх
+   * більше нема потреби: тап веде на сторінку нагород, де видно ще й те,
+   * чого в тебе поки немає. Сам механізм перевороту живе тепер там
+   * (js/awards.js, wireFlip) — в одному екземплярі, а не в двох, які
+   * розійшлися б на першому ж виправленні.
    */
-  function wireAwardFlip(host) {
-    if (!host || host.dataset.awdOn === '1') return;
-    try {
-      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-    } catch (_) { /* немає matchMedia — вважаємо, що дотик */ }
-    host.dataset.awdOn = '1';
-    host.addEventListener('click', function (e) {
-      var card = e.target.closest ? e.target.closest('.awd') : null;
-      if (!card) return;
-      var was = card.classList.contains('is-flip');
-      /* Одночасно перевернута щонайбільше одна: дві відкриті картки
-         поруч читаються як збій, а не як вибір. */
-      Array.prototype.forEach.call(host.querySelectorAll('.awd.is-flip'), function (c) {
-        c.classList.remove('is-flip');
-      });
-      if (!was) card.classList.add('is-flip');
-    });
-  }
 
   var CAT_UA = {
     training: 'Тренування', nutrition: 'Харчування', sleep: 'Сон',

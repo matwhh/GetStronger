@@ -287,6 +287,7 @@
     { href: 'journal.html', label: 'Прогрес', core: true, icon: 'progress', children: [
       { href: 'journal.html',          label: 'Огляд прогресу' },
       { href: 'rating.html',           label: 'Рейтинг' },
+      { href: 'awards.html',           label: 'Нагороди' },
       { href: 'journal.html#history',  label: 'Історія' },
       { href: 'measure.html',          label: 'Заміри тіла' }
     ] },
@@ -319,6 +320,7 @@
     { href: 'journal.html',    label: 'Прогрес' },
     { href: 'measure.html',    label: 'Заміри тіла' },
     { href: 'rating.html',     label: 'Рейтинг' },
+    { href: 'awards.html',     label: 'Нагороди' },
     { href: 'boxing.html',     label: 'Бокс' },
     { href: 'cardio.html',     label: 'Кардіо' },
     { href: 'calculator.html', label: 'Калькулятор 1ПМ' },

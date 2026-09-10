@@ -117,6 +117,49 @@ ok('назад, 0.44s: лице повернулось', (await vis()) === 'visi
   await c2.close();
 }
 
+/* --------------------------------------------------------------------
+   5. Сторінка нагород: вітрина, силуети, перехід із рейтингу
+   -------------------------------------------------------------------- */
+/*
+ * ЧОМУ ВІТРИНА МАЛЮЄТЬСЯ ДО ВІДПОВІДІ СЕРВЕРА. Сторінка мусить бути
+ * осмисленою одразу, а не після мережі: якщо відповідь не прийде, те, що
+ * вже на екрані, лишається правдою — жодної нагороди не приписано.
+ * Тому тут перевіряється саме офлайновий стан: усі види силуетами.
+ */
+{
+  const q = await ctx.newPage();
+  const e4 = []; q.on('pageerror', (e) => e4.push(e.message));
+  await q.goto('file://' + ROOT + '/awards.html', { waitUntil: 'load' });
+  await q.waitForTimeout(1500);
+
+  const all = await q.locator('.awd').count();
+  const locked = await q.locator('.awd--locked').count();
+  ok('вітрина показує всі види нагород', all >= 15, String(all));
+  ok('без сервера всі — силуетами', locked === all, locked + ' із ' + all);
+
+  /* Групи лиць: сітка має читатись без перевороту. */
+  ok('є жетон рівня', await q.locator('.awd__lvl').count() >= 5);
+  ok('є номери місць', await q.locator('.awd__rank').count() >= 5);
+  ok('є частки у відсотках', await q.locator('.awd__pct').count() === 3);
+  ok('є ELITE', await q.locator('.awd__elite').count() === 1);
+
+  /* Силует не має блимати: незаробленій нагороді нема чого привертати
+     увагу анімацією. */
+  const ringAnim = await q.evaluate(() => {
+    const r = document.querySelector('.awd--locked .awd__ring');
+    return r ? getComputedStyle(r).animationName : 'немає кілець';
+  });
+  ok('у силуета анімація вимкнена', ringAnim === 'none' || ringAnim === 'немає кілець', ringAnim);
+
+  ok('місце під тамагочі готове й поки приховане', await q.evaluate(() => {
+    const el = document.querySelector('#pet-slot');
+    return Boolean(el) && el.hidden === true;
+  }));
+
+  ok('сторінка нагород: без JS-помилок', e4.length === 0, e4.slice(0, 2).join(' | '));
+  await q.close();
+}
+
 ok('без JS-помилок', errs.length === 0, errs.slice(0, 3).join(' | '));
 
 await b.close();

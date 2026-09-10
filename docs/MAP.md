@@ -55,7 +55,8 @@ elo-core · elo-api · elo-hooks
 | `measure.html` | Заміри тіла | history-core, measure-core, **measure** |
 | `trackers.html` | Трекери дня: ввід значень | tracker-core, **trackers-day** |
 | `trackers-settings.html` | Що саме відстежувати | tracker-core, **trackers-settings** |
-| `rating.html` | Сезонний рейтинг ELO | daycal-core, **season** |
+| `rating.html` | Сезонний рейтинг ELO | daycal-core, **season**, award-core |
+| `awards.html` | Вітрина нагород: отримані й силуети решти; місце під тамагочі | award-core, **awards** |
 | `calculator.html` | Калькулятор 1ПМ | onerm-core, **onerm** |
 | `cardio.html` | Пульсові зони, LISS vs HIIT | **cardio** |
 | `boxing.html` | Тренування на мішку | boxing-data, **boxing** |
@@ -86,7 +87,7 @@ elo-core · elo-api · elo-hooks
 | `history-core.js` | 321 | журнали: ваги, сесії, закриті дні | `HistoryCore`: `todayKey`, `appendWeight`, `weightSeries`, `upsertSession`, `closeDay` | — |
 | `tracker-core.js` | 808 | модульні трекери: реєстр, записи, стріки, закріплення на «Сьогодні» | `TrackerCore`: `ensureBuiltins`, `logValue`, `entriesFor`, `streak`, `goalAdherence`, `setPinned`, `pinnedList`, `mergeDay` | — |
 | `tracker-tile-core.js` | 339 | кубик трекера на «Сьогодні»: свій ввід під кожен вид | `TrackerTile`: `html`, `grid`, `isWide` | `TrackerCore` |
-| `award-core.js` | 157 | двобічна картка нагороди з переворотом | `Award`: `html`, `grid`, `CODES`, `gearIcon` | — |
+| `award-core.js` | 290 | двобічна картка нагороди: лице за групою, вітрина з силуетами | `Award`: `html`, `grid`, `showcase`, `CODES`, `ORDER`, `gearIcon` | — |
 | `onerm-core.js` | 259 | математика 1ПМ, набір млинців | `OneRM`: `oneRepMax`, `estimates`, `percentOfMax`, `toPlates`, `PLATE_STEP` | — |
 | `password-core.js` | 256 | надійність пароля за правилами Supabase | `PasswordCore`: `check`, `MIN_LEN`, `MAX_LEN` | — |
 | `adherence-core.js` | 237 | % дисципліни за період | `AdherenceCore`: `trainingAdherence`, `nutritionAdherence`, `PERIODS` | `EloCore` |

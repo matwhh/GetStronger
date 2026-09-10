@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Нагороди — FORGE</title>
+<meta name="description" content="Нагороди Forge: за рівень, з яким завершено сезон, за місце в таблиці лідерів, за верхній відсоток і за вихід у зону ELITE.">
+<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
+     js/app.js, коли в config.js заповнено siteUrl: без домену
+     абсолютне посилання все одно було б неправильним. -->
+<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
+     (Telegram, Slack, WhatsApp) JavaScript не виконують.
+     Адреса АБСОЛЮТНА: відносний og:image Telegram ще розбирає, а
+     Facebook, LinkedIn, X і Slack — ні, і в них картки лишались без
+     картинки. Домен той самий, що siteUrl у js/config.js.
+     og:title тут — коротка назва розділу, а не SEO-заголовок: у картці
+     месенджера потрібне «де я опинюсь», а не ключові слова. Довгі
+     варіанти лишаються в <title> і meta description — їх читає пошук.
+     og:site_name лишається: без нього Telegram друкує в синьому рядку
+     голий домен. Тому site_name = FORGE, а title = назва розділу —
+     разом вони не дублюють одне одного. -->
+<meta property="og:image" content="https://forge-mold1.vercel.app/og-image.png?v=2">
+<meta property="og:image:secure_url" content="https://forge-mold1.vercel.app/og-image.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FORGE — знак ковадла й назва на чорному тлі">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORGE">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="Нагороди">
+<meta property="og:description" content="Тренування · Харчування · Прогрес">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b0b0b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icons/icon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
+     отримував би зменшений скріншот сторінки замість знака Forge. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<link rel="stylesheet" href="css/style.css">
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
+     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
+<script src="js/agegate.js"></script>
+<script src="js/nosw.js"></script>
+<script src="js/theme-boot.js"></script>
+
+</head>
+<body>
+
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <div class="row reveal" style="justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <h1 style="margin:0">Нагороди</h1>
+        <!-- Нагороди видає сервер за підсумком сезону, а рахує їх рейтинг —
+             туди й веде єдине посилання звідси. -->
+        <a class="small" href="rating.html">Рейтинг</a>
+      </div>
+
+      <p class="small muted mt-1 reveal">Отримані показані як є, решта — силуетами:
+        вітрина мусить показувати, що взагалі можна зібрати.</p>
+
+      <!-- Сюди js/awards.js малює вітрину: js/award-core.js будує картки -->
+      <div id="awd-page" class="mt-3 reveal" data-d="1"></div>
+
+      <!--
+        МІСЦЕ ПІД ТАМАГОЧІ.
+
+        Заготовка, а не забутий блок. Порожній контейнер тут стоїть
+        свідомо: коли з'явиться сам вихованець, йому потрібне буде місце
+        поруч із нагородами — це та сама полиця з тим, що ти зібрав, і
+        поділ на дві сторінки був би поділом заради поділу.
+
+        Що треба буде зробити: новий модуль js/pet-core.js (чистий, як
+        award-core), рендер у #pet-slot, стан у profile — і рядок у
+        js/awards.js, який його викличе. Розкладку контейнер уже має
+        (.pet-slot у css/style.css), тому вставка нічого не зрушить.
+      -->
+      <div id="pet-slot" class="pet-slot" hidden></div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/errors.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<!-- Контекстна довідка: один механізм на весь сайт, вміст залежить від
+     сторінки. Вміст іде ПЕРЕД механізмом — інакше help.js на швидкому
+     кеші не знайшов би розділу й сховав би кнопку назавжди. -->
+<script defer src="js/help-content.js"></script>
+<script defer src="js/help.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<script defer src="js/elo-hooks.js"></script>
+<script defer src="js/season-core.js"></script>
+<script defer src="js/award-core.js"></script>
+<script defer src="js/awards.js"></script>
+</body>
+</html>

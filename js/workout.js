@@ -172,6 +172,56 @@
   }
 
   /** Обраний день плану вже завершено цього тижня → дата, інакше null */
+  /*
+   * ДЕНЬ, ПІДКАЗАНИЙ ССИЛКОЮ (?day=N).
+   *
+   * ЗВІДКИ ВІН БЕРЕТЬСЯ. З екрана «Сьогодні»: віджет показує день, що
+   * припадає на обраний день тижня, і веде сюди разом із його номером.
+   * Без цього сторінка обирала день сама — «наступний після минулого», —
+   * і людина, тицьнувши на слово «Пуш», відкривала Пул.
+   *
+   * ЧОМУ ПІДКАЗКА, А НЕ НАКАЗ. Перемикання дня скидає закриті підходи —
+   * саме тому ручне перемикання питає підтвердження. Тихо стерти
+   * половину тренування через параметр в адресі неприпустимо, тож
+   * підказка діє ЛИШЕ поки нічого не закрито. Почав день — сторінка
+   * лишається на ньому, а перемкнути можна вкладками, з підтвердженням.
+   *
+   * ЧОМУ ПАРАМЕТР ОДРАЗУ ПРИБИРАЄТЬСЯ З АДРЕСИ. Інакше він діяв би й
+   * після перезавантаження: людина перемкнула день вручну, натиснула F5
+   * — і повернулась туди, звідки прийшла годину тому.
+   */
+  function applyDayFromUrl() {
+    let want = null;
+    try {
+      const raw = new URLSearchParams(location.search).get('day');
+      if (raw !== null) {
+        const n = Number(raw);
+        if (Number.isInteger(n) && n >= 0) want = n;
+      }
+    } catch (_) { want = null; }
+
+    if (want !== null && state.plan && state.plan.length) {
+      const idx = WC.clampDay(want, state.plan.length);
+      const st = WC.dayStats(state.plan[state.dayIdx], state.done);
+      if (idx !== state.dayIdx && st.doneSets === 0) {
+        state.dayIdx = idx;
+        state.done = [];
+        if (!locked()) saveDayState();
+      }
+    }
+
+    /* Адресу чистимо завжди, коли параметр був: навіть якщо підказку
+       відхилено, лишати її в адресі означає лишати міну під F5. */
+    try {
+      if (location.search && /(^|[?&])day=/.test(location.search)) {
+        const q = new URLSearchParams(location.search);
+        q.delete('day');
+        const rest = q.toString();
+        history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+      }
+    } catch (_) { /* file:// або старий браузер — не біда */ }
+  }
+
   function endedThisWeek(dayIdx) {
     return WC.completedThisWeek(state.profile, state.todayKey)[dayIdx] || null;
   }
@@ -835,6 +885,7 @@
           if (!week[idx]) { state.dayIdx = idx; break; }
         }
       }
+      applyDayFromUrl();
     }
 
     render();

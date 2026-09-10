@@ -387,6 +387,99 @@ for (const w of [320, 390, 430]) {
   await ctx.close();
 }
 
+/* ==================================================================== */
+/* День із «Сьогодні» відкривається саме той, на який тицьнули            */
+/* ==================================================================== */
+/*
+ * ЩО ЛАМАЛОСЬ. Віджет на головній каже «сьогодні Пуш», а сторінка
+ * тренування обирала день сама — «наступний після того, що робили
+ * востаннє». Людина тицяла на слово «Пуш» і потрапляла на Пул. Помилка
+ * не падає й нічого не псує; вона просто щоразу відкриває не те, і це
+ * списують на «так задумано».
+ *
+ * ЩО ТУТ СТЕРЕЖЕТЬСЯ, крім самого переходу:
+ *   • підказка не стирає роботу — день із закритими підходами лишається;
+ *   • параметр не залипає в адресі, інакше F5 повертав би людину туди,
+ *     звідки вона прийшла годину тому.
+ */
+{
+  const ctx = await adultContext(b, { viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', (e) => errs.push(e.message));
+  p.on('dialog', (d) => d.accept());
+
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1200);
+  await p.evaluate(async (seed) => {
+    try { await window.Store.saveProfile(seed); } catch (e) { if (!e.queued) throw e; }
+  }, Object.assign({}, SEED, { daysPerWeek: 5, activePlan: { programId: 'fullbody', days: 5 } }));
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(1700);
+
+  const href = await p.locator('.tdy-card').getAttribute('href').catch(() => null);
+  ok('віджет дня веде на конкретний день', /^workout\.html\?day=\d+$/.test(String(href)), String(href));
+
+  /* Номер у посиланні мусить відповідати ТОМУ дню, який показує віджет, —
+     а не сьогоднішньому: у смузі тижня можна обрати інший день, і
+     відкритись має саме він. */
+  const slots = await p.locator('[data-slot]').count();
+  let checked = 0;
+  for (let i = 0; i < slots; i++) {
+    await p.locator('[data-slot]').nth(i).click({ force: true });
+    await p.waitForTimeout(120);
+    const h = await p.locator('.tdy-card').getAttribute('href').catch(() => null);
+    if (!h) continue;                 /* день відпочинку — посилання немає */
+    const title = (await p.locator('.tdy-card__title').innerText()).trim();
+    const n = Number(String(h).split('=')[1]);
+    const real = await p.evaluate((k) => {
+      const r = window.WorkoutCore.resolvePlan(window.Store.localProfile());
+      return r && r.plan[k] ? (r.plan[k].title || '') : '';
+    }, n);
+    if (title === real.trim()) checked++;
+  }
+  ok('номер у посиланні збігається з днем на віджеті', checked >= 3, checked + ' днів звірено');
+
+  /* Перехід за посиланням відкриває саме цей день. */
+  await p.goto('file://' + ROOT + '/workout.html?day=2', { waitUntil: 'load' });
+  await p.waitForTimeout(1800);
+  const picked = await p.evaluate(() => {
+    const el = document.querySelector('input[name="wk-day"]:checked');
+    return el ? el.value : null;
+  });
+  ok('?day=2 відкриває третій день плану', picked === '2', String(picked));
+  ok('параметр прибрано з адреси', await p.evaluate(() => !/day=/.test(location.search)));
+
+  /* Ручне перемикання переживає перезавантаження: підказка не воскресає. */
+  await p.evaluate(() => {
+    const r = document.querySelector('input[name="wk-day"][value="4"]');
+    r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await p.waitForTimeout(500);
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(1700);
+  ok('після F5 лишається день, обраний руками', await p.evaluate(() => {
+    const el = document.querySelector('input[name="wk-day"]:checked');
+    return el && el.value === '4';
+  }));
+
+  /* Найважливіше: почату роботу підказка не чіпає. */
+  await p.locator('[data-set-ex]').first().click({ force: true });
+  await p.waitForTimeout(500);
+  await p.goto('file://' + ROOT + '/workout.html?day=0', { waitUntil: 'load' });
+  await p.waitForTimeout(1800);
+  ok('день із закритими підходами підказка НЕ перемикає', await p.evaluate(() => {
+    const el = document.querySelector('input[name="wk-day"]:checked');
+    return el && el.value === '4';
+  }), await p.evaluate(() => {
+    const el = document.querySelector('input[name="wk-day"]:checked');
+    return el ? el.value : 'немає';
+  }));
+
+  ok('перехід із «Сьогодні»: без JS-помилок', errs.length === 0, errs.slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter(r => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок тренування пройшло.');

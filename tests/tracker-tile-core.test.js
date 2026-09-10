@@ -54,6 +54,11 @@ describe('кубик трекера: кожен вид має свій ввід'
     assert.match(h, /data-trk-durh="sleep"/);
     assert.match(h, /data-trk-durm="sleep"/);
     assert.doesNotMatch(h, /data-trk-scale/);
+    /* Підписи «год» і «хв» зняті з полів — вони дублювали шапку. Для
+       читалки вони лишились там, де потрібні. */
+    assert.match(h, /class="twt__sep"/);
+    assert.match(h, /aria-label="Сон, годин"/);
+    assert.match(h, /aria-label="Сон, хвилин"/);
   });
 
   it('кроки — одне поле; кнопок «+1000» немає навмисно', () => {
@@ -97,7 +102,9 @@ describe('кубик трекера: значення й підпис', () => {
   it('сон приходить обгорнутим {value, source} — і все одно читається', () => {
     const log = { sleep: { [KEY]: { value: 440, source: 'manual', date: KEY } } };
     const h = at('sleep', { log });
-    assert.match(h, /7 год 20 хв/);
+    /* У шапці — коротка форма часу: повний запис забирав усю шапку й
+       обрізав назву кубика до «С…». */
+    assert.match(h, /class="twt__now">7:20</);
     assert.match(h, /value="7"/, 'години в полі');
     assert.match(h, /value="20"/, 'хвилини в полі');
   });
@@ -142,12 +149,14 @@ describe('кубик трекера: ширина, стійкість, сітк�
   it('широкими стають ті види, яким мало половини рядка', () => {
     assert.equal(Tile.isWide('scale'), true);
     assert.equal(Tile.isWide('pair'), true);
-    assert.equal(Tile.isWide('duration'), true);
     assert.equal(Tile.isWide('cumulative'), true);
     /* Галочка й одне поле поміщаються в половину — інакше два кубики
        звичок займали б два рядки замість одного. */
     assert.equal(Tile.isWide('boolean'), false);
     assert.equal(Tile.isWide('value'), false);
+    /* Тривалість теж поміщається: у шапці вже написано «7 год 20 хв»
+       словами, тож у тілі досить двох полів із двокрапкою. */
+    assert.equal(Tile.isWide('duration'), false);
   });
 
   it('назва трекера екранується — вона їде в атрибути', () => {

@@ -50,9 +50,19 @@
     return String(r).replace('.', ',');
   }
 
-  /** Скільки колонок займає кубик цього виду. */
+  /**
+   * Скільки колонок займає кубик цього виду.
+   *
+   * ТРИВАЛІСТЬ ЗВІДСИ ПРИБРАНА. Спершу сон стояв на всю ширину — разом із
+   * підписами «год» і «хв» біля кожного поля. Але шапка кубика вже каже
+   * «7 год 20 хв» словами, тобто підписи дублювали те, що написано на
+   * два рядки вище. Без них лишаються два коротких поля з двокрапкою —
+   * форма, яку читають без жодного пояснення, і вона поміщається в
+   * половину рядка. Звільнене місце дістається сусідньому вузькому
+   * кубику (сітка з grid-auto-flow: dense підтягує його сама).
+   */
   function isWide(kind) {
-    return kind === 'scale' || kind === 'pair' || kind === 'duration' || kind === 'cumulative';
+    return kind === 'scale' || kind === 'pair' || kind === 'cumulative';
   }
 
   /* ------------------------------------------------------------------ */
@@ -189,15 +199,22 @@
   function durationBody(t, def, today) {
     const TC = window.TrackerCore;
     const sp = TC ? TC.splitDuration(today) : { h: null, m: null };
+    /*
+     * Двокрапка замість слів «год» і «хв».
+     *
+     * Слова тут нічого не додавали: те саме значення стоїть у шапці
+     * кубика повним текстом («7 год 20 хв»), а форма «7 : 20» читається
+     * як час без жодного підпису. Для читалки підписи лишились там, де
+     * вони й потрібні, — в aria-label кожного поля.
+     */
     return '<div class="twt__dur">' +
       '<input class="twt__num" type="text" inputmode="numeric" placeholder="—"' +
         ' data-trk-durh="' + esc(t.id) + '" value="' + (sp.h == null ? '' : sp.h) + '"' +
         ' aria-label="' + esc(t.name) + ', годин">' +
-      '<span class="twt__u">год</span>' +
+      '<span class="twt__sep" aria-hidden="true">:</span>' +
       '<input class="twt__num" type="text" inputmode="numeric" placeholder="—"' +
         ' data-trk-durm="' + esc(t.id) + '" value="' + (sp.m == null ? '' : sp.m) + '"' +
         ' aria-label="' + esc(t.name) + ', хвилин">' +
-      '<span class="twt__u">хв</span>' +
     '</div>';
   }
 
@@ -250,7 +267,21 @@
     const TC = window.TrackerCore;
     if (def.kind === 'boolean' || def.kind === 'dose') return '';
     if (def.kind === 'duration') {
-      return today != null && TC ? TC.formatDuration(today) : '—';
+      /*
+       * «7:20», а не «7 год 20 хв».
+       *
+       * Кубик тепер стоїть у половину рядка, і повний запис забирав усю
+       * шапку — назву «Сон» обрізало до «С…». Двокрапкова форма коротша
+       * втричі й читається так само однозначно, бо це загальноприйняте
+       * позначення часу; та сама форма стоїть і в полях під нею.
+       *
+       * Хвилини з провідним нулем: «7:5» читається як помилка, «7:05» —
+       * як пʼять хвилин.
+       */
+      if (today == null || !TC) return '—';
+      var sp = TC.splitDuration(today);
+      if (sp.h == null && sp.m == null) return '—';
+      return (sp.h || 0) + ':' + String(sp.m || 0).padStart(2, '0');
     }
     if (def.kind === 'pair') {
       const cur = today || {};

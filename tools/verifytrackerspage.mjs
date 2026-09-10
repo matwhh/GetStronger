@@ -137,7 +137,7 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(1400);
   const shown = await p.locator('#today [data-trk-tile="sleep"] .twt__now').innerText();
-  ok('1b. після перезавантаження кубик показує те саме', /7\s*год\s*20\s*хв/.test(shown), shown);
+  ok('1b. після перезавантаження кубик показує те саме', /^7:20$/.test(shown.trim()), shown);
   ok('1b. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

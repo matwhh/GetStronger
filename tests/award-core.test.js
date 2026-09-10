@@ -79,7 +79,7 @@ test('лице — чорна діра, зворот — знак і назва,
   assert.match(h, /awd__face--front/);
   assert.match(h, /awd__face--back/);
   assert.match(h, /awd__hole/, 'чорна діра на лиці');
-  assert.equal((h.match(/awd__ring/g) || []).length, 3, 'три кільця, що падають');
+  assert.equal((h.match(/awd__ring/g) || []).length, 10, 'десять кілець — стільки ж, скільки в першоджерела');
   assert.match(h, /awd__mark/, 'знак на звороті');
   /* Старі шари прибрані. Якщо котрийсь повернеться — картка перестане
      бути тим, про що домовлялись. */

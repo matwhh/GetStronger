@@ -131,7 +131,10 @@
                */
          +     '<div class="awd__face awd__face--front">'
          +       '<span class="awd__hole" aria-hidden="true">'
-         +         '<i class="awd__ring"></i><i class="awd__ring"></i><i class="awd__ring"></i>'
+                    /* Десять кілець із рівним зсувом у часі. Менше —
+                       і потік розпадається на окремі спалахи; це не
+                       смак, а те саме число, що в першоджерела. */
+         +         new Array(10).join('<i class="awd__ring"></i>') + '<i class="awd__ring"></i>'
          +       '</span>'
          +     '</div>'
               /* ЗВОРОТ — назва й знак. Більше нічого. */

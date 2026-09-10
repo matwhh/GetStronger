@@ -323,6 +323,96 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
   ok('24. є сітка й підписи шкали', g.grid >= 3 && g.ys.length >= 3, JSON.stringify(g.ys));
   ok('24. крок шкали рівний', g.even, JSON.stringify(g.ys));
 
+  /*
+   * КРАПКИ МУСЯТЬ ЛЕЖАТИ НА ЛІНІЇ.
+   *
+   * Довго графік малював крапки по фактичних зважуваннях, а єдину лінію —
+   * по ковзній середній за 7 днів. На папері правильно: вагу читають по
+   * середній. На екрані — зламано: крапка на 68,5, лінія над нею на 69,3,
+   * і між ними нічого. Ніхто не читає це як «дві різні величини», всі
+   * читають як помилку побудови.
+   *
+   * Тепер ліній дві, і перевіряється саме те, чого бракувало: у графіка
+   * є лінія, яка проходить ЧЕРЕЗ його ж крапки. Порівнюються координати,
+   * а не наявність елемента: лінія на місці була й раніше.
+   */
+  const fit = await q.$eval('#jr-weight svg.exc', (svg) => {
+    const parse = (el) => (el ? el.getAttribute('d') : '')
+      .replace('M', '').split('L')
+      .map((s) => s.trim().split(/\s+/).map(Number))
+      .filter((a) => a.length === 2 && a.every(Number.isFinite));
+    const fact = svg.querySelector('.wc__fact');
+    const main = svg.querySelector('.exc__line');
+    /* Крапки лежать на лінії ФАКТУ, коли вона є; коли середньої не
+       показуємо, факт і є головна лінія. */
+    const pts = parse(fact || main);
+    const dots = [...svg.querySelectorAll('.exc__dot')]
+      .map((d) => [+d.getAttribute('cx'), +d.getAttribute('cy')]);
+    let worst = 0;
+    dots.forEach((d, i) => {
+      if (!pts[i]) { worst = 999; return; }
+      worst = Math.max(worst, Math.abs(pts[i][0] - d[0]), Math.abs(pts[i][1] - d[1]));
+    });
+    return { worst: worst, pts: pts.length, dots: dots.length, hasFact: Boolean(fact) };
+  });
+  ok('24. лінія проходить рівно через крапки',
+     fit.worst <= 0.11 && fit.pts === fit.dots, JSON.stringify(fit));
+  ok('24. на довгій історії середня — окрема лінія', fit.hasFact === true, JSON.stringify(fit));
+
+  /*
+   * МАЛО ЗАПИСІВ — СЕРЕДНЬОЇ НЕМАЄ ВЗАГАЛІ.
+   *
+   * Ковзна за 7 днів на двох записах за пʼять днів не згладжує нічого:
+   * вона ділить два числа навпіл і малює лінію, якої в даних немає. І
+   * саме там розрив із крапками найбільший.
+   */
+  await q.evaluate(() => {
+    const pr = JSON.parse(localStorage.getItem('ib.profile') || '{}');
+    const k = (i) => {
+      const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - i);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+             '-' + String(d.getDate()).padStart(2, '0');
+    };
+    pr.bodyLog = { [k(4)]: 70, [k(0)]: 68.5 };
+    localStorage.setItem('ib.profile', JSON.stringify(pr));
+  });
+  await q.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' });
+  await q.waitForTimeout(1500);
+  const few = await q.$eval('#jr-weight svg.exc', (svg) => {
+    const parse = (el) => (el ? el.getAttribute('d') : '')
+      .replace('M', '').split('L')
+      .map((s) => s.trim().split(/\s+/).map(Number))
+      .filter((a) => a.length === 2 && a.every(Number.isFinite));
+    const pts = parse(svg.querySelector('.exc__line'));
+    const dots = [...svg.querySelectorAll('.exc__dot')]
+      .map((d) => [+d.getAttribute('cx'), +d.getAttribute('cy')]);
+    let worst = 0;
+    dots.forEach((d, i) => {
+      if (!pts[i]) { worst = 999; return; }
+      worst = Math.max(worst, Math.abs(pts[i][0] - d[0]), Math.abs(pts[i][1] - d[1]));
+    });
+    return { fact: svg.querySelectorAll('.wc__fact').length, worst: worst, dots: dots.length };
+  });
+  ok('24. на двох записах середньої немає', few.fact === 0 && few.dots === 2, JSON.stringify(few));
+  ok('24. і єдина лінія йде рівно по крапках', few.worst <= 0.11, JSON.stringify(few));
+
+  /* Повертаємо довгу історію: наступні перевірки блоку писались під неї. */
+  await q.evaluate((n) => {
+    const pr = JSON.parse(localStorage.getItem('ib.profile') || '{}');
+    const log = {};
+    for (let i = 20; i >= 0; i -= 2) {
+      const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - i);
+      const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+                '-' + String(d.getDate()).padStart(2, '0');
+      log[k] = Math.round((82 - (20 - i) * 0.09) * 10) / 10;
+    }
+    pr.bodyLog = log;
+    localStorage.setItem('ib.profile', JSON.stringify(pr));
+    return n;
+  }, seeded);
+  await q.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' });
+  await q.waitForTimeout(1500);
+
   const tip0 = await q.$eval('#w-tip', (el) => {
     const r = el.getBoundingClientRect();
     return { hidden: el.hasAttribute('hidden'), w: Math.round(r.width), h: Math.round(r.height) };

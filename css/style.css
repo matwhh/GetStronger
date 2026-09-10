@@ -2788,6 +2788,23 @@ main:focus:not(:focus-visible) { outline: none; }
   stroke-dasharray: 5 5; opacity: 0.7;
   animation: exc-fade 0.6s ease-out 0.4s backwards;
 }
+/*
+ * ЛІНІЯ ФАКТУ — та, що зʼєднує крапки.
+ *
+ * Тонка й приглушена навмисно: вагу читають по середній, а добові
+ * коливання ±1 кг — це шум. Але шум мусить бути ВИДНО як шум, інакше
+ * крапки висять у повітрі поруч із лінією середньої, і графік читається
+ * як поламаний. Саме так він і читався, доки цієї лінії не було.
+ */
+.wc__fact {
+  fill: none;
+  stroke: var(--acc-bar);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.32;
+  animation: exc-fade 0.6s ease-out 0.3s backwards;
+}
 .exc__line {
   fill: none; stroke: var(--acc-bar); stroke-width: 2.5;
   stroke-linejoin: round; stroke-linecap: round;
@@ -2839,7 +2856,7 @@ main:focus:not(:focus-visible) { outline: none; }
    реченням під графіком і підписом нижнього рядка шкали. */
 
 @media (prefers-reduced-motion: reduce) {
-  .exc__area, .wc__area, .wc__fc, .exc__line, .exc__dot { animation: none; }
+  .exc__area, .wc__area, .wc__fc, .wc__fact, .exc__line, .exc__dot { animation: none; }
   .exc__line { stroke-dasharray: none; }
   .exc__dot { transition: none; }
 }

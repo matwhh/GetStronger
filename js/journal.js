@@ -254,13 +254,34 @@
    *
    * SVG будується рядком без бібліотек, як і решта графіки сайту.
    */
-  function chartSvg(entries) {
+  /** Записи, які потрапляють на графік у поточному періоді. */
+  function chartData(entries) {
     const all = rollingCached(entries);
-    const data = state.period
-      ? all.filter(function (e) {
-          return e.key >= keyOf(daysAgo(state.period));
-        })
+    return state.period
+      ? all.filter(function (e) { return e.key >= keyOf(daysAgo(state.period)); })
       : all;
+  }
+
+  /**
+   * Чи має сенс показувати ковзну середню на цьому наборі.
+   *
+   * Середня за 7 днів на двох записах за пʼять днів не згладжує нічого —
+   * вона ділить два числа навпіл і малює лінію, якої в даних немає. І
+   * саме тоді розрив між лінією та крапками найбільший: графік читається
+   * як поламаний.
+   *
+   * Пʼять записів і тиждень охоплення — та межа, від якої вікно з семи
+   * днів справді щось усереднює.
+   */
+  function avgWorth(data) {
+    if (!data || data.length < 5) return false;
+    const t0 = dateOf(data[0].key).getTime();
+    const t1 = dateOf(data[data.length - 1].key).getTime();
+    return (t1 - t0) / 86400000 >= 7;
+  }
+
+  function chartSvg(entries) {
+    const data = chartData(entries);
     if (data.length < 2) return '';
 
     /* Полотно вужче на телефоні: viewBox стискає текст разом із графікою,
@@ -326,13 +347,42 @@
     const dr = Math.max(2, Math.min(3.5, gap * 0.34));
     const dsw = Math.max(1.2, Math.min(2, dr * 0.6));
 
-    /* ---- заливка під середньою + сама середня ---- */
-    const dPts = data.map(function (e, i) {
+    /*
+     * ДВІ ЛІНІЇ, І КРАПКИ ЗАВЖДИ НА СВОЇЙ.
+     *
+     * Було так: крапки — фактичні зважування, а ЄДИНА лінія — ковзна
+     * середня за 7 днів. На папері логічно (вагу треба читати по
+     * середній, добові коливання ±1 кг нічого не означають), на екрані —
+     * зламано: крапка стоїть на 68,5, лінія над нею на 69,3, і між ними
+     * нічого. Око не читає це як «дві різні величини», воно читає це як
+     * помилку побудови — і має рацію: у графіку не було лінії, що
+     * зʼєднує його ж крапки.
+     *
+     * Тепер їх дві. Тонка приглушена йде ЧЕРЕЗ крапки — це факт, шум і
+     * все. Товста світла — середня, і вона лишається головною.
+     *
+     * КОЛИ СЕРЕДНЬОЇ НЕМАЄ ВЗАГАЛІ. Ковзна за 7 днів на двох записах за
+     * пʼять днів не згладжує нічого: вона просто ділить два числа навпіл
+     * і малює лінію, якої в даних немає. Саме цей випадок і виглядав
+     * найгірше. Поріг — пʼять записів і тиждень охоплення: менше — і
+     * головною стає лінія факту, а середньої на графіку немає.
+     */
+    const showAvg = avgWorth(data);
+
+    const avgPts = data.map(function (e, i) {
       return round(xs[i], 1) + ' ' + round(py(e.avg), 1);
     });
+    const kgPts = data.map(function (e, i) {
+      return round(xs[i], 1) + ' ' + round(py(e.kg), 1);
+    });
+
+    /* Заливка йде під ГОЛОВНОЮ лінією — під тією, яку читають. */
+    const mainPts = showAvg ? avgPts : kgPts;
     const area = '<path class="wc__area" d="M' + round(xs[0], 1) + ' ' + y0 +
-                 'L' + dPts.join('L') + 'L' + round(xs[xs.length - 1], 1) + ' ' + y0 + 'Z"/>';
-    const line = '<path class="exc__line" pathLength="1" d="M' + dPts.join('L') + '"/>';
+                 'L' + mainPts.join('L') + 'L' + round(xs[xs.length - 1], 1) + ' ' + y0 + 'Z"/>';
+    const line =
+      (showAvg ? '<path class="wc__fact" d="M' + kgPts.join('L') + '"/>' : '') +
+      '<path class="exc__line" pathLength="1" d="M' + mainPts.join('L') + '"/>';
 
     /*
      * Прогноз проти факту — коридор цілі поверх графіка.
@@ -369,8 +419,12 @@
       return '<g class="exc__col"' +
                ' data-d="' + esc(d) + '"' +
                ' data-v="' + esc(fmtNum.kg(e.kg) + ' кг') + '"' +
-               ' data-sub="' + esc('середня ' + fmtNum.kg(e.avg) + ' кг') + '">' +
-               '<title>' + esc(d + ': ' + fmtNum.kg(e.kg) + ' кг · середня ' + fmtNum.kg(e.avg) + ' кг') + '</title>' +
+               /* Про середню в підказці мовчимо, коли її немає на
+                  графіку: підпис до лінії, якої не видно, — це загадка,
+                  а не пояснення. */
+               ' data-sub="' + (showAvg ? esc('середня ' + fmtNum.kg(e.avg) + ' кг') : '') + '">' +
+               '<title>' + esc(d + ': ' + fmtNum.kg(e.kg) + ' кг' +
+                 (showAvg ? ' · середня ' + fmtNum.kg(e.avg) + ' кг' : '')) + '</title>' +
                '<line class="exc__cross" x1="' + round(cx, 1) + '" y1="' + PAD.t + '" x2="' + round(cx, 1) + '" y2="' + y0 + '"/>' +
                '<circle class="exc__dot" cx="' + round(cx, 1) + '" cy="' + round(cy, 1) +
                  '" r="' + round(dr, 2) + '"' +
@@ -682,7 +736,16 @@
                weightPeriodLine() +
                forecastLine() +
                '<p class="small muted mt-1">Крапки — окремі зважування. ' +
-               'Лінія — середня за 7 днів; дивіться на неї, а не на окремі дні. ' +
+               (avgWorth(chartData(entries))
+                 /* Дві лінії треба назвати обидві, інакше тонка читається
+                    як помилка малювання. */
+                 ? 'Тонка лінія зʼєднує їх, товста — середня за 7 днів; ' +
+                   'дивіться на неї, а не на окремі дні. '
+                 /* Однієї лінії пояснювати нема чого — вона й так іде
+                    через крапки. Про середню мовчимо: її на графіку
+                    немає, бо на кількох записах вона нічого не згладжує. */
+                 : 'Лінія зʼєднує їх. Середня за 7 днів зʼявиться, коли ' +
+                   'записів набереться на тиждень. ') +
                'Шкала починається з нижнього підпису, а не з нуля: від нуля реальні ' +
                'коливання ваги стиснулись би в рівну смужку.' +
                (state.goal && window.ProgressCore && window.ProgressCore.GOAL_RATES[state.goal]

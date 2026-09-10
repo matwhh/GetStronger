@@ -105,6 +105,52 @@
   var PROFILE_NORM = 1 / Math.sqrt(1 - PROFILE_K);
   var mapCache = Object.create(null);
 
+  /*
+   * КЕШ КАРТИ МІЖ СТОРІНКАМИ.
+   *
+   * mapCache вище живе в памʼяті, тобто рівно до наступного переходу.
+   * У Forge кожен розділ — окрема сторінка, тож при звичайній навігації
+   * панеллю карта будувалась наново КОЖНОГО разу: попіксельний цикл
+   * плюс toDataURL, і саме в ту мить, коли малюється нова сторінка.
+   *
+   * sessionStorage переживає перехід і вмирає разом із вкладкою — це
+   * саме той строк життя, який тут потрібен: розміри лінзи прибиті до
+   * ширини екрана, а вона в межах вкладки не змінюється.
+   *
+   * Кожне звернення в try/catch: у приватному вікні й при заблокованих
+   * даних сайту доступ кидає виняток, і одне неприкрите звернення
+   * поклало б увесь модуль (той самий клас помилки, що LOC-008).
+   * Кеш — прискорювач, а не джерело істини: не спрацював, значить
+   * рахуємо, як рахували.
+   */
+  var SS_KEY = "ib.lg.map";
+  var SS_MAX = 400 * 1024;                    // 400 КБ на всі розміри
+
+  function ssRead(key) {
+    try {
+      var all = JSON.parse(sessionStorage.getItem(SS_KEY) || "{}");
+      var hit = all[key];
+      return hit && typeof hit.url === "string" && typeof hit.scale === "number"
+        ? hit : null;
+    } catch (e) { return null; }
+  }
+
+  function ssWrite(key, out) {
+    try {
+      var all = JSON.parse(sessionStorage.getItem(SS_KEY) || "{}");
+      all[key] = out;
+      var body = JSON.stringify(all);
+      /* Переповнення — не привід зберігати частинами: лишаємо саму
+         останню карту, вона й потрібна. */
+      if (body.length > SS_MAX) {
+        var one = {}; one[key] = out;
+        body = JSON.stringify(one);
+        if (body.length > SS_MAX) return;
+      }
+      sessionStorage.setItem(SS_KEY, body);
+    } catch (e) { /* приватне вікно або переповнене сховище */ }
+  }
+
   function buildMap(w, h, radius, bevel, refraction, zoom, sdf) {
     w = Math.max(2, Math.round(w));
     h = Math.max(2, Math.round(h));
@@ -115,6 +161,9 @@
     var key = [w, h, r.toFixed(2), bev.toFixed(2), refraction.toFixed(2),
                zoom.toFixed(4), sd === sdRoundRect ? "rr" : "custom"].join(":");
     if (mapCache[key]) return mapCache[key];
+
+    var stored = ssRead(key);
+    if (stored) { mapCache[key] = stored; return stored; }
 
     var zf = 1 / zoom - 1;                                  // відʼємний → збільшує
     var maxOff = refraction + Math.max(w, h) / 2 * Math.abs(zf) + 1;
@@ -157,6 +206,7 @@
        тому scale = maxOff · 255/127. */
     var out = { url: cv.toDataURL(), scale: maxOff * 255 / 127 };
     mapCache[key] = out;
+    ssWrite(key, out);
     return out;
   }
 
@@ -318,33 +368,35 @@
       layers[n] = div;
     });
 
-    var f = makeFilter();
+    /*
+     * ФІЛЬТР СТВОРЮЄТЬСЯ ЛИШЕ ТАМ, ДЕ ЙОГО Є ЧИМ ЗАСТОСУВАТИ.
+     *
+     * Safari і Firefox не вміють SVG-фільтр усередині backdrop-filter
+     * (див. canRefract вище). Досі це знали тільки три рядки в кінці
+     * render(): фільтр усе одно збирався, карта зміщення рахувалась
+     * попіксельно, кодувалась у data-URL — і результат мовчки
+     * викидався. На айфоні, де кожен розділ сайту є ОКРЕМОЮ
+     * сторінкою, ця робота повторювалась на кожному переході між
+     * розділами, тобто рівно тоді, коли людина дивиться на панель і
+     * чекає, поки та відмалюється.
+     *
+     * Тепер там, де заломлення не буде, не робиться нічого: лишається
+     * матова форма з кантом — той самий фолбек, що й був.
+     */
+    var f = canRefract ? makeFilter() : null;
     var w = 0, h = 0, mapUrl = "";
 
-    function render() {
-      var box = el.getBoundingClientRect();
-      var nw = Math.round(box.width), nh = Math.round(box.height);
-      if (!nw || !nh) return;
-
-      if (nw !== w || nh !== h) {
-        w = nw; h = nh;
-        f.node.setAttribute("width", w);
-        f.node.setAttribute("height", h);
-        f.image.setAttribute("width", w);
-        f.image.setAttribute("height", h);
-      }
-
-      var r = o.radius == null ? Math.min(w, h) / 2 : o.radius;
-      var m = buildMap(w, h, r, o.bevel, o.refraction, o.zoom, o.sdf);
-      if (m.url !== mapUrl) {
-        mapUrl = m.url;
-        f.image.setAttributeNS(XLINK, "xlink:href", m.url);
-        f.image.setAttribute("href", m.url);
-      }
-      f.disp.R.setAttribute("scale", m.scale * (1 + o.dispersion));
-      f.disp.G.setAttribute("scale", m.scale);
-      f.disp.B.setAttribute("scale", m.scale * (1 - o.dispersion));
-
+    /*
+     * ОФОРМЛЕННЯ ОКРЕМО ВІД РОЗМІРУ.
+     *
+     * Ці сім змінних залежать тільки від опцій. Раніше вони
+     * переписувались усередині render(), тобто на кожен спалах
+     * ResizeObserver — а на iOS він спалахує під час звичайного
+     * скролу, бо згортання адресного рядка міняє висоту вікна. Сім
+     * записів у style дають перерахунок стилів на кадрі, де людина
+     * просто гортає сторінку.
+     */
+    function paint() {
       var s = el.style;
       s.setProperty("--lg-bd", "blur(" + o.blur + "px) saturate(" +
         (o.saturate * 100) + "%) brightness(" + o.brightness + ")");
@@ -361,31 +413,70 @@
       }
     }
 
+    /*
+     * Розмір. Виходить одразу, якщо коробка не змінилась — саме це й
+     * буває на кожному спалаху ResizeObserver під час скролу.
+     */
+    function render(force) {
+      if (!canRefract) return;
+
+      var box = el.getBoundingClientRect();
+      var nw = Math.round(box.width), nh = Math.round(box.height);
+      if (!nw || !nh) return;
+      /* force — це update(): опції змінились, карту треба перебудувати
+         навіть при тій самій коробці. */
+      if (nw === w && nh === h && !force) return;
+
+      w = nw; h = nh;
+      f.node.setAttribute("width", w);
+      f.node.setAttribute("height", h);
+      f.image.setAttribute("width", w);
+      f.image.setAttribute("height", h);
+
+      var r = o.radius == null ? Math.min(w, h) / 2 : o.radius;
+      var m = buildMap(w, h, r, o.bevel, o.refraction, o.zoom, o.sdf);
+      if (m.url !== mapUrl) {
+        mapUrl = m.url;
+        f.image.setAttributeNS(XLINK, "xlink:href", m.url);
+        f.image.setAttribute("href", m.url);
+      }
+      f.disp.R.setAttribute("scale", m.scale * (1 + o.dispersion));
+      f.disp.G.setAttribute("scale", m.scale);
+      f.disp.B.setAttribute("scale", m.scale * (1 - o.dispersion));
+    }
+
+    /* Обгортка навколо render, а не сам render: ResizeObserver передає
+       в колбек масив записів, і той опинився б у force — тобто кожен
+       спалах перебудовував би карту, замість того щоб вийти одразу. */
     var ro = null;
-    if (window.ResizeObserver) {
-      ro = new ResizeObserver(render);
+    if (window.ResizeObserver && canRefract) {
+      ro = new ResizeObserver(function () { render(); });
       ro.observe(el);
     }
     render();
+    paint();
 
     return {
       el: el,
-      filterId: f.id,
+      filterId: f ? f.id : null,
       get options() { return o; },
       update: function (patch) {
         for (var k3 in (patch || {})) o[k3] = patch[k3];
-        render();
+        render(true);
+        paint();
         return this;
       },
       /** Поточна карта як data-URL — зручно для налагодження. */
       debugMap: function () {
-        var r = o.radius == null ? Math.min(w, h) / 2 : o.radius;
-        return buildMap(w, h, r, o.bevel, o.refraction, o.zoom, o.sdf).url;
+        var box = el.getBoundingClientRect();
+        var bw = w || Math.round(box.width), bh = h || Math.round(box.height);
+        var r = o.radius == null ? Math.min(bw, bh) / 2 : o.radius;
+        return buildMap(bw, bh, r, o.bevel, o.refraction, o.zoom, o.sdf).url;
       },
       destroy: function () {
         if (ro) ro.disconnect();
         names.forEach(function (n) { layers[n].remove(); });
-        f.node.remove();
+        if (f) f.node.remove();
         el.classList.remove("lg-root");
       }
     };

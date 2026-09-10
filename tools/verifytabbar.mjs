@@ -438,6 +438,136 @@ for (const w of [320, 390, 430]) {
   await ctx.close();
 }
 
+/* ---- 6. Ціна панелі: карта зміщення ---------------------------------- */
+/*
+ * Найдорожче в цій панелі — карта зміщення для лінзи: попіксельний цикл
+ * по всій її площі плюс toDataURL. Дві помилки змушували платити це
+ * знову й знову.
+ *
+ * ПЕРША. Safari і Firefox не вміють SVG-фільтр усередині backdrop-filter,
+ * і шар заломлення там не малюється взагалі. Але карта все одно
+ * будувалась — і результат мовчки викидався. На айфоні, де кожен розділ
+ * сайту є ОКРЕМОЮ сторінкою, ця робота повторювалась на кожному переході
+ * панеллю, тобто рівно тоді, коли людина дивиться, як малюється нова
+ * сторінка, і чекає.
+ *
+ * ДРУГА. Кеш карти жив у звичайному обʼєкті, тобто вмирав разом зі
+ * сторінкою. Той самий перехід між розділами будував ту саму карту
+ * наново навіть там, де вона потрібна.
+ *
+ * Перевіряється не швидкість — вона різна на різному залізі й дала б
+ * перевірку, що блимає. Перевіряється сам ФАКТ роботи: скільки разів
+ * викликано toDataURL. Нуль і один від заліза не залежать.
+ */
+{
+  /* Лічильник побудов карти. Ставиться ДО скриптів сторінки. */
+  const COUNTER = () => {
+    window.__maps = 0;
+    const orig = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.toDataURL = function () {
+      window.__maps++;
+      return orig.apply(this, arguments);
+    };
+  };
+  /* Браузер, який ніби не вміє фільтра всередині backdrop-filter, —
+     тобто будь-який Safari і Firefox. Chromium тут єдиний доступний,
+     тому єдиний спосіб перевірити ту гілку — підробити відповідь. */
+  const NO_REFRACT = () => {
+    const orig = CSS.supports.bind(CSS);
+    CSS.supports = function (a, b) {
+      const all = String(a) + ' ' + String(b == null ? '' : b);
+      if (all.indexOf('backdrop-filter') >= 0 && all.indexOf('url(') >= 0) return false;
+      return orig.apply(null, arguments);
+    };
+  };
+
+  /*
+   * Скло лінзи будує САМЕ НАТИСКАННЯ, і живе воно, поки палець на
+   * екрані. Тому міряти треба, НЕ відпускаючи: відпускання на пункті —
+   * це перехід у розділ, тобто нова сторінка, з якою обнуляється і
+   * лічильник, і саме скло. Перша версія цієї перевірки на цьому й
+   * попалась: бачила нулі й думала, що карта не будується.
+   */
+  const press = async (p, href) => {
+    const cdpT = await p.context().newCDPSession(p);
+    const box = await p.locator('#tabbar a[href="' + href + '"]').boundingBox();
+    await cdpT.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 1 }]
+    });
+    await p.waitForTimeout(250);
+    return () => cdpT.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+
+  /* 6а. Браузер без заломлення не платить за карту взагалі. */
+  {
+    const ctx = await adultContext(b, {
+      viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true
+    });
+    const p = await ctx.newPage();
+    const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+    await p.addInitScript(COUNTER);
+    await p.addInitScript(NO_REFRACT);
+    await p.goto(file('index.html'), { waitUntil: 'load' });
+    await p.waitForTimeout(1800);
+    const release = await press(p, 'index.html');
+
+    const m = await p.evaluate(() => ({
+      refract: window.LiquidGlass ? window.LiquidGlass.canRefract : null,
+      maps: window.__maps,
+      layers: document.querySelectorAll('.tabbar__lens > .lg-l').length,
+      filters: document.querySelectorAll('svg filter[id^="lg-"]').length,
+      open: !!document.querySelector('.tabbar__lens.is-open')
+    }));
+
+    ok('6а. підробка спрацювала: браузер каже, що фільтра не вміє', m.refract === false);
+    ok('6а. без заломлення карта не будується жодного разу', m.maps === 0, 'карт: ' + m.maps);
+    ok('6а. фільтр теж не збирається', m.filters === 0, 'фільтрів: ' + m.filters);
+    /* Фолбек мусить лишитись живим: матова форма з кантом, лінза відкрита. */
+    ok('6а. лінза все одно працює — фолбек не зламано',
+       m.layers === 6 && m.open, JSON.stringify(m));
+    ok('6а. без JS-помилок', errs.length === 0, errs.join(' | '));
+    await release();
+    await ctx.close();
+  }
+
+  /* 6б. Перехід між розділами не будує ту саму карту наново. */
+  {
+    const ctx = await adultContext(b, {
+      viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true
+    });
+    const p = await ctx.newPage();
+    const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+    await p.addInitScript(COUNTER);
+    await p.goto(file('index.html'), { waitUntil: 'load' });
+    await p.waitForTimeout(1800);
+    const rel1 = await press(p, 'index.html');
+    const first = await p.evaluate(() => ({
+      maps: window.__maps,
+      stored: (function () {
+        try { return Object.keys(JSON.parse(sessionStorage.getItem('ib.lg.map') || '{}')).length; }
+        catch (e) { return -1; }
+      })()
+    }));
+    await rel1();
+
+    /* Той самий розмір вікна, інша сторінка — звичайний перехід панеллю.
+       Кеш у sessionStorage його переживає, обʼєкт у памʼяті — ні. */
+    await p.goto(file('journal.html'), { waitUntil: 'load' });
+    await p.waitForTimeout(1800);
+    const rel2 = await press(p, 'journal.html');
+    const second = await p.evaluate(() => window.__maps);
+    await rel2();
+
+    ok('6б. перша сторінка карту таки будує', first.maps >= 1, 'карт: ' + first.maps);
+    ok('6б. карта лягла в sessionStorage', first.stored >= 1, 'ключів: ' + first.stored);
+    ok('6б. після переходу в інший розділ карта не будується наново',
+       second === 0, 'на другій сторінці: ' + second);
+    ok('6б. без JS-помилок', errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+}
+
 await b.close();
 const bad = R.filter((r) => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок панелі розділів пройшло.');

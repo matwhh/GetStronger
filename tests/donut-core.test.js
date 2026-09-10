@@ -105,6 +105,14 @@ describe('Donut: розмітка', () => {
     assert.ok(html.includes('&lt;img'));
   });
 
+  /* WEB-015 — див. пояснення в daycal-core.test.js. Копія esc() у цьому
+     модулі теж пропускала одинарну лапку. */
+  it('одинарна лапка в підписі теж екранується', () => {
+    const html = Donut.html({ slices: [{ label: "Ол'я", value: 1, cls: 'c' }] });
+    assert.ok(html.includes('&#39;'), 'лапка не екранована');
+    assert.ok(!html.includes("Ол'я"), 'сира лапка доїхала в розмітку');
+  });
+
   it('кожен сектор має <title> для читалки екрана', () => {
     const html = Donut.html({ slices: S(1, 2, 3) });
     assert.equal((html.match(/<title>/g) || []).length, 3);

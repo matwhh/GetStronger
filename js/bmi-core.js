@@ -86,8 +86,8 @@
     const w = WARN[category(b)];
     if (!w) { if (onAck) onAck(); return; }
     const esc = function (t) {
-      return String(t).replace(/[&<>"]/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
     };
     const wrap = document.createElement('div');

@@ -135,7 +135,7 @@ Forge — особистий інструмент для тренувань і �
 
 ```bash
 node --check js/файл.js                     # синтаксис, миттєво
-npm test                                    # 708 юніт-тестів, ~12 с
+npm test                                    # 766 юніт-тестів, ~6 с
 TZ=Europe/Kyiv npm test                     # той самий набір в іншому поясі
 node tools/ci-hygiene.mjs                   # гігієна репозиторію, ~1 с
 node tools/verify<назва>.mjs                # одна браузерна перевірка, 10–60 с
@@ -268,7 +268,7 @@ Co-Authored-By: <модель> <noreply@anthropic.com>
 ```
 робота в репозиторії
    ↓  копіюємо змінені файли
-тека релізу на Mac:  ~/Desktop/Проєкти/Forge/forge release
+тека релізу на Mac:  ~/Desktop/Forge/forge release
    ↓  подвійний клік по «Опублікувати.command» у корені теки
 npm test + ci-hygiene → коміт → git push origin main
    ↓

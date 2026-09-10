@@ -1,8 +1,8 @@
 # Відновлення бази Forge з резервної копії
 
 Supabase на Free-плані не робить бекапів узагалі. Єдина копія даних усіх
-користувачів — це файл `forge-backup-РРРР-ММ-ДД.json` на Mac, у
-`~/Desktop/forge-backups/`. Цей документ описує, як із нього відновитись, і
+користувачів — це файл `backup-forge-РРРР-ММ-ДД.json` на Mac, у
+`~/Desktop/Forge/forge-backups/`. Цей документ описує, як із нього відновитись, і
 чесно перелічує, чого він не покриває.
 
 Стан на 2026-09-07: відновлення пройдено на справжньому дампі продакшену
@@ -19,7 +19,7 @@ Supabase на Free-плані не робить бекапів узагалі. �
 | `tools/verify-backup-roundtrip.mjs` | Повний цикл файл → база → файл. Ганяється в CI на кожен пуш. |
 | Задача «Forge: щоденна резервна копія бази» | Знімає копію щодня о 16:00 UTC (19:00 за Києвом), віддає файл у чат і кладе на Mac. Сповіщення (push + email) увімкнені. |
 
-Копія самого запиту лежить і поруч із бекапами — `~/Desktop/forge-backups/backup-export.sql`,
+Копія самого запиту лежить і поруч із бекапами — `~/Desktop/Forge/forge-backups/backup-export.sql`,
 щоб зняти дамп можна було, не відкриваючи репозиторій. Змінюєш `db/backup-export.sql` —
 онови ту копію і текст запланованої задачі: запит зашитий і в неї теж.
 
@@ -31,10 +31,24 @@ Supabase на Free-плані не робить бекапів узагалі. �
 (`folders_state = FOLDERS_STATE_NONE` плюс вимкнені сповіщення = тиха відсутність
 бекапів).
 
+**Стан на 2026-09-10.** Попередня задача зникла зовсім: у списку запланованих
+задач не було жодної, а найсвіжіша копія на диску була від 1 вересня — девʼять
+днів без бекапа. Задачу створено наново (`trig_01PUgPUqKKgH4iXjWEctZQQB`,
+щодня о 16:00 UTC = 19:00 за Києвом, push і email увімкнені). Привʼязатись до
+Mac вона знову НЕ змогла — `folders_state = FOLDERS_STATE_NONE`, бо створювалась
+не з підтвердженням на самому Mac. Тому тепер головний шлях у її тексті —
+віддати файл у чат через `SendUserFile`, а запис у `~/Desktop/Forge/forge-backups/`
+описаний як необовʼязковий крок «якщо доступ до Mac є». Копія в чаті лежить поза
+Mac, тож як бекап вона навіть надійніша; ціна — файл треба зберегти руками.
+
+Щоб копія знову лягала на диск сама, задачу треба **перестворити з Mac**, у
+десктопному застосунку, підтвердивши доступ до теки. Відредагувати наявну не
+вийде: привʼязка не додається заднім числом.
+
 ## Зняти копію вручну
 
 Supabase → SQL Editor → вміст `db/backup-export.sql` → Run → зберегти результат
-як `~/Desktop/forge-backups/forge-backup-РРРР-ММ-ДД.json`.
+як `~/Desktop/Forge/forge-backups/backup-forge-РРРР-ММ-ДД.json`.
 
 Файл має бути ~35 КБ і більше. Кілька сотень байтів означає, що SELECT віддав
 порожні масиви — це не копія.
@@ -42,7 +56,7 @@ Supabase → SQL Editor → вміст `db/backup-export.sql` → Run → збе
 ## Перевірити копію (без бази, 2 секунди)
 
 ```sh
-node tools/restore-backup.mjs ~/Desktop/forge-backups/forge-backup-2026-09-07.json --out /tmp/restore.sql
+node tools/restore-backup.mjs ~/Desktop/Forge/forge-backups/backup-forge-2026-09-07.json --out /tmp/restore.sql
 ```
 
 Скрипт впаде, якщо файл обрізаний (`counts` не збігається з довжиною масивів),
@@ -52,7 +66,7 @@ node tools/restore-backup.mjs ~/Desktop/forge-backups/forge-backup-2026-09-07.js
 ## Перевірити, що з копії справді відновлюється (повний цикл)
 
 ```sh
-node tools/verify-backup-roundtrip.mjs ~/Desktop/forge-backups/forge-backup-2026-09-07.json
+node tools/verify-backup-roundtrip.mjs ~/Desktop/Forge/forge-backups/backup-forge-2026-09-07.json
 ```
 
 Потрібен локальний Postgres (`initdb`, `pg_ctl` — пакет `postgresql`).

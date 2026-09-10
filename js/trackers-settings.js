@@ -224,6 +224,34 @@
     '</div>';
   }
 
+
+  /*
+   * ШПИЛЬКА «НА СЬОГОДНІ».
+   *
+   * ЧОМУ НЕ ДРУГИЙ ПОВЗУНОК. Повзунок у цьому рядку вже є, і він
+   * відповідає на інше питання — «чи веду я цей трекер узагалі». Два
+   * однакові повзунки поруч читаються як одна настройка з двома
+   * станами, і людина клацає не той. Шпилька — інший жест і інший знак:
+   * не «ввімкнути», а «прикріпити перед очима».
+   *
+   * ЧОМУ ЇЇ НЕМАЄ У ВИМКНЕНИХ. Закріпити вимкнений трекер не можна
+   * (TrackerCore.setPinned це й не дозволить): кубик на головній не мав
+   * би куди писати. Показувати кнопку, яка нічого не робить, гірше, ніж
+   * не показувати її зовсім.
+   */
+  function pinBtn(t) {
+    if (!t.enabled) return '';
+    const on = t.pinned === true;
+    return '<button class="tr-pin' + (on ? ' is-on' : '') + '" type="button"' +
+      ' data-pin="' + esc(t.id) + '" aria-pressed="' + on + '"' +
+      ' title="' + (on ? 'Прибрати з екрана «Сьогодні»' : 'Показувати на екрані «Сьогодні»') + '"' +
+      ' aria-label="' + (on ? 'Прибрати з екрана Сьогодні: ' : 'Показувати на екрані Сьогодні: ') + esc(t.name) + '">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+      ' stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M9 4h6l-1 5 3.5 3.5H6.5L10 9z"/><path d="M12 12.5V20"/></svg>' +
+    '</button>';
+  }
+
   function builtinRow(t) {
     const def = T.defFor(t);
     if (!def) return '';
@@ -239,6 +267,7 @@
           '<span class="tr-row__name">' + esc(t.name) + '</span>' +
           '<span class="tr-row__meta small muted">' + esc(metaLine(t, def)) + '</span>' +
         '</button>' +
+        pinBtn(t) +
       '</div>' +
       (open && t.enabled
         ? '<div class="tr-row__detail">' +
@@ -308,6 +337,7 @@
           '<span class="tr-row__meta small muted">' + st.done + ' із ' + st.total + ' за 30 днів' + esc(streakTxt) + '</span>' +
         '</div>' +
         doseField +
+        pinBtn(t) +
         del +
       '</div>' +
     '</li>';
@@ -384,6 +414,18 @@
   function wire() {
     if (state.wired) return;
     state.wired = true;
+
+    /* Закріплення — click, а не change: це кнопка, а не поле. */
+    document.addEventListener('click', function (e) {
+      const pin = e.target.closest && e.target.closest('[data-pin]');
+      if (!pin) return;
+      const id = pin.dataset.pin;
+      const now = state.trackers[id] && state.trackers[id].pinned === true;
+      saveTrackers(T.setPinned(state.trackers, id, !now));
+      renderBuiltins();
+      renderSupplements();
+      renderHabits();
+    });
 
     document.addEventListener('change', function (e) {
       const tog = e.target.closest('[data-toggle]');

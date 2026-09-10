@@ -449,3 +449,78 @@ describe('Журнал трекерів: ключ — трекер, потім �
     assert.equal(v(log, 'sleep', '2026-09-07'), 407);
   });
 });
+
+/**
+ * ЗАКРІПЛЕННЯ НА «СЬОГОДНІ».
+ *
+ * Стережеться не сам прапорець, а три правила, без яких на головній
+ * зʼявляються кубики-привиди:
+ *
+ * 1. Закріпити можна лише те, що ведеться. Кубик вимкненого трекера не
+ *    має куди писати — сторінка трекерів його вже не показує.
+ * 2. Вимкнення знімає закріплення. Інакше трекер, увімкнений через пів
+ *    року, без попередження виринає на головній.
+ * 3. workoutMood не потрапляє на головну ніколи: питання «як ти
+ *    почувався до і після» має сенс лише поруч із тренуванням.
+ */
+describe('tracker-core: закріплення на «Сьогодні»', () => {
+  it('типово не закріплено нічого — головна лишається такою, як була', () => {
+    const t = T.ensureBuiltins({});
+    assert.deepEqual(T.pinnedList(t), []);
+  });
+
+  it('закріплює увімкнений трекер і не мутує вхід', () => {
+    const t = T.ensureBuiltins({});
+    const next = T.setPinned(t, 'water', true);
+    assert.equal(next.water.pinned, true);
+    assert.equal(t.water.pinned, undefined, 'вхідний реєстр не змінився');
+    assert.deepEqual(T.pinnedList(next).map((x) => x.id), ['water']);
+  });
+
+  it('ВИМКНЕНИЙ трекер закріпити не можна', () => {
+    const t = T.ensureBuiltins({});          // caffeine вимкнений
+    const next = T.setPinned(t, 'caffeine', true);
+    assert.equal(next.caffeine.pinned, false);
+    assert.deepEqual(T.pinnedList(next), []);
+  });
+
+  it('вимкнення трекера знімає закріплення', () => {
+    let t = T.setPinned(T.ensureBuiltins({}), 'water', true);
+    assert.equal(t.water.pinned, true);
+    t = T.setEnabled(t, 'water', false);
+    assert.equal(t.water.pinned, false, 'привид не лишився');
+    /* І назад: увімкнення саме по собі НЕ повертає кубик на головну. */
+    t = T.setEnabled(t, 'water', true);
+    assert.equal(t.water.pinned, false);
+    assert.deepEqual(T.pinnedList(t), []);
+  });
+
+  it('настрій до/після тренування на головну не виноситься', () => {
+    let t = T.setEnabled(T.ensureBuiltins({}), 'workoutMood', true);
+    t = T.setPinned(t, 'workoutMood', true);
+    assert.equal(t.workoutMood.pinned, true, 'прапорець ставиться…');
+    assert.deepEqual(T.pinnedList(t), [], '…але на «Сьогодні» його немає');
+  });
+
+  it('звички й добавки закріплюються так само, як убудовані', () => {
+    const made = T.addCustom(T.ensureBuiltins({}), 'habit', 'Розтяжка');
+    const t = T.setPinned(made.trackers, made.id, true);
+    assert.deepEqual(T.pinnedList(t).map((x) => x.name), ['Розтяжка']);
+  });
+
+  it('порядок кубиків — той самий, що в списку трекерів', () => {
+    let t = T.ensureBuiltins({});
+    t = T.setPinned(t, 'mood', true);
+    t = T.setPinned(t, 'water', true);
+    /* Закріплювали настрій першим, але водa стоїть раніше за order —
+       кубики не мають переставлятись залежно від того, що людина
+       натиснула раніше. */
+    assert.deepEqual(T.pinnedList(t).map((x) => x.id), ['water', 'mood']);
+  });
+
+  it('невідомий id нічого не ламає', () => {
+    const t = T.ensureBuiltins({});
+    assert.equal(T.setPinned(t, 'нема-такого', true), t);
+    assert.deepEqual(T.pinnedList(null), []);
+  });
+});

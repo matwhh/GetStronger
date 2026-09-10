@@ -277,9 +277,65 @@
   function setEnabled(trackers, id, enabled) {
     const src = isPlain(trackers) ? trackers : {};
     if (!src[id]) return src;
+    const on = Boolean(enabled);
     const out = Object.assign({}, src);
-    out[id] = Object.assign({}, out[id], { enabled: Boolean(enabled) });
+    /*
+     * ВИМКНЕНИЙ ТРЕКЕР НЕ МОЖЕ ЛИШАТИСЬ ЗАКРІПЛЕНИМ.
+     *
+     * Інакше зʼявляється привид: трекера немає ніде, а прапорець «на
+     * Сьогодні» в нього стоїть — і варто його колись увімкнути знову, як
+     * на головній без попередження виринає кубик, про який людина давно
+     * забула. Закріплення тут не «памʼятається на потім», воно
+     * знімається.
+     */
+    out[id] = Object.assign({}, out[id], { enabled: on });
+    if (!on) out[id].pinned = false;
     return out;
+  }
+
+  /*
+   * ЗАКРІПЛЕННЯ НА ЕКРАНІ «СЬОГОДНІ».
+   *
+   * ЧОМУ ЦЕ ОКРЕМИЙ ПРАПОРЕЦЬ, А НЕ enabled. Це різні питання. enabled
+   * означає «я веду цей трекер» — він є на сторінці трекерів, входить у
+   * зведення, його історія рахується. pinned означає «він мені потрібен
+   * перед очима щодня».
+   *
+   * Різниця не теоретична: колись усі трекери жили на головній, і вона
+   * перетворилась на довгий стовпчик шкал 1..10 — саме тому їх звідти й
+   * прибрали (див. шапку js/trackers-day.js). Повернути їх усі скопом
+   * означало б повторити ту саму помилку. Тому головну наповнює людина:
+   * два-три кубики, які вона справді закриває щодня.
+   *
+   * Типово не закріплено нічого. Порожній екран «Сьогодні» лишається
+   * таким, яким був, доки власник сам не винесе туди перший трекер.
+   */
+  function setPinned(trackers, id, on) {
+    const src = isPlain(trackers) ? trackers : {};
+    if (!src[id]) return src;
+    const out = Object.assign({}, src);
+    /* Закріпити можна лише те, що ведеться: кубик трекера, який вимкнено,
+       нікуди не запише — сторінка трекерів його вже не показує. */
+    const want = Boolean(on) && out[id].enabled === true;
+    out[id] = Object.assign({}, out[id], { pinned: want });
+    return out;
+  }
+
+  /**
+   * Трекери для екрана «Сьогодні»: увімкнені, закріплені, у своєму порядку.
+   *
+   * workoutMood сюди не потрапляє ніколи — не через вибір оформлення, а
+   * через саму його природу: linkedToSession означає, що питання «як ти
+   * почувався до і після» має сенс лише поруч із тренуванням, і
+   * відповідає на нього сторінка тренування. Кубик із ним на головній
+   * питав би про підхід, якого сьогодні могло й не бути.
+   */
+  function pinnedList(trackers) {
+    return active(trackers).filter(function (t) {
+      if (t.pinned !== true) return false;
+      const def = defFor(t);
+      return Boolean(def) && def.linkedToSession !== true;
+    });
   }
 
   /**
@@ -428,6 +484,44 @@
     const out = Object.assign({}, src);
     out[id] = Object.assign({}, prevDay);
     out[id][d] = value;
+    return out;
+  }
+
+  /**
+   * Злити СЬОГОДНІШНІ значення з `next` у базу `base`.
+   *
+   * ЧОМУ ЦЕ ТУТ, А НЕ НА СТОРІНЦІ. Журнал трекерів зберігається як одне
+   * поле профілю, і Store.saveProfile зливає поля поверхнево — тобто
+   * { trackerLog: X } замінює ВЕСЬ журнал. Дві вкладки з однаковою базою
+   * затирали одна одну повністю (SYN-011). Ліки — патч-функція, яка
+   * переносить лише сьогоднішній день кожного трекера в актуальний
+   * профіль; історія й трекери, яких ця вкладка не бачила, лишаються.
+   *
+   * Тепер таких місць два — сторінка трекерів і кубики на «Сьогодні», —
+   * а логіка одна. Копія розійшлася б, і розійшлася б тихо: помилка тут
+   * не ламає екран, вона просто не зберігає (саме так уже було —
+   * next[today] шукало ДАТУ на верхньому рівні журналу, який
+   * ключований трекером).
+   *
+   * @param {object} base   trackerLog з актуального профілю
+   * @param {object} next   trackerLog екрана (джерело сьогоднішніх значень)
+   * @param {string} date   ключ дня 'РРРР-ММ-ДД'
+   */
+  function mergeDay(base, next, date) {
+    const src = isPlain(base) ? base : {};
+    const from = isPlain(next) ? next : {};
+    const out = Object.assign({}, src);
+    Object.keys(from).forEach(function (id) {
+      const day = isPlain(from[id]) ? from[id][date] : undefined;
+      const cur = isPlain(out[id]) ? Object.assign({}, out[id]) : {};
+      /* undefined означає «сьогодні запису немає» — тобто його стерли.
+         Саме тому тут delete, а не пропуск: інакше стерте значення
+         поверталося б із профілю при наступному злитті. */
+      if (day === undefined) delete cur[date];
+      else cur[date] = day;
+      if (Object.keys(cur).length) out[id] = cur;
+      else delete out[id];
+    });
     return out;
   }
 
@@ -678,6 +772,8 @@
     addCustom: addCustom,
     removeCustom: removeCustom,
     setEnabled: setEnabled,
+    setPinned: setPinned,
+    pinnedList: pinnedList,
     isDefaultSupplement: isDefaultSupplement,
     normDose: normDose,
     isDosed: isDosed,
@@ -695,6 +791,7 @@
     byType: byType,
     defFor: defFor,
     removeEntry: removeEntry,
+    mergeDay: mergeDay,
     logValue: logValue,
     addDelta: addDelta,
     entriesFor: entriesFor,

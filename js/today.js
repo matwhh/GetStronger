@@ -41,15 +41,58 @@
 
   const { $, esc } = window.App;
   const WC = window.WorkoutCore;
+  const TC = window.TrackerCore;
+
+  /* Мить власного запису. Store.onChange спрацьовує і на НАШ власний
+     запис — без цієї позначки кожен дотик по кубику викликав би зайву
+     перемальовку одразу після тієї, яку ми вже зробили самі. */
+  let lastSelfWrite = 0;
+  const SELF_WRITE_MS = 1200;
+
+  /*
+   * ЧОМУ ПЕРЕМАЛЬОВКА БУВАЄ ВІДКЛАДЕНОЮ.
+   *
+   * render() переписує #today цілком — разом із полем, у якому людина
+   * зараз набирає. Для кнопок це не біда (натиснув — і відпустив), а для
+   * полів згубно, і згубно тихо: у сон із двох полів вводять «7», потім
+   * переходять у хвилини — перехід викликає change на годинах, той пише
+   * 7 год і перемальовує кубик, а щойно набрані «20» зникають разом зі
+   * старим елементом. У профілі лишається 7:00, і людина цього не
+   * помічає, бо на екрані все виглядає нормально.
+   *
+   * Тому запис із поля нічого не перемальовує одразу: значення вже стоїть
+   * у полі, показувати нема чого. Перемальовка чекає, доки фокус піде з
+   * полів.
+   */
+  let pendingRender = false;
+  let lastFieldTouch = 0;
+  const FIELD_GRACE_MS = 500;
+
+  function fieldFocused(el) {
+    return Boolean(el && el.closest && el.closest('#today input'));
+  }
+  function fieldBusy() {
+    return fieldFocused(document.activeElement) ||
+           (Date.now() - lastFieldTouch) < FIELD_GRACE_MS;
+  }
 
   const state = {
     profile: {},
     program: null,
     plan: null,
     todayKey: '',
+    trackers: {},     // profile.trackers — реєстр трекерів
+    trackerLog: {},   // profile.trackerLog — { id: { 'РРРР-ММ-ДД': значення } }
     week: 1,      // номер тижня сезону
     slot: 0       // обраний день тижня: Пн = 0 … Нд = 6
   };
+
+  /** Перечитати трекери з профілю. Биті типи не мають валити екран. */
+  function readTrackers() {
+    const p = state.profile || {};
+    state.trackers = (p.trackers && typeof p.trackers === 'object') ? p.trackers : {};
+    state.trackerLog = (p.trackerLog && typeof p.trackerLog === 'object') ? p.trackerLog : {};
+  }
 
   /* ------------------------------------------------------------------ */
   /* Дати                                                                */
@@ -353,10 +396,172 @@
     '</div>';
   }
 
+
+  /* ================================================================== */
+  /* КУБИКИ ТРЕКЕРІВ                                                     */
+  /* ================================================================== */
+  /*
+   * ЧОМУ ТРЕКЕРИ ПОВЕРНУЛИСЬ НА ГОЛОВНУ — І ЧОМУ НЕ ВСІ.
+   *
+   * Колись вони тут уже жили: усі підряд, довгим стовпчиком шкал 1..10,
+   * — і саме тому їх звідси прибрали (див. шапку js/trackers-day.js).
+   * Помилкою був не сам факт, а «усі підряд»: екран дня перетворювався
+   * на анкету, яку треба прогорнути, щоб дійти до тренування.
+   *
+   * Тепер сюди потрапляє тільки те, що людина сама закріпила
+   * (TrackerCore.pinnedList). Типово — нічого: екран лишається таким,
+   * яким був, доки власник не винесе перший кубик зі сторінки
+   * налаштувань трекерів.
+   *
+   * ЗАПИС ІДЕ ПРЯМО ЗВІДСИ. Кубик, який тільки показує число й відсилає
+   * на іншу сторінку, не варт місця на головній: щоб відмітити склянку
+   * води, довелося б зробити три дотики замість одного. Тому обробники
+   * тут повні — ті самі data-атрибути, що на сторінці «Трекери».
+   */
+
+  function trackersHtml() {
+    if (!TC || !window.TrackerTile) return '';
+    const grid = window.TrackerTile.grid(state.trackers, {
+      log: state.trackerLog,
+      todayKey: state.todayKey,
+      now: new Date()
+    });
+    if (grid) return grid;
+
+    /*
+     * ПІДКАЗКА ЗАМІСТЬ ПОРОЖНЕЧІ — і тільки тоді, коли є що закріплювати.
+     *
+     * Людині, яка веде трекери, але не знає про цю можливість, порожній
+     * екран нічого не скаже. Людині, яка трекерів не веде взагалі,
+     * підказка про них — просто ще один рядок, який вона не просила:
+     * тому за відсутності увімкнених трекерів тут немає нічого.
+     */
+    if (!TC.active(state.trackers).length) return '';
+    return '<a class="twt-hint" href="trackers-settings.html">' +
+      '<span>Винести трекер на цей екран</span>' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M9 18l6-6-6-6"/></svg>' +
+    '</a>';
+  }
+
+  /*
+   * Запис дня.
+   *
+   * Патч — ФУНКЦІЯ, а не обʼєкт: trackerLog зберігається як одне поле
+   * профілю, і обʼєктний патч замінив би весь журнал разом з історією та
+   * зі значеннями, які встигла записати сусідня вкладка. TrackerCore.
+   * mergeDay переносить лише сьогоднішній день — та сама функція, що на
+   * сторінці «Трекери».
+   */
+  function saveTrackerLog(next, quiet) {
+    state.trackerLog = next;
+    lastSelfWrite = Date.now();
+    if (quiet) pendingRender = true;
+    else render();
+    const key = state.todayKey;
+    window.Store.saveProfile(function (p) {
+      return { trackerLog: TC.mergeDay(p && p.trackerLog, next, key) };
+    }).catch(function (e) {
+      if (e && e.queued) return;   /* офлайн: піде з черги */
+      if (window.App && window.App.toast) window.App.toast('Не збереглося: ' + e.message, 'err');
+    });
+  }
+
+  /** Число з поля вводу: порожньо — стерти запис, сміття — не чіпати. */
+  function fieldNumber(el) {
+    const raw = String(el.value == null ? '' : el.value).trim().replace(',', '.');
+    if (!raw) return null;
+    const v = Number(raw);
+    return isFinite(v) ? v : false;
+  }
+
+  function wireTrackers(host) {
+    host.addEventListener('click', function (e) {
+      const el = e.target.closest && e.target.closest('[data-trk-add], [data-trk-scale], [data-trk-pair]');
+      if (!el) return;
+
+      if (el.dataset.trkAdd) {
+        saveTrackerLog(TC.addDelta(state.trackers, state.trackerLog,
+          el.dataset.trkAdd, Number(el.dataset.amount), state.todayKey));
+        return;
+      }
+      if (el.dataset.trkScale) {
+        const id = el.dataset.trkScale;
+        const val = Number(el.dataset.val);
+        /* Повторний дотик по вже обраному числі стирає запис: інакше
+           помилковий тап неможливо скасувати, не йдучи на іншу сторінку. */
+        const cur = (state.trackerLog[id] || {})[state.todayKey];
+        saveTrackerLog(cur === val
+          ? TC.removeEntry(state.trackerLog, id, state.todayKey)
+          : TC.logValue(state.trackers, state.trackerLog, id, val, state.todayKey));
+        return;
+      }
+      const id = el.dataset.trkPair;
+      const patch = {};
+      patch[el.dataset.field] = Number(el.dataset.val);
+      saveTrackerLog(TC.logValue(state.trackers, state.trackerLog, id, patch, state.todayKey));
+    });
+
+    host.addEventListener('change', function (e) {
+      const t = e.target;
+
+      const mark = t.closest && t.closest('[data-trk-mark]');
+      if (mark) {
+        const id = mark.dataset.trkMark;
+        const tr = state.trackers[id];
+        /* Галочка в дозованої добавки пише ТИПОВУ дозу, а не true:
+           інакше «прийняв» і «прийняв 5 г» були б різними записами. */
+        const val = t.checked ? (TC.isDosed(tr) ? TC.doseOf(tr) : true) : null;
+        saveTrackerLog(val === null
+          ? TC.removeEntry(state.trackerLog, id, state.todayKey)
+          : TC.logValue(state.trackers, state.trackerLog, id, val, state.todayKey));
+        return;
+      }
+
+      const dose = t.closest && t.closest('[data-trk-dose]');
+      if (dose) {
+        const v = fieldNumber(t);
+        /* Сміття в полі не пишемо й не перемальовуємо: перемальовка під
+           фокусом забрала б у людини поле разом із тим, що вона набирає. */
+        if (v === false) { pendingRender = true; return; }
+        saveTrackerLog(v === null
+          ? TC.removeEntry(state.trackerLog, dose.dataset.trkDose, state.todayKey)
+          : TC.logValue(state.trackers, state.trackerLog, dose.dataset.trkDose, v, state.todayKey), true);
+        return;
+      }
+
+      const val = t.closest && t.closest('[data-trk-value]');
+      if (val) {
+        const v = fieldNumber(t);
+        if (v === false) { pendingRender = true; return; }
+        saveTrackerLog(v === null
+          ? TC.removeEntry(state.trackerLog, val.dataset.trkValue, state.todayKey)
+          : TC.logValue(state.trackers, state.trackerLog, val.dataset.trkValue, v, state.todayKey), true);
+        return;
+      }
+
+      /* Тривалість: два поля, одна величина — читаємо обидва, щоб зміна
+         годин не скидала хвилини. */
+      const dh = t.closest && t.closest('[data-trk-durh]');
+      const dm = t.closest && t.closest('[data-trk-durm]');
+      if (!dh && !dm) return;
+      const id = (dh || dm).dataset.trkDurh || (dh || dm).dataset.trkDurm;
+      const hEl = host.querySelector('[data-trk-durh="' + CSS.escape(id) + '"]');
+      const mEl = host.querySelector('[data-trk-durm="' + CSS.escape(id) + '"]');
+      const prev = TC.entryValue((state.trackerLog[id] || {})[state.todayKey]);
+      const mins = TC.joinDuration(hEl ? hEl.value : '', mEl ? mEl.value : '', prev);
+      if (mins === false) { pendingRender = true; return; }
+      saveTrackerLog(mins === null
+        ? TC.removeEntry(state.trackerLog, id, state.todayKey)
+        : TC.logValue(state.trackers, state.trackerLog, id, mins, state.todayKey), true);
+    });
+  }
+
   function render() {
     const host = $('#today');
     if (!host) return;
-    host.innerHTML = headHtml() + weekHtml() + widgetHtml() + habitsHtml();
+    host.innerHTML = headHtml() + weekHtml() + widgetHtml() + habitsHtml() + trackersHtml();
     /* Нахил вішається на щойно створений віджет: initTilt позначає вже
        оброблені контейнери, тож повторний виклик безпечний. */
     if (window.App && window.App.initTilt) window.App.initTilt(host);
@@ -386,8 +591,10 @@
 
     state.todayKey = localDateKey();
     readPlan();
+    readTrackers();
     readWeek();
     render();
+    wireTrackers(host);
 
     /* Вибір дня в смузі. Делегуванням: смуга перемальовується цілком. */
     host.addEventListener('click', function (e) {
@@ -410,9 +617,29 @@
 
     /* Профіль міг змінитись у сусідній вкладці: інша програма — інша
        назва й інша кількість тренувальних днів у смузі. */
+    /* Сторож вводу: позначаємо, що людина зараз у полі. */
+    ['focusin', 'focusout', 'input'].forEach(function (type) {
+      document.addEventListener(type, function (e) {
+        if (fieldFocused(e.target)) lastFieldTouch = Date.now();
+      });
+    });
+    host.addEventListener('focusout', function () {
+      if (!pendingRender) return;
+      setTimeout(function () {
+        if (fieldFocused(document.activeElement)) return;
+        pendingRender = false;
+        render();
+      }, 120);
+    });
+
     window.Store.onChange(async function () {
       try { state.profile = await window.Store.getProfile() || {}; } catch (_) { return; }
       readPlan();
+      readTrackers();
+      if (fieldBusy() || (Date.now() - lastSelfWrite) < SELF_WRITE_MS) {
+        pendingRender = true;
+        return;
+      }
       /* Журнал міг поповнитись у сусідній вкладці — а разом із першим
          тренуванням з'являється й точка відліку тижнів. */
       const n = weekNoOf(new Date(), firstTrainedKey());

@@ -326,19 +326,7 @@
      * історії, ні трекерів, яких ця вкладка не бачила.
      */
     saveOwn(function (p) {
-      const base = (p && p.trackerLog && typeof p.trackerLog === 'object') ? p.trackerLog : {};
-      const merged = Object.assign({}, base);
-      Object.keys(next || {}).forEach(function (id) {
-        const src = next[id];
-        const dayVal = (src && typeof src === 'object') ? src[today] : undefined;
-        const cur = (merged[id] && typeof merged[id] === 'object')
-          ? Object.assign({}, merged[id]) : {};
-        if (dayVal === undefined) delete cur[today];
-        else cur[today] = dayVal;
-        if (Object.keys(cur).length) merged[id] = cur;
-        else delete merged[id];
-      });
-      return { trackerLog: merged };
+      return { trackerLog: window.TrackerCore.mergeDay(p && p.trackerLog, next, today) };
     }).catch(function (e) {
       if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err');
     });

@@ -4091,7 +4091,11 @@ body {
  */
 .card.card--glass,
 .kpi,
-.tile {
+.tile,
+.twt {
+  /* Блик — окремий шар (::after з inset: 0), тож поверхня мусить бути
+     системою координат для нього. У .card це вже було, у плиток — ні. */
+  position: relative;
   background: linear-gradient(158deg,
     rgba(var(--fx-rgb), 0.11) 0%,
     rgba(var(--fx-rgb), 0.045) 46%,
@@ -4114,39 +4118,73 @@ body {
  * 900px перспективи — на самій картці, як у першоджерела: спільна
  * перспектива на сітці нахиляла б крайні картки сильніше за середні.
  */
-.card.card--glass {
+/*
+ * НАХИЛ — НА ВСІХ СКЛЯНИХ ПОВЕРХНЯХ, А НЕ ТІЛЬКИ НА КАРТКАХ ВИБОРУ.
+ *
+ * Раніше плитки лишались нерухомими: я вирішив, що нахиляти те, що
+ * читають, а не обирають, — зайве, і що п'ятнадцять плиток на «Прогресі»
+ * означають п'ятнадцять шарів композиції. Перше виявилось смаком, а не
+ * правилом: плитка з числом — така сама скляна пластина, і коли сусідня
+ * картка живе, а вона ні, сторінка читається як недороблена.
+ *
+ * Друге вирішується інакше — will-change тепер стоїть тільки на гарячій
+ * (.is-hot), а не на всіх одразу. У спокої зайвих шарів НУЛЬ; шар
+ * створюється в мить наведення й зникає, щойно курсор пішов.
+ *
+ * --tilt-k — коефіцієнт нахилу. Ті самі 7° на плитці 150×90 виглядають
+ * різкіше, ніж на картці 300×200: кут той самий, а шлях кутика вдвічі
+ * коротший. Плитки беруть три чверті.
+ */
+.card.card--glass,
+.kpi,
+.tile {
   transform:
     perspective(900px)
-    rotateX(var(--tilt-x, 0deg))
-    rotateY(var(--tilt-y, 0deg))
+    rotateX(calc(var(--tilt-x, 0deg) * var(--tilt-k, 1)))
+    rotateY(calc(var(--tilt-y, 0deg) * var(--tilt-k, 1)))
     scale(var(--tilt-s, 1));
   transition: transform 0.25s var(--e-out), opacity 0.25s var(--e-out),
               border-color var(--t-fast), background var(--t-fast);
-  will-change: transform;
 }
+.kpi,
+.tile { --tilt-k: 0.75; --spot-w: 150px; --spot-h: 120px; }
+.card.card--glass.is-hot,
+.kpi.is-hot,
+.tile.is-hot { will-change: transform; }
 /* Поки вказівник рухається по картці, переходу немає: інакше нахил
    відставав би від курсора на чверть секунди й читався як гальмування.
    Плавність потрібна на ВХІД і ВИХІД, а не на кожен рух. */
-.card.card--glass.is-tilting { transition: opacity 0.25s var(--e-out), border-color var(--t-fast); }
+.card.card--glass.is-tilting,
+.kpi.is-tilting,
+.tile.is-tilting { transition: opacity 0.25s var(--e-out), border-color var(--t-fast); }
 
 /* Блик, що їде за курсором. Окремий шар, бо він не має нахилятись разом
    із карткою — інакше на краю він виїжджав би за її межі. */
-.card--glass::after {
+.card--glass::after,
+.kpi::after,
+.tile::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(220px 180px at var(--spot-x, 50%) var(--spot-y, 0%),
+  background: radial-gradient(var(--spot-w, 220px) var(--spot-h, 180px)
+    at var(--spot-x, 50%) var(--spot-y, 0%),
     rgba(var(--fx-rgb), 0.13), transparent 68%);
   opacity: 0;
   transition: opacity 0.25s var(--e-out);
 }
-.card--glass.is-hot::after { opacity: 1; }
-.card--glass > * { position: relative; z-index: 1; }
+.card--glass.is-hot::after,
+.kpi.is-hot::after,
+.tile.is-hot::after { opacity: 1; }
+.card--glass > *,
+.kpi > *,
+.tile > * { position: relative; z-index: 1; }
 
-.card.card--glass.is-hot {
+.card.card--glass.is-hot,
+.kpi.is-hot,
+.tile.is-hot {
   border-color: rgba(var(--fx-rgb), 0.26);
   background: linear-gradient(158deg,
     rgba(var(--fx-rgb), 0.15) 0%,
@@ -4155,7 +4193,12 @@ body {
 }
 /* Приглушення сусідів. Разом із бликом це і є «фокус»: у сітці з чотирьох
    карток видно, яку саме ти зараз розглядаєш. */
-.card.card--glass.is-cold { opacity: 0.5; --tilt-s: 0.975; }
+/* Приглушуються тільки СУСІДИ ПО СІТЦІ (js/app.js бере їх у спільного
+   батька), а не все скло сторінки: гасити половину екрана через наведення
+   на одну плитку — не фокус, а миготіння. */
+.card.card--glass.is-cold,
+.kpi.is-cold,
+.tile.is-cold { opacity: 0.5; --tilt-s: 0.975; }
 
 /* Обрана картка в склі: та сама яскравіша межа, а грані лишаються ті
    самі, що й у решти скляних карток. Повторювати їх доводиться тому, що
@@ -4187,6 +4230,8 @@ body {
  * бюджет GPU, і на 4 картках різниця у вигляді непомітна.
  */
 @media not all and (hover: hover) and (pointer: fine) {
+  .kpi,
+  .tile { transform: none; }
   .card.card--glass {
     transform: none;
     backdrop-filter: blur(10px) saturate(1.05);
@@ -4194,9 +4239,15 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card.card--glass { transform: none; transition: opacity 0.2s linear, border-color 0.2s linear; }
-  .card.card--glass.is-cold { --tilt-s: 1; }
-  .card--glass::after { display: none; }
+  .card.card--glass,
+  .kpi,
+  .tile { transform: none; transition: opacity 0.2s linear, border-color 0.2s linear; }
+  .card.card--glass.is-cold,
+  .kpi.is-cold,
+  .tile.is-cold { --tilt-s: 1; }
+  .card--glass::after,
+  .kpi::after,
+  .tile::after { display: none; }
 }
 
 /* ---- Кільця очікування -------------------------------------------------
@@ -5693,6 +5744,36 @@ h1 > .h1-ico {
   display: grid;
   place-items: center;
   pointer-events: none;
+  /*
+   * ЧОМУ ЛИЦЕ ХОВАЄТЬСЯ ЯВНО, А НЕ ЧЕРЕЗ backface-visibility.
+   *
+   * Грань має backface-visibility: hidden, і цього мало б вистачити.
+   * Не вистачає: кільця мають НЕСКІНЧЕННУ анімацію transform, тому
+   * браузер виносить кожне на власний шар композиції. Шар малює GPU
+   * окремо, і backface-visibility БАТЬКА на нього не поширюється —
+   * кільця далі малюються поверх звороту й блимають там у такт власної
+   * анімації. На CPU-растеризації (headless без GPU) цього не видно
+   * взагалі, тому баг і доїхав до екрана.
+   *
+   * Тут вимикається сам малюнок, і рівно на середині обертання: 0.31s —
+   * це половина від 0.62s переходу, тобто той кадр, де картка стоїть
+   * до глядача ребром і має нульову ширину. Перемикання в цю мить не
+   * видно ні туди, ні назад.
+   *
+   * Затримка стоїть у БАЗОВОМУ правилі, а не тільки в перевернутому:
+   * інакше назад лице поверталося б миттєво, ще до того, як зворот
+   * зникне.
+   */
+  transition: visibility 0s linear 0.31s;
+}
+.awd.is-flip .awd__hole,
+.awd:focus-visible .awd__hole { visibility: hidden; }
+@media (hover: hover) and (pointer: fine) {
+  .awd:hover .awd__hole { visibility: hidden; }
+}
+/* Переходу немає — ховати з затримкою нема від чого. */
+@media (prefers-reduced-motion: reduce) {
+  .awd__hole { transition: none; }
 }
 .awd__ring {
   position: absolute;
@@ -5767,6 +5848,242 @@ h1 > .h1-ico {
   text-align: center;
   color: var(--text);
 }
+
+/* =====================================================================
+   КУБИКИ ТРЕКЕРІВ НА «СЬОГОДНІ»
+
+   Сітка та сама, що у звичок (.hbts): дві колонки. Кубик, якому двох
+   колонок замало — шкала 1..10, дві шкали пари, чотири кнопки води, два
+   поля сну, — бере обидві (.twt--wide). Це не про красу: кнопка 30×30 на
+   телефоні означає промах через раз, а промах тут коштує запису дня.
+
+   СКЛО — ТАК, НАХИЛ — НІ. Кубик виглядає як решта скла проєкту, але не
+   нахиляється й не ловить блик: усередині нього мішені, по яких треба
+   влучати, і рухати їх під курсором означає заважати. Нахил лишається
+   там, де він і має бути, — на картках, які ОБИРАЮТЬ.
+   ===================================================================== */
+.twt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.twt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.twt--wide { grid-column: span 2; }
+
+.twt__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.twt__name {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Поточне значення — найбільше в кубику: заради нього сюди й дивляться. */
+.twt__now {
+  font-family: var(--font-mono, inherit);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+}
+.twt__body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.twt__foot {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Накопичення: смуга до цілі + кнопки ------------------------- */
+.twt__bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.twt__bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text);
+  transition: width 0.25s var(--e-out);
+}
+.twt__btns { display: flex; gap: 6px; }
+.twt__btn {
+  flex: 1 1 0;
+  min-width: 0;
+  /* 40px — нижня межа зручної мішені на дотику. Нижче кнопку доводиться
+     ловити, а не натискати. */
+  min-height: 40px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.twt__btn:hover, .twt__btn:focus-visible { border-color: var(--line-2); }
+.twt__btn:active { background: var(--surface-2); }
+/* Відкат стоїть окремо й вужчий: він потрібен рідше за додавання, і не
+   має конкурувати з ним за увагу. */
+.twt__btn--minus { flex: 0 0 40px; color: var(--muted); font-size: 1.1rem; }
+
+/* ---- Шкала 1..10 -------------------------------------------------- */
+.twt__scale { display: flex; gap: 3px; }
+.twt__dot {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.twt__dot:hover, .twt__dot:focus-visible { border-color: var(--line-2); color: var(--text); }
+/* Обране число — суцільна заливка, а не рамка: у ряду з десяти рамка
+   губиться, і людина не бачить, чи взагалі відповіла. */
+.twt__dot.is-on {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+.twt__pair { display: flex; flex-direction: column; gap: 4px; }
+.twt__pairname {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ---- Години й хвилини, число ------------------------------------- */
+.twt__dur { display: flex; align-items: center; gap: 6px; }
+.twt__num {
+  width: 56px;
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-mono, inherit);
+  font-size: 0.95rem;
+  text-align: center;
+}
+.twt__u { font-size: 0.78rem; color: var(--muted); }
+.twt__field {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-mono, inherit);
+  font-size: 0.95rem;
+}
+.twt__num:focus-visible, .twt__field:focus-visible {
+  outline: 2px solid var(--acc-ink);
+  outline-offset: 1px;
+}
+
+/* ---- Звичка й добавка: кубик і є кнопка --------------------------- */
+.twt--boolean .twt__body, .twt--dose .twt__body { flex-direction: row; align-items: center; gap: 8px; }
+.twt__check { flex: 1 1 auto; display: block; cursor: pointer; }
+.twt__check input {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.twt__box {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface);
+  color: transparent;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.twt__box svg { width: 20px; height: 20px; }
+.twt__check input:focus-visible + .twt__box { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
+.twt.is-on .twt__box { background: var(--text); border-color: var(--text); color: var(--bg); }
+.twt.is-on { border-color: var(--line-2); }
+.twt__dose { display: flex; align-items: center; gap: 4px; }
+
+/* ---- Підказка замість порожньої сітки ----------------------------- */
+.twt-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-decoration: none;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.twt-hint:hover, .twt-hint:focus-visible { border-color: var(--line-2); color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .twt__bar > i { transition: none; }
+}
+
+/* Шпилька «на Сьогодні» в налаштуваннях трекерів. Іконка, а не повзунок:
+   повзунок у цьому рядку вже є й означає інше — див. pinBtn() у
+   js/trackers-settings.js. */
+.tr-pin {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 8px);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.tr-pin:hover, .tr-pin:focus-visible { border-color: var(--line-2); color: var(--text); }
+.tr-pin.is-on { background: var(--text); border-color: var(--text); color: var(--bg); }
 
 /* Плитки беруть скло зі спільного правила «ПОВЕРХНЯ СКЛА» вище.
    Окремого рецепта для них тут немає навмисно — саме так і з'являється

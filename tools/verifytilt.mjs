@@ -207,6 +207,72 @@ const vars = () => p.evaluate((sel) => {
   await m.close();
 }
 
+/* ------------------------------------------------------------------ */
+/* 5. Плитки — така сама скляна поверхня, а не мертвий прямокутник      */
+/* ------------------------------------------------------------------ */
+/*
+ * ЧОМУ ЦЕ ОКРЕМИЙ БЛОК. Плитки з числами (.kpi) і плитки-посилання
+ * (.tile) отримали скляну поверхню разом із картками, але нахил і блик
+ * тоді лишились тільки на картках — тобто половина скла на сайті була
+ * жива, а половина ні. Візуально різницю видно лише під курсором, тому
+ * без цієї перевірки вона повертається тихо: досить комусь звузити
+ * селектор у CSS або в js/app.js — і плитки знову застигнуть.
+ *
+ * ОКРЕМО СТЕРЕЖЕТЬСЯ МЕЖА ПРИГЛУШЕННЯ. Сусіди беруться в спільного
+ * батька, а не по всій сторінці: інакше наведення на одну плитку гасило
+ * б пів екрана. Перевіряється саме це — сусід по сітці приглушений,
+ * елемент з іншої сітки — ні.
+ */
+{
+  const q = await ctx.newPage();
+  const e3 = []; q.on('pageerror', (e) => e3.push(e.message));
+  await q.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' });
+  await q.waitForTimeout(2200);
+
+  const n = await q.locator('.kpi').count();
+  ok('у журналі є плитки, є що перевіряти', n >= 2, 'знайдено ' + n);
+
+  if (n >= 2) {
+    const box = await q.locator('.kpi').first().boundingBox();
+    await q.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.25);
+    await q.waitForTimeout(260);
+
+    const st = await q.evaluate(() => {
+      const all = [].slice.call(document.querySelectorAll('.kpi'));
+      const hot = all[0];
+      const cs = getComputedStyle(hot);
+      return {
+        tr: cs.transform,
+        hot: hot.classList.contains('is-hot'),
+        glow: getComputedStyle(hot, '::after').opacity,
+        tx: hot.style.getPropertyValue('--tilt-x'),
+        cold: all.filter((e) => e !== hot && e.parentElement === hot.parentElement)
+                 .every((e) => e.classList.contains('is-cold')),
+        outside: [].slice.call(document.querySelectorAll('.card--glass, .kpi, .tile'))
+                   .filter((e) => e.parentElement !== hot.parentElement)
+                   .some((e) => e.classList.contains('is-cold'))
+      };
+    });
+
+    ok('плитка нахиляється під курсором', /matrix3d/.test(st.tr), st.tr.slice(0, 34));
+    ok('кут справді порахований, а не нульовий', parseFloat(st.tx) !== 0, st.tx);
+    ok('плитка позначена гарячою', st.hot === true);
+    ok('блик під курсором увімкнений', Number(st.glow) > 0.5, st.glow);
+    ok('сусіди по сітці приглушені', st.cold === true);
+    ok('скло за межами сітки НЕ приглушене', st.outside === false);
+
+    await q.mouse.move(5, 5);
+    await q.waitForTimeout(260);
+    const off = await q.evaluate(() => {
+      const hot = document.querySelector('.kpi');
+      return { hot: hot.classList.contains('is-hot'), tx: hot.style.getPropertyValue('--tilt-x') };
+    });
+    ok('курсор пішов — плитка відпустилась', off.hot === false && off.tx === '', JSON.stringify(off));
+  }
+  ok('журнал: без JS-помилок', e3.length === 0, e3.slice(0, 2).join(' | '));
+  await q.close();
+}
+
 ok('без JS-помилок', errs.length === 0, errs.slice(0, 3).join(' | '));
 
 await b.close();

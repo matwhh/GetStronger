@@ -1395,19 +1395,18 @@
   let accSeq = 0;
 
   /* ------------------------------------------------------------------ */
-  /* Нахил і блик на картках вибору                                       */
+  /* Нахил і блик на скляних поверхнях                                    */
   /* ------------------------------------------------------------------ */
   /*
-   * ЩО РОБИТЬ. У контейнері з [data-tilt] стежить за вказівником і кладе
-   * у кожну картку чотири числа: два кути нахилу й позицію блику. Усе
-   * інше — CSS (.card--glass): і сам нахил, і блик, і приглушення сусідів.
-   * Тут немає жодного стилю, тільки координати.
+   * ЩО РОБИТЬ. Стежить за вказівником і кладе в поверхню під ним чотири
+   * числа: два кути нахилу й позицію блику. Усе інше — CSS: і сам нахил,
+   * і блик, і приглушення сусідів. Тут немає жодного стилю, тільки
+   * координати.
    *
-   * ЧОМУ ОДИН СЛУХАЧ НА КОНТЕЙНЕР. pointermove — найчастіша подія в
-   * браузері. Слухач на кожній картці означав би чотири підписки, які
-   * треба знімати при кожній перемальовці списку (а він перемальовується
-   * на кожну зміну кількості днів). Делегування на контейнері живе, доки
-   * живе сторінка.
+   * ЧОМУ ОДИН СЛУХАЧ НА ДОКУМЕНТ. pointermove — найчастіша подія в
+   * браузері. Слухач на кожній поверхні означав би десятки підписок, які
+   * треба знімати при кожній перемальовці (а сторінки перемальовуються
+   * на кожну зміну профілю). Делегування живе, доки живе сторінка.
    *
    * ЧОМУ rAF. Вказівник шле до 120 подій на секунду, екран малює 60. Без
    * дроселя ми рахували б getBoundingClientRect удвічі частіше, ніж це
@@ -1422,13 +1421,39 @@
    */
   const TILT_MAX = 7;   /* градусів; більше — і текст на дальньому краї «пливе» */
 
-  function initTilt(root) {
-    const box = root || document;
-    (box.querySelectorAll ? box.querySelectorAll('[data-tilt]') : []).forEach(function (host) {
-      if (host.dataset.tiltOn === '1') return;
-      host.dataset.tiltOn = '1';
-      wireTilt(host);
-    });
+  /*
+   * ЩО ВВАЖАЄТЬСЯ СКЛЯНОЮ ПОВЕРХНЕЮ. Той самий перелік, що й у CSS у
+   * правилі «ПОВЕРХНЯ СКЛА»: картки вибору, плитки з числами,
+   * плитки-посилання. Тримати його в одному рядку тут — єдиний спосіб не
+   * розійтися з CSS: розійдуться — і частина поверхонь мовчки перестане
+   * нахилятись, лишившись при цьому склом на вигляд.
+   *
+   * .card--off не бере участі: нахиляти те, що не можна обрати, означає
+   * обіцяти дію, якої немає.
+   */
+  const GLASS = '.card--glass:not(.card--off), .kpi, .tile';
+
+  /*
+   * ОДИН СЛУХАЧ НА ВЕСЬ ДОКУМЕНТ, А НЕ НА КОЖЕН КОНТЕЙНЕР.
+   *
+   * Було: слухач вішався на кожен вузол із [data-tilt], і нахил мали
+   * тільки ті сітки, куди хтось не забув поставити атрибут. Плитки його
+   * не мали ніде — тому й лишались мертвими.
+   *
+   * Стало: підписка одна, поставлена раз. Плитки перемальовуються часто
+   * (кожна зміна профілю), і підписка, привʼязана до вузла, після
+   * перемальовки вказувала б у нікуди. Делегування на документі цього
+   * не помічає взагалі.
+   *
+   * initTilt(root) лишається як вхідна точка: його викликають з boot і
+   * зі сторінок після перемальовки. Аргумент більше не потрібен, але
+   * виклики зі старим аргументом мусять і далі працювати.
+   */
+  let tiltWired = false;
+  function initTilt() {
+    if (tiltWired) return;
+    tiltWired = true;
+    wireTilt(document);
   }
 
   function wireTilt(host) {
@@ -1439,25 +1464,35 @@
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     } catch (_) { return; }
 
-    let cards = [];
+    let cards = [];      /* сусіди гарячої поверхні — тільки її сітка */
     let hot = null;      /* картка під курсором */
     let rect = null;     /* її геометрія, поки курсор усередині */
     let frame = 0;
     let pending = null;
 
-    const list = function () {
-      /* Недоступні картки (.card--off) участі не беруть: нахиляти те, що
-         не можна обрати, означає обіцяти дію, якої немає. */
-      cards = [].slice.call(host.querySelectorAll('.card--glass:not(.card--off)'));
+    /*
+     * СУСІДИ — ЦЕ СПІЛЬНИЙ БАТЬКО, А НЕ ВСЯ СТОРІНКА.
+     *
+     * Приглушення сусідів (.is-cold) має показати, яку саме річ ти зараз
+     * розглядаєш. Поки слухач висів на сітці з чотирьох карток, «усі
+     * інші» й означало «три сусідні». На документі це означало б УСЕ
+     * скло сторінки: наведення на одну плитку гасило б на половину і
+     * картку тренування, і решту плиток, і КПІ вгорі — тобто не
+     * підсвічувало б одну річ, а блимало б цілим екраном.
+     */
+    const list = function (card) {
+      const box = (card && card.parentElement) || host;
+      cards = [].slice.call(box.querySelectorAll(GLASS));
       return cards;
     };
 
     const cool = function () {
-      list().forEach(function (c) {
+      cards.forEach(function (c) {
         c.classList.remove('is-hot', 'is-cold', 'is-tilting');
         c.style.removeProperty('--tilt-x');
         c.style.removeProperty('--tilt-y');
       });
+      cards = [];
       hot = null; rect = null;
     };
 
@@ -1476,14 +1511,14 @@
 
     host.addEventListener('pointermove', function (e) {
       if (e.pointerType && e.pointerType !== 'mouse') return;
-      const card = e.target.closest && e.target.closest('.card--glass:not(.card--off)');
+      const card = e.target.closest && e.target.closest(GLASS);
       if (!card) { if (hot) cool(); return; }
 
       if (card !== hot) {
         cool();
         hot = card;
         rect = card.getBoundingClientRect();
-        list().forEach(function (c) {
+        list(card).forEach(function (c) {
           c.classList.toggle('is-hot', c === card);
           c.classList.toggle('is-cold', c !== card);
         });
@@ -1602,8 +1637,7 @@
       if (seg) measureSeg(seg);
     });
 
-    /* Нові доріжки після перемальовки сторінки. Тим самим спостерігачем
-       ловляться й нові сітки з нахилом — вони зʼявляються разом. */
+    /* Нові доріжки після перемальовки сторінки. */
     if (typeof MutationObserver === 'function') {
       new MutationObserver(function (recs) {
         for (let i = 0; i < recs.length; i++) {
@@ -1612,7 +1646,8 @@
             const n = added[j];
             if (n.nodeType !== 1) continue;
             if (n.classList.contains('seg') || n.querySelector('.seg')) { scheduleSegs(); }
-            if (n.hasAttribute('data-tilt') || n.querySelector('[data-tilt]')) initTilt(n.parentNode || document);
+            /* Нахил тут більше не чіпається: слухач один на документ і
+               ставиться в boot, тому нові вузли він бачить сам. */
           }
         }
       }).observe(document.body, { childList: true, subtree: true });

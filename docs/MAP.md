@@ -84,7 +84,9 @@ elo-core · elo-api · elo-hooks
 | `elo-core.js` | 374 | сезони, рівні, бюджети, дельти дій | `EloCore`: `seasonOf`, `seasonRange`, `levelFor`, `weeklyBudget`, `actionDelta`, `applyDayCaps` | — |
 | `exercise-core.js` | 350 | прогрес однієї вправи зі знімків сесій | `ExerciseCore`: `series`, `stats`, `trend`, `prFromSessions`, `METRICS` | `OneRM` |
 | `history-core.js` | 321 | журнали: ваги, сесії, закриті дні | `HistoryCore`: `todayKey`, `appendWeight`, `weightSeries`, `upsertSession`, `closeDay` | — |
-| `tracker-core.js` | 711 | модульні трекери: реєстр, записи, стріки | `TrackerCore`: `ensureBuiltins`, `logValue`, `entriesFor`, `streak`, `goalAdherence` | — |
+| `tracker-core.js` | 808 | модульні трекери: реєстр, записи, стріки, закріплення на «Сьогодні» | `TrackerCore`: `ensureBuiltins`, `logValue`, `entriesFor`, `streak`, `goalAdherence`, `setPinned`, `pinnedList`, `mergeDay` | — |
+| `tracker-tile-core.js` | 339 | кубик трекера на «Сьогодні»: свій ввід під кожен вид | `TrackerTile`: `html`, `grid`, `isWide` | `TrackerCore` |
+| `award-core.js` | 157 | двобічна картка нагороди з переворотом | `Award`: `html`, `grid`, `CODES`, `gearIcon` | — |
 | `onerm-core.js` | 259 | математика 1ПМ, набір млинців | `OneRM`: `oneRepMax`, `estimates`, `percentOfMax`, `toPlates`, `PLATE_STEP` | — |
 | `password-core.js` | 256 | надійність пароля за правилами Supabase | `PasswordCore`: `check`, `MIN_LEN`, `MAX_LEN` | — |
 | `adherence-core.js` | 237 | % дисципліни за період | `AdherenceCore`: `trainingAdherence`, `nutritionAdherence`, `PERIODS` | `EloCore` |

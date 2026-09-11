@@ -48,5 +48,5 @@ window.APP_CONFIG = {
    * Заповниш після деплою — і те, і те зʼявиться саме собою на всіх сторінках.
    * Напр.: 'https://forge.example.com'
    */
-  siteUrl: 'https://forge-mold1.vercel.app'
+  siteUrl: 'https://get-stronger.vercel.app'
 };

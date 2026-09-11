@@ -162,6 +162,6 @@ fi
 
 printf "\n${G}✓ Готово.${N} Усе на GitHub — Vercel уже збирає сайт.\n"
 printf "  Репозиторій: %s\n" "${REPO_URL%.git}"
-printf "  Сайт:        https://forge-mold1.vercel.app\n"
+printf "  Сайт:        https://get-stronger.vercel.app\n"
 printf "\nЗбірка триває ~30 секунд. Можеш закривати це вікно.\n"
 printf "\nНатисни Enter, щоб закрити."; read -r _

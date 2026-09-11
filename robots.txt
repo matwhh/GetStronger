@@ -6,3 +6,4 @@
 # а рішення «не індексувати» дає заголовок, який бот бачить, лише зайшовши.
 User-agent: *
 Allow: /
+Sitemap: https://get-stronger.vercel.app/sitemap.xml

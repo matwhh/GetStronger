@@ -71,6 +71,14 @@ Brevo підміняє кожне посилання своїм і рахує п
 зовнішніми стилями частіше падають у «Спам», а в темній темі поштових
 клієнтів складне оформлення розсипається.
 
+**Назва в листі набрана «Get Stronger», а не великими літерами.** На
+сайті великі літери малює CSS (`text-transform`), а сам текст лишається
+звичайним — тому читалка екрана вимовляє слово, а не літери, і
+скопійований текст не кричить. У листі так зробити не можна: половина
+поштових клієнтів `text-transform` ігнорує, тож великі літери довелося б
+набрати вручну — тобто рівно те, чого правило й забороняє. Верхній
+рядок листа — це підпис відправника, а не намальований знак.
+
 ---
 
 ### Confirm signup
@@ -79,7 +87,7 @@ Brevo підміняє кожне посилання своїм і рахує п
 
 ```html
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;line-height:1.55;color:#111;max-width:520px;margin:0 auto;padding:24px">
-  <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">GET STRONGER</p>
+  <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">Get Stronger</p>
 
   <p style="margin:0 0 16px">Вітаємо. Лишився один крок: підтвердіть, що ця пошта ваша.</p>
 
@@ -113,7 +121,7 @@ Brevo підміняє кожне посилання своїм і рахує п
 
 ```html
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;line-height:1.55;color:#111;max-width:520px;margin:0 auto;padding:24px">
-  <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">GET STRONGER</p>
+  <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">Get Stronger</p>
 
   <p style="margin:0 0 16px">Ви попросили змінити пароль до акаунта <b>{{ .Email }}</b>.</p>
 
@@ -146,7 +154,7 @@ Brevo підміняє кожне посилання своїм і рахує п
 
 ```html
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;line-height:1.55;color:#111;max-width:520px;margin:0 auto;padding:24px">
-  <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">GET STRONGER</p>
+  <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">Get Stronger</p>
 
   <p style="margin:0 0 16px">Посилання для входу без пароля:</p>
 
@@ -169,7 +177,7 @@ Brevo підміняє кожне посилання своїм і рахує п
 
 ```html
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;line-height:1.55;color:#111;max-width:520px;margin:0 auto;padding:24px">
-  <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">GET STRONGER</p>
+  <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">Get Stronger</p>
 
   <p style="margin:0 0 16px">Ви міняєте пошту акаунта на <b>{{ .Email }}</b>. Підтвердіть, що вона ваша:</p>
 
@@ -194,7 +202,7 @@ Brevo підміняє кожне посилання своїм і рахує п
 2. Зареєструйтесь на сайті з цією адресою.
 3. Відкрийте скриньку на mailinator і подивіться: ім’я відправника,
    мову тексту, і — головне — куди веде посилання (вкладка `LINKS`).
-   Якщо воно веде прямо на `forge-mold1.vercel.app`, а не на
+   Якщо воно веде прямо на `get-stronger.vercel.app`, а не на
    `sendibt2.com`, лічильник кліків вимкнено правильно.
 4. Пройдіть по посиланню до кінця.
 5. Приберіть тестовий акаунт із бази — або лишіть: незавершені

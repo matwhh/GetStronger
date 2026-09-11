@@ -80,9 +80,10 @@ const SHELL = ['./index.html', './offline.html', './css/style.css',
                './js/tracker-tile-core.js',
                './js/workout-core.js', './js/season-core.js', './js/daycal-core.js',
                './js/progression-core.js', './js/weight-limits-core.js',
+               './js/auth-msg-core.js',
                './js/liquid-glass.js', './js/tabbar-glass.js', './js/donut-core.js',
                './js/today.js',
-               './js/help-content.js', './js/help.js'];
+               './js/help-content.js', './js/help-search-core.js', './js/help.js'];
 
 /* Скільки чекати на мережу, перш ніж віддати кеш (PWA-002). */
 const NET_TIMEOUT = 4000;

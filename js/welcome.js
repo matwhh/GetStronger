@@ -51,6 +51,13 @@
     acc: { username: '', email: '', pass: '', pass2: '' },
     consents: {},   // c-terms / c-privacy / c-medical
     err: '',
+    /* Поле, у якому саме помилка (id інпута), і що пропонуємо зробити далі.
+       Без цього повідомлення висіло під карткою і не казало, куди дивитись. */
+    errField: '',
+    errAction: '',
+    /* Питання «це ваше посилання з листа?» — воно ж екран, а не діалог.
+       Тут живе {email, type, resolve} доти, доки людина не відповість. */
+    linkAsk: null,
     busy: false
   };
 
@@ -70,6 +77,14 @@
    * памʼяті вкладки; після перезавантаження людину веде вхід, а не
    * підставлений із диска пароль.
    *
+   * ПОШТА — теж не завжди. Поки заявки на сервер не подано, реєстрація
+   * незавершена, і сліду від неї на диску лишатись не має: людина могла
+   * передумати на півдорозі, а пошта — це вже особисті дані, та ще й на
+   * чужому чи спільному компʼютері. Тому адреса лягає в чернетку лише з
+   * того моменту, коли акаунт на сервері ВЖЕ створено (stage === 'confirm')
+   * і вона потрібна, щоб надіслати лист підтвердження ще раз. До того —
+   * у чернетці лише нік, дата народження, заміри й згоди.
+   *
    * Чернетка — не друге джерело правди: профіль сильніший. Вона лише
    * заповнює порожні поля (див. loadDraft) і зникає, щойно заявку подано.
    */
@@ -79,11 +94,13 @@
     try {
       let prev = {};
       try { prev = JSON.parse(localStorage.getItem(DRAFT_KEY)) || {}; } catch (_) {}
+      const stage = (patch && patch.stage) || prev.stage || '';
       const d = {
         v: 1,
-        stage: (patch && patch.stage) || prev.stage || '',
+        stage: stage,
         username: state.acc.username || '',
-        email: state.acc.email || '',
+        /* Див. коментар вище: до 'confirm' акаунта ще немає — пошту не пишемо. */
+        email: stage === 'confirm' ? (state.acc.email || '') : '',
         dob: state.dob,
         body: state.body,
         consents: state.consents
@@ -658,24 +675,43 @@
     nav('body');
   }
 
+  /**
+   * Що не так у формі реєстрації.
+   * @returns {{field: string, msg: string}|null} null — усе гаразд
+   */
   function validAccount() {
     const a = state.acc;
-    if (a.username.trim().length < 3 || a.username.trim().length > 13) return 'Нік — від 3 до 13 символів.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) return 'Перевірте адресу пошти.';
+    const nick = a.username.trim();
+    if (!nick) return { field: 'au-name', msg: 'Введіть нік — під ним вас побачать у таблиці лідерів.' };
+    if (nick.length < 3) {
+      return { field: 'au-name', msg: 'Нік закороткий: ' + nick.length + ' — а треба від 3 символів.' };
+    }
+    if (nick.length > 13) {
+      return { field: 'au-name', msg: 'Нік задовгий: ' + nick.length + ' — а можна не більше 13 символів.' };
+    }
+
+    const AM = window.AuthMsg;
+    const em = AM ? AM.emailProblem(a.email)
+                  : (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim()) ? '' : 'Перевірте адресу пошти.');
+    if (em) return { field: 'au-email', msg: em };
 
     /* Надійність пароля — окреме ядро (js/password-core.js), тут лише
        його вердикт. Мінімальна довжина продубльована на сервері
        (Supabase Auth), щоб правило не трималось на самому браузері. */
     const PC = window.PasswordCore;
+    if (!a.pass) return { field: 'au-pass', msg: 'Придумайте пароль.' };
     if (PC) {
       const v = PC.check(a.pass, { email: a.email, username: a.username });
-      if (!v.ok) return v.problem;
+      if (!v.ok) return { field: 'au-pass', msg: v.problem };
     } else if (a.pass.length < 8) {
-      return 'Пароль — щонайменше 8 символів.';
+      return { field: 'au-pass', msg: 'Пароль — щонайменше 8 символів.' };
     }
 
-    if (a.pass !== a.pass2) return 'Паролі не збігаються.';
-    return '';
+    if (!a.pass2) return { field: 'au-pass2', msg: 'Наберіть пароль ще раз — це захист від помилки.' };
+    if (a.pass !== a.pass2) {
+      return { field: 'au-pass2', msg: 'Паролі не збігаються. Перевірте другий рядок — там інший набір символів.' };
+    }
+    return null;
   }
 
   /** Живий індикатор надійності під полем пароля. */
@@ -700,7 +736,8 @@
     if ($('#au-email')) state.acc.email = g('au-email');
     if ($('#au-pass'))  state.acc.pass = g('au-pass');
     if ($('#au-pass2')) state.acc.pass2 = g('au-pass2');
-    /* Нік і пошта — у чернетку; паролі лишаються тільки в памʼяті. */
+    /* Нік — у чернетку; паролі й пошта лишаються тільки в памʼяті,
+       поки акаунт на сервері не створено (див. saveDraft). */
     saveDraft();
   }
 
@@ -726,19 +763,39 @@
   async function doLogin() {
     if (state.busy) return;
     readAccFields();
-    if (!CLOUD) { state.err = 'Сайт у локальному режимі — вхід вимкнено.'; render(); return; }
-    if (!state.acc.email || state.acc.pass.length < 8) {
-      state.err = 'Заповніть пошту й пароль (від 8 символів).'; render(); return;
+    if (!CLOUD) { return fail('', 'Сайт у локальному режимі — вхід вимкнено.'); }
+
+    /*
+     * СПЕРШУ КАЖЕМО, ЩО САМЕ НЕ ТАК.
+     *
+     * Раніше тут стояв один рядок на всі випадки — «Заповніть пошту й
+     * пароль (від 8 символів)». Людина з пробілом у кінці адреси, людина
+     * з незакритою розкладкою і людина з порожнім полем бачили те саме.
+     * Розбір причин — в AuthMsg (js/auth-msg-core.js), тут лише показ.
+     */
+    const AM = window.AuthMsg;
+    if (AM) {
+      const em = AM.emailProblem(state.acc.email);
+      if (em) return fail('au-email', em);
+      const pm = AM.loginPassProblem(state.acc.pass);
+      if (pm) return fail('au-pass', pm);
+    } else if (!state.acc.email || state.acc.pass.length < 8) {
+      return fail('', 'Заповніть пошту й пароль (від 8 символів).');
     }
-    state.busy = true; state.err = ''; render();
+
+    state.busy = true; state.err = ''; state.errField = ''; state.errAction = ''; render();
     try {
       await afterSignIn(await window.Store.signIn(state.acc.email.trim(), state.acc.pass));
       state.busy = false;
       await routeAfterAuth();
     } catch (e) {
       state.busy = false;
-      state.err = 'Не вдалося увійти: ' + ((e && e.message) || 'помилка');
-      render();
+      const r = AM ? AM.signInProblem(e)
+                   : { field: '', action: '', text: (e && e.message) || 'Не вдалося увійти.' };
+      /* Непідтверджена пошта — не помилка введення, а незавершений крок:
+         ведемо туди, де є кнопка «надіслати лист ще раз». */
+      if (r.action === 'confirm') return void navMsg('confirm', r.text);
+      fail(r.field, r.text, r.action);
     }
   }
 
@@ -747,9 +804,9 @@
     readAccFields();
     if (!CLOUD) { nav('age'); return; }   // локальний режим — одразу скринінг
     const v = validAccount();
-    if (v) { state.err = v; render(); return; }
+    if (v) { fail(v.field, v.msg); return; }
 
-    state.busy = true; state.err = ''; render();
+    state.busy = true; state.err = ''; state.errField = ''; state.errAction = ''; render();
     try {
       const res = await window.Store.signUp(state.acc.email.trim(), state.acc.pass);
       // Нік — у профіль (локально до підтвердження) і в заявку далі
@@ -788,12 +845,21 @@
           await routeAfterAuth();
           return;
         } catch (e2) {
-          state.err = 'Ця пошта вже зареєстрована, але пароль не підійшов.';
-          render(); return;
+          fail('au-pass', 'Ця пошта вже зареєстрована, а цей пароль до неї не підходить. ' +
+               'Увійдіть старим паролем — або відновіть його.', 'forgot');
+          return;
         }
       }
-      state.err = 'Не вдалося створити акаунт: ' + msg;
-      render();
+      /* Код сервера точніший за текст: weak_password стосується пароля,
+         email_exists — пошти. Показуємо помилку там, де її виправляють. */
+      const code = String((e && e.code) || '');
+      if (code === 'weak_password') return void fail('au-pass', msg);
+      if (code === 'email_exists' || code === 'user_already_exists') {
+        return void navMsg('login', 'Ця пошта вже зареєстрована. Увійдіть — ' +
+                           'або відновіть пароль, якщо не памʼятаєте.');
+      }
+      if (code === 'validation_failed') return void fail('au-email', msg);
+      fail('', 'Не вдалося створити акаунт: ' + msg);
     }
   }
 
@@ -801,7 +867,7 @@
   async function afterSignupChecks() {
     try {
       const free = await window.Store.rpc('username_free', { p_username: state.acc.username.trim() });
-      if (free === false) { state.err = 'Цей нік уже зайнятий — оберіть інший.'; nav('name'); return; }
+      if (free === false) { navMsg('name', 'Цей нік уже зайнятий — оберіть інший.', 'au-name'); return; }
     } catch (_) { /* перевірить register_request */ }
     nav('age');
   }
@@ -811,10 +877,11 @@
     if (state.busy) return;
     readAccFields();
     const mail = (state.acc.email || '').trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
-      state.err = 'Перевірте адресу пошти.'; render(); return;
-    }
-    state.busy = true; state.err = ''; render();
+    const AM = window.AuthMsg;
+    const em = AM ? AM.emailProblem(mail)
+                  : (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail) ? '' : 'Перевірте адресу пошти.');
+    if (em) { fail('au-email', em); return; }
+    state.busy = true; state.err = ''; state.errField = ''; state.errAction = ''; render();
     try {
       await window.Store.requestPasswordReset(mail);
       state.busy = false;
@@ -834,15 +901,18 @@
     if (state.busy) return;
     readAccFields();
     const PC = window.PasswordCore;
+    if (!state.acc.pass) { fail('au-pass', 'Придумайте новий пароль.'); return; }
     if (PC) {
       const v = PC.check(state.acc.pass, { email: state.acc.email, username: state.acc.username });
-      if (!v.ok) { state.err = v.problem; render(); return; }
+      if (!v.ok) { fail('au-pass', v.problem); return; }
     } else if ((state.acc.pass || '').length < 8) {
-      state.err = 'Пароль — щонайменше 8 символів.'; render(); return;
+      fail('au-pass', 'Пароль — щонайменше 8 символів.'); return;
     }
-    if (state.acc.pass !== state.acc.pass2) { state.err = 'Паролі не збігаються.'; render(); return; }
+    if (state.acc.pass !== state.acc.pass2) {
+      fail('au-pass2', 'Паролі не збігаються. Перевірте другий рядок.'); return;
+    }
 
-    state.busy = true; state.err = ''; render();
+    state.busy = true; state.err = ''; state.errField = ''; state.errAction = ''; render();
     try {
       await window.Store.updatePassword(state.acc.pass);
       state.busy = false;
@@ -858,7 +928,7 @@
   /** Повторний лист підтвердження. */
   async function doResend() {
     if (state.busy) return;
-    state.busy = true; state.err = ''; render();
+    state.busy = true; state.err = ''; state.errField = ''; state.errAction = ''; render();
     try {
       await window.Store.resendConfirmation(state.acc.email.trim());
       state.busy = false;
@@ -886,7 +956,7 @@
       navMsg('login', 'Пошту підтверджено? Тоді увійдіть тим паролем, який ви створили під час реєстрації.');
       return;
     }
-    state.busy = true; state.err = ''; render();
+    state.busy = true; state.err = ''; state.errField = ''; state.errAction = ''; render();
     try {
       await afterSignIn(await window.Store.signIn(state.acc.email.trim(), state.acc.pass));
       state.busy = false;
@@ -917,11 +987,13 @@
   async function doNameGo() {
     readAccFields();
     const n = state.acc.username.trim();
-    if (n.length < 3 || n.length > 13) { state.err = 'Нік — від 3 до 13 символів.'; render(); return; }
+    if (!n) { fail('au-name', 'Введіть нік.'); return; }
+    if (n.length < 3) { fail('au-name', 'Нік закороткий: ' + n.length + ' — а треба від 3 символів.'); return; }
+    if (n.length > 13) { fail('au-name', 'Нік задовгий: ' + n.length + ' — а можна не більше 13.'); return; }
     try { await window.Store.saveProfile({ displayName: n }); } catch (_) {}
     try {
       const free = await window.Store.rpc('username_free', { p_username: n });
-      if (free === false) { state.err = 'Цей нік теж зайнятий.'; render(); return; }
+      if (free === false) { fail('au-name', 'Цей нік теж зайнятий — спробуйте інший.'); return; }
     } catch (_) {}
     const localSnap = window.Store.localProfile() || {};
     if (localSnap.birthDate && AC.isAdult(localSnap.birthDate) &&
@@ -986,10 +1058,45 @@
    * автентифікації.
    */
 
+  /*
+   * ПОМИЛКА ЖИВЕ БІЛЯ СВОГО ПОЛЯ.
+   *
+   * errLine() лишається для помилок, які не стосуються жодного поля
+   * (немає звʼязку, забагато спроб, відмова сервера). Якщо ж відомо,
+   * ЩО САМЕ набрано не так, текст іде під тим самим інпутом — fieldErr —
+   * а сам інпут позначається aria-invalid і червоною рамкою.
+   */
   function errLine() {
-    return state.err
-      ? '<p class="small" style="color:var(--warn, #d66);margin:10px 0 0">' + esc(state.err) + '</p>'
+    return (state.err && !state.errField)
+      ? '<p class="small form-err" role="alert">' + esc(state.err) + '</p>'
       : '';
+  }
+
+  /** Повідомлення під конкретним полем. */
+  function fieldErr(id) {
+    return (state.err && state.errField === id)
+      ? '<span class="field__err" role="alert">' + esc(state.err) + '</span>'
+      : '';
+  }
+
+  /** Позначка «в цьому полі помилка» для самого інпута. */
+  function bad(id) {
+    return state.errField === id ? ' aria-invalid="true"' : '';
+  }
+
+  /**
+   * Записати помилку поля й перемалювати.
+   * @param {string} field id інпута ('' — помилка не про поле)
+   * @param {string} msg   людський текст
+   * @param {string} [action] підказка інтерфейсу: 'forgot' | 'confirm'
+   */
+  function fail(field, msg, action) {
+    state.err = msg;
+    state.errField = field || '';
+    state.errAction = action || '';
+    state.busy = false;
+    render();
+    return false;
   }
 
   function renderStart(host) {
@@ -1017,12 +1124,16 @@
       '<h1 class="gate__title">Вхід</h1>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-email">Пошта</label>' +
-        '<input class="input" id="au-email" type="email" autocomplete="email" placeholder="you@example.com" value="' + esc(state.acc.email) + '">' +
+        '<input class="input" id="au-email" type="email" autocomplete="email" placeholder="you@example.com"' +
+          bad('au-email') + ' value="' + esc(state.acc.email) + '">' +
+        fieldErr('au-email') +
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass">Пароль</label>' +
         '<input class="input" id="au-pass" type="password" autocomplete="current-password" ' +
-          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ваш пароль">' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ваш пароль"' +
+          bad('au-pass') + '>' +
+        fieldErr('au-pass') +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
@@ -1030,9 +1141,12 @@
         '<button class="btn btn--ghost" type="button" data-nav="start">← Назад</button>' +
       '</div>' +
       /* Без цього виходу акаунт із забутим паролем був назавжди втрачений:
-         відновлення не існувало ніде на сайті. */
+         відновлення не існувало ніде на сайті. Коли сервер щойно сказав
+         «пароль не підходить», кнопка стає помітною: саме там наступний
+         крок людини, яка пароль забула. */
       '<p class="small muted mt-2 mb-0">' +
-        '<button class="btn btn--ghost btn--sm" type="button" data-nav="forgot">Забули пароль?</button>' +
+        '<button class="btn ' + (state.errAction === 'forgot' ? 'btn--primary' : 'btn--ghost') +
+          ' btn--sm" type="button" data-nav="forgot">Забули пароль?</button>' +
       '</p>';
   }
 
@@ -1044,7 +1158,8 @@
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-email">Пошта</label>' +
         '<input class="input" id="au-email" type="email" autocomplete="email" ' +
-          'placeholder="you@example.com" value="' + esc(state.acc.email) + '">' +
+          'placeholder="you@example.com"' + bad('au-email') + ' value="' + esc(state.acc.email) + '">' +
+        fieldErr('au-email') +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px;flex-wrap:wrap">' +
@@ -1064,13 +1179,17 @@
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass">Новий пароль</label>' +
         '<input class="input" id="au-pass" type="password" autocomplete="new-password" ' +
-          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="від 8 символів">' +
-        (v && state.acc.pass && !v.ok ? '<span class="field__hint">' + esc(v.problem || '') + '</span>' : '') +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="від 8 символів"' +
+          bad('au-pass') + '>' +
+        (fieldErr('au-pass') ||
+         (v && state.acc.pass && !v.ok ? '<span class="field__hint">' + esc(v.problem || '') + '</span>' : '')) +
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass2">Ще раз</label>' +
         '<input class="input" id="au-pass2" type="password" autocomplete="new-password" ' +
-          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="повторіть">' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="повторіть"' +
+          bad('au-pass2') + '>' +
+        fieldErr('au-pass2') +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
@@ -1084,12 +1203,15 @@
       '<h1 class="gate__title">Створити акаунт</h1>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-name">Нік</label>' +
-        '<input class="input" id="au-name" maxlength="13" autocomplete="username" placeholder="3–13 символів" value="' + esc(state.acc.username) + '">' +
-        '<span class="field__hint">Видно всім у таблиці лідерів.</span>' +
+        '<input class="input" id="au-name" maxlength="13" autocomplete="username" placeholder="3–13 символів"' +
+          bad('au-name') + ' value="' + esc(state.acc.username) + '">' +
+        (fieldErr('au-name') || '<span class="field__hint">Видно всім у таблиці лідерів.</span>') +
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-email">Пошта</label>' +
-        '<input class="input" id="au-email" type="email" autocomplete="email" placeholder="you@example.com" value="' + esc(state.acc.email) + '">' +
+        '<input class="input" id="au-email" type="email" autocomplete="email" placeholder="you@example.com"' +
+          bad('au-email') + ' value="' + esc(state.acc.email) + '">' +
+        fieldErr('au-email') +
       '</div>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass">Пароль</label>' +
@@ -1099,7 +1221,9 @@
            каже про це прямо. */
         '<input class="input" id="au-pass" type="password" autocomplete="new-password" ' +
           'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" ' +
-          'placeholder="мінімум ' + (window.PasswordCore ? window.PasswordCore.MIN_LEN : 8) + ' символів">' +
+          'placeholder="мінімум ' + (window.PasswordCore ? window.PasswordCore.MIN_LEN : 8) + ' символів"' +
+          bad('au-pass') + '>' +
+        fieldErr('au-pass') +
         /* Індикатор надійності: оцінка приходить із PasswordCore, тут
            лише показ. Порожній, поки нічого не введено. */
         '<div id="au-pw-meter" class="pwm" hidden>' +
@@ -1112,7 +1236,9 @@
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-pass2">Пароль ще раз</label>' +
         '<input class="input" id="au-pass2" type="password" autocomplete="new-password" ' +
-          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="той самий пароль">' +
+          'lang="en" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="той самий пароль"' +
+          bad('au-pass2') + '>' +
+        fieldErr('au-pass2') +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
@@ -1155,7 +1281,9 @@
         '3–13 символів, має бути унікальним.</p>' +
       '<div class="field mt-2">' +
         '<label class="field__label" for="au-name">Нік</label>' +
-        '<input class="input" id="au-name" maxlength="13" placeholder="3–13 символів" value="' + esc(state.acc.username) + '">' +
+        '<input class="input" id="au-name" maxlength="13" placeholder="3–13 символів"' +
+          bad('au-name') + ' value="' + esc(state.acc.username) + '">' +
+        fieldErr('au-name') +
       '</div>' +
       errLine() +
       '<div class="row mt-3" style="gap:10px">' +
@@ -1224,6 +1352,77 @@
       '</div>';
   }
 
+  /*
+   * «ЦЕ ВАШЕ ПОСИЛАННЯ?» — ЕКРАН, А НЕ window.confirm.
+   *
+   * Питання тут потрібне (WEB-001: чуже посилання садило людину в чужий
+   * акаунт), але ставити його системним діалогом виявилось найгіршим із
+   * можливих способів. По-перше, у застосунках пошти посилання відкриває
+   * вбудований браузер, і сірий системний прямокутник «forge-mold1…
+   * каже:» читається як шахрайство — його закривають не читаючи.
+   * По-друге, у частині вбудованих браузерів confirm() узагалі не
+   * показується і мовчки повертає false.
+   *
+   * А ціна відмови була найвищою з можливих: токен із листа вже
+   * витрачено, на екрані — самий рядок «Вхід за посиланням скасовано»,
+   * і ЖОДНОЇ кнопки. Саме так відновлення пароля ставало неможливим:
+   * лист приходив, посилання працювало, а людина впиралась у глухий кут.
+   */
+  function renderLinkAsk(host) {
+    const info = state.linkAsk || {};
+    const mail = info.email || '';
+    const isRecovery = info.type === 'recovery';
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Це ваше посилання?</h1>' +
+      '<p class="small mt-1">Ви відкрили посилання' +
+        (isRecovery ? ' для зміни пароля' : ' із листа') +
+        ' не в тому браузері, з якого його замовляли — так буває, коли лист ' +
+        'читають у застосунку пошти або на іншому пристрої.</p>' +
+      '<p class="mt-2 mb-0">Воно веде в акаунт:</p>' +
+      '<p class="num mono" style="margin:2px 0 0;word-break:break-all"><b>' + esc(mail) + '</b></p>' +
+      '<p class="small muted mt-1">Якщо ця адреса не ваша — не входьте.</p>' +
+      '<div class="grid mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" id="au-link-yes">Так, це моя пошта</button>' +
+        '<button class="btn btn--ghost" type="button" id="au-link-no">Ні, не входити</button>' +
+      '</div>';
+
+    /*
+     * Обробники навішуються тут, а не в загальному делегуванні: init()
+     * стоїть на await цієї самої відповіді, а спільний bind() виконується
+     * ПІСЛЯ нього. Чекати на кнопку, яку ще ніхто не слухає, — вічність.
+     */
+    const answer = function (yes) {
+      const ask = state.linkAsk;
+      state.linkAsk = null;
+      if (ask && typeof ask.resolve === 'function') ask.resolve(yes);
+    };
+    const yes = host.querySelector('#au-link-yes');
+    const no = host.querySelector('#au-link-no');
+    if (yes) yes.addEventListener('click', function () { answer(true); });
+    if (no) no.addEventListener('click', function () { answer(false); });
+  }
+
+  /*
+   * Посилання не спрацювало — і це НЕ кінець дороги.
+   *
+   * Сюди веде все, що може статись із листом: застаріле посилання, вже
+   * використане, відкрите не в тому браузері, відповідь «ні» на питання
+   * вище. Спільне в усіх випадках одне: людині треба не пояснення, а
+   * наступна кнопка.
+   */
+  function renderLinkFail(host) {
+    host.innerHTML = '' +
+      '<h1 class="gate__title">Посилання не спрацювало</h1>' +
+      '<p class="small mt-1">' + esc(state.err || 'Вхід за посиланням не відбувся.') + '</p>' +
+      '<p class="small muted mt-1">Посилання з листа одноразове: воно згоряє після ' +
+        'першого відкриття й за добу. Замовте новий лист — це безкоштовно й ' +
+        'займає хвилину.</p>' +
+      '<div class="grid mt-3" style="gap:10px">' +
+        '<button class="btn btn--primary" type="button" data-nav="forgot">Надіслати новий лист</button>' +
+        '<button class="btn btn--ghost" type="button" data-nav="login">Увійти паролем</button>' +
+      '</div>';
+  }
+
   function renderBlocked(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title">Акаунт заблоковано</h1>' +
@@ -1234,6 +1433,38 @@
   }
 
   function render() {
+    renderStep();
+    afterRender();
+  }
+
+  /*
+   * Що робиться ПІСЛЯ перемальовування.
+   *
+   * 1. Паролі в HTML не пишуться (їм там не місце), тому після кожного
+   *    render поля виявлялись порожніми — і людина, яка помилилась у
+   *    пошті, мусила набирати пароль ще раз. Повертаємо з памʼяті.
+   * 2. Фокус іде в поле з помилкою й виділяє набране: наступне ж
+   *    натискання клавіші замінює неправильне, а не дописує до нього.
+   */
+  function afterRender() {
+    const put = function (id, val) {
+      const el = $('#' + id);
+      if (el && val && !el.value) el.value = val;
+    };
+    put('au-pass', state.acc.pass);
+    put('au-pass2', state.acc.pass2);
+    try { syncPwMeter(); } catch (_) {}
+
+    if (!state.errField) return;
+    const el = $('#' + state.errField);
+    if (!el) return;
+    try {
+      el.focus({ preventScroll: true });
+      if (typeof el.select === 'function') el.select();
+    } catch (_) { try { el.focus(); } catch (_2) {} }
+  }
+
+  function renderStep() {
     const host = $('#gate-card');
     if (!host) return;
     switch (state.step) {
@@ -1243,6 +1474,8 @@
       case 'confirm':  return renderConfirm(host);
       case 'forgot':   return renderForgot(host);
       case 'newpass':  return renderNewPass(host);
+      case 'linkask':  return renderLinkAsk(host);
+      case 'linkfail': return renderLinkFail(host);
       case 'name':     return renderName(host);
       case 'body':     return renderBody(host);
       case 'pending':  return renderPending(host);
@@ -1259,7 +1492,7 @@
    * гасло тим самим викликом, який мав його показати.
    */
   function nav(step) {
-    if (step !== state.step) state.err = '';
+    if (step !== state.step) { state.err = ''; state.errField = ''; state.errAction = ''; }
     state.step = step;
     render();
   }
@@ -1272,9 +1505,11 @@
    * повідомлення саме й пояснює, ЧОМУ нас сюди перекинуло («ця пошта вже
    * зареєстрована»), і без нього перехід виглядає як збій.
    */
-  function navMsg(step, msg) {
+  function navMsg(step, msg, field, action) {
     state.step = step;
     state.err = msg;
+    state.errField = field || '';
+    state.errAction = action || '';
     render();
   }
 
@@ -1306,14 +1541,27 @@
            * саме акаунт іде вхід.
            */
           confirm: function (info) {
-            return window.confirm(
-              'Увійти як ' + (info.email || 'цей користувач') + '?\n\n' +
-              'Посилання відкрито не в тому браузері, з якого його замовляли. ' +
-              'Якщо ця адреса не ваша — натисніть «Скасувати».');
+            return new Promise(function (resolve) {
+              state.linkAsk = { email: info.email || '', type: info.type || '', resolve: resolve };
+              state.step = 'linkask';
+              render();
+            });
           }
         });
       }
-      catch (e) { state.err = (e && e.message) || ''; }
+      catch (e) {
+        state.err = (e && e.message) || '';
+        /* Усе, що зветься link_*, — це одна й та сама ситуація для людини:
+           лист є, а всередину не пустило. Їй потрібен вихід, а не рядок
+           тексту на стартовому екрані (див. renderLinkFail). */
+        if (/^link_/.test(String((e && e.code) || ''))) {
+          state.linkAsk = null;
+          state.step = 'linkfail';
+          render();
+          bind();
+          return;
+        }
+      }
 
       if (fromLink && fromLink.type === 'recovery') {
         /* Лист відновлення: сесія вже є, але вести людину в застосунок не
@@ -1351,7 +1599,20 @@
       render();
     }
 
+    bind();
+  }
+
+  /*
+   * Обробники екрана. Окремо від init() навмисно: гілка «посилання з
+   * листа не спрацювало» виходить із init() раніше, і без цього виклику
+   * її кнопки були б мертві.
+   */
+  let bound = false;
+  function bind() {
+    if (bound) return;
     const host = $('#gate-card');
+    if (!host) return;
+    bound = true;
 
     /** Наступне/попереднє поле дати — для автопереходу. */
     function dobNeighbour(key, dir) {

@@ -1,4 +1,15 @@
-/* Відновлення пароля й перехід із листа. */
+/*
+ * Відновлення пароля й перехід із листа.
+ *
+ * ГОЛОВНЕ, ЩО ТУТ СТЕРЕЖЕТЬСЯ, — що з листа є ВИХІД у будь-якому разі.
+ * Лист приходить, посилання робоче, а людина все одно не міняє пароля —
+ * саме так виглядав живий випадок «відновити пароль неможливо». Причина
+ * була не в пошті й не в Supabase: посилання з листа відкривається у
+ * вбудованому браузері застосунку пошти, тобто НЕ в тому браузері, з
+ * якого його замовляли, — а на цей випадок сайт ставив системний
+ * window.confirm і при відмові лишав порожній екран із одним рядком
+ * тексту. Токен уже витрачено, кнопок немає, іти нікуди.
+ */
 import { chromium } from 'playwright';
 import { CHROME } from './pw.mjs';
 const ROOT = process.cwd();
@@ -61,7 +72,15 @@ const title = p => p.locator('#gate-card h1').innerText().then(t => t.trim());
   await p.goto('file://'+ROOT+'/welcome.html#access_token=AT&refresh_token=RT&expires_in=3600&type=recovery',
     { waitUntil:'load' });
   await p.waitForTimeout(1400);
-  ok('6. з листа відновлення — одразу екран нового пароля', /Новий пароль/.test(await title(p)), await title(p));
+
+  /* Лист відкрито в іншому браузері (позначки «ми замовляли» тут немає) —
+     питаємо СВОЇМ екраном, а не системним діалогом, і показуємо пошту. */
+  ok('6а. питання про чуже посилання — екраном сайту', /Це ваше посилання/.test(await title(p)), await title(p));
+  ok('6б. видно, у чий акаунт іде вхід',
+     /friend@example\.com/.test(await p.locator('#gate-card').innerText()));
+  await p.locator('#au-link-yes').click();
+  await p.waitForTimeout(900);
+  ok('6. з листа відновлення — екран нового пароля', /Новий пароль/.test(await title(p)), await title(p));
   ok('7. токен прибрано з адреси', !/access_token/.test(p.url()), p.url().split('/').pop());
   await p.locator('#au-pass').fill('Nadijnyj1!');
   await p.locator('#au-pass2').fill('Nadijnyj1!');
@@ -72,11 +91,68 @@ const title = p => p.locator('#gate-card h1').innerText().then(t => t.trim());
   await ctx.close();
 }
 
+/* ---- 2б. «Ні, не входити» — і це не глухий кут ---- */
+{
+  const ctx = await ctxWith(async c => {
+    await c.route(/\/auth\/v1\/user/, r => r.fulfill({ status:200, contentType:'application/json',
+      body: JSON.stringify({ id:'u-1', email:'stranger@example.com' }) }));
+  });
+  const p = await ctx.newPage(); const errs=[]; p.on('pageerror', e=>errs.push(e.message));
+  await p.goto('file://'+ROOT+'/welcome.html#access_token=AT&refresh_token=RT&expires_in=3600&type=recovery',
+    { waitUntil:'load' });
+  await p.waitForTimeout(1400);
+  await p.locator('#au-link-no').click();
+  await p.waitForTimeout(700);
+  const txt = () => p.locator('#gate-card').innerText();
+  ok('9а. відмова веде на екран із виходом, а не в порожнечу',
+     /Посилання не спрацювало/.test(await title(p)), await title(p));
+  ok('9б. є кнопка замовити новий лист',
+     (await p.locator('[data-nav="forgot"]').count()) >= 1, await txt());
+  await p.locator('[data-nav="forgot"]').first().click();
+  await p.waitForTimeout(600);
+  ok('9в. кнопка справді відкриває відновлення', /Відновлення пароля/.test(await title(p)), await title(p));
+  ok('9г. без JS-помилок', errs.length===0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 2в. Той самий браузер: жодних питань ---- */
+{
+  const ctx = await ctxWith(async c => {
+    await c.route(/\/auth\/v1\/user/, r => r.fulfill({ status:200, contentType:'application/json',
+      body: JSON.stringify({ id:'u-1', email:'friend@example.com' }) }));
+  });
+  /* Позначку кладемо ДО завантаження сторінки: якщо спершу відкрити
+     welcome.html без фрагмента, а потім із ним, Chromium вважає це
+     переходом усередині тієї самої сторінки — код просто не виконається
+     вдруге, і перевірка міряла б порожнечу. */
+  await ctx.addInitScript(() => {
+    try {
+      localStorage.setItem('ib.auth.await',
+        JSON.stringify({ email: 'friend@example.com', at: Date.now() }));
+    } catch (_) {}
+  });
+  const p = await ctx.newPage(); const errs=[]; p.on('pageerror', e=>errs.push(e.message));
+  await p.goto('file://'+ROOT+'/welcome.html#access_token=AT&refresh_token=RT&expires_in=3600&type=recovery',
+    { waitUntil:'load' });
+  await p.waitForTimeout(1400);
+  ok('9д. свій браузер — одразу новий пароль, без зайвого питання',
+     /Новий пароль/.test(await title(p)), await title(p));
+  ok('9е. без JS-помилок', errs.length===0, errs.join(' | '));
+  await ctx.close();
+}
+
 /* ---- 3. Перехід із листа підтвердження: людина вже ввійдена ---- */
 {
   const ctx = await ctxWith(async c => {
     await c.route(/\/auth\/v1\/user/, r => r.fulfill({ status:200, contentType:'application/json',
       body: JSON.stringify({ id:'u-2', email:'friend@example.com' }) }));
+  });
+  /* Лист замовляли з цього ж браузера — зайвих питань бути не має. */
+  await ctx.addInitScript(() => {
+    try {
+      localStorage.setItem('ib.auth.await',
+        JSON.stringify({ email: 'friend@example.com', at: Date.now() }));
+    } catch (_) {}
   });
   const p = await ctx.newPage(); const errs=[]; p.on('pageerror', e=>errs.push(e.message));
   await p.goto('file://'+ROOT+'/welcome.html#access_token=AT&refresh_token=RT&expires_in=3600&type=signup',
@@ -103,6 +179,8 @@ const title = p => p.locator('#gate-card h1').innerText().then(t => t.trim());
   ok('14. сказано, що посилання застаріле',
      /вже використане або застаріле/.test(await p.locator('#gate-card').innerText()),
      (await p.locator('#gate-card').innerText()).split('\n').filter(Boolean).slice(-2).join(' / '));
+  ok('14б. і тут є кнопка замовити новий лист',
+     (await p.locator('[data-nav="forgot"]').count()) >= 1, await title(p));
   ok('15. токен усе одно прибрано з адреси', !/access_token/.test(p.url()));
   ok('16. без JS-помилок', errs.length===0, errs.join(' | '));
   await ctx.close();
@@ -117,6 +195,12 @@ const title = p => p.locator('#gate-card h1').innerText().then(t => t.trim());
   const ctx = await ctxWith(async c => {
     await c.route(/\/auth\/v1\/user/, r => r.fulfill({ status:200, contentType:'application/json',
       body: JSON.stringify({ id:'u-1', email:'friend@example.com' }) }));
+  });
+  await ctx.addInitScript(() => {
+    try {
+      localStorage.setItem('ib.auth.await',
+        JSON.stringify({ email: 'friend@example.com', at: Date.now() }));
+    } catch (_) {}
   });
   const p = await ctx.newPage(); const errs=[]; p.on('pageerror', e=>errs.push(e.message));
   await p.goto('file://'+ROOT+'/today.html#access_token=AT&refresh_token=RT&expires_in=3600&type=recovery',

@@ -10,6 +10,10 @@
  * Тому тут перевіряються рівно дві речі, яких не бачить verifyregister:
  *   1. що набране переживає F5 — і що пароль при цьому НЕ лягає на диск;
  *   2. що вимкнена кнопка завжди має підпис із причиною.
+ *
+ * І третя, додана пізніше: поки акаунта на сервері НЕМА, на диску не має
+ * бути й пошти. Незавершена реєстрація не лишає по собі слідів — ні коли
+ * людина просто передумала на півдорозі, ні коли запит на сервер упав.
  */
 import { chromium } from 'playwright';
 import { CHROME } from './pw.mjs';
@@ -18,14 +22,17 @@ const ROOT = process.cwd();
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-const server = { confirmed: false, status: 'none', registerCalls: [] };
+const server = { confirmed: false, status: 'none', registerCalls: [], signupFails: false };
 
 const b = await chromium.launch({ executablePath: CHROME });
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
 await ctx.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, r => r.abort());
 await ctx.route(/\/rest\/v1\/rpc\//, r => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
-await ctx.route(/\/auth\/v1\/signup/, r => r.fulfill({ status: 200, contentType: 'application/json',
-  body: JSON.stringify({ id: 'u1', email: 'f@e.com', confirmation_sent_at: new Date().toISOString() }) }));
+await ctx.route(/\/auth\/v1\/signup/, r => server.signupFails
+  ? r.fulfill({ status: 422, contentType: 'application/json',
+      body: JSON.stringify({ error_code: 'weak_password', msg: 'Password is too weak' }) })
+  : r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ id: 'u1', email: 'f@e.com', confirmation_sent_at: new Date().toISOString() }) }));
 await ctx.route(/\/auth\/v1\/token/, r => server.confirmed
   ? r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
       access_token: 'tok', refresh_token: 'ref', expires_in: 3600, user: { id: 'u1', email: 'f@e.com' } }) })
@@ -55,6 +62,17 @@ const title = () => p.evaluate(() => ((document.querySelector('#gate-card h1') |
 const noteOf = async (id) => ((await p.locator(id).textContent()) || '').trim();
 
 const PASS = 'DobrePass1!';
+const MAIL = 'f@e.com';
+
+/** Ключі localStorage, у значенні яких зустрічається рядок. */
+const whereIs = (needle) => p.evaluate((n) => {
+  const hits = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (String(localStorage.getItem(k)).indexOf(n) !== -1) hits.push(k);
+  }
+  return hits;
+}, needle);
 
 /* ---- Реєстрація до екрана «Підтвердіть пошту» ---- */
 await p.goto('file://' + ROOT + '/welcome.html', { waitUntil: 'load' });
@@ -62,7 +80,35 @@ await p.waitForTimeout(700);
 await p.locator('[data-nav="reg"]').click();
 await p.waitForTimeout(300);
 await p.locator('#au-name').fill('Друг');
-await p.locator('#au-email').fill('f@e.com');
+await p.locator('#au-email').fill(MAIL);
+await p.locator('#au-pass').fill(PASS);
+await p.locator('#au-pass2').fill(PASS);
+await p.waitForTimeout(400);
+
+/*
+ * НЕЗАВЕРШЕНА РЕЄСТРАЦІЯ НЕ ЛИШАЄ СЛІДІВ.
+ *
+ * Форма заповнена, але кнопку ще не натиснуто: акаунта нема ніде. Якщо
+ * людина зараз закриє вкладку — на цьому компʼютері (часто спільному або
+ * чужому) не має лишитись ні пошти, ні пароля.
+ */
+ok('0. до подання пошти немає на диску', (await whereIs(MAIL)).length === 0,
+   (await whereIs(MAIL)).join(', ') || 'чисто');
+
+/* Те саме, коли запит дійшов до сервера і той відмовив: акаунта знову
+   нема, отже й памʼятати нічого. Раніше позначка «чекаємо лист» лягала
+   на диск ДО запиту і переживала будь-яку відмову. */
+server.signupFails = true;
+await p.locator('#au-reg').click();
+await p.waitForTimeout(900);
+ok('0б. невдала реєстрація лишилась на екрані реєстрації',
+   !/Підтвердіть пошту/.test(await title()), await title());
+ok('0б. невдала реєстрація не лишила пошти на диску', (await whereIs(MAIL)).length === 0,
+   (await whereIs(MAIL)).join(', ') || 'чисто');
+server.signupFails = false;
+
+/* Після відмови поля паролів перемальовуються порожніми — набираємо ще раз,
+   як зробила б людина. */
 await p.locator('#au-pass').fill(PASS);
 await p.locator('#au-pass2').fill(PASS);
 await p.waitForTimeout(300);
@@ -79,14 +125,7 @@ ok('2. пошта на екрані збереглася',
 
 /* ПАРОЛЬ НЕ МАЄ ЛЕЖАТИ НА ДИСКУ. Чернетка потрібна для зручності, але
    зручність не купується збереженим паролем — перевіряємо все сховище. */
-const leaked = await p.evaluate((pw) => {
-  const hits = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (String(localStorage.getItem(k)).indexOf(pw) !== -1) hits.push(k);
-  }
-  return hits;
-}, PASS);
+const leaked = await whereIs(PASS);
 ok('3. пароля немає в localStorage', leaked.length === 0, leaked.join(', ') || 'чисто');
 
 /* ---- «Я підтвердив(ла)» без пароля в памʼяті веде на вхід, а не в глухий кут ---- */

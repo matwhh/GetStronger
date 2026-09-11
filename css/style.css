@@ -1508,6 +1508,35 @@ a.card > .btn {
 .field__label { font-size: 0.83rem; font-weight: 600; color: var(--text-2); letter-spacing: 0.01em; }
 .field__hint  { font-size: 0.78rem; color: var(--muted); }
 
+/*
+ * ПОМИЛКА ПОРУЧ ІЗ ПОЛЕМ.
+ *
+ * Раніше будь-яка помилка форми лягала одним рядком під карткою — і
+ * людина, у якої не так набрана ОДНА адреса з чотирьох полів, мусила
+ * здогадуватись, котра. Тепер текст стоїть під своїм полем, а сам інпут
+ * позначається aria-invalid — це одночасно і рамка, і сигнал читалці.
+ *
+ * Колір беремо той самий, що й решта попереджень (--warn): нового
+ * кольору тут не зʼявляється, змінюється лише місце.
+ */
+.field__err {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--warn, #d66);
+}
+
+.form-err {
+  margin: 10px 0 0;
+  color: var(--warn, #d66);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--warn, #d66);
+  box-shadow: 0 0 0 1px var(--warn, #d66) inset;
+}
+
 .input, .select, .textarea {
   width: 100%;
   padding: 11px 14px;
@@ -5737,11 +5766,59 @@ h1 > .h1-ico {
   transition: color var(--t-fast), transform var(--t-fast);
 }
 .nav__help[hidden] { display: none; }
-/* 4:3, не квадрат: viewBox книги тісний, тож висота ставиться явно. */
-.nav__help .nav__ico { width: 34px; height: 26px; }
+/*
+ * 4:3, не квадрат: viewBox книги тісний, тож висота ставиться явно.
+ *
+ * ЗНАК НАВМИСНО МАЛИЙ. Він стоїть на КОЖНІЙ сторінці й не є дією, по
+ * якій приходять: у 34px книга перетягувала на себе весь правий кут
+ * шапки й читалась як головна кнопка сайту. Сам ґудзик лишається 40px —
+ * це мінімальна ціль для пальця, її зменшувати не можна.
+ */
+.nav__help .nav__ico { width: 22px; height: 17px; }
+/* Окремо від решти дій: довідка — не синхронізація і не меню, і
+   злипатись із ними в один кластер їй нема чого. */
+.nav__help { margin-right: 4px; }
 .nav__help:hover { color: var(--text); transform: translateY(-1px); }
 /* Фокус із клавіатури мусить бути видимим — без рамки його інакше немає. */
 .nav__help:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; border-radius: 8px; }
+
+/* =====================================================================
+   ПОШУК У ДОВІДЦІ
+
+   Смуга між заголовком і тілом. Липка вона навмисно: тіло довідки на
+   деяких розділах — кілька екранів, і догорнувши до середини, людина
+   інакше мусила б вертатись угору по саме поле пошуку.
+   ===================================================================== */
+.help__tools {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 0 24px 14px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+}
+.help__q { flex: 1 1 200px; min-width: 0; }
+.help__guide { flex: 0 0 auto; white-space: nowrap; }
+
+/* Результати. Кожен — ґудзик на всю ширину: тапати по рядку тексту
+   пальцем незручно, а «де це лежить» важливіше за сам уривок, тому
+   стоїть першим і набране акцентним. */
+.help__hits { display: grid; gap: 10px; }
+.help__hit {
+  display: grid; gap: 4px; text-align: left;
+  width: 100%; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: none; color: inherit; cursor: pointer;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.help__hit:hover { border-color: var(--line-2); background: rgba(var(--acc-rgb), 0.06); }
+.help__hit:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
+.help__hit-where { font-size: 0.78rem; color: var(--acc-ink); font-weight: 600; }
+.help__hit-text { font-size: 0.9rem; line-height: 1.5; color: var(--text-2); }
+
+@media (max-width: 640px) {
+  .help__tools { padding: 0 16px 12px; }
+  .help__guide { flex: 1 1 100%; }
+}
 
 /* Вікно ширше за звичайне: у довідці є таблиці на три колонки, і в 460px
    вони перетворюються на стовпчик із двох слів. */
@@ -5860,7 +5937,7 @@ h1 > .h1-ico {
 .help__fab {
   position: fixed; z-index: 90;
   right: 16px; bottom: 16px;
-  width: 48px; height: 48px; padding: 0;
+  width: 40px; height: 40px; padding: 0;
   display: grid; place-items: center;
   border: 1px solid var(--line-2); border-radius: 999px;
   background: var(--bg-1); color: var(--text-2);
@@ -5871,7 +5948,7 @@ h1 > .h1-ico {
 /* Плашку тут лишено навмисно, на відміну від кнопки в шапці: ця кнопка
    висить ПОВЕРХ довільного вмісту сторінки, і без фону знак губився б на
    тексті. Сам знак — того самого розміру, що й у шапці. */
-.help__fab svg { width: 34px; height: 26px; }
+.help__fab svg { width: 22px; height: 17px; }
 .help__fab:hover { color: var(--text); border-color: transparent; background: rgba(var(--acc-rgb), 0.18); }
 @supports (padding: env(safe-area-inset-bottom)) {
   .help__fab { bottom: calc(16px + env(safe-area-inset-bottom)); }

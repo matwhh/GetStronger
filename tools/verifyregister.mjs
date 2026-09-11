@@ -65,7 +65,7 @@ const step = () => p.evaluate(() => {
 
 await p.goto('file://' + ROOT + '/welcome.html', { waitUntil:'load' });
 await p.waitForTimeout(800);
-ok('1. стартовий екран', /Forge/.test(await step()), await step());
+ok('1. стартовий екран', /Get Stronger/.test(await step()), await step());
 
 await p.locator('[data-nav="reg"]').click();
 await p.waitForTimeout(400);
@@ -141,7 +141,7 @@ if (server.registerCalls.length) {
      JSON.stringify((c.p_consents||[]).map(x=>x.document)));
   ok('13. у заявці є скринінг', c.p_screening && c.p_screening.weight === 78, JSON.stringify(c.p_screening));
 }
-ok('14. фінальний екран — «заявку отримано»', /отримано|очікує/i.test(await p.locator('#gate-card').innerText()),
+ok('14. фінальний екран — «заявку отримано»', /надіслано|отримано|очікує/i.test(await p.locator('#gate-card').innerText()),
    (await step()));
 ok('15. без JS-помилок', errs.length === 0, errs.join(' | '));
 

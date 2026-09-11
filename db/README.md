@@ -86,6 +86,7 @@
 2026090723xxxx  profiles_update_user_id_column_grant   → account-guards.sql
 2026090723xxxx  revoke_anon_elo_week_ready             → (лише міграція)
 2026090721xxxx  elo_submit_delta_equals_actual_change  → cron-log-and-guards.sql
+20260911xxxxxx  purge_abandoned_signups                → purge-abandoned-signups.sql
 ```
 
 **Правило, куплене дорого.** Функцію переписують ЦІЛКОМ лише з її

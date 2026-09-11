@@ -1497,14 +1497,19 @@
     signUp: async function (email, password) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено. Заповніть ключі Supabase у js/config.js.');
       const local = readLocalProfile();
-      /* Позначка «лист замовляли з цього браузера» — до відправки: якщо
-         запит упаде, зайва позначка нікому не шкодить, а якщо дійде —
-         людина повернеться за посиланням без зайвих питань (WEB-001). */
-      markAwaitingLink(email);
       const data = await req(withRedirect('/auth/v1/signup'), {
         method: 'POST', auth: false,
         body: { email: email, password: password }
       });
+      /*
+       * Позначка «лист замовляли з цього браузера» (WEB-001) — лише ПІСЛЯ
+       * вдалої відповіді. Раніше вона лягала на диск ДО запиту, і пошта
+       * людини, чия реєстрація впала на першому ж кроці (слабкий пароль,
+       * обірване зʼєднання, 429), лишалась у localStorage ще добу — хоча
+       * акаунта так і не зʼявилось. Незавершена реєстрація не має лишати
+       * по собі нічого.
+       */
+      markAwaitingLink(email);
 
       // Якщо в проєкті увімкнене підтвердження пошти — сесії ще немає
       if (data && data.access_token) {
@@ -1685,11 +1690,12 @@
     /** Лист для відновлення пароля. */
     requestPasswordReset: async function (email) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
-      markAwaitingLink(email);
-      return req(withRedirect('/auth/v1/recover'), {
+      const out = await req(withRedirect('/auth/v1/recover'), {
         method: 'POST', auth: false,
         body: { email: email }
       });
+      markAwaitingLink(email);   // лист пішов — тільки тепер є що памʼятати
+      return out;
     },
 
     /** Новий пароль для поточної сесії (після листа відновлення). */
@@ -1710,11 +1716,12 @@
      */
     resendConfirmation: async function (email) {
       if (!CLOUD) throw new Error('Хмарний режим вимкнено.');
-      markAwaitingLink(email);
-      return req(withRedirect('/auth/v1/resend'), {
+      const out = await req(withRedirect('/auth/v1/resend'), {
         method: 'POST', auth: false,
         body: { type: 'signup', email: email }
       });
+      markAwaitingLink(email);
+      return out;
     },
 
     /**

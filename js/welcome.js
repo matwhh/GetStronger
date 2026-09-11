@@ -994,11 +994,7 @@
 
   function renderStart(host) {
     host.innerHTML = '' +
-      /* Назва стоїть великим знаком над карткою (.gate__logo у розмітці
-         сторінки), і повторювати її тут означало б написати одне слово
-         двічі поспіль. Заголовок каже, ЩО робити далі — це єдине, чого
-         на цьому екрані бракувало. */
-      '<h1 class="gate__title" style="text-align:center">Тренування, харчування, прогрес</h1>' +
+      '<h1 class="gate__title" style="text-align:center">Get Stronger</h1>' +
       '<div class="grid mt-3" style="gap:12px;max-width:320px;margin-left:auto;margin-right:auto">' +
         '<button class="btn btn--primary" type="button" data-nav="login">Увійти</button>' +
         '<button class="btn btn--ghost" type="button" data-nav="' + (CLOUD ? 'reg' : 'age') + '">Зареєструватися</button>' +

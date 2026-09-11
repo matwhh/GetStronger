@@ -992,20 +992,6 @@
               '<span>' + esc(CFG.siteName || 'Get Stronger') + '</span>' +
           '</span>' +
           '<div class="nav__actions">' +
-            /*
-             * Кнопка довідки. Одна на весь сайт — вміст залежить від
-             * поточної сторінки (js/help-content.js). Стоїть у шапці
-             * ліворуч від решти дій: до неї тягнуться, коли не розуміють
-             * екран, тобто раніше, ніж до синхронізації чи меню.
-             *
-             * hidden доти, доки js/help.js не переконався, що для цієї
-             * сторінки розділ довідки взагалі є: кнопка, яка відкриває
-             * порожнє вікно, гірша за її відсутність.
-             */
-            '<button class="nav__help" type="button" data-help-open hidden ' +
-                    'aria-label="Довідка про цей розділ" title="Довідка">' +
-              navIcon('help', 'nav__ico') +
-            '</button>' +
             '<a class="nav__sync" href="account.html" hidden>' +
               '<span class="nav__sync-dot" aria-hidden="true"></span>' +
               '<span class="nav__sync-txt">Не синхронізовано</span>' +
@@ -1110,10 +1096,6 @@
         // тоді placeRatingBadge() переносить значок сюди, щоб він не
         // зникав із шапки разом із меню.
         '<div class="nav__actions">' +
-          '<button class="nav__help" type="button" data-help-open hidden ' +
-                  'aria-label="Довідка про цей розділ" title="Довідка">' +
-            navIcon('help', 'nav__ico') +
-          '</button>' +
           // Стан синхронізації. За звичайних умов його НЕМАЄ взагалі —
           // зʼявляється лише коли є що досилати (див. renderSyncBadge).
           '<a class="nav__sync" href="account.html" hidden>' +
@@ -2179,6 +2161,13 @@
     levelIcon: levelIcon,
     lockScroll: lockScroll,
     confirmBox: confirmBox,
+    /*
+     * Значки навігації назовні. Потрібно js/help.js: його кутова кнопка
+     * мусить нести ТОЙ САМИЙ знак розгорнутої книги, що стояв у шапці.
+     * Друга копія шляху в іншому файлі — це друга книга, яка розійдеться
+     * з першою на першій же правці.
+     */
+    navIcon: navIcon,
     onDayChange: onDayChange,
     whenReady: whenReady
   };

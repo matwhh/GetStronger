@@ -48,8 +48,12 @@ async function page(ctx, url) {
 {
   const ctx = await adultContext(b, { viewport: { width: 1100, height: 900 } });
   const PAGES = ['index.html', 'workout.html', 'plan.html', 'journal.html',
-                 'meals.html', 'measure.html', 'calculator.html', 'account.html'];
+                 'meals.html', 'measure.html', 'calculator.html', 'account.html',
+                 'trackers-settings.html', 'periodization.html', 'nutrition.html',
+                 'supplements.html', 'research.html', 'rating.html', 'awards.html',
+                 'programs.html', 'cardio.html', 'boxing.html', 'trackers.html'];
   const missing = [];
+  const covered = [];
   let glyph = null;
   for (const url of PAGES) {
     const p = await page(ctx, url);
@@ -59,12 +63,22 @@ async function page(ctx, url) {
       const ico = btn.querySelector('svg');
       const r = ico ? ico.getBoundingClientRect() : null;
       const br = btn.getBoundingClientRect();
+      const nav = document.querySelector('.nav');
+      const navBottom = nav ? Math.round(nav.getBoundingClientRect().bottom) : 0;
+      /* Що саме лежить під кнопкою — так ловиться накладання на текст. */
+      const under = document.elementFromPoint(br.left + br.width / 2, br.top + br.height / 2);
       return { w: r ? Math.round(r.width) : 0, h: r ? Math.round(r.height) : 0,
                bw: Math.round(br.width), bh: Math.round(br.height),
                right: Math.round(window.innerWidth - br.right),
-               top: Math.round(br.top) };
+               top: Math.round(br.top), navBottom: navBottom,
+               inNav: Boolean(btn.closest('.nav')),
+               mine: Boolean(under && btn.contains(under)) };
     });
     if (!info) missing.push(url); else glyph = info;
+    /* Перекриття перевіряємо на КОЖНІЙ сторінці, а не на останній:
+       кнопка висить поверх довільного вмісту, і достатньо одного
+       довгого заголовка, щоб вона опинилась під ним. */
+    if (info && !info.mine) covered.push(url);
     await p.close();
   }
   ok('1. значок довідки є на кожній сторінці', missing.length === 0, missing.join(', ') || 'усі');
@@ -74,8 +88,18 @@ async function page(ctx, url) {
      кнопка перестає натискатись на телефоні. */
   ok('3. але сама кнопка лишається зручною для пальця',
      glyph && glyph.bw >= 36 && glyph.bh >= 36, glyph ? glyph.bw + '×' + glyph.bh : '—');
-  ok('4. стоїть угорі праворуч', glyph && glyph.right < 120 && glyph.top < 90,
-     glyph ? 'справа ' + glyph.right + ', згори ' + glyph.top : '—');
+  /*
+   * У КУТКУ, А НЕ В ПАНЕЛІ. Це різні речі, і саме про це була вимога:
+   * кнопка мусить бути окремим елементом у правому верхньому куті,
+   * нижче шапки, а не ще одним значком у кластері навігації.
+   */
+  ok('4. це окрема кутова кнопка, а не пункт шапки', glyph && !glyph.inNav,
+     glyph && glyph.inNav ? 'усередині .nav' : 'окремо');
+  ok('5. праворуч і одразу під шапкою',
+     glyph && glyph.right < 40 && glyph.top >= glyph.navBottom && glyph.top < glyph.navBottom + 40,
+     glyph ? 'справа ' + glyph.right + ', згори ' + glyph.top + ' (шапка до ' + glyph.navBottom + ')' : '—');
+  ok('6. на жодній сторінці її нічим не перекрито', covered.length === 0,
+     covered.join(', ') || 'вільна скрізь');
   await ctx.close();
 }
 
@@ -90,21 +114,21 @@ p.on('pageerror', e => errs.push(e.message));
 await p.locator('[data-help-open]').first().click();
 await p.waitForTimeout(500);
 
-ok('5. вікно довідки відкрилось', (await p.locator('.help__box').count()) === 1);
-ok('6. у вікні є поле пошуку', (await p.locator('.help__q').count()) === 1);
-ok('7. і кнопка «Інструкція до сайту»', (await p.locator('[data-help-guide]').count()) === 1);
+ok('7. вікно довідки відкрилось', (await p.locator('.help__box').count()) === 1);
+ok('8. у вікні є поле пошуку', (await p.locator('.help__q').count()) === 1);
+ok('9. і кнопка «Інструкція до сайту»', (await p.locator('[data-help-guide]').count()) === 1);
 
 const title = () => p.locator('#help-t').innerText();
-ok('8. спершу показано розділ цієї сторінки', /Сьогодні/.test(await title()), await title());
+ok('10. спершу показано розділ цієї сторінки', /Сьогодні/.test(await title()), await title());
 
 /* ---- пошук ---- */
 await p.locator('.help__q').fill('RIR');
 await p.waitForTimeout(400);
 {
   const hits = await p.locator('.help__hit').count();
-  ok('9. пошук щось знайшов', hits > 0, String(hits));
+  ok('11. пошук щось знайшов', hits > 0, String(hits));
   const where = await p.$$eval('.help__hit-where', (n) => n.map((x) => x.textContent.trim()));
-  ok('10. знайдене лежить у РІЗНИХ розділах, а не лише в поточному',
+  ok('12. знайдене лежить у РІЗНИХ розділах, а не лише в поточному',
      new Set(where.map((w) => w.split('·')[0].trim())).size > 1, where.join(' | '));
 }
 
@@ -114,36 +138,36 @@ await p.waitForTimeout(400);
   const where = (await first.locator('.help__hit-where').innerText()).split('·')[0].trim();
   await first.click();
   await p.waitForTimeout(400);
-  ok('11. дотик по знайденому відкрив саме той розділ',
+  ok('13. дотик по знайденому відкрив саме той розділ',
      (await title()).trim() === where, await title() + ' проти ' + where);
-  ok('12. поле пошуку очистилось', (await p.locator('.help__q').inputValue()) === '');
+  ok('14. поле пошуку очистилось', (await p.locator('.help__q').inputValue()) === '');
 }
 
 /* Запит без відповіді має пояснювати, а не мовчати. */
 await p.locator('.help__q').fill('крокодилопарк');
 await p.waitForTimeout(400);
-ok('13. на безрезультатний запит є людська відповідь',
+ok('15. на безрезультатний запит є людська відповідь',
    /Нічого не знайшлося/.test(await p.locator('.help__body').innerText()));
 
 /* Escape у полі чистить пошук, а не закриває всю довідку. */
 await p.locator('.help__q').press('Escape');
 await p.waitForTimeout(400);
-ok('14. Escape у полі пошуку не закриває вікно', (await p.locator('.help__box').count()) === 1);
-ok('15. і повертає розділ сторінки', /Сьогодні/.test(await title()), await title());
+ok('16. Escape у полі пошуку не закриває вікно', (await p.locator('.help__box').count()) === 1);
+ok('17. і повертає розділ сторінки', /Сьогодні/.test(await title()), await title());
 
 /* ---- інструкція ---- */
 await p.locator('[data-help-guide]').click();
 await p.waitForTimeout(400);
-ok('16. «Інструкція до сайту» відкрилась', /Інструкція до сайту/.test(await title()), await title());
+ok('18. «Інструкція до сайту» відкрилась', /Інструкція до сайту/.test(await title()), await title());
 {
   const t = await p.locator('.help__body').innerText();
-  ok('17. інструкція йде по порядку від акаунта', /Крок 1\. Акаунт/.test(t));
-  ok('18. і доходить до щоденного користування', /Звичайний день/.test(t));
-  ok('19. пояснює, що з чим повʼязане', /Що з чим повʼязане/.test(t));
-  ok('20. вона довга — це інструкція, а не абзац', t.length > 4000, String(t.length));
+  ok('19. інструкція йде по порядку від акаунта', /Крок 1\. Акаунт/.test(t));
+  ok('20. і доходить до щоденного користування', /Звичайний день/.test(t));
+  ok('21. пояснює, що з чим повʼязане', /Що з чим повʼязане/.test(t));
+  ok('22. вона довга — це інструкція, а не абзац', t.length > 4000, String(t.length));
 }
 
-ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
+ok('23. без JS-помилок', errs.length === 0, errs.join(' | '));
 /* Саме кнопка в шапці: підкладка теж має data-help-close, але вона
    лежить під коробкою й кліку не приймає. */
 await p.locator('.help__head [data-help-close]').click();
@@ -154,31 +178,31 @@ await p.waitForTimeout(300);
 /* ------------------------------------------------------------------ */
 {
   const a = await page(ctx, 'account.html');
-  ok('22. в «Акаунті» є вимикач значка', (await a.locator('#a-help-btn').count()) === 1);
-  ok('23. типово увімкнений', await a.locator('#a-help-btn').isChecked());
+  ok('24. в «Акаунті» є вимикач значка', (await a.locator('#a-help-btn').count()) === 1);
+  ok('25. типово увімкнений', await a.locator('#a-help-btn').isChecked());
 
   await a.locator('#a-help-btn').uncheck();
   await a.waitForTimeout(800);
-  ok('24. після вимкнення значок зник одразу, без перезавантаження',
+  ok('26. після вимкнення значок зник одразу, без перезавантаження',
      (await a.locator('[data-help-open]:not([hidden])').count()) === 0);
 
   const saved = await a.evaluate(async () => (await window.Store.getProfile()).hideHelp);
-  ok('25. вибір записано в профіль', saved === true, String(saved));
+  ok('27. вибір записано в профіль', saved === true, String(saved));
 
   /* Найважливіше: вимкнена кнопка не має ховати довідку на інших сторінках
      назавжди — її повертають там само. */
   const other = await ctx.newPage();
   await other.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await other.waitForTimeout(1200);
-  ok('26. і на інших сторінках його теж немає',
+  ok('28. і на інших сторінках його теж немає',
      (await other.locator('[data-help-open]:not([hidden])').count()) === 0);
-  ok('27. але сама довідка жива — її можна відкрити з коду',
+  ok('29. але сама довідка жива — її можна відкрити з коду',
      await other.evaluate(() => Boolean(window.Help && window.Help.open)));
   await other.close();
 
   await a.locator('#a-help-btn').check();
   await a.waitForTimeout(800);
-  ok('28. повернувся так само одразу',
+  ok('30. повернувся так само одразу',
      (await a.locator('[data-help-open]:not([hidden])').count()) >= 1);
   await a.close();
 }

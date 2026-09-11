@@ -5756,32 +5756,6 @@ h1 > .h1-ico {
    робив із двох різних речей у шапці візуальну пару, якою вони не є.
    Область натискання лишається 40×40: вона й раніше була більшою за знак,
    просто тепер її не видно. */
-.nav__help {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; padding: 0;
-  border: 0; border-radius: 999px;
-  background: none;
-  color: var(--text-2);
-  cursor: pointer;
-  transition: color var(--t-fast), transform var(--t-fast);
-}
-.nav__help[hidden] { display: none; }
-/*
- * 4:3, не квадрат: viewBox книги тісний, тож висота ставиться явно.
- *
- * ЗНАК НАВМИСНО МАЛИЙ. Він стоїть на КОЖНІЙ сторінці й не є дією, по
- * якій приходять: у 34px книга перетягувала на себе весь правий кут
- * шапки й читалась як головна кнопка сайту. Сам ґудзик лишається 40px —
- * це мінімальна ціль для пальця, її зменшувати не можна.
- */
-.nav__help .nav__ico { width: 22px; height: 17px; }
-/* Окремо від решти дій: довідка — не синхронізація і не меню, і
-   злипатись із ними в один кластер їй нема чого. */
-.nav__help { margin-right: 4px; }
-.nav__help:hover { color: var(--text); transform: translateY(-1px); }
-/* Фокус із клавіатури мусить бути видимим — без рамки його інакше немає. */
-.nav__help:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; border-radius: 8px; }
-
 /* =====================================================================
    ПОШУК У ДОВІДЦІ
 
@@ -5934,25 +5908,54 @@ h1 > .h1-ico {
 /* Кнопка довідки там, де шапки немає (екран входу). Той самий вигляд, що
    й у шапці, тільки власним кутом: інакше на welcome.html — сторінці, де
    людина вперше й питає «що це таке» — довідки не було б узагалі. */
+/* =====================================================================
+   КНОПКА ДОВІДКИ — ПРАВИЙ ВЕРХНІЙ КУТ, НА КОЖНІЙ СТОРІНЦІ
+
+   Раніше вона стояла в смузі навігації, у кластері з синхронізацією й
+   бургером. Довідка — не пункт меню: там вона і читалась як щось
+   щоденне, і губилась серед сусідів. А на welcome.html, де шапки немає,
+   доводилось тримати другу точку входу.
+
+   Тепер вона одна й завжди на тому самому місці — під шапкою, у куті.
+   Позиція fixed, а не absolute: сторінки тут довгі, і кнопка, яка
+   зникає після першого ж прокручування, нічим не краща за відсутню.
+
+   ЧОМУ ВГОРІ, А НЕ ВНИЗУ, ЯК БУЛО. Унизу на телефоні стоїть панель
+   розділів, і кутова кнопка сідала їй на голову. Верхній кут вільний на
+   всіх сторінках: заголовок притиснутий ліворуч.
+   ===================================================================== */
 .help__fab {
   position: fixed; z-index: 90;
-  right: 16px; bottom: 16px;
-  width: 40px; height: 40px; padding: 0;
+  right: 14px;
+  /* Під шапкою: вона sticky й має свою висоту в --nav-h. */
+  top: calc(var(--nav-h) + 8px);
+  width: 36px; height: 36px; padding: 0;
   display: grid; place-items: center;
-  border: 1px solid var(--line-2); border-radius: 999px;
-  background: var(--bg-1); color: var(--text-2);
-  box-shadow: var(--shadow);
+  /* НІЯКОЇ ПЛАШКИ: ні рамки, ні фону, ні тіні.
+     Кружечок навколо знака перетворював довідку на кнопку дії — а вона
+     не дія, по якій приходять. У шапці знак стояв без обведення, і в
+     кутку має виглядати так само. Що він не сяде на текст, стереже
+     перевірка в tools/verifyhelpbook.mjs: вона обходить 19 сторінок і
+     дивиться, чи не перекрито кнопку. */
+  border: 0; background: none; color: var(--muted);
   cursor: pointer;
-  transition: all var(--t-fast);
+  transition: color var(--t-fast), transform var(--t-fast);
 }
-/* Плашку тут лишено навмисно, на відміну від кнопки в шапці: ця кнопка
-   висить ПОВЕРХ довільного вмісту сторінки, і без фону знак губився б на
-   тексті. Сам знак — того самого розміру, що й у шапці. */
-.help__fab svg { width: 22px; height: 17px; }
-.help__fab:hover { color: var(--text); border-color: transparent; background: rgba(var(--acc-rgb), 0.18); }
-@supports (padding: env(safe-area-inset-bottom)) {
-  .help__fab { bottom: calc(16px + env(safe-area-inset-bottom)); }
+/* 4:3, не квадрат: viewBox книги тісний, тож висота ставиться явно. */
+.help__fab svg { width: 21px; height: 16px; }
+.help__fab:hover { color: var(--text); transform: translateY(-1px); }
+.help__fab:focus-visible { color: var(--text); outline: 2px solid var(--acc-ink); outline-offset: 2px; border-radius: 8px; }
+
+/* На телефоні шапка нижча (--nav-h перевизначений), тож відступ рахується
+   сам. Ближче до краю: там кожен піксель ширини на рахунку. */
+@media (max-width: 720px) {
+  .help__fab { right: 8px; top: calc(var(--nav-h) + 6px); width: 34px; height: 34px; }
+  .help__fab svg { width: 20px; height: 15px; }
 }
+
+/* Сторінка без шапки (welcome.html): там --nav-h ні на що не спирається,
+   тому кнопку ставимо просто від верху. */
+.gate-body .help__fab { top: 14px; }
 
 /* =====================================================================
    КАРТКА НАГОРОДИ (розмітку будує js/award-core.js)

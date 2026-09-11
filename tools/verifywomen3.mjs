@@ -19,12 +19,19 @@ const visibleDays = (p) => p.locator('input[name="days"]').evaluateAll(es => es.
 /* 1. жінка: лише 3 і 4 дні; на 3 днях є Full Body */
 {
   const { ctx, p, errs } = await open('female', { activePlan: null, weights: {} });
-  ok('1. жінка бачить лише 3 і 4 дні', (await visibleDays(p)) === '3,4', await visibleDays(p));
+  /*
+   * Днів тепер видно всі чотири — і це не послаблення правила.
+   * Готових ЖІНОЧИХ схем як було дві (3 і 4 дні), так і лишилось; на 5
+   * і 6 днях доступний тільки порожній власний каркас, який жінка
+   * складає сама. Тому перевіряємо не перемикач, а те, ЩО в списку.
+   */
+  ok('1. жінка бачить усі варіанти днів', (await visibleDays(p)) === '3,4,5,6', await visibleDays(p));
   await p.locator('input[name="days"][value="3"]').evaluate(e => e.click()); await p.waitForTimeout(500);
   const picks = p.locator('#program-list [data-pick]');
-  ok('1. на 3 днях є план для вибору', await picks.count() === 1, String(await picks.count()));
+  ok('1. на 3 днях є готовий план і власний каркас', await picks.count() === 2, String(await picks.count()));
   ok('1. це Full Body', /Full Body/.test(await p.locator('#program-list').innerText()));
-  await picks.first().click({ force: true }); await p.waitForTimeout(800);
+  await p.locator('#program-list [data-pick]:not([data-pick="own"])').first().click({ force: true });
+  await p.waitForTimeout(800);
   const txt = (await p.locator('#plan').innerText()).replace(/\s+/g, ' ');
   ok('1. три дні по 12 вправ · 28 підходи', (txt.match(/12 вправ/g) || []).length === 3 && (txt.match(/28 підход/g) || []).length === 3, txt.slice(0, 200));
   ok('1. чоловічих планів немає', !/PPL|Upper/.test(await p.locator('#program-list').innerText()));
@@ -35,10 +42,20 @@ const visibleDays = (p) => p.locator('input[name="days"]').evaluateAll(es => es.
   ok('1. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
-/* 2. жінка з профілем на 5 днів: перемикач сам стає на дозволений */
+/* 2. жінка з профілем на 5 днів: готових жіночих схем там немає */
 {
   const { ctx, p, errs } = await open('female', { daysPerWeek: 5, activePlan: null, weights: {} });
-  ok('2. 5 днів приховано, обрано дозволене', (await visibleDays(p)) === '3,4' && ['3', '4'].includes(await p.locator('input[name="days"]:checked').inputValue()));
+  const ids = await p.$$eval('#program-list [data-pick]', (n) => n.map((x) => x.dataset.pick).join(','));
+  ok('2. на 5 днях жінці доступний лише власний каркас', ids === 'own', ids || '(порожньо)');
+  /*
+   * Назвами не перевіряємо: у жіночій «PUSH/PULL» усередині є і «UL», і
+   * «PU», а «Full Body» звуться дві схеми різних статей. Рахуємо картки:
+   * жінці на 5 днях їх рівно три — два її готові плани (недоступні на
+   * такій кількості днів, тому сірі) плюс власний каркас. Четверта
+   * картка означала б, що пролізла чужа схема.
+   */
+  const cards = await p.locator('#program-list article').count();
+  ok('2. карток рівно три — дві жіночі сірі плюс власний каркас', cards === 3, String(cards));
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

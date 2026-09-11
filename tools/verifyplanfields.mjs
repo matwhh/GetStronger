@@ -247,28 +247,45 @@ for (const url of ['plan.html', 'programs.html']) {
   const ctx = await adultContext(b, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message));
-  /* Поля робочої ваги переїхали на власний екран тренування разом із
-     самим тренуванням — сторож фокуса перевіряємо там, де вони тепер. */
   await seeded(p, 'workout.html');
-  const ins = p.locator('#workout input[inputmode=decimal]');
+
+  /*
+   * РОБОЧОЇ ВАГИ ТУТ БІЛЬШЕ НЕ ПРАВЛЯТЬ — її міняють у плані. Лишились
+   * поля ВАГИ ПІДХОДУ, і сторож фокуса треба перевіряти саме на них.
+   * Вони живуть у згорнутому журналі й зʼявляються, коли в вправі є
+   * бодай один закритий підхід, — тому спершу закриваємо два підходи
+   * першої вправи, потім розкриваємо «Ваги підходів».
+   */
+  ok('«Тренування»: поля робочої ваги прибрано',
+     (await p.locator('#workout [data-wt]').count()) === 0);
+
+  const pips = p.locator('#workout .tdy-ex').first().locator('[data-set-ex]');
+  const pipN = await pips.count();
+  for (let k = 0; k < Math.min(2, pipN); k++) {
+    await pips.nth(k).click();
+    await p.waitForTimeout(350);
+  }
+  const tgl = p.locator('#workout [data-log-tgl]').first();
+  if (await tgl.count() && !(await tgl.isDisabled())) {
+    await tgl.click();
+    await p.waitForTimeout(400);
+  }
+
+  const ins = p.locator('#workout .tdy-set__w');
   const n = await ins.count();
-  ok('«Тренування»: є поля робочої ваги', n >= 2, String(n));
+  ok('«Тренування»: є поля ваги підходів', n >= 2, String(n));
   if (n >= 2) {
     await ins.nth(0).click();
     await ins.nth(0).fill('100');
     await p.waitForTimeout(150);
     await ins.nth(1).click({ timeout: 5000 }).catch(() => {});
     await p.waitForTimeout(900);
-    const r = await p.evaluate(async () => {
-      const a = document.activeElement;
-      const pr = await window.Store.getProfile();
-      return { tag: a.tagName,
-        first: document.querySelectorAll('#workout input[inputmode=decimal]')[0].value,
-        saved: Object.values(pr.weights || {}).map(Number).includes(100) };
-    });
+    const r = await p.evaluate(() => ({
+      tag: (document.activeElement || {}).tagName,
+      first: document.querySelectorAll('#workout .tdy-set__w')[0].value
+    }));
     ok('«Тренування»: фокус лишився в полі, а не впав на body', r.tag === 'INPUT', r.tag);
     ok('«Тренування»: перше поле утримало набране', r.first === '100', r.first);
-    ok('«Тренування»: вага збережена', r.saved);
   }
   ok('«Тренування»: без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();

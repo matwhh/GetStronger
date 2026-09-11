@@ -2081,6 +2081,80 @@
     });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Питання «ви точно?» — вікном сайту, а не системним confirm()        */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЧОМУ НЕ window.confirm. Системне віконце не можна ні оформити, ні
+   * назвати своїми словами: у ньому стоїть адреса сайту й кнопки «ОК /
+   * Скасувати», і на телефоні воно виглядає як сторонній попап — його
+   * закривають не читаючи. Частина вбудованих браузерів (застосунки
+   * пошти, соцмереж) узагалі його не показує і мовчки повертає false.
+   *
+   * Тут — та сама розмітка .modal, що вже носять вікно завершення
+   * тренування й попередження про ІМТ: нового вигляду не зʼявляється.
+   *
+   * БЕЗПЕЧНА ВІДПОВІДЬ — ЗА ЗАМОВЧУВАННЯМ. Фокус стоїть на «Скасувати»,
+   * Escape і клік по тлу — теж «ні». Питання ставлять перед тим, що не
+   * відкотити, тож промах пальцем має коштувати нуль.
+   *
+   * @param {{title:string, text?:string, ok?:string, cancel?:string}} o
+   * @returns {Promise<boolean>}
+   */
+  function confirmBox(o) {
+    const opts = o || {};
+    return new Promise(function (resolve) {
+      const wrap = document.createElement('div');
+      wrap.className = 'modal';
+      wrap.innerHTML =
+        '<div class="modal__backdrop"></div>' +
+        '<div class="modal__box" role="alertdialog" aria-modal="true" aria-labelledby="cf-t">' +
+          '<h3 id="cf-t" style="margin:0">' + esc(opts.title || 'Ви впевнені?') + '</h3>' +
+          (opts.text ? '<p class="small mt-1">' + esc(opts.text) + '</p>' : '') +
+          '<div class="modal__actions mt-3">' +
+            '<button class="btn btn--primary" type="button" data-cf="no">' +
+              esc(opts.cancel || 'Скасувати') + '</button>' +
+            '<button class="btn btn--ghost" type="button" data-cf="yes">' +
+              esc(opts.ok || 'Видалити') + '</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(wrap);
+
+      const no = wrap.querySelector('[data-cf="no"]');
+      const yes = wrap.querySelector('[data-cf="yes"]');
+      const prevFocus = document.activeElement;
+      let closed = false;
+
+      try { lockScroll(true); } catch (_) {}
+
+      function close(answer) {
+        if (closed) return;
+        closed = true;
+        document.removeEventListener('keydown', onKey, true);
+        wrap.remove();
+        try { lockScroll(false); } catch (_) {}
+        try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (_) {}
+        resolve(answer);
+      }
+
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); close(false); return; }
+        if (e.key !== 'Tab') return;
+        /* Фокус не виходить за межі вікна: двоє кнопок по колу. */
+        e.preventDefault();
+        const cur = document.activeElement;
+        if (e.shiftKey) (cur === no ? yes : no).focus();
+        else (cur === yes ? no : yes).focus();
+      }
+
+      no.addEventListener('click', function () { close(false); });
+      yes.addEventListener('click', function () { close(true); });
+      wrap.querySelector('.modal__backdrop').addEventListener('click', function () { close(false); });
+      document.addEventListener('keydown', onKey, true);
+      try { no.focus(); } catch (_) {}
+    });
+  }
+
   initServiceWorker();
 
   window.App = {
@@ -2104,6 +2178,7 @@
     dateLabel: dateLabel,
     levelIcon: levelIcon,
     lockScroll: lockScroll,
+    confirmBox: confirmBox,
     onDayChange: onDayChange,
     whenReady: whenReady
   };

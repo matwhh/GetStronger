@@ -1025,6 +1025,26 @@
       const selected = p.id === state.programId;
       const plan = loadPlan(p.id, days);
       const freq = frequencyOf(p, days);
+      const total = plan.reduce(function (n, d) { return n + d.exercises.length; }, 0);
+
+      /*
+       * ПОРОЖНІЙ КАРКАС НЕ ОПИСУЮТЬ ЧИСЛАМИ.
+       *
+       * У власного плану, поки в ньому нічого немає, усі три показники —
+       * нулі: «0 підх./тиждень · ~0 хв». Три нулі в ряд читаються як
+       * поламка сторінки, а не як «ви ще нічого не додали». Тому замість
+       * них — одне речення про те, що це таке.
+       */
+      const facts = total
+        ? '<div class="row small muted" style="gap:16px;margin-bottom:16px">' +
+            '<span><b class="mono">' + esc(freq.label) + '</b> на групу</span>' +
+            '<span><b class="mono">' + weeklySets(plan) + '</b> підх./тиждень</span>' +
+            '<span><b class="mono">~' + sessionMinutes(plan) + '</b> хв/тренування</span>' +
+          '</div>'
+        : '<p class="small muted" style="margin-bottom:16px">' +
+            'Порожній каркас на ' + days + ' ' + plural(days, 'день', 'дні', 'днів') +
+            '. Вправи, підходи й повторення ставите ви — назву дня теж.' +
+          '</p>';
 
       return '' +
         '<article class="card card--glass card--hover' + (selected ? ' is-selected' : '') + '">' +
@@ -1049,13 +1069,9 @@
              * три рядки замість одного.
              */
           '</div>' +
-          '<div class="row small muted" style="gap:16px;margin-bottom:16px">' +
-            '<span><b class="mono">' + esc(freq.label) + '</b> на групу</span>' +
-            '<span><b class="mono">' + weeklySets(plan) + '</b> підх./тиждень</span>' +
-            '<span><b class="mono">~' + sessionMinutes(plan) + '</b> хв/тренування</span>' +
-          '</div>' +
+          facts +
           '<button class="btn ' + (selected ? 'btn--ghost' : 'btn--primary') + ' btn--sm" type="button" data-pick="' + esc(p.id) + '">' +
-            (selected ? 'Показана нижче' : 'Показати план') +
+            (selected ? 'Показана нижче' : (total ? 'Показати план' : 'Скласти свій')) +
           '</button>' +
         '</article>';
     }).join('') + '</div>';
@@ -1224,6 +1240,24 @@
       '</tr>';
   }
 
+  /* Скільки символів лишаємо в назві дня. Довша не влізе в заголовок
+     акордеона на телефоні й у смугу тижня — обріжеться трьома крапками,
+     тобто збережеться те, чого людина не побачить. */
+  const DAY_TITLE_MAX = 28;
+  const DAY_FOCUS_MAX = 40;
+  /* Сім — бо тиждень. Восьмий день нікуди поставити в розкладі. */
+  const DAYS_MAX = 7;
+
+  /* Порожній день — нормальний стан власного плану, а не поламка. Але
+     порожня таблиця без жодного слова читається саме як поламка. */
+  function emptyDayNote() {
+    return '<p class="small muted mt-0 mb-2">Поки що порожньо. ' +
+      (state.editing
+        ? 'Додайте першу вправу списком під таблицею.'
+        : 'Натисніть «Редагувати» й додайте вправи.') +
+      '</p>';
+  }
+
   function dayBlock(day, dayIdx) {
     const head = state.editing
       /* «Повт.» у правці ширша за перегляд: там просто число, а тут поле
@@ -1243,6 +1277,41 @@
               return '<option value="' + esc(m.id) + '">' + esc(m.name) + '</option>';
             }).join('') +
           '</select>' +
+        '</div>'
+      : '';
+
+    /*
+     * ПРАВКИ САМОГО ДНЯ, А НЕ ЛИШЕ ЙОГО ВПРАВ.
+     *
+     * Редактор умів усе всередині дня — і нічого з самим днем. «День A ·
+     * Усе тіло» був незмінним написом навіть у власному плані, який
+     * людина склала з нуля: назвати його «Понеділок — груди» було
+     * неможливо. І видалити зайвий день теж: лишалось по одному
+     * прибирати з нього вправи, а порожній день усе одно стояв у
+     * розкладі тижня.
+     *
+     * Два поля й дві кнопки стоять НАД таблицею: спершу «що це за день»,
+     * потім «що в ньому».
+     */
+    const dayTools = state.editing
+      ? '<div class="row mt-0 mb-2" style="gap:10px;flex-wrap:wrap;align-items:flex-end">' +
+          '<label class="field" style="flex:1 1 190px;margin:0">' +
+            '<span class="field__label">Назва дня</span>' +
+            '<input class="input input--sm" type="text" maxlength="' + DAY_TITLE_MAX + '" ' +
+              'data-act="day-title" data-day="' + dayIdx + '" ' +
+              'value="' + esc(day.title || '') + '" placeholder="Понеділок — груди">' +
+          '</label>' +
+          '<label class="field" style="flex:1 1 190px;margin:0">' +
+            '<span class="field__label">Про що день</span>' +
+            '<input class="input input--sm" type="text" maxlength="' + DAY_FOCUS_MAX + '" ' +
+              'data-act="day-focus" data-day="' + dayIdx + '" ' +
+              'value="' + esc(day.focus || '') + '" placeholder="груди, трицепс, дельти">' +
+          '</label>' +
+          '<button class="btn btn--ghost btn--sm" type="button" ' +
+            'data-act="day-del" data-day="' + dayIdx + '"' +
+            (state.plan.length <= 1 ? ' disabled title="Це останній день плану"' : '') + '>' +
+            'Видалити день' +
+          '</button>' +
         '</div>'
       : '';
 
@@ -1275,6 +1344,8 @@
           '<svg class="acc__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>' +
         '</button>' +
         '<div class="acc__body"><div class="acc__inner"><div class="acc__pad">' +
+          dayTools +
+          (day.exercises.length ? '' : emptyDayNote()) +
           '<div class="table-wrap">' +
             '<table class="tbl tbl--plan">' +
               '<thead><tr><th style="width:40px">#</th><th>Вправа</th>' + head + '</tr></thead>' +
@@ -1355,10 +1426,44 @@
    * Розклад тижня з програми: числа — індекси днів, 'rest' — відпочинок.
    * Якщо розкладу немає, показуємо просто всі дні поспіль.
    */
+  /*
+   * Розклад тижня для ЦЬОГО плану.
+   *
+   * Ключ — довжина плану, а не перемикач днів угорі сторінки: день можна
+   * видалити або додати просто в редакторі, і тоді в плані лишається,
+   * скажімо, три дні, а перемикач досі каже «4». Брати розклад за
+   * перемикачем означало б малювати тиждень із днем, якого вже немає
+   * (plan[3] → undefined → «—» у смузі).
+   *
+   * Якщо готового розкладу на таку довжину немає — тренування підряд,
+   * решта тижня відпочинок. Так само робить «Сьогодні» (js/today.js).
+   */
   function weekSchedule(program, days, plan) {
-    const sch = (program.schedule || {})[String(days)];
-    if (!Array.isArray(sch)) return plan.map(function (_, i) { return i; });
-    return sch;
+    const byLen = (program.schedule || {})[String(plan.length)];
+    const byDays = (program.schedule || {})[String(days)];
+    /*
+     * Придатний розклад мусить не лише не показувати неіснуючих днів, а
+     * й ПОКАЗАТИ кожен наявний. Дні малюються саме обходом розкладу
+     * (див. renderPlan), тож день, якого в ньому немає, просто зникає з
+     * екрана — а в плані лишається. Це і сталось би після «додати день»
+     * на схемі, у якої розкладу на таку довжину не заготовлено.
+     */
+    const fits = function (sch) {
+      if (!Array.isArray(sch)) return false;
+      const seen = new Set();
+      for (let k = 0; k < sch.length; k++) {
+        const x = sch[k];
+        if (x === 'rest') continue;
+        if (!Number.isInteger(x) || x < 0 || x >= plan.length) return false;
+        seen.add(x);
+      }
+      return seen.size === plan.length;
+    };
+    if (fits(byLen)) return byLen;
+    if (fits(byDays)) return byDays;
+    const out = [];
+    for (let i = 0; i < 7; i++) out.push(i < plan.length ? i : 'rest');
+    return out;
   }
 
   /** Рядок «Верх · Низ · відпочинок · …» над розкладом */
@@ -1512,6 +1617,13 @@
               (edited ? '' : ' disabled') +
               ' title="Повернути вправи й підходи до початкового обсягу плану">' +
               'Початковий план</button>' +
+            /* Додати день можна лише в режимі правки — поряд із рештою
+               правок, а не окремою кнопкою, яка стоїть завжди. */
+            (state.editing
+              ? '<button class="btn btn--ghost btn--sm" type="button" id="add-day"' +
+                  (plan.length >= DAYS_MAX ? ' disabled title="У тижні сім днів"' : '') +
+                  '>+ день</button>'
+              : '') +
             '<button class="btn ' + (state.editing ? 'btn--primary' : 'btn--ghost') + ' btn--sm" type="button" id="toggle-edit">' +
               (state.editing ? 'Готово' : 'Редагувати') +
             '</button>' +
@@ -1628,9 +1740,62 @@
   }
 
   function applyEdit(act, dayIdx, i, value) {
+    /*
+     * ДІЇ НАД САМИМ ДНЕМ ідуть до того, як ми беремо список вправ: у них
+     * немає індексу вправи, а «додати день» узагалі не має дня-джерела.
+     */
+    if (act === 'day-add') {
+      if (state.plan.length >= DAYS_MAX) {
+        toast('Більше ' + DAYS_MAX + ' днів у тижні не буває', 'err');
+        return false;
+      }
+      /*
+       * Номер беремо вільний, а не «довжина + 1»: після видалення
+       * середнього дня довжина зменшується, і наступний доданий дістав
+       * би імʼя, яке в плані вже є. Два «День 4» поспіль у розкладі
+       * тижня — це вже не назва, а загадка.
+       */
+      const used = new Set(state.plan.map(function (d) { return String(d.title || '').trim(); }));
+      let n = state.plan.length + 1;
+      while (used.has('День ' + n)) n++;
+      state.plan.push({ title: 'День ' + n, focus: 'Заповніть самі', exercises: [] });
+      return true;
+    }
+
     const day = state.plan[dayIdx];
     if (!day) return false;
     const list = day.exercises;
+
+    if (act === 'day-title' || act === 'day-focus') {
+      const max = act === 'day-title' ? DAY_TITLE_MAX : DAY_FOCUS_MAX;
+      /* Переноси рядків із вставленого тексту зіпсували б і заголовок
+         акордеона, і смугу тижня — зводимо до пробілів. */
+      const txt = String(value == null ? '' : value)
+        .replace(/\s+/g, ' ').trim().slice(0, max);
+      const field = act === 'day-title' ? 'title' : 'focus';
+      /* Порожню назву не лишаємо: день без імені неможливо ні знайти в
+         розкладі, ні назвати в «Сьогодні». Порожнє «про що день» —
+         можна, це справді необовʼязково. */
+      if (field === 'title' && !txt) {
+        day.title = 'День ' + (dayIdx + 1);
+      } else {
+        day[field] = txt;
+      }
+      return true;
+    }
+
+    if (act === 'day-del') {
+      /* Останній день не видаляємо: план без жодного дня — це не план, і
+         жодна сторінка не знає, що з ним робити. Кнопка в такому разі
+         вимкнена, але перевірка потрібна й тут: дію можна викликати не
+         лише кнопкою. */
+      if (state.plan.length <= 1) {
+        toast('Це останній день — план не може лишитись порожнім', 'err');
+        return false;
+      }
+      state.plan.splice(dayIdx, 1);
+      return true;
+    }
 
     if (act === 'up' && i > 0) {
       const t = list[i - 1]; list[i - 1] = list[i]; list[i] = t;
@@ -1894,6 +2059,34 @@
   }
 
   async function onEdit(act, dayIdx, i, value) {
+    /*
+     * ВИДАЛЕННЯ ДНЯ ПИТАЄМО ВГОЛОС.
+     *
+     * Вправу повертає «Скасувати правку», і ціна помилки — один клік.
+     * День — це десяток вправ, їхні підходи, повторення й порядок; на
+     * телефоні кнопка стоїть за півсантиметра від поля з назвою дня.
+     * Тому перед ним — вікно з назвою саме того дня, який зникне.
+     */
+    if (act === 'day-del') {
+      const day = state.plan[dayIdx];
+      if (!day) return;
+      const CB = window.App.confirmBox;
+      const cnt = (day.exercises || []).length;
+      const text = 'День «' + (day.title || ('День ' + (dayIdx + 1))) + '»' +
+        (cnt ? ' разом із ' + cnt + ' ' + plural(cnt, 'вправою', 'вправами', 'вправами') : ' (він порожній)') +
+        ' зникне з плану. Повернути можна кнопкою «Скасувати правку» — ' +
+        'але лише поки ви не пішли зі сторінки.';
+      const yes = CB
+        ? await CB({
+            title: 'Ви точно бажаєте видалити цей день з плану тренувань?',
+            text: text,
+            ok: 'Видалити день',
+            cancel: 'Залишити'
+          })
+        : window.confirm('Видалити день «' + (day.title || '') + '» із плану тренувань?');
+      if (!yes) return;
+    }
+
     const snap = act === 'weight'
       ? null
       : JSON.stringify({ p: state.programId, d: state.days, plan: state.plan });
@@ -1958,6 +2151,8 @@
     }
 
     if (act === 'del') toast('Вправу видалено — «Скасувати правку» поверне', 'ok');
+    if (act === 'day-del') toast('День видалено — «Скасувати правку» поверне', 'ok');
+    if (act === 'day-add') toast('День додано — назвіть його й додайте вправи', 'ok');
   }
 
   /* ------------------------------------------------------------------ */
@@ -2321,6 +2516,10 @@
           }
           toast('Буфер недоступний — текст нижче, скопіюйте вручну', 'err');
         });
+        return;
+      }
+      if (e.target.closest('#add-day')) {
+        onEdit('day-add', 0, 0);
         return;
       }
       if (e.target.closest('#undo-edit')) {

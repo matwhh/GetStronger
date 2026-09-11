@@ -65,11 +65,16 @@ const FEMALE = Object.assign({}, MALE, { sex: 'female', weight: 60, height: 168 
   await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(1200);
   const names = await listedPlans(p);
-  /* Два жіночі плани: PUSH/PULL (4 дні) і Full Body (3 дні). «Full Body»
-     як назва є і в чоловіків, тож звіряємо не назвою, а id обраної схеми. */
-  ok('2. жінка бачить рівно два плани', names.length === 2, names.join(' | '));
+  /* Два ГОТОВІ жіночі плани: PUSH/PULL (4 дні) і Full Body (3 дні).
+     «Full Body» як назва є і в чоловіків, тож звіряємо не назвою, а id
+     обраної схеми. Третім у списку стоїть «Власний план» — порожній
+     каркас, він не належить статі й видний усім (js/programs-data.js). */
+  const ready = names.filter((n) => !/Власний план/.test(n));
+  ok('2. жінка бачить рівно два готові плани', ready.length === 2, names.join(' | '));
+  ok('2. і порожній власний каркас — він для обох статей',
+     names.some((n) => /Власний план/.test(n)), names.join(' | '));
   ok('2. серед них «PUSH/PULL»', names.includes(WOMEN), names.join(' | '));
-  ok('2. жодної чоловічої схеми (крім однойменного Full Body)', !names.some((n) => MEN.includes(n) && n !== 'Full Body'), names.join(' | '));
+  ok('2. жодної чоловічої схеми (крім однойменного Full Body)', !ready.some((n) => MEN.includes(n) && n !== 'Full Body'), names.join(' | '));
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

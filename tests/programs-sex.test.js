@@ -28,39 +28,57 @@ const w = loadModules([
    а не на вмісті. Рядок порівнюється чесно. */
 const idsOf = (list) => list.map((p) => p.id).sort().join(', ');
 
+/*
+ * ВИНЯТОК ОДИН І ВІН НАЗВАНИЙ: власний план (sex: 'any').
+ *
+ * Правило «схема належить одній статі» стереже готові програми: їхній
+ * обʼєм і добір вправ складені під конкретну стать, і мовчки підсунути
+ * чуже не можна. Власний план складає сама людина — там нема чого
+ * підсовувати, тому він видний обом. Щоб виняток не розповз на інші
+ * схеми, він перелічений поіменно: будь-яка НОВА схема з sex: 'any'
+ * завалить перший тест.
+ */
+const ANY_SEX = ['own'];
+const ready = (list) => list.filter((p) => !ANY_SEX.includes(p.id));
+
 describe('доступ до схем за статтю', () => {
-  it('у кожної схеми реєстру проставлена стать', () => {
-    for (const p of w.PROGRAMS) {
+  it('у кожної готової схеми проставлена стать', () => {
+    for (const p of ready(w.PROGRAMS)) {
       assert.ok(p.sex === 'male' || p.sex === 'female', `${p.id}: sex = ${p.sex}`);
     }
   });
 
+  it('спільних схем рівно стільки, скільки названо винятком', () => {
+    const any = w.PROGRAMS.filter((p) => p.sex === 'any').map((p) => p.id).sort().join(', ');
+    assert.equal(any, ANY_SEX.join(', '));
+  });
+
   it('жінка бачить рівно два жіночі плани', () => {
-    assert.equal(idsOf(w.programsForSex('female')), 'women3, women4');
+    assert.equal(idsOf(ready(w.programsForSex('female'))), 'women3, women4');
   });
 
   it('чоловік бачить усі наявні чоловічі схеми й жодної жіночої', () => {
-    const male = idsOf(w.programsForSex('male'));
+    const male = idsOf(ready(w.programsForSex('male')));
     assert.equal(male, 'fullbody, ppl, ulppl, upperlower');
     assert.ok(!male.includes('women4'));
   });
 
-  it('списки не перетинаються — жодна схема не видна обом', () => {
-    const male = new Set(idsOf(w.programsForSex('male')).split(', '));
-    for (const id of idsOf(w.programsForSex('female')).split(', ')) {
+  it('готові списки не перетинаються — жодна готова схема не видна обом', () => {
+    const male = new Set(idsOf(ready(w.programsForSex('male'))).split(', '));
+    for (const id of idsOf(ready(w.programsForSex('female'))).split(', ')) {
       assert.ok(!male.has(id), `${id} видно обом статям`);
     }
   });
 
   it('разом дві статі покривають увесь реєстр — схем-сиріт немає', () => {
     const both = idsOf(w.programsForSex('male')).split(', ')
-      .concat(idsOf(w.programsForSex('female')).split(', '));
+      .concat(idsOf(ready(w.programsForSex('female'))).split(', '));
     assert.equal(both.length, w.PROGRAMS.length);
   });
 
   it('невідома стать бачить чоловічі схеми — старий профіль не втрачає план', () => {
     for (const sex of [undefined, null, '', 'інше']) {
-      assert.equal(idsOf(w.programsForSex(sex)), 'fullbody, ppl, ulppl, upperlower');
+      assert.equal(idsOf(ready(w.programsForSex(sex))), 'fullbody, ppl, ulppl, upperlower');
     }
   });
 
@@ -72,6 +90,78 @@ describe('доступ до схем за статтю', () => {
     assert.equal(w.programAllowedFor(ppl, 'male'), true);
     assert.equal(w.programAllowedFor(ppl, 'female'), false);
     assert.equal(w.programAllowedFor(null, 'female'), false);
+  });
+});
+
+describe('власний план — порожній каркас для обох статей', () => {
+  const own = () => w.PROGRAMS.find((p) => p.id === 'own');
+
+  it('він є в реєстрі й позначений як спільний', () => {
+    assert.ok(own(), 'схеми own немає в реєстрі');
+    assert.equal(own().sex, 'any');
+  });
+
+  it('видний і чоловікові, і жінці, і профілю без статі', () => {
+    for (const sex of ['male', 'female', undefined, '']) {
+      assert.ok(idsOf(w.programsForSex(sex)).includes('own'), `sex=${sex}`);
+    }
+    assert.equal(w.programAllowedFor(own(), 'male'), true);
+    assert.equal(w.programAllowedFor(own(), 'female'), true);
+  });
+
+  it('у перемикачі ті самі 3–6 днів, що в решти схем', () => {
+    assert.equal(own().daysSupported.join(','), '3,4,5,6');
+  });
+
+  it('каркаси заготовлені на 2–7 днів — стільки може лишитись після правок', () => {
+    assert.equal(Object.keys(own().days).sort().join(','), '2,3,4,5,6,7');
+  });
+
+  it('дні ПОРОЖНІ: жодної вправи нікому не навʼязано', () => {
+    for (const n of Object.keys(own().days)) {
+      const days = own().days[n];
+      assert.equal(days.length, Number(n), `днів у каркасі на ${n}`);
+      for (const d of days) {
+        assert.equal(d.exercises.length, 0, `${n}: день «${d.title}» не порожній`);
+        assert.ok(d.title, `${n}: день без назви`);
+      }
+    }
+  });
+
+  it('розклад тижня покриває кожен день каркаса й не вигадує зайвих', () => {
+    for (const n of Object.keys(own().days)) {
+      const sch = own().schedule[n];
+      assert.equal(sch.length, 7, `${n}: у тижні має бути 7 слотів`);
+      const seen = new Set(sch.filter((x) => x !== 'rest'));
+      assert.equal(seen.size, Number(n), `${n}: у розкладі ${seen.size} днів із ${n}`);
+      for (const i of seen) assert.ok(i >= 0 && i < Number(n), `${n}: слот ${i} поза каркасом`);
+    }
+  });
+
+  it('resolvePlan віддає його обом статям', () => {
+    for (const sex of ['male', 'female']) {
+      const r = w.WorkoutCore.resolvePlan({ sex, trainingAge: 'inter',
+        activePlan: { programId: 'own', days: 4 } });
+      assert.ok(r, `sex=${sex}: план не відкрився`);
+      assert.equal(r.program.id, 'own');
+      assert.equal(r.plan.length, 4);
+    }
+  });
+
+  it('складений власний план читається з customPlans так само, як готова схема', () => {
+    const r = w.WorkoutCore.resolvePlan({
+      sex: 'female', trainingAge: 'inter',
+      activePlan: { programId: 'own', days: 3 },
+      customPlans: { 'own:3': [
+        { title: 'Понеділок — груди', focus: 'груди', exercises: [
+          { name: 'Жим лежачи', muscles: ['chest'], sets: 4, reps: '6–8', rir: '2', rest: '3 хв' }
+        ] }
+      ] }
+    });
+    assert.ok(r);
+    assert.equal(r.plan.length, 1, 'день видалили — план коротший за перемикач, і це нормально');
+    assert.equal(r.plan[0].title, 'Понеділок — груди');
+    assert.equal(r.plan[0].exercises[0].sets, 4);
   });
 });
 

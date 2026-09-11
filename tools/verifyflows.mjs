@@ -20,11 +20,13 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
  await p.reload(); await p.waitForTimeout(1200);
 
  /* Головну перебрано: картки сезону, плиток стану й картки-входу в
-    тренування там більше немає. Лишились назва програми, номер сезону і
-    смуга тижня — їх і перевіряємо. Те, що на головній НЕ МАЄ бути
+    тренування там більше немає. Лишились назва програми, номер ТИЖНЯ і
+    смуга тижня — їх і перевіряємо. Слово «Сезон» із підпису прибрано
+    навмисно: у шапці на телефоні воно з’їдало рядок, а номер сезону
+    людина й так бачить у «Рейтингу». Те, що на головній НЕ МАЄ бути
     редактора тренування, лишається як було. */
  const home=await p.locator('#today').innerText();
- ok('головна: назва програми й сезон', /Full Body/.test(home) && /Сезон/.test(home), home.split('\n')[0]);
+ ok('головна: назва програми й тиждень', /Full Body/.test(home) && /Тиждень/.test(home), home.split('\n')[0]);
  ok('головна: смуга тижня', /Тиждень/.test(home) && await p.locator('.tdy-day').count()===7);
  ok('головна: видно поточний день', await p.locator('.tdy-day.is-now').count()===1);
  ok('головна: не список вправ', await p.locator('#today .tdy-ex').count()===0);
@@ -53,10 +55,19 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
  await p.locator('.tdy-ex [data-set-n="1"]').first().click(); await p.waitForTimeout(2200);
  const sl=await p.evaluate(async()=>{const pr=await window.Store.getProfile();return pr.sessionLog;});
  ok('Тренування: галочка пише сесію в історію', Object.keys(sl||{}).length>0, JSON.stringify(sl));
- const inp=p.locator('[data-wt]').first(); const nm=await inp.getAttribute('data-wt');
- await inp.fill('77.5'); await inp.blur(); await p.waitForTimeout(700);
- const w=await p.evaluate(async n=>{const pr=await window.Store.getProfile();return pr.weights[n];},nm);
- ok('Тренування: робоча вага зберігається в спільну книгу', w===77.5, 'w='+w);
+ /* РОБОЧУ ВАГУ ТУТ БІЛЬШЕ НЕ ПРАВЛЯТЬ — її міняють у плані. Тут лишилась
+    вага конкретного підходу: вона пише в історію тренування, а книги ваг
+    не чіпає. Одне число не може означати дві різні речі. */
+ ok('Тренування: поля робочої ваги немає', await p.locator('[data-wt]').count()===0);
+ await p.locator('[data-log-tgl]').first().click(); await p.waitForTimeout(400);
+ const sw=p.locator('.tdy-set__w').first();
+ await sw.fill('77.5'); await sw.blur(); await p.waitForTimeout(700);
+ const rec=await p.evaluate(async()=>{
+   const pr=await window.Store.getProfile();
+   const day=Object.values(pr.sessionLog||{})[0]||{};
+   return JSON.stringify(day).indexOf('77.5')!==-1;
+ });
+ ok('Тренування: вага підходу лягла в історію тренування', rec);
  await p.locator('[data-rest-sec]').first().click(); await p.waitForTimeout(400);
  ok('Тренування: таймер відпочинку запускається', await p.locator('.rest-timer').isVisible());
  ok('Тренування: тости піднялись над таймером', await p.evaluate(()=>document.body.classList.contains('has-rest-timer')));

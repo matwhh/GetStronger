@@ -568,6 +568,79 @@ for (const w of [320, 390, 430]) {
   }
 }
 
+/* ---- 7. Лінза гасне там, де переходу немає ---------------------------- */
+/*
+ * Функції close() у модулі НЕ БУЛО ВЗАГАЛІ: пʼять місць кликали її, і всі
+ * пʼять потрапляли у window.close(), який браузер для вкладки, відкритої
+ * не скриптом, мовчки не виконує. Лінза не гасла ніколи.
+ *
+ * Чому цього не було видно: майже завжди одразу після відпускання
+ * сторінка йшла на інший розділ і малювалась заново. Лишався єдиний
+ * випадок без переходу — відпустити палець на ТОМУ Ж розділі, де ти вже
+ * є. Тоді скло зависало під пальцем назавжди.
+ *
+ * Саме цей випадок тут і відтворюється, двома способами: простим дотиком
+ * і протягом, що повернувся на свій пункт.
+ */
+{
+  const ctx = await adultContext(b, {
+    viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true
+  });
+  const p = await ctx.newPage();
+  const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+  await p.goto(file('index.html'), { waitUntil: 'load' });
+  await p.waitForTimeout(1800);
+
+  const cdp7 = await ctx.newCDPSession(p);
+  const touch = (type, x, y) => cdp7.send('Input.dispatchTouchEvent', {
+    type: type, touchPoints: type === 'touchEnd' ? [] : [{ x: x, y: y, id: 1 }]
+  });
+  const lensOpen = () => p.evaluate(() =>
+    !!document.querySelector('.tabbar__lens.is-open'));
+
+  /* «Сьогодні» — поточний розділ: відпускання на ньому нікуди не веде. */
+  const here = await p.locator('#tabbar a[href="index.html"]').boundingBox();
+  const y = here.y + here.height / 2;
+
+  await p.evaluate(() => { window.__alive = 1; });
+  await touch('touchStart', here.x + here.width / 2, y);
+  await p.waitForTimeout(120);
+  ok('7. дотик по поточному розділу відкриває лінзу', await lensOpen());
+
+  await touch('touchEnd');
+  await p.waitForTimeout(700);           // 180 мс таймера + запас
+  /*
+   * ЧОМУ ТУТ НЕ ДОВЕСТИ ГАСІННЯ. Короткий дотик по посиланню на поточну
+   * сторінку браузер усе одно виконує — документ новий, і лінза зникає
+   * разом зі старим незалежно від того, чи працює close(). Мітка в
+   * window це показує чесно: вона перезавантаження не переживає.
+   *
+   * Тому тут перевіряється лише те, що після відпускання лінзи на екрані
+   * НЕМАЄ. Справжній сторож гасіння — протяг нижче: він глушить клік,
+   * переходу не буде, і зникнути лінза може тільки сама.
+   */
+  const reloaded = await p.evaluate(() => !window.__alive);
+  ok('7. після дотику лінзи на екрані немає', (await lensOpen()) === false,
+     reloaded ? 'документ новий — гасіння тут не доводиться' : 'той самий документ');
+  ok('7. сторінка лишилась та сама', page(p) === 'index.html', page(p));
+
+  /* Те саме протягом: поїхали до сусіда й повернулись на свій пункт. */
+  const next = await p.locator('#tabbar a[href="workout.html"]').boundingBox();
+  await touch('touchStart', here.x + here.width / 2, y);
+  await p.waitForTimeout(60);
+  await touch('touchMove', next.x + next.width / 2, y);
+  await p.waitForTimeout(60);
+  await touch('touchMove', here.x + here.width / 2, y);
+  await p.waitForTimeout(60);
+  await touch('touchEnd');
+  await p.waitForTimeout(700);
+  ok('7. протяг, що повернувся на свій пункт, теж гасне',
+     (await lensOpen()) === false);
+  ok('7. і нікуди не перевів', page(p) === 'index.html', page(p));
+  ok('7. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter((r) => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок панелі розділів пройшло.');

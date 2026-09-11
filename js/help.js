@@ -609,9 +609,14 @@
      * Це не друга система довідки: вікно, вміст і механізм ті самі, інша
      * лише точка входу.
      */
-    /* Кутову кнопку, якщо вона вже стоїть, прибираємо разом із рештою. */
-    const fabOld = document.querySelector('.help__fab');
-    if (fabOld && !has) fabOld.remove();
+    /* Кутову кнопку, якщо вона вже стоїть, прибираємо разом із рештою.
+       querySelectorAll, а не querySelector: цей файл чіпає document ще на
+       завантаженні, і в юніт-тесті (tests/help.test.js) підробка document
+       має рівно ті методи, які тут кличуться. Зайвий метод — це не
+       дрібниця: на ньому весь набір перевірок довідки мовчки перестав
+       виконуватись, а лічильник «fail» лишився нулем. */
+    const fabOld = document.querySelectorAll('.help__fab')[0];
+    if (fabOld && !has && fabOld.remove) fabOld.remove();
 
     if (has && !found.length && document.body) {
       const fab = document.createElement('button');

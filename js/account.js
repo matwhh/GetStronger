@@ -667,7 +667,7 @@
       'displayName','pet','scheme',
       'bodyLog','workLog','theme','periodization','deload',
       'weightLog','sessionLog','mealLog','trackers','trackerLog',
-      'measureLog','bmiAck',
+      'measureLog','bmiAck','hideHelp',
       'ratingLog','ratingSeen','ratingAlgorithmVersion',
       /* Латки разових міграцій. Без них імпорт на чистий браузер знімав
          позначку weightsHarvested, і programs.js на завантаженні знову
@@ -1437,6 +1437,11 @@
             return accept(k, out);
           }
 
+          case 'hideHelp':
+            /* Побажання «не показувати значок довідки». Проста булева
+               ознака: усе, що не true, означає «показувати». */
+            return typeof v === 'boolean' ? accept(k, v) : reject(k);
+
           case 'bmiAck': {
             // Підтвердження BMI-попередження: категорія + значення + час.
             if (!isPlain(v)) return reject(k);
@@ -1676,10 +1681,60 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Інтерфейс: що людина хоче бачити                                     */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЧОМУ ВИМИКАЧ ДОВІДКИ ЖИВЕ ТУТ, А НЕ В САМІЙ ДОВІДЦІ.
+   *
+   * Кнопка книжки стоїть на КОЖНІЙ сторінці. Перші тижні вона рятує, а
+   * через пів року це просто значок у кутку кожного екрана — і прибрати
+   * його не було як. Вимикач у самому вікні довідки був би пасткою:
+   * вимкнувши кнопку, людина втратила б і спосіб її повернути.
+   *
+   * Прапорець лежить у профілі (а не лише в браузері), бо це побажання
+   * людини, а не налаштування пристрою: вимкнув на телефоні — вимкнено й
+   * на компʼютері.
+   */
+  async function renderUiPrefs() {
+    const host = $('#ui-prefs');
+    if (!host) return;
+
+    let p = {};
+    try { p = (await Store.getProfile()) || {}; } catch (_) {}
+    const on = p.hideHelp !== true;
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<h3 class="card__title">Довідка</h3>' +
+        '<p class="small muted mt-1">Значок розгорнутої книжки у правому верхньому ' +
+          'куті кожної сторінки. Відкриває пояснення саме про той екран, де ви ' +
+          'стоїте, пошук по всій довідці й загальну інструкцію до сайту.</p>' +
+        '<label class="check mt-2">' +
+          '<input type="checkbox" id="a-help-btn"' + (on ? ' checked' : '') + '>' +
+          '<span>Показувати значок довідки на сторінках</span>' +
+        '</label>' +
+        '<p class="small muted mt-2 mb-0">Вимкнена кнопка нічого не видаляє: ' +
+          'довідка лишається на місці, її можна повернути тут будь-коли.</p>' +
+      '</div>';
+
+    const box = $('#a-help-btn', host);
+    if (!box) return;
+    box.addEventListener('change', function () {
+      const hide = !box.checked;
+      Store.saveProfile({ hideHelp: hide })
+        .catch(function (e) { if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err'); });
+      /* Кнопка має зникнути й зʼявитись одразу, без перезавантаження. */
+      try { if (window.Help && window.Help.sync) window.Help.sync(hide); } catch (_) {}
+      toast(hide ? 'Значок довідки прибрано' : 'Значок довідки повернуто', 'ok');
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
 
   async function renderAll() {
     renderMode();
     renderAuth();
+    renderUiPrefs();
 
     // Якщо фокус зараз у полі профілю, значить його саме зараз редагують —
     // перемальовування вибило б курсор і скинуло напівнабране число.

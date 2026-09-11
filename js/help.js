@@ -287,6 +287,54 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Пошук                                                               */
+  /* ------------------------------------------------------------------ */
+
+  /*
+   * Покажчик будується ОДИН раз на вкладку й лежить тут. Перебудовувати
+   * його на кожне натискання клавіші безглуздо: вміст довідки статичний
+   * і за час життя сторінки не міняється.
+   */
+  let searchIndex = null;
+
+  function ensureIndex() {
+    if (searchIndex) return searchIndex;
+    const HS = window.HelpSearchCore;
+    if (!HS || !window.HELP_CONTENT) return null;
+    searchIndex = HS.buildIndex(window.HELP_CONTENT);
+    return searchIndex;
+  }
+
+  /** Людська назва сторінки за її ключем у вмісті. */
+  function sectionTitle(page) {
+    const C = window.HELP_CONTENT;
+    if (!C) return page;
+    if (page === 'guide' && C.guide) return C.guide.title;
+    if (page === 'about' && C.about) return C.about.title;
+    const sec = C.sections[page];
+    return sec ? sec.title : page;
+  }
+
+  function resultsHtml(list, q) {
+    if (!list.length) {
+      return '<p class="help__lead">Нічого не знайшлося за запитом «' + esc(q) + '».</p>' +
+        '<p class="small muted">Спробуйте одне слово замість кількох — ' +
+        'наприклад «сон», «RIR», «розвантаження», «нагороди».</p>';
+    }
+    return '<p class="help__lead">Знайдено: ' + list.length +
+      (list.length === 1 ? ' відповідь' : ' відповідей') + '.</p>' +
+      '<div class="help__hits">' +
+        list.map(function (h) {
+          return '<button class="help__hit" type="button" data-help-go="' + esc(h.page) + '">' +
+            '<span class="help__hit-where">' + esc(h.title) +
+              (h.heading ? ' · ' + esc(h.heading) : '') + '</span>' +
+            '<span class="help__hit-text">' + esc(h.text) + '</span>' +
+          '</button>';
+        }).join('') +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Вікно                                                               */
   /* ------------------------------------------------------------------ */
 
@@ -297,6 +345,7 @@
     if (!openEl) return;
     const el = openEl;
     openEl = null;
+    clearSearch = null;
     document.removeEventListener('keydown', onKey, true);
     el.classList.add('is-out');
     /* Прибираємо ПІСЛЯ анімації, але не покладаємось на подію: якщо
@@ -314,9 +363,27 @@
       function (el) { return el.offsetParent !== null || el === document.activeElement; });
   }
 
+  /* Скинути пошук, якщо він зараз показує результати. Повертає true,
+     якщо було що скидати. */
+  let clearSearch = null;
+
   function onKey(e) {
     if (!openEl) return;
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      /*
+       * ESCAPE СПОЧАТКУ ЧИСТИТЬ ПОШУК, І ЛИШЕ ПОТІМ ЗАКРИВАЄ.
+       *
+       * Інакше одне натискання скасовує і запит, і всю довідку: людина
+       * хотіла повернутись до розділу сторінки, а опинилась на порожньому
+       * екрані й мусить відкривати книжку заново. Слухач на самому полі
+       * тут не рятує — цей стоїть на document у фазі ЗАХОПЛЕННЯ, тобто
+       * спрацьовує першим, і зупиняти подію в полі вже пізно.
+       */
+      if (clearSearch && clearSearch()) return;
+      close();
+      return;
+    }
     if (e.key !== 'Tab') return;
     const box = openEl.querySelector('.help__box');
     const list = focusables(box);
@@ -327,10 +394,26 @@
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
 
+  /**
+   * Розділ, який показати першим.
+   *
+   * Якщо в цієї сторінки власного розділу немає — відкриваємо загальну
+   * інструкцію. Раніше в такому разі вікно просто не відкривалось, і
+   * кнопку доводилось ховати: тепер ховати нічого, бо порожнього вікна
+   * більше не буває.
+   */
+  function homePage(page) {
+    const C = window.HELP_CONTENT;
+    const want = page || currentPage();
+    if (C && C.sections[want]) return want;
+    return (C && C.guide) ? 'guide' : '';
+  }
+
   function open(page) {
     if (openEl) return;
     const C = window.HELP_CONTENT;
-    const sec = C && C.sections[page || currentPage()];
+    const start = homePage(page);
+    const sec = start === 'guide' ? (C && C.guide) : (C && C.sections[start]);
     if (!sec) return;
 
     prevFocus = document.activeElement;
@@ -347,6 +430,25 @@
                  'stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
           '</button>' +
         '</div>' +
+        /*
+         * ПОШУК І ЗАГАЛЬНА ІНСТРУКЦІЯ — ПІД ЗАГОЛОВКОМ, НЕ В ТІЛІ.
+         *
+         * Довідка контекстна: вона показує розділ тієї сторінки, де ти
+         * стоїш. Це добре, доки питання стосується цієї сторінки. Але
+         * питання звучить «де ввести сон?» — і людина не знає, на якій
+         * сторінці лежить відповідь. Смуга лишається на місці, поки тіло
+         * прокручується: інакше, догортавши до середини, пошук довелось
+         * би шукати самому.
+         */
+        '<div class="help__tools">' +
+          '<input class="input input--sm help__q" type="search" ' +
+            'placeholder="Пошук по довідці…" aria-label="Пошук по довідці" ' +
+            'autocomplete="off" spellcheck="false">' +
+          (C.guide
+            ? '<button class="btn btn--ghost btn--sm help__guide" type="button" ' +
+                'data-help-guide>Інструкція до сайту</button>'
+            : '') +
+        '</div>' +
         '<div class="help__body">' +
           sectionHtml(sec) +
           /* «Про Get Stronger» — згорнутий хвіст, а не окремий екран: він
@@ -362,16 +464,76 @@
     openEl = wrap;
     try { if (A.lockScroll) A.lockScroll(true); } catch (_) {}
 
+    const body = wrap.querySelector('.help__body');
+    const titleEl = wrap.querySelector('#help-t');
+    const about = wrap.querySelector('.help__about');
+
+    /** Показати розділ (сторінку, інструкцію або «Про Get Stronger»). */
+    function showSection(page) {
+      const target = page === 'guide' ? C.guide
+                   : page === 'about' ? C.about
+                   : C.sections[page];
+      if (!target) return;
+      titleEl.textContent = target.title;
+      body.innerHTML = sectionHtml(target);
+      /* Хвіст «Про Get Stronger» лишається тільки на своїй сторінці, а не
+         дублюється під інструкцією й під результатами пошуку. */
+      if (about && page !== 'about' && page !== 'guide') body.appendChild(about);
+      body.scrollTop = 0;
+    }
+
     wrap.addEventListener('click', function (e) {
-      if (e.target.closest('[data-help-close]')) { e.preventDefault(); close(); }
+      if (e.target.closest('[data-help-close]')) { e.preventDefault(); close(); return; }
+      if (e.target.closest('[data-help-guide]')) {
+        e.preventDefault();
+        const q = wrap.querySelector('.help__q');
+        if (q) q.value = '';
+        showSection('guide');
+        return;
+      }
+      const go = e.target.closest('[data-help-go]');
+      if (go) {
+        e.preventDefault();
+        const q = wrap.querySelector('.help__q');
+        if (q) q.value = '';
+        showSection(go.dataset.helpGo);
+      }
     });
+
+    /*
+     * Пошук на кожне натискання, без кнопки. Покажчик уже в памʼяті, і
+     * весь вміст довідки — це десятки кілобайт тексту: шукати в ньому
+     * дешевше, ніж малювати результат.
+     */
+    const qEl = wrap.querySelector('.help__q');
+    if (qEl) {
+      qEl.addEventListener('input', function () {
+        const q = qEl.value.trim();
+        if (q.length < 2) { showSection(start); return; }
+        const idx = ensureIndex();
+        if (!idx) return;
+        const hits = window.HelpSearchCore.search(idx, q);
+        titleEl.textContent = 'Пошук';
+        body.innerHTML = resultsHtml(hits, q);
+        body.scrollTop = 0;
+      });
+      /* Див. onKey: саме він вирішує, що робить Escape. */
+      clearSearch = function () {
+        if (!qEl.value) return false;
+        qEl.value = '';
+        showSection(start);
+        try { qEl.focus(); } catch (_) {}
+        return true;
+      };
+    }
+
     document.addEventListener('keydown', onKey, true);
 
     const box = wrap.querySelector('.help__box');
     try { (box.querySelector('[data-help-close]') || box).focus(); } catch (_) {}
     /* Вікно прокручується з початку, навіть якщо сторінка під ним була
        прокручена: інакше довідка відкривалася б із середини тексту. */
-    try { wrap.querySelector('.help__body').scrollTop = 0; } catch (_) {}
+    try { body.scrollTop = 0; } catch (_) {}
 
     /*
      * СТАН СЕЗОНУ МІГ ЩЕ НЕ ПРИЇХАТИ.
@@ -385,8 +547,11 @@
         !eloConfig() && eloAvailable()) {
       window.EloApi.refresh().then(function () {
         if (openEl !== wrap || !eloConfig()) return;
-        const body = wrap.querySelector('.help__body');
-        const about = body.querySelector('.help__about');
+        /* Якщо людина вже щось шукає або пішла в інструкцію — не
+           затираємо те, що вона читає, свіжою таблицею. */
+        const q = wrap.querySelector('.help__q');
+        if (q && q.value.trim().length >= 2) return;
+        if (titleEl.textContent !== sec.title) return;
         body.innerHTML = sectionHtml(sec);
         if (about) body.appendChild(about);
       }).catch(function () {});
@@ -403,8 +568,32 @@
    * відкриває порожнє вікно, гірша за її відсутність. Шапка будується
    * асинхронно, тому перевіряємо і зараз, і після завантаження.
    */
+  /*
+   * ЧИ ХОЧЕ ЛЮДИНА БАЧИТИ ЦЮ КНОПКУ.
+   *
+   * Довідка потрібна перші тижні, а далі кнопка просто стоїть у кутку
+   * кожного екрана. Вимикач живе в «Акаунті» (profile.hideHelp) —
+   * читаємо його синхронно зі сховища, бо кнопку треба намалювати до
+   * того, як приїде профіль із мережі. Довідка від цього не зникає:
+   * window.Help.open() працює далі, зникає лише кнопка.
+   */
+  /* Щойно перемкнуте значення. Потрібне тому, що запис у профіль
+     асинхронний: «Акаунт» перемикає галочку і хоче, щоб кнопка зникла
+     ЗАРАЗ, а не коли доїде збереження. */
+  let forcedHidden = null;
+
+  function hidden() {
+    if (typeof forcedHidden === 'boolean') return forcedHidden;
+    try {
+      const p = JSON.parse(localStorage.getItem('ib.profile')) || {};
+      return p.hideHelp === true;
+    } catch (_) { return false; }
+  }
+
   function wire() {
-    const has = Boolean(window.HELP_CONTENT && window.HELP_CONTENT.sections[currentPage()]);
+    /* Розділ є або в самої сторінки, або загальна інструкція — тобто
+       практично завжди. Порожнього вікна кнопка більше не відкриває. */
+    const has = Boolean(homePage()) && !hidden();
     const found = document.querySelectorAll('[data-help-open]');
     Array.prototype.forEach.call(found, function (b) { b.hidden = !has; });
 
@@ -420,6 +609,10 @@
      * Це не друга система довідки: вікно, вміст і механізм ті самі, інша
      * лише точка входу.
      */
+    /* Кутову кнопку, якщо вона вже стоїть, прибираємо разом із рештою. */
+    const fabOld = document.querySelector('.help__fab');
+    if (fabOld && !has) fabOld.remove();
+
     if (has && !found.length && document.body) {
       const fab = document.createElement('button');
       fab.className = 'help__fab';
@@ -456,6 +649,16 @@
     close: close,
     has: function (page) {
       return Boolean(window.HELP_CONTENT && window.HELP_CONTENT.sections[page || currentPage()]);
+    },
+    /*
+     * Перечитати вимикач — кличе «Акаунт» після перемикання, щоб кнопка
+     * зникла чи зʼявилась одразу, без перезавантаження сторінки.
+     * Значення можна передати явно: запис у профіль асинхронний, і
+     * читати сховище в цю ж мить ще рано.
+     */
+    sync: function (hide) {
+      if (typeof hide === 'boolean') forcedHidden = hide;
+      wire();
     },
     /*
      * Зібрати динамічний блок окремо від вікна.

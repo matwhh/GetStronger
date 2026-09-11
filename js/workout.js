@@ -67,48 +67,6 @@
     return window.Store.saveProfile(patch);
   }
 
-  /**
-   * Робоча вага з рядка вправи.
-   *
-   * Пише в ті самі два місця, що й «Мій план тренувань»: profile.weights (поточне
-   * значення — його читають план, періодизація і прогноз) та weightLog
-   * через HistoryCore.appendWeight (історія змін). Власної арифметики тут
-   * немає — лише передача значення в наявні функції.
-   *
-   * Порожнє поле стирає вагу: інакше помилково введене число не було б як
-   * прибрати, не йдучи на іншу сторінку.
-   */
-  function saveWeight(name, raw) {
-    if (!name) return;
-    const txt = String(raw == null ? '' : raw).trim().replace(',', '.');
-    const weights = Object.assign({}, state.profile.weights || {});
-
-    if (!txt) {
-      if (!(name in weights)) return;
-      delete weights[name];
-    } else {
-      const kg = Number(txt);
-      if (!Number.isFinite(kg) || kg < 0 || kg > 500) { toast('Вага — число від 0 до 500', 'err'); return; }
-      if (weights[name] === kg) return;   // нічого не змінилось — не смітимо в історію
-      weights[name] = kg;
-    }
-
-    state.profile.weights = weights;
-    const patch = { weights: weights };
-
-    if (txt && window.HistoryCore) {
-      const log = window.HistoryCore.appendWeight(state.profile.weightLog, name, Number(txt));
-      state.profile.weightLog = log;
-      patch.weightLog = log;
-    }
-
-    window.App.stampRating(Object.assign({}, state.profile, patch), patch);
-    saveOwn(patch).then(function () {
-      toast(txt ? 'Вагу збережено' : 'Вагу прибрано', 'ok');
-    }, function (e) {
-      toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');
-    });
-  }
 
   /*
    * Одна дія людини — ДВА незалежні записи: галочки в forge.today і
@@ -713,6 +671,28 @@
     const fbR = repMid(ex.reps);
     const raw = String(patch.w != null ? patch.w : patch.r);
 
+    /*
+     * СТЕЛЯ — СВОЯ ДЛЯ КОЖНОЇ ВПРАВИ.
+     *
+     * Спільні 0–500 у normWeight для присідання майже чесні, а для махів
+     * гантелями — ні: 300 кг у бічній дельті проходили мовчки й лягали в
+     * журнал, а звідти в історію та графіки. Помилку помічали через
+     * тижні, коли графік уже не читався.
+     *
+     * Перевірка стоїть ПЕРЕД записом, а не після: інакше значення встигає
+     * потрапити в стан дня, і відкочувати довелося б із журналу.
+     */
+    const WL = window.WeightLimits;
+    if (WL && patch.w != null && raw !== '') {
+      const v = WL.check(ex.name, raw);
+      if (!v.ok && v.why === 'big') {
+        const shownNow = WC.performedSets(state.done[i], ps, fbW, fbR)[k] || {};
+        el.value = shownNow.w == null ? '' : fmtNum.kg(shownNow.w);
+        toast(WL.message(ex.name), 'err');
+        return;
+      }
+    }
+
     state.done[i] = WC.editSet(state.done[i], k, patch, ps, fbW, fbR);
     saveDayState();
     refreshProgress();
@@ -723,7 +703,10 @@
     const shown = WC.performedSets(state.done[i], ps, fbW, fbR)[k] || {};
     if ('w' in patch) {
       el.value = shown.w == null ? '' : fmtNum.kg(shown.w);
-      if (raw !== '' && WC.normWeight(raw) === null) toast('Вага підходу: 0–500 кг', 'err');
+      if (raw !== '' && WC.normWeight(raw) === null) {
+        toast(window.WeightLimits ? window.WeightLimits.message(ex.name)
+                                  : 'Вага підходу: 0–500 кг', 'err');
+      }
     } else {
       el.value = shown.r == null ? '' : String(shown.r);
       if (raw !== '' && WC.normReps(raw) === null) toast('Повтори: 1–200', 'err');
@@ -772,17 +755,25 @@
         '<div class="tdy-ex__log" id="wk-log-' + i + '" data-set-log="' + i + '" hidden>' +
           setLogHtml(i, ex, ps) +
         '</div>' +
+        /*
+         * РОБОЧУ ВАГУ ТУТ НЕ МІНЯЮТЬ — ЇЇ ТІЛЬКИ ВИДНО.
+         *
+         * Раніше поруч стояло поле вводу, і воно писало просто в книгу
+         * ваг. Через це одна сторінка робила дві протилежні речі одним
+         * жестом: «сьогодні я взяв 50» і «віднині моя робоча вага 50».
+         * Зменшив вагу через втому — і план мовчки поїхав униз назавжди;
+         * історія ваг отримала подію, якої не було; прогресія побачила
+         * зміну ваги й обнулила лічильник тренувань на ній.
+         *
+         * Тепер поділ чіткий: вага КОНКРЕТНОГО ПІДХОДУ правиться в
+         * «Вагах підходів» вище і лишається фактом одного дня, а робоча
+         * вага живе в плані, де її й змінюють свідомо.
+         */
         '<div class="tdy-ex__wt">' +
-          '<label class="tdy-ex__wt-lbl" for="wk-w-' + i + '">Робоча вага</label>' +
-          '<input class="input input--sm input--weight num mono" id="wk-w-' + i + '" ' +
-            'type="text" inputmode="decimal" placeholder="—" ' +
-            /* Кома, а не крапка: людина набирає її і бачить її ж по всьому
-               Forge. Назад значення читає saveWeight(), яка приймає обидва
-               знаки, тож редагування від цього не змінюється. */
-            'value="' + esc(w == null ? '' : fmtNum.kg(w)) + '" ' +
-            'data-wt="' + esc(ex.name || '') + '" ' +
-            'aria-label="Робоча вага, кг: ' + esc(ex.name) + '">' +
+          '<span class="tdy-ex__wt-lbl">Робоча вага</span>' +
+          '<b class="tdy-ex__wt-val num mono">' + (w == null ? '—' : esc(fmtNum.kg(w))) + '</b>' +
           '<span class="tdy-ex__wt-unit">кг</span>' +
+          '<a class="tdy-ex__wt-edit small" href="plan.html">змінити</a>' +
         '</div>' +
       '</li>';
   }
@@ -1082,8 +1073,7 @@
         return;
       }
 
-      const wt = e.target.closest('[data-wt]');
-      if (wt) { saveWeight(wt.dataset.wt, wt.value); }
+      /* [data-wt] більше немає: робочу вагу з цієї сторінки не міняють. */
     });
 
     host.addEventListener('click', function (e) {

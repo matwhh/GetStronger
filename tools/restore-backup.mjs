@@ -97,7 +97,7 @@ export function validate(b) {
   }
 
   if (!(counts.users >= 1)) {
-    throw new Error('counts.users = ' + counts.users + '. Бекап без жодного користувача — це не бекап бази Forge.');
+    throw new Error('counts.users = ' + counts.users + '. Бекап без жодного користувача — це не бекап бази Get Stronger.');
   }
 
   /* Однорідність ключів: якщо рядки одної таблиці мають різні набори колонок,

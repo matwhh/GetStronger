@@ -469,7 +469,7 @@
     };
     return '<div class="mt-2" id="b-consents" style="border-top:1px solid var(--line);padding-top:14px">' +
       box('c-terms', 'Я прочитав(ла) та погоджуюсь із ' +
-        '<a href="legal.html#terms" target="_blank" rel="noopener">Умовами використання</a> Forge.') +
+        '<a href="legal.html#terms" target="_blank" rel="noopener">Умовами використання</a> Get Stronger.') +
       box('c-privacy', 'Я прочитав(ла) ' +
         '<a href="legal.html#privacy" target="_blank" rel="noopener">Політику конфіденційності</a>.') +
       box('c-medical', 'Я розумію, що Get Stronger не є медичним сервісом, а інформація на платформі ' +

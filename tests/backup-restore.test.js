@@ -81,7 +81,7 @@ describe('Перевірка файла резервної копії', () => {
     const b = backup();
     b.users = []; b.identities = []; b.account_status = []; b.profiles = [];
     b.counts = Object.assign({}, b.counts, { users: 0, identities: 0, account_status: 0, profiles: 0 });
-    assert.throws(() => validate(b), /не бекап бази Forge/);
+    assert.throws(() => validate(b), /не бекап бази Get Stronger/);
   });
 
   test('рядки з різними наборами колонок ловляться', () => {

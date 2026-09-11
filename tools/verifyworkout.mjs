@@ -87,7 +87,13 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   ok('2. усе тренування тут', await p.locator('#workout .tdy-ex').count() === 14);
   ok('2. підходи й RIR на місці',
      /RIR/.test(await p.locator('#workout').innerText()));
-  ok('2. поля робочої ваги на місці', await p.locator('#workout [data-wt]').count() === 14);
+  /* Робоча вага тепер ТІЛЬКИ показується — міняють її в плані. Раніше
+     тут стояла перевірка «поля на місці», і саме вона першою почервоніла
+     на правці; замінена на перевірку того, що число видно для кожної
+     вправи, а поля вводу немає ніде. */
+  ok('2. робоча вага видна для кожної вправи',
+     await p.locator('#workout .tdy-ex__wt-val').count() === 14);
+  ok('2. і жодного поля вводу робочої ваги', await p.locator('#workout [data-wt]').count() === 0);
   ok('2. вибір дня плану на місці', await p.locator('#workout input[name="wk-day"]').count() === 3);
   ok('2. таймер відпочинку на місці', await p.locator('#workout [data-rest-sec]').count() === 14);
   ok('2. кнопки підходів відрендерені', await p.locator('#workout [data-set-ex]').count() > 14);
@@ -140,20 +146,32 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
      JSON.stringify(rec).slice(0, 120));
   ok('3. сесія ще НЕ завершена (без end)', rec && !rec.end);
 
-  const wt = p.locator('#workout [data-wt]').first();
-  const nm = await wt.getAttribute('data-wt');
-  await wt.fill('72,5'); await wt.blur();
-  await p.waitForTimeout(900);
-  const w = await p.evaluate(async n => (await window.Store.getProfile()).weights[n], nm);
-  ok('3. робоча вага пише у спільну книгу ваг', w === 72.5, 'w=' + w);
+  /*
+   * Тут стояли дві перевірки поля «Робоча вага» — воно писало в книгу
+   * ваг просто з тренування. Поля більше немає навмисно (див. розділ 10
+   * і коментар у js/workout.js): одна сторінка не має робити «сьогодні я
+   * взяв 50» і «віднині моя робоча вага 50» одним жестом.
+   *
+   * Замість них стережемо протилежне: що вагу звідси НЕ змінити, але
+   * видно, і що вага ПІДХОДУ лишилась редагованою — це різні речі, і
+   * перша не мусить забрати другу з собою.
+   */
+  ok('3. робочу вагу з тренування не змінити', await p.locator('#workout [data-wt]').count() === 0);
+  ok('3. але вона видна', await p.locator('#workout .tdy-ex__wt-val').count() > 0);
 
-  const ins = p.locator('#workout [data-wt]');
-  await ins.nth(1).click(); await ins.nth(1).fill('40');
-  await ins.nth(2).click({ timeout: 5000 }).catch(() => {});
+  const row1 = p.locator('#workout .tdy-ex').first();
+  await tap(row1.locator('[data-log-tgl]'));
+  await p.waitForTimeout(400);
+  const setW = row1.locator('[data-setw]').first();
+  await setW.fill('72,5'); await setW.press('Enter');
   await p.waitForTimeout(900);
-  ok('3. фокус не падає при переході між полями ваги',
-     await p.evaluate(() => document.activeElement.tagName) === 'INPUT',
-     await p.evaluate(() => document.activeElement.tagName));
+  ok('3. вага підходу редагується й лишається в полі',
+     (await setW.inputValue()).replace('.', ',') === '72,5', await setW.inputValue());
+  ok('3. і в книгу ваг вона НЕ пішла',
+     await p.evaluate(async () => {
+       const pr = await window.Store.getProfile();
+       return !Object.values(pr.weights || {}).includes(72.5);
+     }));
 
   await tap(p.locator('#workout [data-rest-sec]').first());
   await p.waitForTimeout(500);
@@ -557,6 +575,61 @@ for (const w of [320, 390, 430]) {
   }));
 
   ok('перехід із «Сьогодні»: без JS-помилок', errs.length === 0, errs.slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
+/* ---- 10. Робочу вагу з тренування не міняють, і вага підходу має стелю -- */
+/*
+ * Поле «Робоча вага» стояло просто на сторінці тренування й писало в
+ * книгу ваг. Одна сторінка робила дві протилежні речі одним жестом:
+ * «сьогодні я взяв 50» і «віднині моя робоча вага 50». Зменшив через
+ * втому — план мовчки поїхав униз назавжди, історія ваг отримала подію,
+ * якої не було, а прогресія побачила зміну ваги й обнулила лічильник
+ * тренувань на ній.
+ *
+ * Друге: стеля вводу була спільна, 0–500 на будь-що. Для присідання це
+ * майже чесно, для махів гантелями — ні: 300 кг у бічній дельті
+ * проходили мовчки й доїжджали до графіків.
+ */
+{
+  const { ctx, p, errs } = await open();
+  await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1400);
+
+  ok('10. поля робочої ваги на тренуванні немає',
+     await p.locator('[data-wt]').count() === 0);
+  ok('10. але саме число видно', await p.locator('.tdy-ex__wt-val').count() > 0);
+  ok('10. і є вихід туди, де її міняють',
+     await p.locator('.tdy-ex__wt-edit[href="plan.html"]').count() > 0);
+
+  /* Вага ПІДХОДУ лишається редагованою — це факт одного дня. */
+  const first = p.locator('#workout .tdy-ex').first();
+  await tap(first.locator('[data-set-ex]').first());
+  await p.waitForTimeout(300);
+  await tap(first.locator('[data-log-tgl]'));
+  await p.waitForTimeout(300);
+
+  const name = await first.locator('.tdy-ex__name').innerText();
+  const cap = await p.evaluate((n) => window.WeightLimits.maxFor(n), name);
+  ok('10. стеля своя, а не спільні 500', cap > 0 && cap !== 500, name + ' → ' + cap);
+
+  const w = first.locator('[data-setw]').first();
+  await w.fill(String(cap + 100));
+  await w.press('Enter');
+  await p.waitForTimeout(600);
+  const after = await w.inputValue();
+  ok('10. нереальна вага не приймається', after !== String(cap + 100), 'у полі: ' + after);
+  ok('10. і сказано, яка межа',
+     /до \s*' + cap + '\s*кг/.test(await p.locator('.toast').first().innerText().catch(() => '')) ||
+     (await p.locator('.toast').first().innerText().catch(() => '')).includes(String(cap)),
+     await p.locator('.toast').first().innerText().catch(() => '—'));
+
+  await w.fill(String(Math.round(cap / 2)));
+  await w.press('Enter');
+  await p.waitForTimeout(600);
+  ok('10. нормальна вага приймається', await w.inputValue() === String(Math.round(cap / 2)),
+     await w.inputValue());
+  ok('10. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 

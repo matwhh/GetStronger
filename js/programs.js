@@ -1653,7 +1653,10 @@
       if (raw === '') { setWeight(name, null); invalidateDeload(); return true; }
       const n = Number(raw);
       if (!Number.isFinite(n)) return false;
-      setWeight(name, clamp(Math.round(n * 2) / 2, 0, 500));   // крок 0,5 кг
+      /* Стеля своя для кожної вправи (js/weight-limits-core.js): спільні
+         500 кг для махів гантелями — не запобіжник, а формальність. */
+      const cap = window.WeightLimits ? window.WeightLimits.maxFor(name) : 500;
+      setWeight(name, clamp(Math.round(n * 2) / 2, 0, cap));   // крок 0,5 кг
       invalidateDeload();
       return true;
     }
@@ -1902,7 +1905,9 @@
        */
       if (act === 'weight') {
         if (String(value == null ? '' : value).trim() !== '') {
-          toast('Робоча вага — число від 0 до 500 кг', 'err');
+          const nm = (state.plan[dayIdx].exercises[i] || {}).name || '';
+          toast(window.WeightLimits ? window.WeightLimits.message(nm)
+                                    : 'Робоча вага — число від 0 до 500 кг', 'err');
         }
         showStoredWeight(dayIdx, i);
       }
@@ -1937,12 +1942,16 @@
       /* Поле, у якому щойно набрали, sync пропускає (воно ще у фокусі при
          change з Enter) — показуємо в ньому збережене число саме тут. */
       showStoredWeight(dayIdx, i);
-      /* Число поза межами мовчки обрізалось до 0–500: у полі лишалось
-         900, у профілі — 500. Тепер про обрізання кажемо вголос. */
+      /* Число поза межами мовчки обрізалось: у полі лишалось 900, у
+         профілі — стеля. Тепер про обрізання кажемо вголос, і стеля
+         своя для кожної вправи. */
+      const nm = (state.plan[dayIdx].exercises[i] || {}).name || '';
+      const cap = window.WeightLimits ? window.WeightLimits.maxFor(nm) : 500;
       const raw = String(value == null ? '' : value).trim().replace(',', '.');
       const n = Number(raw);
-      if (raw !== '' && Number.isFinite(n) && (n < 0 || n > 500)) {
-        toast('Робоча вага — від 0 до 500 кг', 'err');
+      if (raw !== '' && Number.isFinite(n) && (n < 0 || n > cap)) {
+        toast(window.WeightLimits ? window.WeightLimits.message(nm)
+                                  : 'Робоча вага — від 0 до 500 кг', 'err');
       }
       /* Перша збережена вага завершує онбординг — банер має це сказати. */
       updateOnboardBanner();

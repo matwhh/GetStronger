@@ -268,7 +268,7 @@ Co-Authored-By: <модель> <noreply@anthropic.com>
 ```
 робота в репозиторії
    ↓  копіюємо змінені файли
-тека релізу на Mac:  ~/Desktop/Forge/forge release
+тека релізу на Mac:  ~/Desktop/Get Stronger/Get Stronger
    ↓  подвійний клік по «Опублікувати.command» у корені теки
 npm test + ci-hygiene → коміт → git push origin main
    ↓
@@ -286,7 +286,7 @@ Vercel збирає сам (збірки немає — статика)
 `/bin/bash` читати теку на Робочому столі —
 
 ```
-/bin/bash: .../forge release/tools/auto-publish.sh: Operation not permitted
+/bin/bash: .../Get Stronger/tools/auto-publish.sh: Operation not permitted
 ```
 
 — і дві доби зміни нікуди не їхали, а ніхто цього не бачив. Автомат,

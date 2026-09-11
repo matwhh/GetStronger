@@ -12,7 +12,7 @@ backup-*.json
 *backup-*.json
 
 # Дампи бази з db/backup-export.sql (пошта всіх користувачів, профілі,
-# історія ELO). Лежать на Mac у ~/Desktop/forge-backups/ і в git не їдуть
+# історія ELO). Лежать на Mac у ~/Desktop/Get Stronger/backups/ і в git не їдуть
 # ніколи. Див. db/RESTORE.md.
 forge-backup-*.json
 

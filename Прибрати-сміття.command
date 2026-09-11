@@ -8,7 +8,7 @@
 #  міг прочитати будь-хто, хто знав адресу.
 #
 #  Що робить:
-#    1. виносить експорти акаунта з теки сайту в ~/Desktop/forge-backups
+#    1. виносить експорти акаунта з теки сайту в ~/Desktop/Get Stronger/backups
 #       (НЕ видаляє — це твої дані, просто не місце їм у репозиторії);
 #    2. прибирає з git службові файли macOS, архіви та теку _to_delete;
 #    3. лишає .gitignore і .vercelignore такими, щоб воно не повернулось.
@@ -27,7 +27,7 @@ fail() { printf "\n${R}✕ %s${N}\n" "$1"; printf "\nНатисни Enter, що�
 printf "\n${B}FORGE — чистка репозиторію${N}\n\n"
 
 command -v git >/dev/null 2>&1 || fail "немає git"
-[ -d .git ] || fail "тут немає репозиторію — поклади цей файл у теку «forge release»"
+[ -d .git ] || fail "тут немає репозиторію — поклади цей файл у теку «Get Stronger»"
 
 # Замок від перерваного git (той самий випадок, що й у Опублікувати.command).
 if [ -f .git/index.lock ]; then
@@ -39,11 +39,11 @@ fi
 changed=0
 
 # --- 1. Експорти акаунта геть із теки сайту -------------------------------
-DEST="$HOME/Desktop/forge-backups"
+DEST="$HOME/Desktop/Get Stronger/backups"
 for f in backup-*.json; do
   [ -e "$f" ] || continue
   mkdir -p "$DEST" || fail "не вдалося створити $DEST"
-  mv -n "$f" "$DEST/" && printf "· бекап перенесено: %s → ~/Desktop/forge-backups/\n" "$f"
+  mv -n "$f" "$DEST/" && printf "· бекап перенесено: %s → ~/Desktop/Get Stronger/backups/\n" "$f"
   changed=1
 done
 

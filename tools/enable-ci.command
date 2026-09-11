@@ -19,7 +19,7 @@ fail() { printf "\n${R}✕ %s${N}\n" "$1"; printf "\nНатисни Enter, що�
 
 printf "\n${B}Get Stronger — увімкнення CI${N}\n\n"
 
-[ -d .git ] || fail "тут немає репозиторію — поклади цей файл у теку «forge release»"
+[ -d .git ] || fail "тут немає репозиторію — поклади цей файл у теку «Get Stronger»"
 [ -f .github/workflows/ci.yml ] || fail "немає .github/workflows/ci.yml — нема чого вмикати"
 
 if [ -f .git/index.lock ]; then

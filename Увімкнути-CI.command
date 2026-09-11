@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#  FORGE — увімкнути CI.
+#  Get Stronger — увімкнути CI.
 #
 #  Запускати ПІСЛЯ того, як у токені зʼявилось право «workflow».
 #  До того GitHub відхилить пуш, і скрипт сам відкотить усе назад.
@@ -17,7 +17,7 @@ BRANCH="main"
 G=$'\033[32m'; R=$'\033[31m'; Y=$'\033[33m'; B=$'\033[1m'; N=$'\033[0m'
 fail() { printf "\n${R}✕ %s${N}\n" "$1"; printf "\nНатисни Enter, щоб закрити вікно."; read -r _; exit 1; }
 
-printf "\n${B}FORGE — увімкнення CI${N}\n\n"
+printf "\n${B}Get Stronger — увімкнення CI${N}\n\n"
 
 [ -d .git ] || fail "тут немає репозиторію — поклади цей файл у теку «Get Stronger»"
 [ -f .github/workflows/ci.yml ] || fail "немає .github/workflows/ci.yml — нема чого вмикати"

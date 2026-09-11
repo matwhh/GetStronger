@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#  FORGE — публікація одним кліком.
+#  Get Stronger — публікація одним кліком.
 #
 #  Двічі клацнути в Finder → усі зміни їдуть на GitHub, а Vercel сам
 #  збирає й викладає сайт. Нічого вводити не треба.
@@ -17,7 +17,7 @@ G=$'\033[32m'; R=$'\033[31m'; Y=$'\033[33m'; B=$'\033[1m'; N=$'\033[0m'
 say()  { printf "%s\n" "$1"; }
 fail() { printf "\n${R}✕ %s${N}\n" "$1"; printf "\nНатисни Enter, щоб закрити вікно."; read -r _; exit 1; }
 
-printf "\n${B}FORGE → GitHub → Vercel${N}\n\n"
+printf "\n${B}Get Stronger → GitHub → Vercel${N}\n\n"
 
 command -v git >/dev/null 2>&1 || fail "На цьому компʼютері немає git. Постав Xcode Command Line Tools: xcode-select --install"
 

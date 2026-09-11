@@ -6,7 +6,7 @@
 #  збирає й викладає сайт. Нічого вводити не треба.
 #
 #  Репозиторій, куди все їде. Якщо колись переїде — міняти тільки цей рядок.
-REPO_URL="https://github.com/matwhh/Forge.git"
+REPO_URL="https://github.com/matwhh/Get-Stronger.git"
 BRANCH="main"
 
 cd "$(dirname "$0")" || exit 1
@@ -151,21 +151,10 @@ if ! git push -u $FORCE origin "$BRANCH" 2>/tmp/forge-push.log; then
       printf "Потім просто запусти цей файл ще раз.\n"
       open "https://github.com/new?name=forge&visibility=private" 2>/dev/null
       ;;
-    *"could not read Username"*|*"Authentication"*|*"denied"*|*"403"*|*"Invalid username or token"*|*"expired"*)
-      printf "\n${Y}GitHub не пустив: пропуск недійсний.${N}\n"
-      printf "Найчастіша причина — у токена ЗАКІНЧИВСЯ ТЕРМІН. Він не вічний,\n"
-      printf "і в цей день усе просто перестає заливатись без інших ознак.\n\n"
-      printf "Найпростіший вихід — GitHub CLI, у нього термін не треба стерегти:\n"
-      printf "  ${B}brew install gh${N}\n"
-      printf "  ${B}gh auth login${N}   (Обери: GitHub.com → HTTPS → Yes → Login with a web browser)\n"
-      printf "  ${B}gh auth setup-git${N}\n"
-      printf "Далі просто запусти цей файл ще раз.\n\n"
-      printf "Якщо хочеш лишитись на токені: зроби новий на\n"
-      printf "  https://github.com/settings/tokens  (scope: repo)\n"
-      printf "і прибери старий із Звʼязки ключів:\n"
-      printf "  ${B}git credential-osxkeychain erase${N}\n"
-      printf "  (далі набери: host=github.com ⏎ protocol=https ⏎ ⏎)\n"
-      printf "Наступний push спитає логін — вкажи нік і НОВИЙ токен замість пароля.\n"
+    *"could not read Username"*|*"Authentication"*|*"denied"*|*"403"*)
+      printf "\n${Y}GitHub не пустив: потрібен вхід.${N}\n"
+      printf "Найпростіше — постав GitHub CLI і залогінься один раз:\n"
+      printf "  brew install gh && gh auth login\n"
       ;;
   esac
   printf "\nНатисни Enter, щоб закрити вікно."; read -r _; exit 1

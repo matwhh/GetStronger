@@ -66,7 +66,7 @@ printf "· відправляю на GitHub…\n"
 if git push -u origin "$BRANCH" 2>/tmp/forge-ci-push.log; then
   rm -f "$BACKUP"
   printf "\n${G}✓ Готово.${N} CI увімкнено.\n"
-  printf "  Перевірити: https://github.com/matwhh/Forge/actions\n"
+  printf "  Перевірити: https://github.com/matwhh/Get-Stronger/actions\n"
   printf "  Перший прогін почнеться за кілька секунд і триватиме ~30 с.\n"
   printf "\nНатисни Enter, щоб закрити."; read -r _; exit 0
 fi

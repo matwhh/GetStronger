@@ -117,7 +117,7 @@ forgesite/
 Збірки немає. Достатньо:
 
 ```bash
-git clone https://github.com/matwhh/Forge.git
+git clone https://github.com/matwhh/Get-Stronger.git
 cd Get Stronger
 open index.html          # або просто подвійний клік
 ```

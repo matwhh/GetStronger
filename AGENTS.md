@@ -315,7 +315,7 @@ Vercel збирає сам (збірки немає — статика)
 
 Щоб продовжити в іншому чаті або з іншою нейронкою, дай їй рівно це:
 
-> Проєкт Get Stronger, репозиторій `github.com/matwhh/Forge`.
+> Проєкт Get Stronger, репозиторій `github.com/matwhh/Get-Stronger`.
 > Прочитай спершу `AGENTS.md` — там правила, карта й рецепти.
 > Потім `docs/MAP.md` (де що лежить) і `docs/RECIPES.md` (як робити
 > типові зміни). `docs/ENGINEERING.md` — довідник, читати за потреби.

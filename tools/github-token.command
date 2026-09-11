@@ -14,7 +14,7 @@ cd "$(dirname "$0")"
 printf '\n=== Новий токен GitHub ===\n\n'
 printf 'Спершу створи токен у браузері (якщо ще не створив):\n'
 printf '  1. github.com/settings/personal-access-tokens → Generate new token → Fine-grained\n'
-printf '  2. Repository access → Only select repositories → matwhh/Get-Stronger\n'
+printf '  2. Repository access → Only select repositories → matwhh/GetStronger\n'
 printf '  3. Repository permissions: Contents = Read and write, Workflows = Read and write\n'
 printf '  4. Термін 1 рік. Скопіюй токен — його показують ОДИН раз.\n\n'
 printf 'Токен нікуди не вставляй у цей скрипт. Його спитає сам git.\n\n'
@@ -29,13 +29,13 @@ printf 'Перевіряю доступ. Git зараз спитає:\n'
 printf '  Username — matwhh\n'
 printf '  Password — ВСТАВ НОВИЙ ТОКЕН (не пароль від GitHub)\n\n'
 
-if git ls-remote https://github.com/matwhh/Get-Stronger.git HEAD >/dev/null 2>&1; then
+if git ls-remote https://github.com/matwhh/GetStronger.git HEAD >/dev/null 2>&1; then
   printf '\nOK: доступ до репозиторію є. Тепер публікація працюватиме.\n'
 else
   printf '\nНЕ ВИЙШЛО. Найчастіші причини:\n'
   printf '  · у поле Password вставлено пароль від GitHub, а не токен\n'
   printf '  · у токена не дано Contents = Read and write\n'
-  printf '  · токен видано не на репозиторій matwhh/Get-Stronger\n'
+  printf '  · токен видано не на репозиторій matwhh/GetStronger\n'
   printf 'Запусти цей файл ще раз після виправлення.\n'
 fi
 

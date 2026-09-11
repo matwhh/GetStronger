@@ -6,8 +6,13 @@
 #  збирає й викладає сайт. Нічого вводити не треба.
 #
 #  Репозиторій, куди все їде. Якщо колись переїде — міняти тільки цей рядок.
-REPO_URL="https://github.com/matwhh/Get-Stronger.git"
+#  Назва тут ОДНА: нижче вона не переписується руками, а виймається з
+#  адреси. Саме розбіжність між ними й зламала публікацію — в адресі
+#  стояло Get-Stronger, а на GitHub репозиторій зветься GetStronger.
+REPO_URL="https://github.com/matwhh/GetStronger.git"
 BRANCH="main"
+REPO_NAME="${REPO_URL##*/}"; REPO_NAME="${REPO_NAME%.git}"
+REPO_OWNER="${REPO_URL%/*}"; REPO_OWNER="${REPO_OWNER##*/}"
 
 cd "$(dirname "$0")" || exit 1
 
@@ -145,16 +150,26 @@ if ! git push -u $FORCE origin "$BRANCH" 2>/tmp/forge-push.log; then
   printf "\n${R}Не вдалося відправити.${N}\n%s\n" "$ERR"
   case "$ERR" in
     *"Repository not found"*|*"not found"*)
-      printf "\n${Y}Схоже, репозиторію ще немає.${N}\n"
-      printf "Зараз відкрию сторінку створення — назви його ${B}forge${N}, тип Private,\n"
-      printf "НІЧОГО не додавай (без README, без .gitignore) і натисни Create.\n"
-      printf "Потім просто запусти цей файл ще раз.\n"
-      open "https://github.com/new?name=forge&visibility=private" 2>/dev/null
+      # Для ПРИВАТНОГО репозиторію GitHub навмисно віддає «not found» і
+      # тоді, коли він існує, але доступ протух: щоб не підказувати
+      # стороннім, що такий репозиторій є. Тому причин рівно дві, і
+      # вгадувати за нас не треба — обидві названо.
+      printf "\n${Y}GitHub каже, що за цією адресою нічого немає:${N}\n"
+      printf "  %s\n\n" "${REPO_URL%.git}"
+      printf "Причин дві, і обидві просто перевірити.\n\n"
+      printf "  ${B}1. Назва не збігається.${N} Відкрий список своїх репозиторіїв і\n"
+      printf "     звір назву ЛІТЕРА В ЛІТЕРУ — дефіс і регістр мають значення.\n"
+      printf "     Якщо там інша — виправ рядок REPO_URL на початку цього файла.\n\n"
+      printf "  ${B}2. Доступ протух.${N} Токен GitHub має строк придатності; коли він\n"
+      printf "     минає, приватний репозиторій починає виглядати як неіснуючий.\n"
+      printf "     Лікується новим входом: tools/github-token.command\n\n"
+      printf "  3. І лише якщо репозиторію справді немає — створи його з назвою\n"
+      printf "     ${B}%s${N}, тип Private, без README і без .gitignore.\n" "$REPO_NAME"
+      open "https://github.com/${REPO_OWNER}?tab=repositories" 2>/dev/null
       ;;
     *"could not read Username"*|*"Authentication"*|*"denied"*|*"403"*)
       printf "\n${Y}GitHub не пустив: потрібен вхід.${N}\n"
-      printf "Найпростіше — постав GitHub CLI і залогінься один раз:\n"
-      printf "  brew install gh && gh auth login\n"
+      printf "Запусти ${B}tools/github-token.command${N} — він проведе по кроках.\n"
       ;;
   esac
   printf "\nНатисни Enter, щоб закрити вікно."; read -r _; exit 1

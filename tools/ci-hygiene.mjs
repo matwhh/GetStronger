@@ -352,6 +352,46 @@ for (const { mode, file } of modes) {
   }
 }
 
+/* ---- 13. Адреса репозиторію написана скрізь однаково ----------------- */
+//
+// Привід реальний: у скрипті публікації стояло «…/Get-Stronger», а
+// репозиторій зветься «GetStronger» — без дефіса. (Приклад навмисно без
+// повної адреси: вона потрапила б під цю саму перевірку.) Один зайвий символ, і
+// публікація падала з «Repository not found». Найгірше тут не помилка, а
+// підказка: скрипт радив СТВОРИТИ репозиторій, бо для приватного GitHub
+// навмисно віддає «не знайдено» замість «немає доступу». Тобто порада
+// вела не туди, куди треба, — створити другий репозиторій замість
+// виправлення літери.
+//
+// Джерело одне — REPO_URL у скрипті публікації. Решта файлів (README,
+// AGENTS.md, скрипти в tools/) мусять називати те саме місце. Записи
+// аудиту в docs/audit/ не чіпаємо: вони описують минулий стан, і
+// підганяти їх під сьогодні означало б переписати історію.
+const PUB = 'Опублікувати.command';
+if (existsSync(PUB)) {
+  const src = readFileSync(PUB, 'utf8');
+  const m = /REPO_URL="https:\/\/github\.com\/([^/"]+)\/([^/".]+)/.exec(src);
+  if (!m) {
+    fail(`${PUB} — не видно REPO_URL: перевірка адреси репозиторію осліпла`);
+  } else {
+    const canon = `${m[1]}/${m[2]}`;
+    const REF = /github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)/g;
+    for (const f of tracked) {
+      if (!TEXT.test(f) || f.startsWith('docs/audit/')) continue;
+      let body = '';
+      try { body = readFileSync(f, 'utf8'); } catch { continue; }
+      for (const hit of body.matchAll(REF)) {
+        const where = `${hit[1]}/${hit[2].replace(/\.git$/, '')}`;
+        if (where.toLowerCase() === canon.toLowerCase() && where !== canon) {
+          fail(`${f} — «${where}» замість «${canon}»: GitHub розрізняє регістр`);
+        } else if (hit[1] === m[1] && where !== canon) {
+          fail(`${f} — посилається на «${where}», а публікація йде в «${canon}»`);
+        }
+      }
+    }
+  }
+}
+
 /* ---- підсумок -------------------------------------------------------- */
 if (problems.length) {
   console.error('Гігієна репозиторію — знайдено проблеми:\n');

@@ -5243,6 +5243,41 @@ button.heatmap__cell::after {
 }
 .tdy-sub { margin: 6px 0 0; font-size: 1rem; color: var(--muted); }
 
+/*
+ * ВІДЖЕТ «ЧАС ДОДАТИ ВАГУ».
+ *
+ * Це .card — тобто матова поверхня, а не скло, і це навмисно. За
+ * правилом розділу «Скло» воно позначає ПРЕДМЕТ, який можна взяти:
+ * картку вибору, плитку з числом. Тут не предмет, а повідомлення, і
+ * скло на ньому означало б, що віджет можна кудись потягнути.
+ *
+ * Кольору теж немає. Порада підняти вагу — не помилка й не тривога;
+ * фарбувати її означало б сказати, що сталось щось нештатне.
+ */
+.prg { margin-top: clamp(18px, 3.5vw, 26px); }
+.prg__title { margin: 0 0 4px; font-size: 1.05rem; }
+
+/* Роздільник між вправами, а не рамка на кожній: рамок у картці вже
+   одна, і друга всередині читається як вкладена картка. */
+.prg__row { padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--line); }
+.prg__row:first-of-type { padding-top: 8px; margin-top: 8px; border-top: 0; }
+
+.prg__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.prg__name { font-size: 1rem; }
+.prg__why { margin: 6px 0 0; }
+
+/* На вузькому кнопки стають стовпчиком: три кнопки в рядок на 320px
+   дають цілі дотику по ~90px, а текст у них ріжеться. */
+.prg__acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.prg__acts .btn { flex: 1 1 auto; }
+@media (max-width: 380px) {
+  .prg__acts { flex-direction: column; }
+  .prg__acts .btn { width: 100%; }
+}
+
 .tdy-week { margin-top: clamp(28px, 6vw, 44px); }
 .tdy-week__num {
   display: block; margin-bottom: 16px;

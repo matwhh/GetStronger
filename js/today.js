@@ -37,7 +37,7 @@
 (function () {
   'use strict';
 
-  const { $, esc } = window.App;
+  const { $, esc, fmtNum } = window.App;
   const WC = window.WorkoutCore;
   const TC = window.TrackerCore;
 
@@ -585,10 +585,129 @@
     });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Час додати вагу                                                     */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЧОМУ ДРУГИМ БЛОКОМ, А НЕ ДЕСЬ ІЗ КРАЮ.
+   *
+   * Правило подвійної прогресії лежало на сторінці програми, кнопки
+   * кроку — на «Планах тренувань», а людина між ними мусила сама
+   * помітити, що вже закриває верхню межу. Підказка, яку треба піти
+   * пошукати, не працює: її не шукають. Тому вона стоїть одразу під
+   * карткою дня — у другому місці, куди падає око.
+   *
+   * ПРО ЗАПИТАННЯ. Фактичний RIR ніде не записується, і вигадати його з
+   * повторень не можна: десять повторень на RIR 3 і десять у відмову
+   * виглядають у даних однаково. Тому питає віджет, а відповідь — це
+   * саме натискання кнопки. «Так» означає «запас був», а не «згоден».
+   */
+  function progressionHtml() {
+    const PC = window.ProgressionCore;
+    if (!PC || !state.plan) return '';
+
+    const rows = PC.due({
+      profile: state.profile, plan: state.plan,
+      today: state.todayKey, isLeg: isLegExercise
+    });
+    if (!rows.length) return '';
+
+    const one = rows.map(function (r) {
+      const stood = r.sessions + ' ' +
+        window.App.plural(r.sessions, 'тренування', 'тренування', 'тренувань') +
+        (r.days != null ? ' · ' + r.days + ' ' +
+          window.App.plural(r.days, 'день', 'дні', 'днів') : '');
+      return '' +
+        '<div class="prg__row">' +
+          '<div class="prg__head">' +
+            '<b class="prg__name">' + esc(r.name) + '</b>' +
+            '<span class="small muted mono">' + fmtNum.kg(r.kg) + ' кг · ' + esc(stood) + '</span>' +
+          '</div>' +
+          '<p class="small muted prg__why">Верхня межа ' + r.top +
+            ' закрита в усіх підходах. Якщо в останньому лишалось ще 2 повтори — час на +' +
+            fmtNum.kg(r.step) + ' кг.</p>' +
+          '<div class="prg__acts">' +
+            '<button class="btn btn--primary btn--sm" type="button" data-prg-up="' + esc(r.name) + '">' +
+              'Так — ' + fmtNum.kg(r.next) + ' кг</button>' +
+            '<button class="btn btn--ghost btn--sm" type="button" data-prg-keep="' + esc(r.name) + '">' +
+              'Ні — лишити</button>' +
+            '<button class="btn btn--ghost btn--sm" type="button" data-prg-snooze="' + esc(r.name) + '">' +
+              'Відкласти</button>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+
+    return '' +
+      '<section class="card prg mt-2" aria-labelledby="prg-t">' +
+        '<h2 class="prg__title" id="prg-t">Час додати вагу</h2>' +
+        one +
+      '</section>';
+  }
+
+  /* Ноги беруть крок 5 кг, решта 2,5 — те саме правило, що в «Планах
+     тренувань». Класифікація одна: MUSCLES із js/exercises.js. */
+  const LEG_MUSCLES = ['quads', 'hamstrings', 'glutes', 'adductors', 'abductors', 'calves'];
+
+  /* Один в один із js/programs.js: книга ваг ключується назвами, тож
+     вправу шукаємо в бібліотеці за назвою. Якої в бібліотеці немає —
+     вважаємо не-ногами; промах у цей бік означає лише крок 2,5 замість
+     5, і це видно одразу на самій кнопці. */
+  function isLegExercise(name) {
+    const ex = (window.EXERCISES || []).find(function (e) { return e.name === name; });
+    if (!ex || !window.musclesOfExercise) return false;
+    return window.musclesOfExercise(ex).some(function (m) {
+      return LEG_MUSCLES.indexOf(m) !== -1;
+    });
+  }
+
+  /** Записати рішення по вправі й перемалювати. */
+  function decide(name, patch, weightDelta) {
+    const PC = window.ProgressionCore;
+    if (!PC) return;
+
+    const prg = Object.assign({}, state.profile.progression || {});
+    prg[name] = Object.assign({}, prg[name] || {}, patch);
+    state.profile.progression = prg;
+
+    let weights = state.profile.weights;
+    if (weightDelta) {
+      const cur = Number((weights || {})[name]);
+      if (Number.isFinite(cur) && cur > 0) {
+        const next = Math.max(1, Math.round((cur + weightDelta) * 2) / 2);
+        weights = Object.assign({}, weights, {});
+        weights[name] = next;
+        state.profile.weights = weights;
+        /* Історія ваг — тим самим записом, що й ручна правка: інакше
+           «вік ваги» не помітив би підвищення, зробленого звідси. */
+        if (window.HistoryCore) {
+          state.profile.weightLog =
+            window.HistoryCore.appendWeight(state.profile.weightLog, name, next);
+        }
+        if (window.App && window.App.toast) {
+          window.App.toast(name + ' — ' + fmtNum.kg(next) + ' кг', 'ok');
+        }
+      }
+    }
+
+    render();
+
+    const snapshot = {
+      progression: state.profile.progression,
+      weights: state.profile.weights,
+      weightLog: state.profile.weightLog
+    };
+    window.Store.saveProfile(weightDelta ? snapshot : { progression: snapshot.progression })
+      .catch(function (e) {
+        if (e && e.queued) return;
+        if (window.App && window.App.toast) window.App.toast('Не збереглося: ' + e.message, 'err');
+      });
+  }
+
   function render() {
     const host = $('#today');
     if (!host) return;
-    host.innerHTML = headHtml() + weekHtml() + widgetHtml() + habitsHtml() + trackersHtml();
+    host.innerHTML = headHtml() + weekHtml() + widgetHtml() + progressionHtml() +
+      habitsHtml() + trackersHtml();
     /* Нахил вішається на щойно створений віджет: initTilt позначає вже
        оброблені контейнери, тож повторний виклик безпечний. */
     if (window.App && window.App.initTilt) window.App.initTilt(host);
@@ -622,6 +741,36 @@
     readWeek();
     render();
     wireTrackers(host);
+
+    /* Кнопки віджета прогресії. Делегуванням: віджет перемальовується. */
+    host.addEventListener('click', function (e) {
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const PC = window.ProgressionCore;
+
+      const up = t.closest('[data-prg-up]');
+      if (up) {
+        const name = up.dataset.prgUp;
+        decide(name, { ackWeek: null, snoozeUntil: null },
+               isLegExercise(name) ? PC.STEP_LEGS : PC.STEP_OTHER);
+        return;
+      }
+      const keep = t.closest('[data-prg-keep]');
+      if (keep) {
+        /* Закриваємо САМЕ ЦЕЙ трігер: тиждень, який його підняв.
+           Наступний ідеально закритий тиждень запитає знову. */
+        const rows = PC.due({ profile: state.profile, plan: state.plan,
+                              today: state.todayKey, isLeg: isLegExercise });
+        const row = rows.find(function (r) { return r.name === keep.dataset.prgKeep; });
+        decide(keep.dataset.prgKeep, { ackWeek: row ? row.week : state.todayKey });
+        return;
+      }
+      const snooze = t.closest('[data-prg-snooze]');
+      if (snooze) {
+        decide(snooze.dataset.prgSnooze, { snoozeUntil: PC.snoozeUntil(state.todayKey) });
+        return;
+      }
+    });
 
     /* Вибір дня в смузі. Делегуванням: смуга перемальовується цілком. */
     host.addEventListener('click', function (e) {

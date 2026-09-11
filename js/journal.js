@@ -1350,6 +1350,65 @@
       '</li>';
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Вік робочої ваги                                                    */
+  /* ------------------------------------------------------------------ */
+  /*
+   * «Робочі ваги» вище показують, ЯК вага росла. Тут — протилежне
+   * питання: де вона СТОЇТЬ і як довго. Саме воно й губилось, бо
+   * відповідь на нього не видно ні в графіку, ні в останньому числі.
+   *
+   * Два числа поруч навмисно. Календарні дні минають і в тижні, коли ти
+   * хворів, тож самі по собі вони брешуть; тренування на цій вазі —
+   * чесна міра, але без днів не видно, чи вправа взагалі жива. Разом
+   * вони читаються однозначно: «60 кг · 44 дні · 2 тренування» означає
+   * не застій у залі, а півтора місяця, у які майже не тренувались.
+   */
+  const STALE_SHOWN = 8;
+
+  function renderStale() {
+    const host = $('#jr-stale');
+    if (!host || !window.ProgressionCore) return;
+
+    const rows = window.ProgressionCore.ages({
+      profile: { weightLog: state.weightLog, sessionLog: state.sessionLog },
+      today: window.App.localDateKey ? window.App.localDateKey() : todayKey()
+    });
+    if (!rows.length) { host.innerHTML = ''; return; }
+
+    const shown = state.staleAll ? rows : rows.slice(0, STALE_SHOWN);
+    const hidden = rows.length - shown.length;
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+          '<h2 style="margin:0">Скільки стоїть вага</h2>' +
+          '<span class="small muted">від останньої зміни</span>' +
+        '</div>' +
+        '<div class="table-wrap mt-2">' +
+          '<table class="tbl">' +
+            '<thead><tr>' +
+              '<th>Вправа</th><th class="num">Вага</th>' +
+              '<th class="num">Днів</th><th class="num">Тренувань</th>' +
+            '</tr></thead>' +
+            '<tbody>' + shown.map(function (r) {
+              return '<tr>' +
+                '<td>' + esc(r.name) + '</td>' +
+                '<td class="num mono">' + fmtNum.kg(r.kg) + '</td>' +
+                '<td class="num mono">' + (r.days == null ? '—' : r.days) + '</td>' +
+                '<td class="num mono">' + r.sessions + '</td>' +
+              '</tr>';
+            }).join('') + '</tbody>' +
+          '</table>' +
+        '</div>' +
+        (hidden > 0
+          ? '<button class="btn btn--ghost btn--sm mt-2" type="button" id="stale-more">' +
+              'Ще ' + hidden + ' ' + window.App.plural(hidden, 'вправа', 'вправи', 'вправ') +
+            '</button>'
+          : '') +
+      '</div>';
+  }
+
   function renderLifts() {
     const host = $('#jr-lifts');
     if (!host || !window.HistoryCore) return;
@@ -2734,6 +2793,7 @@
     keepFocus(renderWeight);
     keepFocus(renderTrain);
     renderLifts();
+    renderStale();
     renderPrs();
     renderExercise();
     renderFood();
@@ -2796,6 +2856,7 @@
 
     document.addEventListener('click', function (e) {
       if (e.target.closest('#lifts-more')) { state.liftsAll = true; renderLifts(); return; }
+      if (e.target.closest('#stale-more')) { state.staleAll = true; renderStale(); return; }
       if (e.target.closest('#lifts-less')) { state.liftsAll = false; renderLifts(); return; }
       const lf = e.target.closest('[data-lift]');
       if (lf) {

@@ -79,6 +79,7 @@ const SHELL = ['./index.html', './offline.html', './css/style.css',
                './js/day-core.js', './js/nutrition-core.js', './js/tracker-core.js',
                './js/tracker-tile-core.js',
                './js/workout-core.js', './js/season-core.js', './js/daycal-core.js',
+               './js/progression-core.js',
                './js/liquid-glass.js', './js/tabbar-glass.js', './js/donut-core.js',
                './js/today.js',
                './js/help-content.js', './js/help.js'];

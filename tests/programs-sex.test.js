@@ -189,7 +189,7 @@ describe('жіночий план: дані', () => {
     }
   });
 
-  it('тижневий обʼєм рахується правилом Forge і не виходить за стелі', () => {
+  it('тижневий обʼєм рахується правилом Get Stronger і не виходить за стелі', () => {
     const cap = (id) => {
       const m = w.MUSCLES.find((x) => x.id === id);
       return m ? (m.cap ?? w.VOLUME_CAP[m.size]) : Infinity;

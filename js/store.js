@@ -204,7 +204,7 @@
       version: SCHEMA_VERSION,
       // Антропометрія.
       // birthDate ('YYYY-MM-DD') — джерело правди про вік: з нього
-      // виводиться і доступ до Forge (17+, див. js/agegate.js), і саме
+      // виводиться і доступ до Get Stronger (17+, див. js/agegate.js), і саме
       // поле age. age лишається числом, бо його читають розрахунки
       // харчування й пульсу; воно похідне, а не друге джерело.
       birthDate: null,
@@ -257,7 +257,7 @@
       //   форма, що bodyLog/workLog.
       trackers: {},
       trackerLog: {},
-      // FORGE RATING (етап 5). Форма — js/rating-core.js.
+      // Get Stronger RATING (етап 5). Форма — js/rating-core.js.
       // ratingLog — ЦЕ КЕШ, не джерело правди: {'YYYY-MM-DD': {rating,delta,quality,reasons}},
       //   будь-коли перебудовується заново RatingCore.recompute() з history + ratingSeen.
       // ratingSeen — коли Rating ВПЕРШЕ побачив кожен факт ('train:D'/'meal:D'/…),
@@ -461,7 +461,7 @@
     }
 
     /*
-     * 3 -> 4: зʼявився Forge Rating.
+     * 3 -> 4: зʼявився Get Stronger Rating.
      *
      * Лише гарантія типу — ratingLog/ratingSeen порожні, ratingAlgorithmVersion 0.
      * Свідомо НЕ рахуємо тут перший ratingLog: recompute() потребує window.HistoryCore
@@ -858,7 +858,7 @@
        * 401 і 403 — РІЗНІ речі, і плутати їх не можна.
        *
        * 401 — сесії немає або токен не чинний: перезайти.
-       * 403 — сесія чинна, але прав на цей рядок немає. Для Forge це
+       * 403 — сесія чинна, але прав на цей рядок немає. Для Get Stronger це
        *       звичайний стан акаунта зі статусом pending: RLS не пускає
        *       його до profiles. Раніше 403 теж стирав сесію, тому людина
        *       з правильним паролем бачила «Не вдалося увійти» одразу

@@ -119,7 +119,7 @@ async function landing(p, f) {
 {
   /* План обрано, ваги ще немає — це ще НЕ кінець. */
   const { ctx, p } = await fresh(WITH_PLAN);
-  ok('1. план без жодної ваги не відчиняє Forge', await landing(p, 'index.html') === 'programs.html');
+  ok('1. план без жодної ваги не відчиняє Get Stronger', await landing(p, 'index.html') === 'programs.html');
   await ctx.close();
 }
 {
@@ -217,7 +217,7 @@ async function landing(p, f) {
 
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(600);
-  ok('5. після імпорту Forge відчинений — онбординг зарахувався сам',
+  ok('5. після імпорту Get Stronger відчинений — онбординг зарахувався сам',
      page(p.url()) === 'index.html', page(p.url()));
   ok('5. і повне меню повернулось', await p.locator('.nav__links').count() === 1);
   ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));

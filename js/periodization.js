@@ -341,7 +341,7 @@
     const cy = state.cycle;
     const c = cy.config;
     const lines = [
-      'FORGE — цикл на ' + c.weeks + ' тижнів',
+      'Get Stronger — цикл на ' + c.weeks + ' тижнів',
       round(c.startPct, 0) + '% → ' + round(c.endPct, 0) + '% від 1ПМ, ' +
         'крок ' + round(c.stepPct, 2) + '% ' +
         (c.cadence === 1 ? 'щотижня' : 'кожні 2 тижні'),
@@ -365,7 +365,7 @@
     // Таблиця для вставки в нотатки: рамки атрибутами, а не CSS, бо
     // зовнішні стилі при вставці не переживають майже ніде.
     return '' +
-      '<p><b>FORGE — цикл на ' + c.weeks + ' тижнів</b><br>' +
+      '<p><b>Get Stronger — цикл на ' + c.weeks + ' тижнів</b><br>' +
       round(c.startPct, 0) + '% → ' + round(c.endPct, 0) + '% від 1ПМ, крок ' +
       round(c.stepPct, 2) + '% ' + (c.cadence === 1 ? 'щотижня' : 'кожні 2 тижні') + '</p>' +
       '<table border="1" cellpadding="6" cellspacing="0">' +

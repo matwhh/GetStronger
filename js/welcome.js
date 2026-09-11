@@ -1,5 +1,5 @@
 /**
- * Перші екрани Forge: вік (17+) і базові дані тіла.
+ * Перші екрани Get Stronger: вік (17+) і базові дані тіла.
  *
  * Це ПЕРШІ КРОКИ онбордингу, а не окрема система. Усе лягає в той самий
  * профіль (Store), яким живе застосунок; власного сховища й прапорця
@@ -62,7 +62,7 @@
   /*
    * Екран реєстрації НЕ переживав перезавантаження: людина йшла в пошту
    * по лист підтвердження, поверталась — і всі поля були порожні, а на
-   * екрані стояв стартовий «Forge», ніби нічого й не було. Половина
+   * екрані стояв стартовий «Get Stronger», ніби нічого й не було. Половина
    * кинутих реєстрацій — саме тут.
    *
    * Тому все набране лягає в localStorage і піднімається назад при
@@ -158,7 +158,7 @@
        */
       return '' +
         '<div class="gate__msg gate__msg--block" role="alert">' +
-          '<p class="gate__msg-title">Forge доступний лише користувачам віком від 17 років.</p>' +
+          '<p class="gate__msg-title">Get Stronger доступний лише користувачам віком від 17 років.</p>' +
           '<p class="small mb-0">Платформа та її тренувальні програми розроблені для ' +
             'користувачів віком 17 років і старше.</p>' +
         '</div>';
@@ -472,7 +472,7 @@
         '<a href="legal.html#terms" target="_blank" rel="noopener">Умовами використання</a> Forge.') +
       box('c-privacy', 'Я прочитав(ла) ' +
         '<a href="legal.html#privacy" target="_blank" rel="noopener">Політику конфіденційності</a>.') +
-      box('c-medical', 'Я розумію, що Forge не є медичним сервісом, а інформація на платформі ' +
+      box('c-medical', 'Я розумію, що Get Stronger не є медичним сервісом, а інформація на платформі ' +
         'не замінює консультацію лікаря (<a href="legal.html#medical" target="_blank" rel="noopener">медичне застереження</a>).') +
     '</div>';
   }
@@ -572,7 +572,7 @@
     /*
      * Хмарний режим: скринінг завершено — подаємо ЗАЯВКУ. Сервер ще раз
      * перевіряє вік (underage не пройде і прямим викликом API) та
-     * унікальність ніка, і ставить статус pending. Доступу до Forge це
+     * унікальність ніка, і ставить статус pending. Доступу до Get Stronger це
      * ще не дає — RLS відкриється лише після ручного підтвердження.
      */
     const uname = (window.Store.localProfile() || {}).displayName || state.acc.username || '';
@@ -595,7 +595,7 @@
       state.busy = false;
       const msg = String((e && e.message) || '');
       if (msg.indexOf('UNDERAGE') !== -1) {
-        state.err = 'Forge доступний із 17 років.';
+        state.err = 'Get Stronger доступний із 17 років.';
         nav('age');
       } else if (msg.indexOf('USERNAME_TAKEN') !== -1 || msg.indexOf('USERNAME_INVALID') !== -1) {
         state.err = 'Нік зайнятий або некоректний — оберіть інший.';
@@ -994,7 +994,7 @@
 
   function renderStart(host) {
     host.innerHTML = '' +
-      '<h1 class="gate__title" style="text-align:center">Forge</h1>' +
+      '<h1 class="gate__title" style="text-align:center">Get Stronger</h1>' +
       '<div class="grid mt-3" style="gap:12px;max-width:320px;margin-left:auto;margin-right:auto">' +
         '<button class="btn btn--primary" type="button" data-nav="login">Увійти</button>' +
         '<button class="btn btn--ghost" type="button" data-nav="' + (CLOUD ? 'reg' : 'age') + '">Зареєструватися</button>' +
@@ -1227,7 +1227,7 @@
   function renderBlocked(host) {
     host.innerHTML = '' +
       '<h1 class="gate__title">Акаунт заблоковано</h1>' +
-      '<p class="small mt-1">Доступ до Forge для цього акаунта закрито адміністратором.</p>' +
+      '<p class="small mt-1">Доступ до Get Stronger для цього акаунта закрито адміністратором.</p>' +
       '<div class="row mt-3" style="gap:10px">' +
         '<button class="btn btn--ghost" type="button" id="au-out">Вийти</button>' +
       '</div>';
@@ -1331,7 +1331,7 @@
       } else {
         /* Сесії немає. Якщо акаунт уже створено і ми чекали лист —
            повертаємо той самий екран, а не стартовий: інакше людина
-           бачить «Forge» і вирішує, що реєстрація не зберіглася. */
+           бачить «Get Stronger» і вирішує, що реєстрація не зберіглася. */
         state.step = (draft && draft.stage === 'confirm' && state.acc.email) ? 'confirm' : 'start';
         render();
       }

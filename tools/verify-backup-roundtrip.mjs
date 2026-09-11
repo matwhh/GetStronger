@@ -262,7 +262,7 @@ checkThrows('бекап без користувачів ловиться', funct
   b.season_state = []; b.counts.season_state = 0; b.elo_events = []; b.counts.elo_events = 0;
   b.elo_week_plan = []; b.counts.elo_week_plan = 0;
   validate(b);
-}, 'не бекап бази Forge');
+}, 'не бекап бази Get Stronger');
 
 checkThrows('різні набори колонок у рядках ловляться', function () {
   const b = clone(fx); delete b.profiles[1].updated_at;

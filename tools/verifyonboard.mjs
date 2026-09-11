@@ -112,7 +112,7 @@ const weights=await p.evaluate(async()=>(await window.Store.getProfile()).weight
 ok('3. вага збереглась', Object.values(weights||{}).some(v=>Number(v)===60), JSON.stringify(weights));
 ok('3. банер каже «готово»', /Готово/.test(await p.locator('#onboard-banner').innerText().catch(()=>'')), 'банер');
 
-// 4. Forge відкрився
+// 4. Get Stronger відкрився
 await p.goto(U('index.html')); await p.waitForTimeout(1000);
 ok('4. головна відкрилась', here()==='index.html', here());
 ok('4. повне меню повернулось', await p.locator('.nav__links').count()===1);

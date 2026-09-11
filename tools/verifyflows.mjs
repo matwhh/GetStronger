@@ -73,7 +73,7 @@ async function page(vp){ const ctx=await adultContext(b, {viewport:vp||{width:39
  await p.reload(); await p.waitForTimeout(900);
  await p.locator('.acc:has(.tbl--plan) .acc__head').first().click(); await p.waitForTimeout(500);
  const v=await p.locator('[data-act="weight"]').first().inputValue();
- /* Кома, а не крапка: числа Forge показує однаково скрізь, і поле
+ /* Кома, а не крапка: числа Get Stronger показує однаково скрізь, і поле
     робочої ваги — не виняток (App.fmtNum). Зчитує значення onEdit(),
     яка приймає обидва знаки. */
  ok('план: бачить вагу, введену на «Сьогодні»', v==='77,5', 'value='+v);

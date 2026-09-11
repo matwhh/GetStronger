@@ -56,7 +56,7 @@ ok('історія ваг', B.weightLog['Присідання зі штанго�
 ok('журнал тіла / сесії / їжа', B.bodyLog['2026-08-17']===61.4 && B.sessionLog['2026-08-17']?.done===5 && B.mealLog['2026-08-17']?.kcal===2100);
 ok('періодизація: oneRM і stepPct', B.periodization?.oneRM?.['Присідання зі штангою']===120 && B.periodization?.stepPct===2.5);
 ok('делоуд: percent', B.deload?.percent===15);
-ok('Forge Rating', B.ratingLog['2026-08-17']?.rating===1500 && B.ratingSeen['train:2026-08-17']==='2026-08-17');
+ok('Get Stronger Rating', B.ratingLog['2026-08-17']?.rating===1500 && B.ratingSeen['train:2026-08-17']==='2026-08-17');
 ok('трекер із джерелом', B.trackerLog.sleep['2026-08-17'].source==='apple_health');
 ok('латки міграцій', B.weightsHarvested===true && B.weightLogSeeded===true);
 

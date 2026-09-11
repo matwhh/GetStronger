@@ -145,7 +145,7 @@ async function toAge(p) {
   const MIN = await p.evaluate(() => window.AgeCore.MIN_AGE);
   const msg = await p.locator('#gate-card').innerText();
   ok('2. повідомлення точне за текстом',
-     msg.includes('Forge доступний лише користувачам віком від ' + MIN + ' років.'), String(MIN));
+     msg.includes('Get Stronger доступний лише користувачам віком від ' + MIN + ' років.'), String(MIN));
   ok('2. пояснення на місці',
      msg.includes('розроблені для користувачів віком ' + MIN + ' років і старше.'));
 

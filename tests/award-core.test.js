@@ -86,7 +86,7 @@ test('лице — чорна діра, зворот — знак і назва,
   assert.doesNotMatch(h, /awd__eyebrow|awd__hint|awd__text|awd__ico|awd__glow/);
 });
 
-test('знак Forge, а не типова шестерня з набору іконок', () => {
+test('знак Get Stronger, а не типова шестерня з набору іконок', () => {
   const h = Award.html({ code: 'beta' });
   /* viewBox знака — 1022×1043; будь-яка «іконка налаштувань» із набору
      була б 24×24. */

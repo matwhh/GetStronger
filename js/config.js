@@ -13,7 +13,7 @@
  * усі дані зберігаються в localStorage браузера. Нічого не ламається.
  */
 window.APP_CONFIG = {
-  siteName: 'FORGE',
+  siteName: 'Get Stronger',
 
   supabase: {
     url: 'https://sojbyoxcxyiollefupss.supabase.co',

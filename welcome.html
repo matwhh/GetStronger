@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FORGE</title>
-<meta name="description" content="Forge — особистий інструмент для тренувань і харчування. Доступний користувачам віком від 17 років.">
+<title>Get Stronger</title>
+<meta name="description" content="Get Stronger — особистий інструмент для тренувань і харчування. Доступний користувачам віком від 17 років.">
 <!-- Картка для месенджерів і соцмереж. og:url і canonical додає
      js/app.js, коли в config.js заповнено siteUrl: без домену
      абсолютне посилання все одно було б неправильним. -->
@@ -17,15 +17,15 @@
      месенджера потрібне «де я опинюсь», а не ключові слова. Довгі
      варіанти лишаються в <title> і meta description — їх читає пошук.
      og:site_name лишається: без нього Telegram друкує в синьому рядку
-     голий домен. Тому site_name = FORGE, а title = назва розділу —
+     голий домен. Тому site_name = Get Stronger, а title = назва розділу —
      разом вони не дублюють одне одного. -->
-<meta property="og:image" content="https://forge-mold1.vercel.app/og-image.png?v=2">
-<meta property="og:image:secure_url" content="https://forge-mold1.vercel.app/og-image.png?v=2">
+<meta property="og:image" content="https://forge-mold1.vercel.app/og-image.png?v=3">
+<meta property="og:image:secure_url" content="https://forge-mold1.vercel.app/og-image.png?v=3">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="FORGE — знак ковадла й назва на чорному тлі">
+<meta property="og:image:alt" content="Get Stronger — знак ковадла й назва на чорному тлі">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="FORGE">
+<meta property="og:site_name" content="Get Stronger">
 <meta property="og:locale" content="uk_UA">
 <meta property="og:title" content="Тренування · Харчування · Прогрес">
 <meta property="og:description" content="Сезонний рейтинг, плани тренувань, розрахунок калорій.">
@@ -39,7 +39,7 @@
 <!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
      отримував би зменшений скріншот сторінки замість знака Forge. -->
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-title" content="Get Stronger">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
@@ -48,9 +48,9 @@
 <!-- Шрифти не блокують перший показ: стиль вантажиться як print (браузер
      не чекає на нього), а після завантаження перемикається на all.
      Без JS спрацьовує noscript-запасний варіант. -->
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
 <link rel="stylesheet" href="css/style.css">
 <!-- Сторож онбордингу: синхронно, до розмітки. З кроку «програма» і
      далі цей екран уже не потрібен — сторож відвертає вперед. -->
@@ -66,15 +66,15 @@
 <main id="main" class="gate" tabindex="-1">
   <div class="gate__box">
 
-    <!-- Знак Forge, без навігації: до перевірки віку застосунку немає,
+    <!-- Знак Get Stronger, без навігації: до перевірки віку застосунку немає,
          тож і меню, з якого нікуди не можна піти, теж бути не повинно. -->
     <div class="gate__logo">
-      <img class="logo__mark" src="logo-mark.svg" alt="" width="57" height="41">
-      <span>FORGE</span>
+      <img class="logo__mark" src="logo-mark.svg" alt="" width="64" height="64">
+      <span>Get Stronger</span>
     </div>
 
     <div class="card" id="gate-card">
-      <noscript><p class="small">Forge працює на JavaScript — без нього перевірити вік неможливо.</p></noscript>
+      <noscript><p class="small">Get Stronger працює на JavaScript — без нього перевірити вік неможливо.</p></noscript>
     </div>
 
   </div>

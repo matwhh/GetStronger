@@ -1,7 +1,7 @@
 {
   "id": "/index.html",
-  "name": "FORGE — тренування і харчування",
-  "short_name": "FORGE",
+  "name": "Get Stronger — тренування і харчування",
+  "short_name": "Get Stronger",
   "description": "Особистий інструмент: програми тренувань, робочі ваги, калорії, журнал.",
   "lang": "uk",
   "start_url": "./index.html",

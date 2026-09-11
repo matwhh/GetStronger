@@ -1,5 +1,5 @@
 /**
- * FORGE Seasonal ELO — чисте ядро. Без DOM, без мережі, під тестами.
+ * Get Stronger Seasonal ELO — чисте ядро. Без DOM, без мережі, під тестами.
  *
  * Правила гри (ТЗ «Gamification, Seasonal ELO & Account System»):
  *   • сезон ≈ 3 місяці (SPRING 03–05, SUMMER 06–08, AUTUMN 09–11,

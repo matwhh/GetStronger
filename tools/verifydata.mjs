@@ -64,7 +64,7 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
  ok('round-trip: історія ваг', back.weightLog['Жим лежачи']?.[0]?.kg===92.5);
  ok('round-trip: журнал тіла', back.bodyLog['2026-08-17']===82.4);
  ok('round-trip: трекер із джерелом apple_health', back.trackerLog.sleep['2026-08-17'].source==='apple_health');
- ok('round-trip: Forge Rating', back.ratingLog?.['2026-08-17']?.rating===900 && back.ratingSeen?.['train:2026-08-17']==='2026-08-17', 'ratingLog='+JSON.stringify(back.ratingLog)+' seen='+JSON.stringify(back.ratingSeen));
+ ok('round-trip: Get Stronger Rating', back.ratingLog?.['2026-08-17']?.rating===900 && back.ratingSeen?.['train:2026-08-17']==='2026-08-17', 'ratingLog='+JSON.stringify(back.ratingLog)+' seen='+JSON.stringify(back.ratingSeen));
  ok('round-trip: активний план', back.activePlan.programId==='fullbody');
  fs.unlinkSync(tmp); await ctx.close(); await ctx2.close();
 }

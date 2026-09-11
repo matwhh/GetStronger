@@ -58,7 +58,7 @@ const CACHE = 'forge-v1';
  *
  * Раніше тут було шість файлів, тоді як index.html підключає 21 скрипт.
  * Наслідок: людина ставить застосунок, втрачає мережу до другого
- * відкриття — і бачить шапку, навігацію й заголовок «FORGE — сьогодні»
+ * відкриття — і бачить шапку, навігацію й заголовок «Get Stronger — сьогодні»
  * без window.Store і без панелі дня. Тобто екран, який виглядає робочим і
  * не працює, ще й мовчки (PWA-013).
  *
@@ -66,7 +66,11 @@ const CACHE = 'forge-v1';
  * розмітці зʼявиться новий, його треба додати сюди: tools/ci-hygiene.mjs
  * за цим стежить і валить збірку при розбіжності.
  */
-const SHELL = ['./index.html', './offline.html', './css/style.css', './logo-mark.svg', './favicon.svg',
+const SHELL = ['./index.html', './offline.html', './css/style.css',
+               /* Назва сайту набрана Archivo Black; без нього офлайн вона
+                  падає на системний гротеск — знак перестає бути знаком. */
+               './fonts/archivo-black.woff2',
+               './logo-mark.svg', './favicon.svg',
                './js/theme-boot.js', './js/agegate.js', './js/config.js', './js/errors.js', './js/age-core.js',
                './js/onboarding-core.js', './js/app.js', './js/store.js',
                './js/elo-core.js', './js/elo-api.js', './js/elo-hooks.js',

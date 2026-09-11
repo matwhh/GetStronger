@@ -106,12 +106,12 @@ describe('Довідка: покриття сторінок', () => {
     assert.equal(new Set(leads).size, leads.length, 'знайшлись однакові вступи');
   });
 
-  test('«Про Forge» є і не підміняє контекстну довідку', () => {
+  test('«Про Get Stronger» є і не підміняє контекстну довідку', () => {
     assert.ok(W.HELP_CONTENT.about.title);
     assert.ok(W.HELP_CONTENT.about.blocks.length >= 4);
     /* Він мусить називати межі системи — інакше це реклама, а не довідка. */
     const txt = allText(W.HELP_CONTENT.about).join(' ');
-    assert.match(txt, /не може/i, 'у «Про Forge» немає розділу про обмеження');
+    assert.match(txt, /не може/i, 'у «Про Get Stronger» немає розділу про обмеження');
   });
 });
 

@@ -8,7 +8,7 @@
  * що б він не зробив із цією сторінкою.
  *
  * Дії: Approve / Reject / Block. Статус пише SECURITY DEFINER RPC,
- * а доступ до даних Forge контролює RLS через is_approved().
+ * а доступ до даних Get Stronger контролює RLS через is_approved().
  */
 (function () {
   'use strict';
@@ -148,7 +148,7 @@
   const CONFIRM = {
     approve: 'Підтвердити цей акаунт? Людина отримає повний доступ до Forge.',
     reject: 'Відхилити заявку? Людина зможе подати нову.',
-    block: 'Заблокувати акаунт? Доступ до даних Forge буде закрито одразу.'
+    block: 'Заблокувати акаунт? Доступ до даних Get Stronger буде закрито одразу.'
   };
 
   async function decide(uid, action) {

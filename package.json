@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "FORGE — особистий інструмент: тренування, харчування, разовий максимум. Сайт статичний і збірки НЕ потребує; цей package.json існує лише заради тестів і скрипта метатегів.",
+  "description": "Get Stronger — особистий інструмент: тренування, харчування, разовий максимум. Сайт статичний і збірки НЕ потребує; цей package.json існує лише заради тестів і скрипта метатегів.",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "build:meta": "node tools/build-meta.js"

@@ -2404,6 +2404,10 @@ body.has-rest-timer { --rest-h: 86px; }
 .footer__links a:hover { color: var(--link-hover); }
 .footer__note { margin: 22px 0 0; font-size: 0.8rem; color: var(--muted); max-width: 70ch; }
 
+
+/* Рядок копірайту. Тихіший за решту підвалу: він потрібен, щоб бути, а
+   не щоб його читали. */
+.footer__rights { margin-top: 10px; opacity: 0.72; }
 /* ---------- Дисклеймер ---------- */
 .notice {
   display: flex; gap: 13px; align-items: flex-start;

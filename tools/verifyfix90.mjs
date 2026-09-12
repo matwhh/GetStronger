@@ -142,9 +142,25 @@ const browser = await chromium.launch({ executablePath: EXE });
     }
     return out;
   });
+  /*
+   * ПРАВИЛО ЗМІНИЛОСЬ, І САМЕ ТУТ ВИДНО ЯК. Раніше «у жінок немає нічого
+   * на 5 і 6 днів» було правдою про весь каталог. Тепер зʼявився ВЛАСНИЙ
+   * план: він нічий за статтю (sex: 'any') і підтримує 3–6 днів для
+   * обох — саме цього й просили, «повна свобода».
+   *
+   * Тому перевірка розділена на дві, а не послаблена:
+   *   · ГОТОВИХ програм для жінок на 5–6 днів як не було, так і немає —
+   *     це не косметика, це методика, і власний план її не скасовує;
+   *   · власний план натомість мусить бути доступний усюди, інакше
+   *     «створити свій» тихо зникне для половини людей.
+   */
   for (const m of matrix) {
+    const ready = (m.ids ? m.ids.split(',') : []).filter((id) => id !== 'own');
     const expectSome = m.sex === 'male' || m.d <= 4;
-    check('B2 каталог ' + m.sex + ' × ' + m.d + ' дн', expectSome ? m.n > 0 : m.n === 0, m.ids || '—');
+    check('B2 готові програми ' + m.sex + ' × ' + m.d + ' дн',
+      expectSome ? ready.length > 0 : ready.length === 0, ready.join(',') || '—');
+    check('B2 власний план є для ' + m.sex + ' × ' + m.d + ' дн',
+      (m.ids || '').split(',').indexOf('own') !== -1, m.ids || '—');
   }
   for (const sex of ['male', 'female']) {
     await setProfile(p, { sex });
@@ -154,8 +170,12 @@ const browser = await chromium.launch({ executablePath: EXE });
       const cs = getComputedStyle(lab);
       return r.value + ':' + (cs.display !== 'none' && cs.visibility !== 'hidden' && lab.offsetParent !== null ? 'on' : 'off');
     }).join(' '));
-    const ok = sex === 'female' ? /5:off/.test(vis) && /6:off/.test(vis) && /3:on/.test(vis) && /4:on/.test(vis)
-                                : /3:on/.test(vis) && /4:on/.test(vis) && /5:on/.test(vis) && /6:on/.test(vis);
+    /* Перемикач показує день, якщо на нього є ХОЧ ЩОСЬ. Відколи власний
+       план підтримує 3–6 днів для обох статей, у жінок відкрились 5 і 6 —
+       і це правильно: сховати їх означало б сховати саму можливість
+       скласти свій план на пʼять днів. Те, що ГОТОВИХ жіночих програм на
+       5–6 днів немає, стереже перевірка вище. */
+    const ok = /3:on/.test(vis) && /4:on/.test(vis) && /5:on/.test(vis) && /6:on/.test(vis);
     check('B2 перемикач днів для ' + sex, ok, vis);
   }
   await ctx.close();

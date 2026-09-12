@@ -47,7 +47,10 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   const { ctx, p, errs } = await open();
 
   const home = await p.locator('#today').innerText();
-  ok('1. головна називає програму й сезон', /Full Body/.test(home) && /Сезон/.test(home),
+  /* Слово «Сезон» із головної прибрано навмисно (див. verifyflows): у
+     шапці на телефоні воно зʼїдало рядок, а номер сезону видно в
+     «Рейтингу». Лишились назва програми й номер тижня — їх і питаємо. */
+  ok('1. головна називає програму й тиждень', /Full Body/.test(home) && /Тиждень/.test(home),
      home.replace(/\n+/g, ' | ').slice(0, 60));
   ok('1. головна показує тиждень', /Тиждень/.test(home));
   ok('1. головна не редагує тренування', await p.locator('#today .tdy-ex').count() === 0);
@@ -152,9 +155,15 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await p.waitForTimeout(1300);
   await tap(p.locator('#workout .tdy-ex [data-set-n="1"]').first());
   await p.waitForTimeout(2400);
-  const wt = p.locator('[data-wt]').first();
-  const nm = await wt.getAttribute('data-wt');
-  await wt.fill('73,5'); await wt.blur();
+  /* РОБОЧОЇ ВАГИ НА ЦІЙ СТОРІНЦІ БІЛЬШЕ НЕМАЄ: поле [data-wt] прибрано,
+     книгу ваг правлять у плані. Тут живе вага КОНКРЕТНОГО ПІДХОДУ — вона
+     пише в історію тренування й книги ваг не чіпає. Перевірка їхала на
+     старому селекторі й падала за тайм-аутом, тобто мовчки не перевіряла
+     нічого з того, заради чого писалась. */
+  await p.locator('[data-log-tgl]').first().click();
+  await p.waitForTimeout(500);
+  const sw = p.locator('.tdy-set__w').first();
+  await sw.fill('73,5'); await sw.blur();
   await p.waitForTimeout(900);
   const doneBefore = await p.locator('#wk-done').innerText();
 
@@ -162,12 +171,17 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await p.waitForTimeout(1400);
   ok('5. галочка пережила перезавантаження',
      await p.locator('#wk-done').innerText() === doneBefore, doneBefore);
-  const w = await p.evaluate(async n => (await window.Store.getProfile()).weights[n], nm);
-  ok('5. робоча вага пережила перезавантаження', w === 73.5, 'w=' + w);
+  const inLog = await p.evaluate(async () => {
+    const pr = await window.Store.getProfile();
+    const day = Object.values(pr.sessionLog || {})[0] || {};
+    return JSON.stringify(day).indexOf('73.5') !== -1;
+  });
+  ok('5. вага підходу пережила перезавантаження', inLog);
   /* Значення полів у innerText не потрапляють — читаємо саме поле. */
-  ok('5. вага показана з комою, а не крапкою',
-     (await p.locator('[data-wt]').first().inputValue()) === '73,5',
-     await p.locator('[data-wt]').first().inputValue());
+  await p.locator('[data-log-tgl]').first().click();
+  await p.waitForTimeout(500);
+  const shown = await p.locator('.tdy-set__w').first().inputValue();
+  ok('5. вага показана з комою, а не крапкою', shown === '73,5', shown);
   ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

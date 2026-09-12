@@ -53,12 +53,26 @@ async function pickRow(p, min) {
   return idx;
 }
 
-/* Робоча вага вправи i */
+/* Робоча вага вправи i.
+   РАНІШЕ її правили просто тут, полем [data-wt] на «Сьогодні». Поле
+   прибрано навмисно: одне число не може означати і книгу ваг, і вагу
+   конкретного підходу. Тепер книгу ваг правлять у плані — тож пишемо
+   туди, звідки сторінка її читає, і перемальовуємо.
+   Перезавантаження сценарію не шкодить: денний стан лежить у сховищі,
+   і саме його незмінність перевіряє перший же сценарій. */
 const setWorkWeight = async (p, kg, i) => {
-  const f = p.locator('#workout [data-wt]').nth(i || 0);
-  await f.fill(String(kg));
-  await f.evaluate(e => e.dispatchEvent(new Event('change', { bubbles: true })));
-  await p.waitForTimeout(120);
+  await p.evaluate(async ({ kg, i }) => {
+    const row = document.querySelectorAll('#workout .tdy-ex')[i || 0];
+    const nameEl = row && row.querySelector('.tdy-ex__name');
+    const name = nameEl && nameEl.textContent.trim();
+    if (!name) throw new Error('не видно назви вправи в рядку ' + i);
+    const pr = await window.Store.getProfile();
+    const weights = Object.assign({}, pr.weights || {});
+    weights[name] = kg;
+    await window.Store.saveProfile(Object.assign({}, pr, { weights: weights }));
+  }, { kg: kg, i: i || 0 });
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(1200);
 };
 const dayState = (p) => p.evaluate(() => {
   try { return JSON.parse(localStorage.getItem(window.WorkoutCore.LS_TODAY)); } catch (_) { return null; }
@@ -170,8 +184,16 @@ const snapshot = (p) => p.evaluate(async () => {
   const vals = await row2.locator('[data-setw]').evaluateAll(
     es => es.map(e => e.value.replace(',', '.')));
   ok('3. після reload підходи ті самі', vals.join(',') === '60,70', vals.join(','));
-  ok('3. поле робочої ваги показує останню (70)',
-    (await p.locator('#workout [data-wt]').nth(I).inputValue()).replace(',', '.') === '70');
+  /* Поля робочої ваги на цій сторінці немає (див. setWorkWeight), тож
+     питаємо книгу ваг напряму: вона мусить памʼятати ОСТАННЮ задану
+     вагу — 70, — тимчасом як підходи вище лишились 60 і 70. Саме це
+     розділення двох чисел і є суттю всієї перевірки. */
+  const book = await p.evaluate(async (i) => {
+    const row = document.querySelectorAll('#workout .tdy-ex')[i];
+    const name = row.querySelector('.tdy-ex__name').textContent.trim();
+    return (await window.Store.getProfile()).weights[name];
+  }, I);
+  ok('3. книга ваг памʼятає останню (70)', Number(book) === 70, 'книга=' + book);
   ok('3. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

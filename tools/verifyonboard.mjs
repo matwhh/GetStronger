@@ -147,9 +147,16 @@ ok('6. сторінка тренування показує список впр�
 await tap(p.locator('.tdy-ex [data-set-n="1"]').first()); await p.waitForTimeout(2200);
 const sess=await p.evaluate(async()=>(await window.Store.getProfile()).sessionLog);
 ok('6. галочка потрапила в історію', Object.keys(sess||{}).length>0);
-const wt2=p.locator('[data-wt]').first();
+/* РОБОЧУ ВАГУ ЗАДАЮТЬ У ПЛАНІ, а не на «Сьогодні»: поле [data-wt] звідти
+   прибрано, щоб одне число не означало дві різні речі (книга ваг проти
+   ваги конкретного підходу). Перевірка їхала на старому селекторі й
+   падала за тайм-аутом — тобто новачок «проходив шлях» лише до цього
+   рядка, а решту кроків ніхто не перевіряв уже давно. */
+await p.goto(U('plan.html')); await p.waitForTimeout(900);
+await tap(p.locator('.acc:has(.tbl--plan) .acc__head').first()); await p.waitForTimeout(500);
+const wt2=p.locator('[data-act="weight"]').first();
+const nm=await wt2.getAttribute('data-name');
 await wt2.fill('62,5'); await wt2.blur(); await p.waitForTimeout(800);
-const nm=await wt2.getAttribute('data-wt');
 const w=await p.evaluate(async n=>(await window.Store.getProfile()).weights[n],nm);
 ok('6. робоча вага з комою зберіглась', w===62.5, 'w='+w);
 
@@ -170,13 +177,16 @@ ok('8. вага тіла з комою записалась', Object.values(bl||
 
 // 9. Повернення наступного дня
 await p.goto(U('index.html')); await p.waitForTimeout(1200);
-/* Панелі плиток на головній більше немає. Питання лишається тим самим —
-   «після всього шляху екран показує живі числа, а не прочерки», — тільки
-   числа тепер інші: номер сезону, номер тижня й пронумеровані дні. */
+/* Панелі плиток на головній більше немає, і слова «Сезон» — теж: у шапці
+   на телефоні воно зʼїдало рядок, а номер сезону видно в «Рейтингу».
+   Питання лишається тим самим — «після всього шляху екран показує живі
+   числа, а не прочерки», — тільки числа тепер інші: назва програми,
+   номер тижня, пронумеровані дні й позначений сьогоднішній. */
 const home9=await p.locator('#today').innerText();
 ok('9. головна показує живі числа, а не прочерки',
-   /Сезон\s*\d/.test(home9) && /Тиждень\s*\d/.test(home9) && !/—/.test(home9),
+   /Full Body/.test(home9) && /Тиждень\s*\d/.test(home9) && !/—/.test(home9),
    home9.replace(/\n/g,' | ').slice(0,120));
+ok('9. і позначає сьогоднішній день', await p.locator('#today .tdy-day.is-now').count()===1);
 ok('9. бейдж сезону так і прихований (локальний режим)', await p.locator('.nav__rating').isHidden());
 ok('весь шлях без JS-помилок', errs.length===0, errs.join(' | '));
 

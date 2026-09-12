@@ -8,7 +8,7 @@
 -- Це ДОВІДКА, а не міграція: виконувати цілком по бойовій базі не можна.
 -- Повний опис — у db/README.md.
 --
--- Знято: 2026-09-07. PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit, проєкт postgres.
+-- Знято: 2026-09-12. PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit, проєкт postgres.
 -- =============================================================================
 
 create table if not exists public.account_status (
@@ -123,7 +123,7 @@ alter table public.account_status add constraint account_status_user_id_fkey FOR
 alter table public.account_status add constraint account_status_username_len CHECK (((username IS NULL) OR ((char_length(username) >= 3) AND (char_length(username) <= 13))));
 alter table public.admins add constraint admins_pkey PRIMARY KEY (user_id);
 alter table public.admins add constraint admins_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-alter table public.awards add constraint awards_kind_check CHECK ((kind = ANY (ARRAY['level5'::text, 'level7'::text, 'level8'::text, 'level9'::text, 'level10'::text, 'elite'::text, 'first'::text, 'top3'::text, 'top10'::text, 'top100'::text, 'top1000'::text, 'top10pct'::text, 'top5pct'::text, 'top1pct'::text])));
+alter table public.awards add constraint awards_kind_check CHECK ((kind = ANY (ARRAY['level5'::text, 'level7'::text, 'level8'::text, 'level9'::text, 'level10'::text, 'elite'::text, 'first'::text, 'top3'::text, 'top10'::text, 'top100'::text, 'top1000'::text, 'top10pct'::text, 'top5pct'::text, 'top1pct'::text, 'beta'::text])));
 alter table public.awards add constraint awards_pkey PRIMARY KEY (user_id, season, kind);
 alter table public.awards add constraint awards_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 alter table public.consent_log add constraint consent_log_document_check CHECK ((document = ANY (ARRAY['privacy_policy'::text, 'terms_of_use'::text, 'medical_disclaimer'::text])));
@@ -409,6 +409,20 @@ $function$
 grant execute on function public.admin_requests(p_status text, p_limit integer, p_offset integer) to authenticated;
 grant execute on function public.admin_requests(p_status text, p_limit integer, p_offset integer) to service_role;
 
+CREATE OR REPLACE FUNCTION public.cron_purge_abandoned_signups()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare r jsonb;
+begin
+  r := public.purge_abandoned_signups(7);
+  insert into public.cron_log (job, result) values ('purge_abandoned_signups', r);
+end $function$
+;
+grant execute on function public.cron_purge_abandoned_signups() to service_role;
+
 CREATE OR REPLACE FUNCTION public.delete_account()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -437,27 +451,6 @@ $function$
 ;
 grant execute on function public.delete_account() to authenticated;
 grant execute on function public.delete_account() to service_role;
-
-CREATE OR REPLACE FUNCTION public.elo_pace(p_elo numeric, cfg jsonb)
- RETURNS numeric
- LANGUAGE sql
- IMMUTABLE
- SET search_path TO 'public'
-AS $function$
-  select case
-    when p_elo is null then 1
-    when cfg->'levelPace' is null or jsonb_typeof(cfg->'levelPace') <> 'array' then 1
-    when p_elo >= (cfg->>'eliteFloor')::numeric
-      then coalesce((cfg->>'elitePace')::numeric, 1)
-    else coalesce(
-      (cfg->'levelPace' ->> (
-        least((cfg->>'levelCount')::int,
-              floor(greatest(0, p_elo) / (cfg->>'levelSize')::numeric)::int + 1) - 1
-      ))::numeric, 1)
-  end;
-$function$
-;
-grant execute on function public.elo_pace(p_elo numeric, cfg jsonb) to service_role;
 
 CREATE OR REPLACE FUNCTION public.elo_action_delta(kind text, payload jsonb, cfg jsonb, planned_days integer, grace boolean, p_elo numeric)
  RETURNS TABLE(quality numeric, delta integer)
@@ -1072,6 +1065,27 @@ $function$
 ;
 grant execute on function public.elo_num(j jsonb, dflt numeric) to service_role;
 
+CREATE OR REPLACE FUNCTION public.elo_pace(p_elo numeric, cfg jsonb)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  select case
+    when p_elo is null then 1
+    when cfg->'levelPace' is null or jsonb_typeof(cfg->'levelPace') <> 'array' then 1
+    when p_elo >= (cfg->>'eliteFloor')::numeric
+      then coalesce((cfg->>'elitePace')::numeric, 1)
+    else coalesce(
+      (cfg->'levelPace' ->> (
+        least((cfg->>'levelCount')::int,
+              floor(greatest(0, p_elo) / (cfg->>'levelSize')::numeric)::int + 1) - 1
+      ))::numeric, 1)
+  end;
+$function$
+;
+grant execute on function public.elo_pace(p_elo numeric, cfg jsonb) to service_role;
+
 CREATE OR REPLACE FUNCTION public.elo_planned_for(uid uuid, p_week_start date)
  RETURNS integer
  LANGUAGE plpgsql
@@ -1505,6 +1519,21 @@ $function$
 ;
 grant execute on function public.elo_week_room(uid uuid, p_day date, cfg jsonb) to service_role;
 
+CREATE OR REPLACE FUNCTION public.grant_beta_award()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+begin
+  insert into public.awards (user_id, season, kind, label)
+  values (new.user_id, '', 'beta', 'Бета')
+  on conflict (user_id, season, kind) do nothing;
+  return new;
+end;
+$function$
+;
+grant execute on function public.grant_beta_award() to service_role;
+
 CREATE OR REPLACE FUNCTION public.is_admin(uid uuid)
  RETURNS boolean
  LANGUAGE sql
@@ -1551,6 +1580,44 @@ $function$
 ;
 grant execute on function public.profile_patch(p_patch jsonb) to authenticated;
 grant execute on function public.profile_patch(p_patch jsonb) to service_role;
+
+CREATE OR REPLACE FUNCTION public.purge_abandoned_signups(p_grace_days integer DEFAULT 7)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_cut   timestamptz := now() - make_interval(days => greatest(p_grace_days, 1));
+  v_ids   uuid[];
+  v_count integer := 0;
+begin
+  select coalesce(array_agg(u.id), '{}')
+    into v_ids
+    from auth.users u
+   where u.email_confirmed_at is null
+     and u.last_sign_in_at is null
+     and u.created_at < v_cut;
+
+  v_count := coalesce(array_length(v_ids, 1), 0);
+  if v_count = 0 then
+    return jsonb_build_object('deleted', 0, 'cutoff', v_cut);
+  end if;
+
+  delete from public.elo_events     where user_id = any(v_ids);
+  delete from public.elo_week_plan  where user_id = any(v_ids);
+  delete from public.season_history where user_id = any(v_ids);
+  delete from public.season_state   where user_id = any(v_ids);
+  delete from public.awards         where user_id = any(v_ids);
+  delete from public.consent_log    where user_id = any(v_ids);
+  delete from public.account_status where user_id = any(v_ids);
+  delete from public.profiles       where user_id = any(v_ids);
+  delete from auth.users            where id      = any(v_ids);
+
+  return jsonb_build_object('deleted', v_count, 'cutoff', v_cut);
+end $function$
+;
+grant execute on function public.purge_abandoned_signups(p_grace_days integer) to service_role;
 
 CREATE OR REPLACE FUNCTION public.register_request(p_username text, p_birth date, p_screening jsonb, p_consents jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
@@ -1664,38 +1731,121 @@ CREATE OR REPLACE FUNCTION public.season_bounds(p_season text, OUT s date, OUT e
  IMMUTABLE
  SET search_path TO 'public'
 AS $function$
-declare m text[]; y int;
 begin
-  m := regexp_match(coalesce(p_season, ''), '^(SPRING|SUMMER|AUTUMN|WINTER)-(\d{4})$');
-  if m is null then s := null; e := null; return; end if;
-  y := m[2]::int;
-  case m[1]
-    when 'SPRING' then s := make_date(y, 3, 1);  e := make_date(y, 5, 31);
-    when 'SUMMER' then s := make_date(y, 6, 1);  e := make_date(y, 8, 31);
-    when 'AUTUMN' then s := make_date(y, 9, 1);  e := make_date(y, 11, 30);
-    else               s := make_date(y, 12, 1); e := make_date(y + 1, 3, 1) - 1;
-  end case;
+  e := public.season_end(p_season);
+  if e is null then s := null; return; end if;
+  s := public.season_end(public.season_prev(p_season)) + 1;
 end $function$
 ;
+grant execute on function public.season_bounds(p_season text, OUT s date, OUT e date) to authenticated;
 grant execute on function public.season_bounds(p_season text, OUT s date, OUT e date) to service_role;
 
-CREATE OR REPLACE FUNCTION public.season_of(d date)
- RETURNS text
- LANGUAGE sql
+CREATE OR REPLACE FUNCTION public.season_end(p_season text)
+ RETURNS date
+ LANGUAGE plpgsql
  IMMUTABLE
  SET search_path TO 'public'
 AS $function$
-  select case
-    when extract(month from d) in (3,4,5)  then 'SPRING-'  || extract(year from d)
-    when extract(month from d) in (6,7,8)  then 'SUMMER-'  || extract(year from d)
-    when extract(month from d) in (9,10,11) then 'AUTUMN-' || extract(year from d)
-    when extract(month from d) = 12         then 'WINTER-' || extract(year from d)
-    else 'WINTER-' || (extract(year from d) - 1)
+declare nom date;
+begin
+  nom := public.season_nominal_end(p_season);
+  if nom is null then return null; end if;
+  -- До вересня 2026 сезон закінчувався номінальною датою; далі — найближчою
+  -- неділею від неї, щоб тижні сезону були цілими (season_week_bounds).
+  if nom < date '2026-09-01' then return nom; end if;
+  return nom + ((7 - extract(isodow from nom)::int) % 7);
+end $function$
+;
+grant execute on function public.season_end(p_season text) to authenticated;
+grant execute on function public.season_end(p_season text) to service_role;
+
+CREATE OR REPLACE FUNCTION public.season_nominal_end(p_season text)
+ RETURNS date
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+declare m text[]; y int;
+begin
+  m := regexp_match(coalesce(p_season, ''), '^(SPRING|SUMMER|AUTUMN|WINTER)-(\d{4})$');
+  if m is null then return null; end if;
+  y := m[2]::int;
+  case m[1]
+    when 'SPRING' then return make_date(y, 5, 31);
+    when 'SUMMER' then return make_date(y, 8, 31);
+    when 'AUTUMN' then return make_date(y, 11, 30);
+    else               return make_date(y + 1, 3, 1) - 1;
+  end case;
+end $function$
+;
+grant execute on function public.season_nominal_end(p_season text) to authenticated;
+grant execute on function public.season_nominal_end(p_season text) to service_role;
+
+CREATE OR REPLACE FUNCTION public.season_of(d date)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+declare
+  szn text;
+  m int := extract(month from d)::int;
+  y int := extract(year from d)::int;
+  b record;
+  i int := 0;
+begin
+  if d is null then return null; end if;
+  szn := case
+    when m between 3 and 5  then 'SPRING-'  || y
+    when m between 6 and 8  then 'SUMMER-'  || y
+    when m between 9 and 11 then 'AUTUMN-' || y
+    when m = 12             then 'WINTER-' || y
+    else                         'WINTER-' || (y - 1)
   end;
-$function$
+  loop
+    exit when i >= 4;
+    i := i + 1;
+    select * into b from public.season_bounds(szn);
+    if d < b.s then
+      szn := public.season_prev(szn);
+    elsif d > b.e then
+      szn := case
+        when szn like 'SPRING-%' then 'SUMMER-' || split_part(szn, '-', 2)
+        when szn like 'SUMMER-%' then 'AUTUMN-' || split_part(szn, '-', 2)
+        when szn like 'AUTUMN-%' then 'WINTER-' || split_part(szn, '-', 2)
+        else 'SPRING-' || (split_part(szn, '-', 2)::int + 1)
+      end;
+    else
+      exit;
+    end if;
+  end loop;
+  return szn;
+end $function$
 ;
 grant execute on function public.season_of(d date) to authenticated;
 grant execute on function public.season_of(d date) to service_role;
+
+CREATE OR REPLACE FUNCTION public.season_prev(p_season text)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+declare m text[]; y int;
+begin
+  m := regexp_match(coalesce(p_season, ''), '^(SPRING|SUMMER|AUTUMN|WINTER)-(\d{4})$');
+  if m is null then return null; end if;
+  y := m[2]::int;
+  case m[1]
+    when 'SPRING' then return 'WINTER-' || (y - 1);
+    when 'SUMMER' then return 'SPRING-' || y;
+    when 'AUTUMN' then return 'SUMMER-' || y;
+    else               return 'AUTUMN-' || y;
+  end case;
+end $function$
+;
+grant execute on function public.season_prev(p_season text) to authenticated;
+grant execute on function public.season_prev(p_season text) to service_role;
 
 CREATE OR REPLACE FUNCTION public.touch_updated_at()
  RETURNS trigger
@@ -1792,6 +1942,7 @@ create policy season_state_select_own on public.season_state as PERMISSIVE for S
   using (((( SELECT auth.uid() AS uid) = user_id) AND ( SELECT is_approved(auth.uid()) AS is_approved)));
 
 CREATE TRIGGER profiles_touch_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+CREATE TRIGGER trg_grant_beta AFTER INSERT ON public.account_status FOR EACH ROW EXECUTE FUNCTION grant_beta_award();
 
 -- права на таблиці
 grant SELECT on public.account_status to authenticated;
@@ -1889,3 +2040,4 @@ grant UPDATE (user_id) on public.profiles to authenticated;
 
 -- заплановані завдання (для довідки, не виконується цим файлом)
 -- cron: forge-elo-week  «10 0 * * *»  select public.elo_cron_log_eval_week()
+-- cron: forge-purge-abandoned-signups  «20 3 * * *»  select public.cron_purge_abandoned_signups()

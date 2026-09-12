@@ -78,18 +78,15 @@
   /* Вага тіла                                                           */
   /* ------------------------------------------------------------------ */
 
-  /* Ті самі фізіологічні межі, що в ядрі харчування */
-  const W_MIN = 30, W_MAX = 300;
+  /* Ті самі фізіологічні межі, що в ядрі харчування. Джерело —
+     js/daylog-core.js: їх перевіряє і ввід тут, і ввід на окремій
+     сторінці «Зважування». */
+  const W_MIN = window.DayLogCore.W_MIN, W_MAX = window.DayLogCore.W_MAX;
 
   /** Відсортовані записи ваги: [{key, kg}] від старих до нових */
+  /* Делегат: єдина реалізація — js/daylog-core.js. */
   function weightEntries() {
-    return Object.keys(state.bodyLog)
-      .filter(function (k) {
-        const v = Number(state.bodyLog[k]);
-        return /^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v >= W_MIN && v <= W_MAX;
-      })
-      .sort()
-      .map(function (k) { return { key: k, kg: Number(state.bodyLog[k]) }; });
+    return window.DayLogCore.weightEntries(state.bodyLog);
   }
 
   /**
@@ -656,10 +653,9 @@
   }
 
   /** День, у який пишеться вага. Порожній або майбутній → сьогодні. */
+  /* Делегат: єдина реалізація — js/daylog-core.js. */
   function weightDay() {
-    const k = state.wDay;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(k || '')) || k > todayKey()) return todayKey();
-    return k;
+    return window.DayLogCore.pickDay(state.wDay, todayKey());
   }
 
   function renderWeight() {
@@ -810,64 +806,36 @@
    * половини» означало б сказати про день те, чого в даних немає. У
    * підказці так і написано, а в легенді він має власну позначку.
    */
+  /* Делегат: єдина реалізація — js/daylog-core.js. Та сама шкала
+     потрібна окремій сторінці «Дні тренувань», а шкала, написана двічі,
+     двічі й переїде при наступній зміні порогів. */
   function hmLevel(key) {
-    if (!trained(key)) return 0;
-    const s = state.sessionLog[key];
-    const total = Number(s && s.totalSets);
-    const done = Number(s && s.doneSets);
-    if (!(total > 0) || !(done > 0)) return 1;      /* відмічено руками */
-    const share = done / total;
-    if (share >= 0.999) return 4;
-    if (share >= 0.5) return 3;
-    return 2;
+    return window.DayLogCore.dayLevel(state.workLog, state.sessionLog, key);
   }
 
   /** Підпис рівня — той самий текст у підказці й у легенді. */
-  const HM_LEVEL_TEXT = [
-    'без тренування',
-    'відмічено вручну — підходи не записані',
-    'закрито менше половини підходів',
-    'закрито більшу частину підходів',
-    'закрито всі підходи'
-  ];
+  const HM_LEVEL_TEXT = window.DayLogCore.LEVEL_TEXT;
 
   /**
    * День або тренувальний, або ні — саме це вмикає й вимикає клік.
+   *
+   * Делегат: єдина реалізація — js/daylog-core.js. Копія цього правила
+   * жила ще й у today.js, і розходження між ними означало б, що
+   * теплокарта тут і квадратик на головній розповідають про один день
+   * різне. Там же пояснено, чому явний 0 перекриває сесію.
    */
   function trained(key) {
-    const v = Number(state.workLog[key]);
-    if (Number.isFinite(v)) {
-      /*
-       * Явний 0 — це «знято руками», і він ПЕРЕКРИВАЄ сесію.
-       *
-       * Раніше 0 не відрізнявся від відсутнього запису, а перемикач умів
-       * лише delete. Тож день, підсвічений сесією з «Сьогодні», не можна
-       * було зняти взагалі: delete нічого не міняв, sessionLog лишався,
-       * клітинка світилась далі — і продовжувала годувати статистику
-       * дотримання плану та Get Stronger Rating. Підказка «клікни, щоб зняти»
-       * була неправдою.
-       */
-      return v > 0;
-    }
-    // Сесія з «Тренування» — теж тренування: підходи й таймер — два
-    // способи сказати одне й те саме, і клітинка має світитись від обох.
-    return sessionCounts(state.sessionLog[key]);
+    return window.DayLogCore.trained(state.workLog, state.sessionLog, key);
   }
 
-  /*
-   * Чи є в записі сесії робота. done — це закриті ВПРАВИ, і відколи
-   * виконання відмічається по підходах, день із чотирма закритими
-   * підходами, але жодною добитою вправою, мав done === 0: людина
-   * тренувалась, а календар лишався порожнім. Тому дивимось і на підходи.
-   */
+  /** Чи є в записі сесії робота. Делегат: js/daylog-core.js. */
   function sessionCounts(s) {
-    if (!s || typeof s !== 'object') return false;
-    return Number(s.done) > 0 || Number(s.doneSets) > 0;
+    return window.DayLogCore.sessionCounts(s);
   }
 
   /** Чи є під днем сесія з «Тренування» (тоді зняття треба записати явним 0) */
   function hasSession(key) {
-    return sessionCounts(state.sessionLog[key]);
+    return window.DayLogCore.hasSession(state.sessionLog, key);
   }
 
   const DOW = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
@@ -2566,18 +2534,19 @@
     $('#jr-weight').addEventListener('click', function (e) {
       if (e.target.closest('#w-add')) {
         const input = $('#w-kg');
-        const v = Number(String(input && input.value).replace(',', '.'));
-        if (!Number.isFinite(v) || v < W_MIN || v > W_MAX) {
+        /* Розбір рядка, кома, межі й крок 0,1 кг — усе в ядрі: те саме
+           поле є на сторінці «Зважування», і два розбори одного вводу
+           розійшлись би на першій же правці меж. */
+        const kg = window.DayLogCore.parseKg(input && input.value);
+        if (kg === null) {
           toast('Вага має бути числом від ' + W_MIN + ' до ' + W_MAX + ' кг', 'err');
           return;
         }
-        // Пів кроку побутових ваг: 0,1 кг. Точніші цифри — ілюзія точності.
-        const kg = Math.round(v * 10) / 10;
         /* День беремо з календаря, а не з годинника: людина могла обрати
            пропущений четвер. weightDay() сам відкочується на сьогодні,
            якщо обране зіпсоване або в майбутньому. */
         const day = weightDay();
-        state.bodyLog[day] = kg;
+        state.bodyLog = window.DayLogCore.setWeight(state.bodyLog, day, kg);
         /* Патч — функція (SYN-011): дописуємо один день на актуальному
            профілі, а не надсилаємо весь журнал, зчитаний колись. Інакше
            сусідня вкладка втрачала б свої записи цілком. */
@@ -2614,7 +2583,7 @@
         // Журнал ваги append-only: видалене нізвідки не відновити, а ✕
         // стоїть у щільному рядку впритул до інших елементів.
         if (!window.confirm('Видалити запис ваги за ' + key + '? Відновити його буде нічим.')) return;
-        delete state.bodyLog[key];
+        state.bodyLog = window.DayLogCore.removeWeight(state.bodyLog, key);
         /* Видалення теж адресне: прибираємо один день, решту журналу
            беремо з актуального профілю. */
         persist(function (p) {
@@ -2631,19 +2600,15 @@
       const cell = e.target.closest('[data-hm]');
       if (cell) {
         const k = cell.dataset.hm;
-        if (trained(k)) {
-          // Під днем є сесія — просте видалення нічого не дало б, бо
-          // trained() однаково побачив би її. Пишемо явний 0 як перекриття.
-          if (hasSession(k)) state.workLog[k] = 0; else delete state.workLog[k];
-        } else {
-          state.workLog[k] = 1;
-        }
+        /* Три стани перемикача (немає ключа / 1 / явний 0) живуть в ядрі:
+           той самий перемикач стоїть на сторінці «Дні тренувань». */
+        state.workLog = window.DayLogCore.toggleTrained(state.workLog, state.sessionLog, k);
         persist({ workLog: state.workLog });
         keepFocus(renderTrain);
         return;
       }
       if (e.target.closest('#t-mark')) {
-        state.workLog[todayKey()] = 1;
+        state.workLog = window.DayLogCore.markTrained(state.workLog, todayKey());
         persist({ workLog: state.workLog });
         keepFocus(renderTrain);
         toast('Позначено', 'ok');

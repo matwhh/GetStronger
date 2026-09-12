@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дні тренувань — Get Stronger</title>
+<meta name="description" content="Календар тренувань у Get Stronger: позначити день одним дотиком, побачити тиждень і сім місяців історії.">
+<meta name="author" content="Matthew Grace">
+<meta name="copyright" content="© 2026 Matthew Grace. Усі права застережено.">
+<meta name="theme-color" content="#0b0b0b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icons/icon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Шрифти не блокують перший кадр: сторонній CDN може відповідати
+     секундами, і сторінка чекала б на нього білим екраном. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/agegate.js"></script>
+<script src="js/nosw.js"></script>
+<script src="js/theme-boot.js"></script>
+<!-- build-meta:start -->
+<link rel="canonical" href="https://get-stronger.vercel.app/train-log.html">
+<meta property="og:url" content="https://get-stronger.vercel.app/train-log.html">
+<!-- build-meta:end -->
+</head>
+<body>
+
+<a class="skip-link" href="#main">До вмісту</a>
+
+<div class="bg-fx"></div>
+
+<header id="site-nav"></header>
+
+<main id="main" tabindex="-1">
+  <section class="section">
+    <div class="wrap">
+
+      <h1 class="reveal">Дні тренувань</h1>
+      <p class="lead reveal" data-d="1">
+        Календар за сім місяців і одна дія: позначити день тренувальним
+        або зняти позначку. Дні, у які записані підходи на «Тренуванні»,
+        зараховуються самі — їх позначати не треба.
+      </p>
+
+      <!-- Усе, що є на сторінці, малює js/train-log.js -->
+      <div id="tl-main" class="mt-3 reveal" data-d="1"></div>
+
+      <div class="mt-3">
+        <h2 class="reveal">Де дивитись статистику</h2>
+        <div class="card reveal">
+          <p class="small mb-0">
+            Ця сторінка — про ввід. Скільки тренувань за місяць, як
+            виконується план, які вправи ростуть — усе це в
+            <a href="journal.html#jr-train">«Прогресі»</a>: там та сама
+            теплокарта, але поруч із числами.
+          </p>
+        </div>
+      </div>
+
+
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script defer src="js/config.js"></script>
+<script defer src="js/date-core.js"></script>
+<script defer src="js/errors.js"></script>
+<script defer src="js/age-core.js"></script>
+<script defer src="js/onboarding-core.js"></script>
+<script defer src="js/app.js"></script>
+<!-- Контекстна довідка: один механізм на весь сайт, вміст залежить від
+     сторінки. -->
+<script defer src="js/help.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/elo-core.js"></script>
+<script defer src="js/elo-api.js"></script>
+<!-- Запис у журнал — подія для сезонного рейтингу; її подає elo-hooks -->
+<script defer src="js/elo-hooks.js"></script>
+<!-- Стандартна сітка днів — та сама, що в «Прогресі» й у рейтингу -->
+<script defer src="js/daycal-core.js"></script>
+<!-- Правила обох журналів дня: одні на «Сьогодні», тут і в «Прогресі» -->
+<script defer src="js/daylog-core.js"></script>
+<script defer src="js/train-log.js"></script>
+</body>
+</html>

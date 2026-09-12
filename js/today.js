@@ -143,17 +143,18 @@
    * сесія з бодай одним закритим підходом або вправою. Тримаємо його в
    * одному місці — від нього залежать і відлік тижнів, і плитка звички.
    */
+  /* Делегат: єдина реалізація — js/daylog-core.js. Ця функція була
+     написана окремо тут і в journal.js, і «майже однаково» — найгірший
+     стан для питання «чи тренувався я цього дня»: теплокарта в журналі
+     й квадратик на головній починали розповідати про один день різне. */
   function trainedOn(key) {
-    const v = Number((state.profile.workLog || {})[key]);
-    if (Number.isFinite(v)) return v > 0;
-    const x = (state.profile.sessionLog || {})[key];
-    return !!x && typeof x === 'object' && (Number(x.done) > 0 || Number(x.doneSets) > 0);
+    return window.DayLogCore.trained(state.profile.workLog, state.profile.sessionLog, key);
   }
 
   /** Чи є того дня запис ваги тіла. */
+  /* Делегат: єдина реалізація — js/daylog-core.js. */
   function weighedOn(key) {
-    const v = Number((state.profile.bodyLog || {})[key]);
-    return Number.isFinite(v) && v > 0;
+    return window.DayLogCore.weighed(state.profile.bodyLog, key);
   }
 
   /**
@@ -374,9 +375,16 @@
    * теплокарті журналу, лише без сходинок обсягу: плитка відповідає на
    * питання «чи роблю я це регулярно», а не «скільки я зробив».
    *
-   * Обидві ведуть у журнал — у той самий розділ, який показує повну
-   * історію того ж факту. Нових даних плитки не заводять: усе, що вони
-   * показують, уже лежить у профілі.
+   * КУДИ ВЕДУТЬ. До вересня 2026 — у відповідний розділ «Прогресу»,
+   * через якір. З телефона це означало: відкрити сторінку на дві тисячі
+   * рядків розмітки, дочекатись графіків і теплокарти, доїхати до
+   * потрібного блоку — і аж тоді вписати число. Тепер кожна плитка веде
+   * на власну сторінку, де є рівно календар і поле вводу.
+   *
+   * У «Прогресі» ті самі розділи лишились як були: там вони стоять серед
+   * графіків і статистики, і саме там їх ЧИТАЮТЬ, а не заповнюють. Це не
+   * дві копії даних — два входи в один журнал, і правила запису в обох
+   * одні (js/daylog-core.js).
    */
   function habitCells(has) {
     const today = new Date();
@@ -422,9 +430,9 @@
     const target = state.plan ? state.plan.length : 0;
 
     return '<div class="hbts">' +
-      habitCard('journal.html#jr-train', 'Тренування', trainedOn,
+      habitCard('train-log.html', 'Тренування', trainedOn,
         target ? trainWeek + '/' + target : String(trainWeek), 'цього тижня') +
-      habitCard('journal.html#jr-weight', 'Зважування', weighedOn,
+      habitCard('weight-log.html', 'Зважування', weighedOn,
         weighWeek + '/7', 'цього тижня') +
     '</div>';
   }

@@ -137,12 +137,12 @@ Get Stronger — особистий інструмент для тренуван
 
 ```bash
 node --check js/файл.js                     # синтаксис, миттєво
-npm test                                    # 960 юніт-тестів, ~6 с
+npm test                                    # 998 юніт-тестів, ~6 с
 TZ=Europe/Kyiv npm test                     # той самий набір в іншому поясі
 node tools/ci-hygiene.mjs                   # гігієна репозиторію, ~1 с
 node tools/verify<назва>.mjs                # одна браузерна перевірка, 10–60 с
-bash tools/ci-browser.sh core               # 12 наборів, ~7 хв
-bash tools/ci-browser.sh full               # core + 32, ~50 хв
+bash tools/ci-browser.sh core               # 13 наборів, ~8 хв
+bash tools/ci-browser.sh full               # core + 33, ~50 хв
 ```
 
 **Правило, яке тут головне: нова перевірка мусить ПАДАТИ без

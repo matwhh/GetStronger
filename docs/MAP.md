@@ -61,15 +61,17 @@ elo-core · elo-api · elo-hooks
 
 | Сторінка | Для користувача | Свої скрипти (після спільного префікса) |
 |---|---|---|
-| `index.html` | «Сьогодні»: огляд дня | history-core, exercises, reps-core, programs-data, nutrition-core, tracker-core, tracker-tile-core, workout-core, progression-core, measure-core, **today** |
+| `index.html` | «Сьогодні»: огляд дня | history-core, daylog-core, exercises, reps-core, programs-data, nutrition-core, tracker-core, tracker-tile-core, workout-core, progression-core, measure-core, **today** |
 | `workout.html` | Екран тренування в залі | history-core, exercises, reps-core, programs-data, tracker-core, workout-core, weight-limits-core, finish-core, **workout** |
 | `programs.html` | Вибір і редагування плану | history-core, exercises, reps-core, programs-data, workout-core, **programs** |
 | `plan.html` | Мій план + прогноз ваг | …, onerm-core, periodization-core, programs, projection, **plan-ui** |
 | `periodization.html` | Цикл на 8–16 тижнів | exercises, reps-core, programs-data, onerm-core, periodization-core, **periodization** |
-| `journal.html` | Прогрес: вага, сила, тренування | daycal-core, history-core, progression-core, season-core, progress-core, adherence-core, onerm-core, exercise-core, tracker-core, **journal** |
+| `journal.html` | Прогрес: вага, сила, тренування | daycal-core, history-core, daylog-core, progression-core, season-core, progress-core, adherence-core, onerm-core, exercise-core, tracker-core, **journal** |
 | `nutrition.html` | План харчування: норма КБЖВ | donut-core, nutrition-core, **nutrition** |
 | `meals.html` | Раціон: продукти, рецепти, день | history-core, foods, recipes-data, donut-core, day-core, nutrition-core, **meals** |
 | `measure.html` | Заміри тіла | history-core, measure-core, **measure** |
+| `train-log.html` | «Дні тренувань»: календар і одна позначка | daycal-core, daylog-core, **train-log** |
+| `weight-log.html` | «Зважування»: поле вводу й календар | daycal-core, daylog-core, **weight-log** |
 | `trackers.html` | «Трекери»: **тільки налаштування** — що відстежувати й з якою ціллю | measure-core, tracker-core, **trackers-settings** |
 | `trackers-settings.html` | Стара адреса | nosw, **trackers-settings-redirect**, agegate |
 | `rating.html` | Сезонний рейтинг ELO | daycal-core, **season**, award-core |
@@ -117,6 +119,7 @@ elo-core · elo-api · elo-hooks
 | `exercise-core.js` | 350 | прогрес однієї вправи зі знімків сесій | `ExerciseCore`: `series`, `stats`, `trend`, `prFromSessions`, `METRICS` | `OneRM` |
 | `progression-core.js` | 335 | «пора підняти вагу»: коли підказати й на скільки | `ProgressionCore`: `due`, `hitTop`, `weekComplete`, `ages`, `snoozeUntil`, `STEP_LEGS`, `STEP_OTHER` | `DateCore` |
 | `history-core.js` | 320 | журнали: ваги, сесії, закриті дні | `HistoryCore`: `appendWeight`, `weightSeries`, `upsertSession`, `closeDay` | `DateCore` |
+| `daylog-core.js` | 233 | ⭐ **правила обох журналів дня**: чи був тренувальний день, як пишеться вага | `DayLogCore`: `trained`, `toggleTrained`, `dayLevel`, `LEVEL_TEXT`, `parseKg`, `setWeight`, `weightEntries`, `pickDay`, `weekTally` | `DateCore` |
 | `boxing-data.js` | 267 | одна готова боксерська сесія | `BOXING`: `session`, `sessionText` | — |
 | `onerm-core.js` | 259 | математика 1ПМ, набір млинців | `OneRM`: `oneRepMax`, `estimates`, `percentOfMax`, `toPlates`, `PLATE_STEP` | — |
 | `password-core.js` | 256 | надійність пароля за правилами Supabase | `PasswordCore`: `check`, `MIN_LEN`, `MAX_LEN` | — |
@@ -149,6 +152,17 @@ elo-core · elo-api · elo-hooks
 - **Різниця днів — В UTC.** `daysBetween('2026-03-28','2026-03-29')` = 1,
   хоча через перехід на літній час місцева доба тривала 23 години.
   Рахувати різницю місцевими датами означає отримати 0 або 2 двічі на рік.
+
+### Один журнал — три входи
+
+`profile.workLog` і `profile.bodyLog` пише тепер троє: «Сьогодні»
+(плитки), окремі сторінки «Дні тренувань» і «Зважування», і «Прогрес».
+Правила запису в усіх одні — `js/daylog-core.js`. Це не формальність:
+до вересня 2026 питання «чи був цього дня тренувальний день» відповідали
+`journal.js` і `today.js` кожен своїм кодом, і код збігався «майже».
+Журнал умів явний нуль як «знято руками», і достатньо було правки в
+одному з двох, щоб теплокарта й квадратик на головній почали розповідати
+про той самий день різне — мовчки.
 
 ---
 
@@ -295,9 +309,9 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 
 | Рівень | Чим | Скільки | Коли |
 |---|---|---|---|
-| Юніт | `node --test`, без залежностей | **47 файлів, 960 тестів** | `npm test`, ~6 с |
+| Юніт | `node --test`, без залежностей | **48 файлів, 998 тестів** | `npm test`, ~6 с |
 | Гігієна | `tools/ci-hygiene.mjs` | 16 перевірок по ~300 файлах | `node tools/ci-hygiene.mjs`, ~1 с |
-| Браузер | Playwright на справжньому Chromium | **52 файли `verify*.mjs`** | `bash tools/ci-browser.sh core` |
+| Браузер | Playwright на справжньому Chromium | **54 файли `verify*.mjs`** | `bash tools/ci-browser.sh core` |
 
 Ще 5 файлів `verify*.mjs` — не браузерні: `verify-sql-suites.mjs`,
 `verify-schema-perms.mjs`, `verify-elo-week.mjs`,
@@ -305,11 +319,11 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 
 Набори задає `tools/ci-browser.sh`:
 
-- **core** (кожен пуш, ~7 хв), 12 наборів: `verifyhistory`,
+- **core** (кожен пуш, ~8 хв), 13 наборів: `verifyhistory`,
   `verifyworkout`, `verifydata`, `verifyroundtrip`, `verifyloop`,
   `verify7`, `verifyaccountmix`, `verifylink`, `verifysw`, `verifyhelp`,
-  `verifymeasurewidget`, `verifyawards`.
-- **full** (раз на добу): core + 32, зокрема `verifya11y`,
+  `verifymeasurewidget`, `verifyawards`, `verifydaylogs`.
+- **full** (раз на добу): core + 33, зокрема `verifylvlbar`, `verifya11y`,
   `verifythemes`, `verifyresponsive`, `verifyperf`, `verifychaos`,
   `verifychaos2`, `verifyhardening`, `verifytabbar`, `verifydonut`,
   `verifydaycal`, `verifylevelicon`, `verifyprogression`.

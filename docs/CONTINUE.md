@@ -65,7 +65,7 @@ node tools/ci-hygiene.mjs     # гігієна репозиторію, митт�
 
 # 2. якщо чіпав те, що видно на екрані:
 node tools/verify<щось>.mjs   # потрібна перевірка, ~30 с
-bash tools/ci-browser.sh core # 12 найважливіших наборів, ~7 хв
+bash tools/ci-browser.sh core # 13 найважливіших наборів, ~8 хв
 
 # 3. кнопка «Опублікувати.command»
 ```

@@ -284,8 +284,15 @@
       { href: 'supplements.html', label: 'Добавки' }
     ] },
 
+    /* «Дні тренувань» і «Зважування» стоять тут, а не окремим розділом:
+       це два входи в ті самі журнали, що показує «Огляд прогресу», лише
+       для запису, а не для читання. Головний шлях до них — плитки на
+       «Сьогодні»; пункт у меню потрібен, щоб сторінка не була
+       досяжною виключно з однієї плитки. */
     { href: 'journal.html', label: 'Прогрес', core: true, icon: 'progress', children: [
       { href: 'journal.html',          label: 'Огляд прогресу' },
+      { href: 'train-log.html',        label: 'Дні тренувань' },
+      { href: 'weight-log.html',       label: 'Зважування' },
       { href: 'rating.html',           label: 'Рейтинг' },
       { href: 'awards.html',           label: 'Нагороди' },
       { href: 'journal.html#history',  label: 'Історія' },
@@ -318,6 +325,8 @@
     { href: 'nutrition.html',  label: 'План харчування' },
     { href: 'trackers.html',   label: 'Трекери' },
     { href: 'journal.html',    label: 'Прогрес' },
+    { href: 'train-log.html',  label: 'Дні тренувань' },
+    { href: 'weight-log.html', label: 'Зважування' },
     { href: 'measure.html',    label: 'Заміри тіла' },
     { href: 'rating.html',     label: 'Рейтинг' },
     { href: 'awards.html',     label: 'Нагороди' },

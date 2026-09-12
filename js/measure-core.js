@@ -135,6 +135,92 @@
     });
   }
 
+
+  /* ------------------------------------------------------------------ */
+  /* ЗВЕДЕННЯ ДЛЯ ГОЛОВНОЇ                                               */
+  /* ------------------------------------------------------------------ */
+  /*
+   * НАВІЩО. Заміри — єдиний факт про тіло, який не видно ніде, крім
+   * власної сторінки: вага показана в журналі й у звичках, тренування —
+   * у віджеті дня, їжа — в раціоні, а обхвати лежать окремо й про них
+   * просто забувають. Забутий замір нічого не коштує один раз, але за
+   * три місяці мовчання втрачається єдина шкала, якою видно, що змінює
+   * форму, а не лише число на вагах.
+   *
+   * ЧОМУ НЕ ПЛИТКА ЗВИЧКИ. Поруч на головній є «Тренування» і
+   * «Зважування» — тридцять квадратиків «було / не було». Для замірів
+   * така сітка бреше: міряються раз на два-три тижні, і чесно заповнена
+   * вона виглядала б як провал. Тому тут інше питання — не «чи роблю я
+   * це щодня», а «коли востаннє і що змінилось».
+   *
+   * ЗНАК ЗМІНИ НЕ ОЦІНЮЄТЬСЯ. Мінус на талії й мінус на біцепсі означають
+   * протилежне, а на стегні залежить від того, що людина собі поставила
+   * за мету. Число показується, висновок лишається людині — саме тому
+   * тут немає ні «добре/погано», ні кольору.
+   */
+
+  /** Через скільки днів без заміру головна нагадує про нього. */
+  const STALE_DAYS = 21;
+
+  /* Що показати першим, якщо виміряно багато. Це не «найважливіші»
+     обхвати взагалі — це ті, які найчастіше й міняються помітно. */
+  const HOME_ORDER = ['waist', 'chest', 'bicepsR', 'bicepsL', 'hips', 'thighR', 'belly', 'bodyfat'];
+
+  /** Різниця в календарних днях між двома ключами 'YYYY-MM-DD'. */
+  function daysBetween(fromKey, toKey) {
+    if (!DATE_KEY.test(String(fromKey)) || !DATE_KEY.test(String(toKey))) return null;
+    /* UTC навмисно: інакше перехід на літній час дає 0.96 доби й
+       «вчора» перетворюється на «сьогодні». */
+    const a = Date.parse(fromKey + 'T00:00:00Z');
+    const b = Date.parse(toKey + 'T00:00:00Z');
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    return Math.round((b - a) / 86400000);
+  }
+
+  /**
+   * Те, що головна має показати про заміри.
+   *
+   * @param {object} log   profile.measureLog
+   * @param {string} today ключ сьогоднішнього дня 'YYYY-MM-DD'
+   * @param {object} [opt] { limit } — скільки параметрів показати (типово 3)
+   * @returns {null|object} null, якщо жодного заміру ще не було
+   *   { last, daysAgo, stale, total, items: [{key,label,unit,current,delta}] }
+   */
+  function homeSummary(log, today, opt) {
+    const all = dates(log);
+    if (!all.length) return null;
+    const last = all[0];
+    const limit = (opt && Number.isFinite(opt.limit)) ? opt.limit : 3;
+    const daysAgo = daysBetween(last, today);
+
+    /* Показуємо лише те, що є в ОСТАННЬОМУ записі: параметр, який колись
+       міряли й закинули, на головній був би не станом, а археологією. */
+    const present = measuredKeys(log).filter(function (k) {
+      return Number.isFinite(Number((log[last] || {})[k]));
+    });
+    const ordered = HOME_ORDER.filter(function (k) { return present.indexOf(k) !== -1; })
+      .concat(present.filter(function (k) { return HOME_ORDER.indexOf(k) === -1; }));
+
+    const items = ordered.slice(0, Math.max(0, limit)).map(function (k) {
+      const st = stats(log, k);
+      return {
+        key: k,
+        label: st.label,
+        unit: st.unit,
+        current: st.current,
+        delta: st.delta
+      };
+    });
+
+    return {
+      last: last,
+      daysAgo: daysAgo,
+      stale: Number.isFinite(daysAgo) && daysAgo >= STALE_DAYS,
+      total: all.length,
+      items: items
+    };
+  }
+
   window.MeasureCore = {
     FIELDS: FIELDS,
     GROUPS: GROUPS,
@@ -145,6 +231,9 @@
     dates: dates,
     series: series,
     stats: stats,
-    measuredKeys: measuredKeys
+    measuredKeys: measuredKeys,
+    STALE_DAYS: STALE_DAYS,
+    daysBetween: daysBetween,
+    homeSummary: homeSummary
   };
 })();

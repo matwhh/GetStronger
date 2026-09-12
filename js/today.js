@@ -424,6 +424,82 @@
   }
 
 
+
+  /* ================================================================== */
+  /* ЗАМІРИ ТІЛА                                                         */
+  /* ================================================================== */
+  /*
+   * ЧОМУ ВОНИ ТУТ. Усе інше про себе людина бачить на головній: день
+   * тренування у віджеті, вагу й регулярність у плитках звичок, воду й
+   * сон у кубиках трекерів. Обхвати лежали лише на своїй сторінці — і
+   * саме тому про них забували. Заміри — єдина шкала, якою видно зміну
+   * ФОРМИ, а не числа на вагах: талія мінус два сантиметри при тій самій
+   * вазі — це результат, якого не показує жоден інший екран.
+   *
+   * ЧОМУ НЕ ПЛИТКА ЗВИЧКИ. Поруч є дві такі плитки з тридцятьма
+   * квадратиками «було / не було». Для замірів ця сітка бреше: їх роблять
+   * раз на два-три тижні, і чесно заповнена вона виглядала б як провал.
+   * Тут інше питання — «коли востаннє і що змінилось».
+   *
+   * ЗНАК ЗМІНИ НЕ ФАРБУЄТЬСЯ. Мінус на талії й мінус на біцепсі означають
+   * протилежне. Показуємо число, висновок лишаємо людині.
+   *
+   * Картка НЕ ВВОДИТЬ дані — як і решта головної: тут показують стан, а
+   * редагують на своїй сторінці. Один дотик — і ти там.
+   */
+  function measuresHtml() {
+    const MC = window.MeasureCore;
+    if (!MC || !MC.homeSummary) return '';
+    const sum = MC.homeSummary(state.profile && state.profile.measureLog, state.todayKey);
+
+    /* Жодного заміру — не мовчимо й не соромимо: один рядок, що це таке
+       й куди тиснути. Порожнє місце на головній нічого не пояснює. */
+    if (!sum) {
+      return '<a class="card mez mez--empty" href="measure.html">' +
+          '<span class="mez__head">' +
+            '<span class="mez__title">Заміри тіла</span>' +
+            '<span class="mez__when">ще не робили</span>' +
+          '</span>' +
+          '<span class="mez__hint">Обхвати показують зміну форми там, де вага мовчить.</span>' +
+          '<span class="mez__cta">Зробити перший замір →</span>' +
+        '</a>';
+    }
+
+    const items = sum.items.map(function (it) {
+      const d = Number.isFinite(it.delta) && it.delta !== 0
+        ? '<i class="mez__d">' + esc(fmtNum.signed(it.delta, 1)) + '</i>'
+        : '';
+      return '<span class="mez__item">' +
+          '<span class="mez__lbl">' + esc(it.label) + '</span>' +
+          '<span class="mez__num"><b class="mono">' + esc(fmtNum.n(it.current, 1)) + '</b>' +
+            '<span class="mez__unit">' + esc(it.unit) + '</span>' + d + '</span>' +
+        '</span>';
+    }).join('');
+
+    return '<a class="card mez' + (sum.stale ? ' is-stale' : '') + '" href="measure.html">' +
+        '<span class="mez__head">' +
+          '<span class="mez__title">Заміри тіла</span>' +
+          '<span class="mez__when">' + esc(agoLabel(sum.daysAgo)) + '</span>' +
+        '</span>' +
+        '<span class="mez__row">' + items + '</span>' +
+        '<span class="mez__cta">' +
+          esc(sum.stale ? 'Три тижні без заміру — час зміряти →' : 'Записати заміри →') +
+        '</span>' +
+      '</a>';
+  }
+
+  /* «сьогодні», «вчора», «12 днів тому» — і відмінок, бо «1 днів тому»
+     на екрані читається як недоробка, якою воно і є. */
+  function agoLabel(days) {
+    if (!Number.isFinite(days) || days < 0) return 'дата невідома';
+    if (days === 0) return 'сьогодні';
+    if (days === 1) return 'учора';
+    const t = days % 10, h = days % 100;
+    const word = (t === 1 && h !== 11) ? 'день'
+      : (t >= 2 && t <= 4 && (h < 12 || h > 14)) ? 'дні' : 'днів';
+    return days + ' ' + word + ' тому';
+  }
+
   /* ================================================================== */
   /* КУБИКИ ТРЕКЕРІВ                                                     */
   /* ================================================================== */
@@ -707,7 +783,7 @@
     const host = $('#today');
     if (!host) return;
     host.innerHTML = headHtml() + weekHtml() + widgetHtml() + progressionHtml() +
-      habitsHtml() + trackersHtml();
+      habitsHtml() + measuresHtml() + trackersHtml();
     /* Нахил вішається на щойно створений віджет: initTilt позначає вже
        оброблені контейнери, тож повторний виклик безпечний. */
     if (window.App && window.App.initTilt) window.App.initTilt(host);

@@ -12,7 +12,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const ctx = loadModules(['js/elo-core.js', 'js/adherence-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/elo-core.js', 'js/adherence-core.js']);
 const A = ctx.AdherenceCore;
 
 const T = '2026-09-20';   // неділя; вікно тижня: 14–20.09

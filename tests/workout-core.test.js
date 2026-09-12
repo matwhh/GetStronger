@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
 /* exercises.js дає liftKind/primaryMuscle/MUSCLES для restSecFor */
-const ctx = loadModules(['js/exercises.js', 'js/workout-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/exercises.js', 'js/workout-core.js']);
 const WC = ctx.WorkoutCore;
 
 /* Синтетичний день: складна велика (3 хв), ізоляція (2 хв), кругова («—»).
@@ -183,7 +183,7 @@ describe('workout-core: денний стан', () => {
       setItem: (k, v) => store.set(k, String(v)),
       removeItem: (k) => store.delete(k)
     };
-    const c = loadModules(['js/exercises.js', 'js/workout-core.js'], { localStorage: ls });
+    const c = loadModules(['js/date-core.js', 'js/exercises.js', 'js/workout-core.js'], { localStorage: ls });
     return { W: c.WorkoutCore, ls: ls };
   }
 
@@ -240,7 +240,7 @@ describe('workout-core: денний стан', () => {
 
   it('переповнене сховище не валить запис дня', () => {
     const { W } = fresh();
-    const c = loadModules(['js/exercises.js', 'js/workout-core.js'], {
+    const c = loadModules(['js/date-core.js', 'js/exercises.js', 'js/workout-core.js'], {
       localStorage: { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); } }
     });
     assert.doesNotThrow(() => c.WorkoutCore.writeDay(P, '2026-08-01', 0, [1]));
@@ -291,7 +291,7 @@ describe('resolvePlan: власне число повторень доїжджа
    * reps-core потрібен окремо: resolvePlan викликає RepsCore.applyPlan,
    * і без нього ця гілка мовчки віддала б план як є.
    */
-  const R = loadModules(['js/exercises.js', 'js/reps-core.js', 'js/workout-core.js']);
+  const R = loadModules(['js/date-core.js', 'js/exercises.js', 'js/reps-core.js', 'js/workout-core.js']);
   const RWC = R.WorkoutCore;
 
   const PROGRAMS = [{

@@ -13,7 +13,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const W = loadModules(['js/exercises.js', 'js/weight-limits-core.js']);
+const W = loadModules(['js/date-core.js', 'js/exercises.js', 'js/weight-limits-core.js']);
 const WL = W.WeightLimits;
 const EXERCISES = W.EXERCISES;
 

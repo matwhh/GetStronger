@@ -20,7 +20,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { Award } = loadModules(['js/award-core.js']);
+const { Award } = loadModules(['js/date-core.js', 'js/award-core.js']);
 
 test('сервер віддає kind, а не code — картка мусить читати саме його', () => {
   /* elo_history: jsonb_build_object('season', …, 'kind', kind, 'label', …).

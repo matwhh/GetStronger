@@ -392,6 +392,63 @@ if (existsSync(PUB)) {
   }
 }
 
+/* ---- 14. Дата рахується ОДНИМ способом ------------------------------ */
+//
+// Привід — аудит 12.09.2026. Одні й ті самі чотири функції жили копіями в
+// сімох файлах, і копії вже розійшлись: keyOf мав три реалізації, dateOf
+// три, todayKey три, а mondayOf — ЧОТИРИ. Одна з них (journal.js) лишала
+// час доби, тимчасом як решта нормалізували до півночі.
+//
+// Такі розходження не падають. На екрані дата правильна, неправильне лише
+// «скільки днів тому» — і помічають це через місяці, коли зіпсовані вже
+// стріки, тижні й рейтинг. Дата в Get Stronger лежить в основі всього
+// цього, тож правило просте: реалізація одна, решта — делегати.
+//
+// Делегатом вважається функція, у тілі якої є window.DateCore. Тобто
+// лишити імʼя заради сотні місць виклику можна; написати всередині свою
+// арифметику — ні.
+const DATE_FNS = ['keyOf', 'todayKey', 'dateOf', 'mondayOf', 'daysBetween', 'addDaysKey'];
+for (const f of tracked) {
+  if (!/^js\/.+\.js$/.test(f) || f === 'js/date-core.js') continue;
+  let src = '';
+  try { src = readFileSync(f, 'utf8'); } catch { continue; }
+  for (const name of DATE_FNS) {
+    const re = new RegExp('function\\s+' + name + '\\s*\\([^)]*\\)\\s*\\{', 'g');
+    let m;
+    while ((m = re.exec(src))) {
+      /* Тіло функції: від відкритої дужки до парної закритої. */
+      let depth = 0, end = -1;
+      for (let i = src.indexOf('{', m.index); i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') { depth--; if (!depth) { end = i; break; } }
+      }
+      const body = end > 0 ? src.slice(m.index, end + 1) : '';
+      if (!/window\.DateCore/.test(body)) {
+        fail(`${f} — власна реалізація ${name}(): дата має рахуватись лише в `
+           + `js/date-core.js. Лишіть імʼя делегатом: `
+           + `function ${name}(...) { return window.DateCore.${name}(...); }`);
+      }
+    }
+  }
+}
+
+/* ---- 15. Сторінка, що вживає дату, мусить вантажити date-core -------- */
+//
+// Модулі кличуть window.DateCore у момент ВИКЛИКУ, а не завантаження —
+// тобто забутий рядок у <head> не ламає сторінку одразу. Вона падає
+// пізніше й в іншому місці: «Cannot read properties of undefined».
+const DATE_USERS = tracked.filter((f) => /^js\/.+\.js$/.test(f) && f !== 'js/date-core.js')
+  .filter((f) => { try { return /window\.DateCore/.test(readFileSync(f, 'utf8')); } catch { return false; } })
+  .map((f) => f.replace(/^js\//, ''));
+for (const page of tracked.filter((f) => /^[^/]+\.html$/.test(f))) {
+  let html = '';
+  try { html = readFileSync(page, 'utf8'); } catch { continue; }
+  const uses = DATE_USERS.filter((m) => html.includes('js/' + m));
+  if (uses.length && !html.includes('js/date-core.js')) {
+    fail(`${page} — вантажить ${uses[0]}, який рахує дату, але не вантажить js/date-core.js`);
+  }
+}
+
 /* ---- підсумок -------------------------------------------------------- */
 if (problems.length) {
   console.error('Гігієна репозиторію — знайдено проблеми:\n');

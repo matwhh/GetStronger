@@ -10,7 +10,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { AuthMsg } = loadModules(['js/auth-msg-core.js']);
+const { AuthMsg } = loadModules(['js/date-core.js', 'js/auth-msg-core.js']);
 
 describe('пошта: кожна поламка має свою відповідь', () => {
   test('правильна адреса проходить мовчки', () => {

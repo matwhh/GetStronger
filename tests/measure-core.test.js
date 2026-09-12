@@ -18,7 +18,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const w = loadModules(['js/measure-core.js']);
+const w = loadModules(['js/date-core.js', 'js/measure-core.js']);
 const MC = w.MeasureCore;
 
 /* Два заміри: талія впала, груди й біцепс підросли. */

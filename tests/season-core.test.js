@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { SeasonCore: S } = loadModules(['js/season-core.js']);
+const { SeasonCore: S } = loadModules(['js/date-core.js', 'js/season-core.js']);
 
 /* Локальний полудень: дата не «переїде» в сусідню добу через пояс. */
 const at = (iso) => new Date(iso + 'T12:00:00');

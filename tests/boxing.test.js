@@ -11,7 +11,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const B = loadModules(['js/boxing-data.js']).BOXING;
+const B = loadModules(['js/date-core.js', 'js/boxing-data.js']).BOXING;
 const S = B.session;
 const TEXT = B.sessionText();
 

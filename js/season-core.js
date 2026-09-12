@@ -35,12 +35,11 @@
   const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
   /** Локальна дата 'YYYY-MM-DD' */
-  function keyOf(d) {
-    const x = d instanceof Date ? d : new Date();
-    return x.getFullYear() + '-' +
-      String(x.getMonth() + 1).padStart(2, '0') + '-' +
-      String(x.getDate()).padStart(2, '0');
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 3 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function keyOf(d) { return window.DateCore.keyOf(d); }
 
   /**
    * Період, активний на дату (за замовчуванням — сьогодні).

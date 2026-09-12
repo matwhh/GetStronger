@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { PasswordCore: P } = loadModules(['js/password-core.js']);
+const { PasswordCore: P } = loadModules(['js/date-core.js', 'js/password-core.js']);
 const bad = (pw, ctx) => { const r = P.check(pw, ctx); assert.equal(r.ok, false, 'мав відхилити: ' + pw); return r; };
 const good = (pw, ctx) => { const r = P.check(pw, ctx); assert.equal(r.ok, true, 'мав прийняти: ' + pw + ' → ' + r.problem); return r; };
 

@@ -1,0 +1,149 @@
+/**
+ * ДАТА — ОДНА НА ВЕСЬ ПРОЄКТ.
+ *
+ * НАВІЩО ЦЕЙ ФАЙЛ ІСНУЄ. Аудит 12.09.2026 показав, що одні й ті самі
+ * чотири функції жили копіями по семи файлах — і копії вже розійшлись:
+ *
+ *   keyOf     7 файлів, 3 різні реалізації
+ *   dateOf    7 файлів, 3 різні
+ *   todayKey  5 файлів, 3 різні
+ *   mondayOf  4 файли,  ЧОТИРИ різні
+ *
+ * Найгірше розходження — mondayOf у journal.js: він брав new Date(d) і
+ * лишав ЧАС ДОБИ, тимчасом як решта нормалізували до півночі. Різниця
+ * тижнями нічого не ламала — доки не зійшлися б перехід на літній час і
+ * ділення на 7 діб.
+ *
+ * Це не теорія. Рівно на цьому я спіткнувся в замірах: у локальних
+ * мілісекундах перехід на літній час дає 0,96 доби, і «вчора»
+ * перетворюється на «сьогодні». Дата в Get Stronger лежить в основі
+ * тижня, стріків, рейтингу й прогресії — там така похибка коштує не
+ * косметики.
+ *
+ * ДВІ ШКАЛИ, І ЇХ НЕ МОЖНА ПЛУТАТИ:
+ *
+ *   1. КЛЮЧ ДНЯ — 'YYYY-MM-DD' за МІСЦЕВИМ часом. Усі журнали профілю
+ *      (trackerLog, bodyLog, sessionLog, measureLog) підписані саме так,
+ *      бо «сьогодні» для людини — це її сьогодні, а не UTC-шне.
+ *
+ *   2. РІЗНИЦЯ В ДНЯХ — рахується в UTC. Це не суперечність: щойно дата
+ *      стала ключем, час доби вже не має значення, і арифметика в UTC
+ *      єдина, що не зсувається на годину двічі на рік.
+ *
+ * Без DOM і без сховища, як і решта *-core: чисті функції, які можна
+ * перевірити юнітом.
+ */
+(function () {
+  'use strict';
+
+  var DAY_MS = 86400000;
+  var KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  /**
+   * Ключ дня за МІСЦЕВИМ часом: 'YYYY-MM-DD'.
+   * Не Date на вході — береться сьогоднішній день: так поводились дві з
+   * трьох колишніх копій, і це рятує від «undefined-NaN-NaN» у ключі.
+   */
+  function keyOf(d) {
+    var x = (d instanceof Date && !isNaN(d.getTime())) ? d : new Date();
+    return x.getFullYear() + '-' + pad2(x.getMonth() + 1) + '-' + pad2(x.getDate());
+  }
+
+  /** Ключ сьогоднішнього дня. */
+  function todayKey(d) { return keyOf(d); }
+
+  /**
+   * Ключ → Date на МІСЦЕВУ північ.
+   *
+   * Повертає Date завжди, і для сміття це Invalid Date, а не null:
+   * тридцять вісім місць у проєкті пишуть dateOf(k).getTime() одразу, і
+   * null там означав би падіння замість NaN. Хто мусить відрізнити —
+   * питає isValid().
+   */
+  function dateOf(key) {
+    var p = String(key == null ? '' : key).split('-');
+    if (p.length !== 3) return new Date(NaN);
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    return d;
+  }
+
+  /** Чи це придатна до арифметики дата. */
+  function isValid(d) { return d instanceof Date && !isNaN(d.getTime()); }
+
+  /** Чи схожий рядок на ключ дня. */
+  function isKey(key) { return KEY_RE.test(String(key)); }
+
+  /**
+   * Понеділок тижня, у якому лежить дата, на МІСЦЕВУ північ.
+   *
+   * getDay(): неділя = 0. Зсув (day + 6) % 7 робить понеділок нулем —
+   * тиждень у Get Stronger починається з понеділка, так само як його
+   * рахує сервер.
+   *
+   * Нормалізація до півночі ОБОВʼЯЗКОВА: різниця двох понеділків ділиться
+   * на 7 діб, і залишений час доби вносить у це ділення похибку, яку
+   * Math.round приховує рівно доти, доки до неї не додасться година
+   * переходу на літній час.
+   */
+  function mondayOf(d) {
+    var src = isValid(d) ? d : new Date();
+    var x = new Date(src.getFullYear(), src.getMonth(), src.getDate());
+    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+    return x;
+  }
+
+  /** Дата через n днів від заданої, на місцеву північ. n може бути відʼємним. */
+  function addDays(d, n) {
+    var src = isValid(d) ? d : new Date();
+    var x = new Date(src.getFullYear(), src.getMonth(), src.getDate());
+    x.setDate(x.getDate() + (Number(n) || 0));
+    return x;
+  }
+
+  /** Ключ через n днів від заданого ключа. */
+  function shiftKey(key, n) {
+    var d = dateOf(key);
+    return isValid(d) ? keyOf(addDays(d, n)) : '';
+  }
+
+  /**
+   * Різниця в КАЛЕНДАРНИХ днях між двома ключами: from → to.
+   *
+   * В UTC навмисно. У місцевих мілісекундах доба переходу на літній час
+   * триває 23 години, і 0,96 доби після округлення вниз стає нулем —
+   * «вчора» перетворюється на «сьогодні». Помилка тиха: дата на екрані
+   * правильна, неправильне лише «скільки днів тому».
+   */
+  function daysBetween(fromKey, toKey) {
+    if (!isKey(fromKey) || !isKey(toKey)) return null;
+    var a = Date.parse(fromKey + 'T00:00:00Z');
+    var b = Date.parse(toKey + 'T00:00:00Z');
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    return Math.round((b - a) / DAY_MS);
+  }
+
+  /** Останні n ключів, найстаріший перший, включно з сьогоднішнім. */
+  function lastKeys(n, from) {
+    var out = [];
+    var end = isValid(from) ? from : new Date();
+    var count = Math.max(0, Number(n) || 0);
+    for (var i = count - 1; i >= 0; i--) out.push(keyOf(addDays(end, -i)));
+    return out;
+  }
+
+  window.DateCore = {
+    DAY_MS: DAY_MS,
+    keyOf: keyOf,
+    todayKey: todayKey,
+    dateOf: dateOf,
+    isValid: isValid,
+    isKey: isKey,
+    mondayOf: mondayOf,
+    addDays: addDays,
+    shiftKey: shiftKey,
+    daysBetween: daysBetween,
+    lastKeys: lastKeys
+  };
+})();

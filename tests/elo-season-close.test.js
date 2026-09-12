@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 import { readFileSync } from 'node:fs';
 
-const EC = loadModules(['js/elo-core.js']).EloCore;
+const EC = loadModules(['js/date-core.js', 'js/elo-core.js']).EloCore;
 
 /*
  * ПЕРЕВІРЯЄМО ПРОДАКШЕН-ФУНКЦІЮ, А НЕ ЇЇ ДВІЙНИКА.

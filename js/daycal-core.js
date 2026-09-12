@@ -44,26 +44,25 @@
   }
 
   /** Локальна дата → 'YYYY-MM-DD' */
-  function keyOf(d) {
-    return d.getFullYear() + '-' +
-      String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 2 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function keyOf(d) { return window.DateCore.keyOf(d); }
 
   /** 'YYYY-MM-DD' → локальний Date опівночі */
-  function dateOf(k) {
-    const p = String(k).split('-').map(Number);
-    return new Date(p[0], p[1] - 1, p[2]);
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 2 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function dateOf(k) { return window.DateCore.dateOf(k); }
 
   /** Понеділок того тижня, у який потрапляє дата. */
-  function mondayOf(d) {
-    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    /* getDay(): неділя = 0. Зсув (day + 6) % 7 робить понеділок нулем —
-       тиждень у Get Stronger починається з понеділка скрізь. */
-    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
-    return x;
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 2 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function mondayOf(d) { return window.DateCore.mondayOf(d); }
 
   /**
    * Сітка днів.

@@ -11,7 +11,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const H = loadModules(['js/history-core.js']).HistoryCore;
+const H = loadModules(['js/date-core.js', 'js/history-core.js']).HistoryCore;
 
 describe('weightLog: append-only', () => {
   it('нові дні накопичуються, не затираючи старі', () => {

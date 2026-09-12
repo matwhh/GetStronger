@@ -17,10 +17,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const ctx = loadModules(['js/workout-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/workout-core.js']);
 const W = ctx.WorkoutCore;
 
-const ectx = loadModules(['js/onerm-core.js', 'js/exercise-core.js']);
+const ectx = loadModules(['js/date-core.js', 'js/onerm-core.js', 'js/exercise-core.js']);
 const E = ectx.ExerciseCore;
 
 /** Компактний вигляд списку підходів: '100x8,90x8' — масиви з vm не рівні */

@@ -60,12 +60,11 @@
 
   /* ---------------- дати (локальний календар, як усі журнали) --------- */
 
+  /* Делегат: єдина реалізація — js/date-core.js. Сміття тут повертає сам
+     ключ (як і раніше), а не порожнечу: виклики вище передають його далі
+     як межу діапазону, і порожній рядок зробив би діапазон нескінченним. */
   function addDays(key, n) {
-    const m = DATE_PARSE.exec(String(key || ''));
-    if (!m) return key;
-    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + n);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
+    return window.DateCore.shiftKey(key, n) || key;
   }
 
   /** Різниця в днях між ISO-ключами (b − a) */

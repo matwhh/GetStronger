@@ -43,39 +43,40 @@
   /** На скільки днів ховає кнопка «відкласти». */
   var SNOOZE_DAYS = 7;
 
-  function keyOf(d) {
-    return d.getFullYear() + '-' +
-      String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 2 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function keyOf(d) { return window.DateCore.keyOf(d); }
 
-  function dateOf(key) {
-    var p = String(key || '').split('-');
-    if (p.length !== 3) return null;
-    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
-    return isNaN(d.getTime()) ? null : d;
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 4 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function dateOf(k) { return window.DateCore.dateOf(k); }
 
   /** Понеділок того тижня, у який потрапляє дата. Тиждень скрізь із Пн. */
-  function mondayOf(d) {
-    var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    var dow = (x.getDay() + 6) % 7;          // Пн = 0 … Нд = 6
-    x.setDate(x.getDate() - dow);
-    return x;
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 1 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function mondayOf(d) { return window.DateCore.mondayOf(d); }
 
+  /* Делегат: єдина реалізація — js/date-core.js.
+     ВАЖЛИВО: shiftKey віддає ПОРОЖНІЙ РЯДОК на сміття, а не null. Тут
+     раніше був null, і перевірка «if (!d)» ловила саме його; після
+     переїзду dateOf на спільну реалізацію вона перестала б спрацьовувати
+     мовчки — тому функція делегує цілком, а не наполовину. */
   function addDays(key, n) {
-    var d = dateOf(key);
-    if (!d) return null;
-    d.setDate(d.getDate() + n);
-    return keyOf(d);
+    return window.DateCore.shiftKey(key, n) || null;
   }
 
   /** Різниця в календарних днях між двома ключами. */
+  /* Делегат: єдина реалізація — js/date-core.js. Там різниця рахується
+     в UTC, тому доба переходу на літній час (23 години) не зменшує
+     відповідь на один день. */
   function daysBetween(fromKey, toKey) {
-    var a = dateOf(fromKey), b = dateOf(toKey);
-    if (!a || !b) return null;
-    return Math.round((b - a) / 86400000);
+    return window.DateCore.daysBetween(fromKey, toKey);
   }
 
   /**

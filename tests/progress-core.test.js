@@ -8,7 +8,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const ctx = loadModules(['js/history-core.js', 'js/progress-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/history-core.js', 'js/progress-core.js']);
 const P = ctx.ProgressCore;
 
 const NOW = new Date(2026, 7, 17); // 17 серпня 2026, локально

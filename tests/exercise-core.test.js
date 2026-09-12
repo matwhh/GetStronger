@@ -11,7 +11,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const ctx = loadModules(['js/onerm-core.js', 'js/exercise-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/onerm-core.js', 'js/exercise-core.js']);
 const E = ctx.ExerciseCore;
 
 /** Сесія зі знімком вправ */

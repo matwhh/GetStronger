@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { loadModules } from './helpers.js';
 
-const E = loadModules(['js/elo-core.js']).EloCore;
+const E = loadModules(['js/date-core.js', 'js/elo-core.js']).EloCore;
 const CFG = JSON.parse(readFileSync(new URL('../db/elo-config.json', import.meta.url), 'utf8'));
 
 describe('ELO: сезони', () => {

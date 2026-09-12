@@ -109,7 +109,7 @@ describe('правило зарахування підходів', () => {
 
 describe('базові схеми не перевищують стель обʼєму', () => {
   it('жодна програма × кількість днів не виходить за межу', () => {
-    const w = loadModules(['js/exercises.js', 'js/programs-data.js']);
+    const w = loadModules(['js/date-core.js', 'js/exercises.js', 'js/programs-data.js']);
     const cap = (id) => {
       const m = w.MUSCLES.find((x) => x.id === id);
       return m ? (m.cap ?? w.VOLUME_CAP[m.size]) : Infinity;

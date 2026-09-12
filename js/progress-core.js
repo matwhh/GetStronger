@@ -21,16 +21,17 @@
   const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
   const DAY_MS = 86400000;
 
-  function dateOf(key) {
-    const p = String(key).split('-').map(Number);
-    return new Date(p[0], p[1] - 1, p[2]);
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 4 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function dateOf(k) { return window.DateCore.dateOf(k); }
 
-  function keyOf(d) {
-    return d.getFullYear() + '-' +
-      String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 3 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function keyOf(d) { return window.DateCore.keyOf(d); }
 
   /**
    * Ключ ПЕРШОГО дня вікна завдовжки `days`, рахуючи сьогодні включно.

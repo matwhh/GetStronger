@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const ctx = loadModules(['js/foods.js', 'js/recipes-data.js', 'js/day-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/foods.js', 'js/recipes-data.js', 'js/day-core.js']);
 const D = ctx.DayCore;
 const Foods = ctx.Foods;
 

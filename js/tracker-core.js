@@ -39,17 +39,17 @@
   const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
   const DAY_MS = 86400000;
 
-  function todayKey(d) {
-    const x = d instanceof Date ? d : new Date();
-    return x.getFullYear() + '-' +
-      String(x.getMonth() + 1).padStart(2, '0') + '-' +
-      String(x.getDate()).padStart(2, '0');
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 10 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function todayKey(d) { return window.DateCore.todayKey(d); }
 
-  function dateOf(key) {
-    const p = String(key).split('-').map(Number);
-    return new Date(p[0], p[1] - 1, p[2]);
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 2 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function dateOf(k) { return window.DateCore.dateOf(k); }
 
   /* Перший день вікна завдовжки `days`, сьогодні включно. setDate, а не
      віднімання DAY_MS: у ніч переходу на зимовий час доба 25-годинна, і

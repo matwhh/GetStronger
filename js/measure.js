@@ -23,15 +23,16 @@
     busy: false
   };
 
-  function keyOf(d) {
-    const x = d instanceof Date ? d : new Date();
-    return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') +
-      '-' + String(x.getDate()).padStart(2, '0');
-  }
-  function dateOf(k) {
-    const p = String(k).split('-').map(Number);
-    return new Date(p[0], p[1] - 1, p[2]);
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 2 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function keyOf(d) { return window.DateCore.keyOf(d); }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 2 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function dateOf(k) { return window.DateCore.dateOf(k); }
   function nowHM() {
     const d = new Date();
     return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');

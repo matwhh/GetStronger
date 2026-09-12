@@ -8,7 +8,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const T = loadModules(['js/tracker-core.js']).TrackerCore;
+const T = loadModules(['js/date-core.js', 'js/tracker-core.js']).TrackerCore;
 
 const NOW = new Date(2026, 7, 17); // понеділок, 17 серпня 2026, локально
 

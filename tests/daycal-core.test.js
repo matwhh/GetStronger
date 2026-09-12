@@ -16,7 +16,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { DayCal } = loadModules(['js/daycal-core.js']);
+const { DayCal } = loadModules(['js/date-core.js', 'js/daycal-core.js']);
 
 /** Скільки колонок (тижнів) у виведеній сітці */
 const cols = (html) => (html.match(/class="mcal__col/g) || []).length;

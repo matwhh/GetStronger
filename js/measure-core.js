@@ -167,14 +167,11 @@
   const HOME_ORDER = ['waist', 'chest', 'bicepsR', 'bicepsL', 'hips', 'thighR', 'belly', 'bodyfat'];
 
   /** Різниця в календарних днях між двома ключами 'YYYY-MM-DD'. */
+  /* Делегат: єдина реалізація — js/date-core.js. Саме звідси вона туди й
+     переїхала: UTC-арифметика, придумана тут для замірів, потрібна всім
+     сімом місцям, де раніше стояли власні копії. */
   function daysBetween(fromKey, toKey) {
-    if (!DATE_KEY.test(String(fromKey)) || !DATE_KEY.test(String(toKey))) return null;
-    /* UTC навмисно: інакше перехід на літній час дає 0.96 доби й
-       «вчора» перетворюється на «сьогодні». */
-    const a = Date.parse(fromKey + 'T00:00:00Z');
-    const b = Date.parse(toKey + 'T00:00:00Z');
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-    return Math.round((b - a) / 86400000);
+    return window.DateCore.daysBetween(fromKey, toKey);
   }
 
   /**

@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const W = loadModules(['js/exercises.js', 'js/reps-core.js']);
+const W = loadModules(['js/date-core.js', 'js/exercises.js', 'js/reps-core.js']);
 const RC = W.RepsCore;
 
 const ex = (m) => ({ name: 'x', muscles: Array.isArray(m) ? m : [m], sets: 3 });
@@ -94,7 +94,7 @@ describe('Повторення: застосування до плану', () =>
 });
 
 describe('Повторення: усі 4 програми проходять через одну логіку', () => {
-  const P = loadModules(['js/exercises.js', 'js/programs-data.js', 'js/reps-core.js']);
+  const P = loadModules(['js/date-core.js', 'js/exercises.js', 'js/programs-data.js', 'js/reps-core.js']);
   /* Увесь набір діапазонів, які взагалі бувають у таблиці. Новачок і еліта
      беруть із нього різні підмножини; ALLOWED стереже, щоб у таблиці не
      зʼявився третій, ніде не описаний варіант (TST-013: константа була

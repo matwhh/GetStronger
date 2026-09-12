@@ -13,7 +13,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { Donut } = loadModules(['js/donut-core.js']);
+const { Donut } = loadModules(['js/date-core.js', 'js/donut-core.js']);
 
 /** Довжини намальованих дуг у порядку появи */
 const dashes = (html) =>

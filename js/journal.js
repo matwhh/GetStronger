@@ -55,20 +55,24 @@
   /* ------------------------------------------------------------------ */
 
   /** Локальна дата → 'YYYY-MM-DD' */
-  function keyOf(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return y + '-' + m + '-' + day;
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 12 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function keyOf(d) { return window.DateCore.keyOf(d); }
 
-  function todayKey() { return keyOf(new Date()); }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 19 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function todayKey(d) { return window.DateCore.todayKey(d); }
 
   /** 'YYYY-MM-DD' → Date опівночі локального часу */
-  function dateOf(key) {
-    const p = String(key).split('-').map(Number);
-    return new Date(p[0], p[1] - 1, p[2]);
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 26 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function dateOf(k) { return window.DateCore.dateOf(k); }
 
   /* ------------------------------------------------------------------ */
   /* Вага тіла                                                           */
@@ -870,11 +874,11 @@
   const MON = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
 
   /** Понеділок того тижня, якому належить дата */
-  function mondayOf(d) {
-    const m = new Date(d);
-    m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
-    return m;
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 4 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function mondayOf(d) { return window.DateCore.mondayOf(d); }
 
   /**
    * Вікно календаря — РІВНО сім календарних місяців: поточний і шість

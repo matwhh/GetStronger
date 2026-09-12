@@ -102,20 +102,20 @@
   /* Дати                                                                */
   /* ------------------------------------------------------------------ */
 
-  function keyOf(d) {
-    return d.getFullYear() + '-' +
-      String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 3 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function keyOf(d) { return window.DateCore.keyOf(d); }
 
   function localDateKey() { return keyOf(new Date()); }
 
   /** Понеділок тижня, у якому лежить дата. Пн = 0, Нд = 6. */
-  function mondayOf(d) {
-    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
-    return x;
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 3 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function mondayOf(d) { return window.DateCore.mondayOf(d); }
 
   /** Індекс дня в тижні: Пн = 0 … Нд = 6. */
   function dowIndex(d) { return (d.getDay() + 6) % 7; }

@@ -53,7 +53,7 @@ test('замовчування лежить у дозволених межах',
  * Логіку винесено в js/day-core.js; js/meals.js лишив тонку обгортку, яка
  * лише підставляє назви зі схеми.
  */
-const DC = loadModules(['js/day-core.js']).DayCore;
+const DC = loadModules(['js/date-core.js', 'js/day-core.js']).DayCore;
 const applySchema = (meals, count, report) =>
   DC.applySchema(meals, NC.mealNames(count), report);
 

@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const OC = loadModules(['js/age-core.js', 'js/onboarding-core.js']).OnboardingCore;
+const OC = loadModules(['js/date-core.js', 'js/age-core.js', 'js/onboarding-core.js']).OnboardingCore;
 
 const NOW = new Date(2026, 7, 26); // 26 серпня 2026
 const step = (p) => OC.stepFor(p, NOW);

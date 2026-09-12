@@ -12,7 +12,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const w = loadModules(['js/help-content.js', 'js/help-search-core.js']);
+const w = loadModules(['js/date-core.js', 'js/help-content.js', 'js/help-search-core.js']);
 const HS = w.HelpSearchCore;
 const CONTENT = w.HELP_CONTENT;
 const IDX = HS.buildIndex(CONTENT);

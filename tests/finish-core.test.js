@@ -19,7 +19,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { FinishCore: F } = loadModules(['js/finish-core.js']);
+const { FinishCore: F } = loadModules(['js/date-core.js', 'js/finish-core.js']);
 
 /** Джерело «випадковості», що завжди вибирає елемент за номером. */
 const at = (i, len) => () => i / len;

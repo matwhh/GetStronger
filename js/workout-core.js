@@ -25,12 +25,11 @@
 
   /** Локальна дата 'YYYY-MM-DD'. Локальна, не UTC: запис о 23:40 має
       лягти в сьогодні, а toISOString поклав би його у завтра. */
-  function todayKey(d) {
-    const x = d instanceof Date ? d : new Date();
-    return x.getFullYear() + '-' +
-      String(x.getMonth() + 1).padStart(2, '0') + '-' +
-      String(x.getDate()).padStart(2, '0');
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 1 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function todayKey(d) { return window.DateCore.todayKey(d); }
 
   /** Ключ 'programId:days' — той самий, що в programs.js */
   function planKey(programId, days) { return String(programId) + ':' + String(days); }
@@ -336,11 +335,9 @@
   /* ------------------------------------------------------------------ */
 
   /** 'YYYY-MM-DD' + n днів, у локальному календарі */
+  /* Делегат: єдина реалізація — js/date-core.js. */
   function addDaysKey(key, n) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ''));
-    if (!m) return key;
-    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + n);
-    return todayKey(d);
+    return window.DateCore.shiftKey(key, n) || key;
   }
 
   /**

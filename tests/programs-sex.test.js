@@ -16,7 +16,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const w = loadModules([
+const w = loadModules(['js/date-core.js', 
   'js/exercises.js',
   'js/programs-data.js',
   'js/reps-core.js',

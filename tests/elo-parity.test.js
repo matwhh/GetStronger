@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { loadModules } from './helpers.js';
 
-const EC = loadModules(['js/elo-core.js']).EloCore;
+const EC = loadModules(['js/date-core.js', 'js/elo-core.js']).EloCore;
 const CFG = JSON.parse(readFileSync(new URL('../db/elo-config.json', import.meta.url), 'utf8'));
 const FX = JSON.parse(readFileSync(new URL('./elo-parity.fixtures.json', import.meta.url), 'utf8'));
 

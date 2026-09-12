@@ -21,7 +21,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { ProgressionCore: P } = loadModules(['js/progression-core.js']);
+const { ProgressionCore: P } = loadModules(['js/date-core.js', 'js/progression-core.js']);
 
 /* Понеділок 2026-09-07 … неділя 2026-09-13. Сьогодні — понеділок 14-го,
    тобто попередній тиждень щойно закрився. */

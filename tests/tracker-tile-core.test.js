@@ -24,7 +24,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const mod = loadModules(['js/tracker-core.js', 'js/tracker-tile-core.js']);
+const mod = loadModules(['js/date-core.js', 'js/tracker-core.js', 'js/tracker-tile-core.js']);
 const T = mod.TrackerCore;
 const Tile = mod.TrackerTile;
 

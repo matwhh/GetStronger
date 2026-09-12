@@ -30,12 +30,11 @@
 
   /** Локальна дата 'YYYY-MM-DD'. Локальна, не UTC: запис о 23:40
       має лягти в сьогодні, а toISOString поклав би його у завтра. */
-  function todayKey(d) {
-    const x = d instanceof Date ? d : new Date();
-    return x.getFullYear() + '-' +
-      String(x.getMonth() + 1).padStart(2, '0') + '-' +
-      String(x.getDate()).padStart(2, '0');
-  }
+  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
+     імʼя, щоб не переписувати 3 місць виклику. Чому одна: копії
+     цієї функції встигли розійтись у сімох файлах (див.
+     docs/audit/2026-09-12/AUDIT.md). */
+  function todayKey(d) { return window.DateCore.todayKey(d); }
 
   /* ------------------------------------------------------------------ */
   /* Робочі ваги                                                         */

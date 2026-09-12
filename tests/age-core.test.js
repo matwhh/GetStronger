@@ -8,7 +8,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const A = loadModules(['js/age-core.js']).AgeCore;
+const A = loadModules(['js/date-core.js', 'js/age-core.js']).AgeCore;
 
 const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 

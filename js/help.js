@@ -409,8 +409,49 @@
     return (C && C.guide) ? 'guide' : '';
   }
 
+  /*
+   * ВМІСТ ДОВІДКИ ВАНТАЖИТЬСЯ ЛИШЕ КОЛИ ЇЇ ВІДКРИВАЮТЬ.
+   *
+   * js/help-content.js — найбільший файл проєкту після сторінкових
+   * модулів: 90 КБ тексту, і він стояв у <head> двадцяти сторінок. Тобто
+   * кожен, хто просто відкривав «Сьогодні», качав і розбирав усю книжку —
+   * включно з інструкцією на сорок блоків, якої більшість не відкриє
+   * жодного разу. Кнопку в куті це не зачіпає: вона більше не питає, чи
+   * є розділ (див. wire), а сам розділ зʼясовується вже після
+   * натискання.
+   *
+   * Тому вантажимо на першу вимогу. Друга й наступні — миттєві: файл уже
+   * в памʼяті, а між ними його ще й кешує service worker.
+   */
+  let contentLoading = null;
+  function needContent(next) {
+    if (window.HELP_CONTENT) { next(); return; }
+    if (contentLoading) { contentLoading.push(next); return; }
+    contentLoading = [next];
+    const done = function () {
+      const q = contentLoading || [];
+      contentLoading = null;
+      q.forEach(function (fn) { fn(); });
+    };
+    const add = function (src, cb) {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = cb;
+      /* Не завантажилось — черга однаково має розрядитись, інакше кнопка
+         довідки мовчатиме назавжди, і причина буде невидима. */
+      el.onerror = cb;
+      document.head.appendChild(el);
+    };
+    /* Пошук потрібен тому самому вікну — тягнемо разом, одним ланцюжком. */
+    add('js/help-content.js', function () {
+      if (window.HelpSearchCore) { done(); return; }
+      add('js/help-search-core.js', done);
+    });
+  }
+
   function open(page) {
     if (openEl) return;
+    if (!window.HELP_CONTENT) { needContent(function () { open(page); }); return; }
     const C = window.HELP_CONTENT;
     const start = homePage(page);
     const sec = start === 'guide' ? (C && C.guide) : (C && C.sections[start]);
@@ -591,9 +632,20 @@
   }
 
   function wire() {
-    /* Розділ є або в самої сторінки, або загальна інструкція — тобто
-       практично завжди. Порожнього вікна кнопка більше не відкриває. */
-    const has = Boolean(homePage()) && !hidden();
+    /*
+     * КНОПКА НЕ ЧЕКАЄ НА ВМІСТ.
+     *
+     * Раніше тут питалось homePage() — тобто «чи є розділ для цієї
+     * сторінки», — а відповідь на це питання лежить у HELP_CONTENT.
+     * Відколи вміст вантажиться на першу вимогу, у момент wire() його ще
+     * немає, і кнопка ховалася б назавжди: подія, яка мала б її показати,
+     * настає лише після натискання на неї саму.
+     *
+     * Питання й було зайвим: загальна інструкція є на кожній сторінці,
+     * тож порожнього вікна кнопка не відкриває в жодному разі. Єдине, що
+     * справді керує її наявністю, — вимикач у «Акаунті».
+     */
+    const has = !hidden();
     const found = document.querySelectorAll('[data-help-open]');
     Array.prototype.forEach.call(found, function (b) { b.hidden = !has; });
 

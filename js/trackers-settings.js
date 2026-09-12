@@ -290,8 +290,13 @@
     if (def.kind === 'card') {
       return '<li class="tr-row' + (t.enabled ? '' : ' tr-row--off') + '">' +
         '<div class="tr-row__top">' +
-          '<label class="switch" aria-label="Увімкнути: ' + esc(t.name) + '">' +
-            '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') + '>' +
+          /* aria-label СТОЇТЬ НА ПОЛІ, а не на <label>.
+             Напис на обгортці читалка не переносить на input: у дерева
+             доступності там лишався голий «прапорець» без назви — тобто
+             незрячий чув «увімкнено», не знаючи, що саме. */
+          '<label class="switch">' +
+            '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') +
+              ' aria-label="Увімкнути: ' + esc(t.name) + '">' +
             '<span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>' +
           '</label>' +
           '<a class="tr-row__btn" href="' + esc(def.page || '#') + '">' +
@@ -307,8 +312,9 @@
 
     return '<li class="tr-row' + (t.enabled ? '' : ' tr-row--off') + '">' +
       '<div class="tr-row__top">' +
-        '<label class="switch" aria-label="Увімкнути: ' + esc(t.name) + '">' +
-          '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') + '>' +
+        '<label class="switch">' +
+          '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') +
+            ' aria-label="Увімкнути: ' + esc(t.name) + '">' +
           '<span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>' +
         '</label>' +
         '<button class="tr-row__btn" type="button" data-expand="' + esc(t.id) + '" aria-expanded="' + open + '">' +
@@ -376,8 +382,9 @@
 
     return '<li class="tr-row' + (t.enabled ? '' : ' tr-row--off') + '">' +
       '<div class="tr-row__top">' +
-        '<label class="switch" aria-label="Увімкнути: ' + esc(t.name) + '">' +
-          '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') + '>' +
+        '<label class="switch">' +
+          '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') +
+            ' aria-label="Увімкнути: ' + esc(t.name) + '">' +
           '<span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>' +
         '</label>' +
         '<div class="tr-row__btn" style="cursor:default">' +

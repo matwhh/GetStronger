@@ -515,8 +515,31 @@ for (const w of [320, 390, 430]) {
   await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(1700);
 
+  /*
+   * ДЕНЬ ОБИРАЄМО ЯВНО, А НЕ ЧЕКАЄМО ВІД КАЛЕНДАРЯ.
+   *
+   * Перевірка питала href у картки «Сьогодні». У плані на 5 днів два дні
+   * з семи — відпочинок, і в такий день картка свідомо не посилання, а
+   * <div>: відкривати нема чого. Тобто перевірка падала двічі на тиждень
+   * і проходила пʼять разів — найгірший вид червоного, бо його списують
+   * на випадковість. Тепер тицяємо в смузі тижня перший НЕ вихідний день
+   * і питаємо вже про нього.
+   */
+  const workDay = p.locator('#today .tdy-day:not(.is-rest)').first();
+  await workDay.click();
+  await p.waitForTimeout(600);
   const href = await p.locator('.tdy-card').getAttribute('href').catch(() => null);
   ok('віджет дня веде на конкретний день', /^workout\.html\?day=\d+$/.test(String(href)), String(href));
+  /* І навпаки: у вихідний картка не має бути посиланням — відкривати
+     нічого, а мертве посилання гірше за його відсутність. */
+  const restDay = p.locator('#today .tdy-day.is-rest').first();
+  if (await restDay.count()) {
+    await restDay.click();
+    await p.waitForTimeout(600);
+    ok('у день відпочинку картка не посилання',
+      await p.locator('.tdy-card.is-rest').count() === 1 &&
+      await p.locator('a.tdy-card').count() === 0);
+  }
 
   /* Номер у посиланні мусить відповідати ТОМУ дню, який показує віджет, —
      а не сьогоднішньому: у смузі тижня можна обрати інший день, і

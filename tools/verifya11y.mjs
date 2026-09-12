@@ -49,8 +49,15 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
  await p.waitForTimeout(500);
  await p.evaluate(async s=>{await window.Store.saveProfile(Object.assign({},s,{trackers:{
    mood:{id:'mood',type:'mood',name:'Настрій',enabled:true,settings:{},goal:null,source:null,order:2,createdAt:null}}}));},SEED);
- /* Шкали 1..10 тепер живуть на сторінці «Трекери», а не на «Сьогодні» */
- await p.goto(`file://${ROOT}/trackers.html`); await p.waitForTimeout(1100);
+ /* Шкали 1..10 живуть КУБИКОМ НА ГОЛОВНІЙ: окрема сторінка вводу
+    прибрана, «Трекери» стали налаштуваннями. Закріплюємо кубик явно —
+    типово на головній не стоїть жоден. */
+ await p.evaluate(async () => {
+   const T = window.TrackerCore;
+   const tr = T.setPinned(T.ensureBuiltins({}), 'mood', true);
+   try { await window.Store.saveProfile({ trackers: tr }); } catch (e) { if (!e.queued) throw e; }
+ });
+ await p.goto(`file://${ROOT}/index.html`); await p.waitForTimeout(1300);
  const noName=await p.evaluate(()=>{
    const out=[];
    document.querySelectorAll('button, input, select, a[href]').forEach(el=>{
@@ -63,9 +70,11 @@ const SEED={birthDate: '1990-06-15', sex:'male',age:30,height:180,weight:82,acti
    return out;
  });
  ok('усі кнопки/поля/посилання мають доступну назву', noName.length===0, noName.join(' | '));
- const scale=await p.locator('.qi-scale__btn').first();
+ /* Шкала кубика: та сама розмітка, що була на прибраній сторінці, —
+    змінився лише клас (.twt__scale замість .qi-scale). */
+ const scale=p.locator('.twt__scale [data-trk-scale]').first();
  ok('кнопки шкали 1..10 мають aria-pressed', (await scale.getAttribute('aria-pressed'))!==null);
- const grp=await p.locator('.qi-scale').first();
+ const grp=p.locator('.twt__scale').first();
  ok('шкала має role=group з назвою', await grp.getAttribute('role')==='group' && !!(await grp.getAttribute('aria-label')));
  // фокус видимий
  const fv=await p.evaluate(()=>{const s=getComputedStyle(document.documentElement);return true;});

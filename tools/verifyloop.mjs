@@ -127,17 +127,23 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 /* ---- Flow 4: відновлення (трекер) → головна ---- */
 {
   const { ctx, p, errs } = await open();
-  /* Плиток трекерів на головній більше немає — відмічаємо й звіряємо на
-     сторінці трекерів, тобто там, де це тепер і робиться. */
+  /* Відмічають трекер КУБИКОМ НА ГОЛОВНІЙ — окремої сторінки вводу більше
+     немає, «Трекери» стали налаштуваннями. Кубик треба спершу закріпити:
+     типово на головній не стоїть жоден. */
   const logged = () => p.evaluate(async () => {
     const pr = await window.Store.getProfile();
     const k = window.TrackerCore.todayKey();
     return String((pr.trackerLog && pr.trackerLog.water || {})[k]);
   });
-  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
+  await p.evaluate(async () => {
+    const T = window.TrackerCore;
+    const tr = T.setPinned(T.ensureBuiltins({}), 'water', true);
+    try { await window.Store.saveProfile({ trackers: tr }); } catch (e) { if (!e.queued) throw e; }
+  });
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
   const before = await logged();
-  await tap(p.locator('#trk-day [data-trk-add]').first());
+  await tap(p.locator('#today [data-trk-add]').first());
   await p.waitForTimeout(900);
   await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(1300);

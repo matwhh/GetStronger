@@ -1966,7 +1966,7 @@
           '<h2 style="margin:0">Трекери</h2>' +
           '<p class="small mt-1 mb-0">Жоден трекер не ввімкнено, тому рахувати нічого. ' +
             'Увімкніть сон, кроки чи біль і втому — і тут зʼявиться середнє за період ' +
-            'поруч із вагою й тренуваннями. <a href="trackers-settings.html">Увімкнути трекери</a></p>' +
+            'поруч із вагою й тренуваннями. <a href="trackers.html">Увімкнути трекери</a></p>' +
         '</div>';
       return;
     }
@@ -1975,7 +1975,7 @@
       '<div class="card">' +
         '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px">' +
           '<h2 style="margin:0">Трекери</h2>' +
-          '<a class="small" href="trackers-settings.html">Детальніше</a>' +
+          '<a class="small" href="trackers.html">Детальніше</a>' +
         '</div>' +
         '<div class="kpis mt-2">' +
           lines.map(function (l) {

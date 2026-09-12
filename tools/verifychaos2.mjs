@@ -419,10 +419,34 @@ ctx = await freshCtx({ width: 480, height: 950 });
 p = await ctx.newPage();
 const errsToday = []; p.on('pageerror', e => errsToday.push(e.message));
 p.on('dialog', d => d.accept().catch(() => {}));
-/* Контроли трекерів дня переїхали з «Сьогодні» на окрему trackers.html;
-   пресети тривалості замінили полями год/хв — спамимо шкали й дельти. */
-await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
-await p.waitForTimeout(1100);
+/* Контроли трекерів дня ЖИВУТЬ КУБИКАМИ НА «СЬОГОДНІ»: окрема сторінка
+   вводу прибрана, «Трекери» стали налаштуваннями. Кубики треба спершу
+   закріпити — типово на головній не стоїть жоден. */
+/*
+ * Реєстр дописується ІНІЦІАЛІЗАЦІЙНИМ СКРИПТОМ, а не через Store після
+ * завантаження: контекст цього набору засіває ib.profile власним
+ * addInitScript на КОЖНІЙ навігації, тож усе, збережене зі сторінки,
+ * затирається наступним же переходом. Саме на цьому перевірка й показала
+ * нуль контролів там, де їх мало бути чотири.
+ */
+await p.addInitScript(() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem('ib.profile') || '{}');
+    const mk = (id, type, name, order, goal) => ({
+      id: id, type: type, name: name, enabled: true, pinned: true,
+      settings: {}, goal: goal == null ? null : goal, source: null, order: order, createdAt: null
+    });
+    raw.trackers = {
+      water: mk('water', 'water', 'Вода', 0, 2.5),
+      sleep: mk('sleep', 'sleep', 'Сон', 1, 480),
+      mood: mk('mood', 'mood', 'Настрій', 2, null),
+      recovery: mk('recovery', 'recovery', 'Recovery', 5, null)
+    };
+    localStorage.setItem('ib.profile', JSON.stringify(raw));
+  } catch (_) {}
+});
+await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+await p.waitForTimeout(1300);
 {
   const controls = await p.evaluate(() => ({
     add: document.querySelectorAll('[data-trk-add]').length,

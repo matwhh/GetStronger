@@ -67,32 +67,73 @@
    * візьме підпис із самої нагороди, — але виглядатиме безіменною.
    */
   var CODES = {
-    beta:    { name: 'BETA',  hint: 'Учасник бета-версії', face: 'hole' },
+    beta:    { name: 'BETA',  hint: 'Учасник бета-версії', face: 'hole', tier: 8 },
 
     /* Рівень, на якому завершено сезон. Сервер видає з пʼятого: нижчі
        рівні проходить кожен, хто просто вів щоденник, і нагорода за це
        знецінила б решту. */
-    level5:  { name: 'L5',  hint: 'Сезон завершено на 5 рівні',  face: 'level', level: 5 },
-    level7:  { name: 'L7',  hint: 'Сезон завершено на 7 рівні',  face: 'level', level: 7 },
-    level8:  { name: 'L8',  hint: 'Сезон завершено на 8 рівні',  face: 'level', level: 8 },
-    level9:  { name: 'L9',  hint: 'Сезон завершено на 9 рівні',  face: 'level', level: 9 },
-    level10: { name: 'L10', hint: 'Сезон завершено на 10 рівні', face: 'level', level: 10 },
+    level5:  { name: 'L5',  hint: 'Сезон завершено на 5 рівні',  face: 'level', level: 5,  tier: 1 },
+    level7:  { name: 'L7',  hint: 'Сезон завершено на 7 рівні',  face: 'level', level: 7,  tier: 2 },
+    level8:  { name: 'L8',  hint: 'Сезон завершено на 8 рівні',  face: 'level', level: 8,  tier: 3 },
+    level9:  { name: 'L9',  hint: 'Сезон завершено на 9 рівні',  face: 'level', level: 9,  tier: 4 },
+    level10: { name: 'L10', hint: 'Сезон завершено на 10 рівні', face: 'level', level: 10, tier: 5 },
 
-    elite:   { name: 'ELITE', hint: '2000+ ELO у сезоні', face: 'elite' },
+    elite:   { name: 'ELITE', hint: '2000+ ELO у сезоні', face: 'elite', tier: 7 },
 
     /* Місце в таблиці лідерів сезону. */
-    first:   { name: '#1',      hint: 'Перше місце сезону',   face: 'rank', rank: 1 },
-    top3:    { name: 'TOP 3',   hint: 'Трійка сезону',        face: 'rank', rank: 3 },
-    top10:   { name: 'TOP 10',  hint: 'Десятка сезону',       face: 'rank', rank: 10 },
-    top100:  { name: 'TOP 100', hint: 'Сотня сезону',         face: 'rank', rank: 100 },
-    top1000: { name: 'TOP 1000', hint: 'Тисяча сезону',       face: 'rank', rank: 1000 },
+    first:   { name: '#1',      hint: 'Перше місце сезону',   face: 'rank', rank: 1,    tier: 7 },
+    top3:    { name: 'TOP 3',   hint: 'Трійка сезону',        face: 'rank', rank: 3,    tier: 6 },
+    top10:   { name: 'TOP 10',  hint: 'Десятка сезону',       face: 'rank', rank: 10,   tier: 4 },
+    top100:  { name: 'TOP 100', hint: 'Сотня сезону',         face: 'rank', rank: 100,  tier: 3 },
+    top1000: { name: 'TOP 1000', hint: 'Тисяча сезону',       face: 'rank', rank: 1000, tier: 2 },
 
     /* Частка від усіх учасників — на відміну від місця, не залежить від
        того, скільки людей грало в сезоні. */
-    top10pct: { name: 'TOP 10%', hint: 'Верхні 10 % сезону', face: 'pct', pct: 10 },
-    top5pct:  { name: 'TOP 5%',  hint: 'Верхні 5 % сезону',  face: 'pct', pct: 5 },
-    top1pct:  { name: 'TOP 1%',  hint: 'Верхній 1 % сезону', face: 'pct', pct: 1 }
+    top10pct: { name: 'TOP 10%', hint: 'Верхні 10 % сезону', face: 'pct', pct: 10, tier: 3 },
+    top5pct:  { name: 'TOP 5%',  hint: 'Верхні 5 % сезону',  face: 'pct', pct: 5,  tier: 4 },
+    top1pct:  { name: 'TOP 1%',  hint: 'Верхній 1 % сезону', face: 'pct', pct: 1,  tier: 5 }
   };
+
+
+  /*
+   * РІДКІСНІСТЬ — ВІСІМ СХОДИНОК, І ВОНА ВИДНА НА ЛИЦІ.
+   *
+   * Досі всі нагороди виглядали однаково чорними, і «Тисяча сезону»
+   * коштувала на око стільки ж, скільки «Перше місце». Вітрина, у якій
+   * усе однакове, не показує головного — що саме з цього рідкість.
+   *
+   * ЧОМУ КОЛІР ТУТ ДОЗВОЛЕНИЙ, хоча в решті проєкту він означає ДАНІ.
+   * Рідкісність — теж дані: це шкала, така сама як «в нормі / увага», і
+   * вона впорядкована. Виняток свідомий і замкнений: колір рідкості
+   * живе лише на нагородах і більше ніде.
+   *
+   * ПЕРШІ ДВІ СХОДИНКИ — ПРИГЛУШЕНІ Й НАПІВПРОЗОРІ. Звичайне не має
+   * світитися: якби «сіра» й «блакитна» кричали так само, як золота,
+   * шкала перестала б бути шкалою. Тому насиченим кольором світяться
+   * лише сходинки від третьої.
+   *
+   * ЧОРНА — ОСТАННЯ Й ОДНА. Її дають не за сезон, а за те, чого не
+   * повторити: бета — це час, а не результат. Роздавати чорний за
+   * досяжне означало б знецінити його першим же сезоном.
+   */
+  var TIERS = [
+    { n: 1, id: 'common',    name: 'Звичайна',   soft: true },
+    { n: 2, id: 'uncommon',  name: 'Незвичайна', soft: true },
+    { n: 3, id: 'rare',      name: 'Рідкісна',   soft: false },
+    { n: 4, id: 'epic',      name: 'Епічна',     soft: false },
+    { n: 5, id: 'mythic',    name: 'Міфічна',    soft: false },
+    { n: 6, id: 'unique',    name: 'Унікальна',  soft: false },
+    { n: 7, id: 'gold',      name: 'Золота',     soft: false },
+    { n: 8, id: 'legendary', name: 'Легендарна', soft: false }
+  ];
+  var TIER_BY_N = {};
+  TIERS.forEach(function (t) { TIER_BY_N[t.n] = t; });
+
+  /** Сходинка рідкості нагороди. Невідомий код — найнижча. */
+  function tierOf(kind) {
+    var def = CODES[kind];
+    return TIER_BY_N[(def && def.tier) || 1];
+  }
 
   /* Порядок для сторінки нагород: від рідкісного до звичайного, групами.
      Саме в такому вигляді їх і збирають — спершу дивляться на верхівку. */
@@ -220,14 +261,25 @@
      * і «перейти». Один жест — один зміст, і місце вирішує який.
      */
     var locked = o.locked === true;
+    var tier = tierOf(kind);
     var tag = o.href ? 'a' : 'article';
     var attrs = o.href
       ? ' href="' + esc(o.href) + '"'
       : ' tabindex="0"';
 
+    /*
+     * Рідкість і сезон їдуть атрибутами, а не лише класом: сторінка
+     * фільтрує картки, і робити це розбором рядка класів означало б
+     * тримати формат розмітки як другий, неписаний договір.
+     */
     return '<' + tag + ' class="awd' + (kind ? ' awd--' + esc(kind) : '') +
+             ' awd--t' + tier.n +
+             (tier.soft ? ' awd--soft' : '') +
              (locked ? ' awd--locked' : '') + '"' + attrs
-         +   ' aria-label="' + esc(name + '. ' + hint + (when ? '. ' + when : '') +
+         +   ' data-tier="' + tier.n + '"'
+         +   (a.season ? ' data-season="' + esc(a.season) + '"' : '')
+         +   ' aria-label="' + esc(name + '. ' + hint + '. ' + tier.name +
+               (when ? '. ' + when : '') +
                (locked ? '. Ще не отримано' : '')) + '">'
          +   '<div class="awd__in">'
               /*
@@ -237,11 +289,20 @@
                */
          +     '<div class="awd__face awd__face--front awd__face--' + esc((def && def.face) || 'hole') + '">'
          +       faceHtml(def)
+              /*
+               * РІДКІСТЬ ПІДПИСАНА СЛОВОМ, А НЕ ЛИШЕ КОЛЬОРОМ.
+               * Колір відповідає «наскільки рідкісна» швидше за будь-який
+               * текст, але сам по собі він недоступний: дальтонік бачить
+               * рожеве й червоне однаково, а читалка не бачить кольору
+               * взагалі. Слово коштує один рядок і знімає обидва питання.
+               */
+         +       '<span class="awd__rar">' + esc(tier.name) + '</span>'
          +     '</div>'
               /* ЗВОРОТ — назва й знак. Більше нічого. */
          +     '<div class="awd__face awd__face--back">'
          +       '<span class="awd__mark" aria-hidden="true">' + gearIcon() + '</span>'
          +       '<span class="awd__name">' + esc(name) + '</span>'
+         +       (when ? '<span class="awd__when">' + esc(when) + '</span>' : '')
          +     '</div>'
          +   '</div>'
          + '</' + tag + '>';
@@ -285,6 +346,7 @@
 
   window.Award = {
     html: html, grid: grid, showcase: showcase,
-    CODES: CODES, ORDER: ORDER, gearIcon: gearIcon
+    CODES: CODES, ORDER: ORDER, gearIcon: gearIcon,
+    TIERS: TIERS, tierOf: tierOf
   };
 })();

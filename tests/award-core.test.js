@@ -16,7 +16,7 @@
  *    перевороту, а читалка перевертати не вміє — тому весь текст мусить
  *    бути в aria-label.
  */
-import { test } from 'node:test';
+import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
@@ -106,7 +106,16 @@ test('сезон підписується переданою функцією, �
   const h = Award.html({ code: 'first', season: 'AUTUMN-2026' },
     { seasonLabel: (s) => 'Осінь 2026' });
   assert.match(h, /Осінь 2026/);
-  assert.doesNotMatch(h, /AUTUMN-2026/);
+  /*
+   * Сирий код сезону лишається В АТРИБУТІ — по ньому фільтрує сторінка
+   * нагород, і розбирати заради цього людський підпис означало б
+   * тримати «Осінь 2026» як другий, неписаний формат даних. Тому
+   * перевіряємо те, що й перевірялось по суті: код не витікає в ТЕКСТ,
+   * який людина читає.
+   */
+  const text = h.replace(/<[^>]*>/g, ' ');
+  assert.doesNotMatch(text, /AUTUMN-2026/);
+  assert.match(h, /data-season="AUTUMN-2026"/);
 });
 
 test('назва потрапляє на зворот', () => {
@@ -214,7 +223,9 @@ test('одна нагорода за два сезони — це дві кар�
     { kind: 'top3', season: 'S1' },
     { kind: 'top3', season: 'S2' }
   ], { seasonLabel: (s) => 'Сезон ' + s.slice(1) });
-  assert.equal((h.match(/class="awd awd--top3"/g) || []).length, 2);
+  /* Клас тепер несе ще й сходинку рідкості (awd--t6), тож шукаємо
+     початок рядка класів, а не його цілком. */
+  assert.equal((h.match(/class="awd awd--top3 /g) || []).length, 2);
   assert.match(h, /Сезон 1/);
   assert.match(h, /Сезон 2/);
   assert.equal((h.match(/class="awd /g) || []).length, Award.ORDER.length + 1);
@@ -226,4 +237,80 @@ test('порожня вітрина — не порожня сітка', () => {
   const h = Award.showcase([]);
   assert.match(h, /awd-grid/);
   assert.equal((h.match(/class="awd /g) || []).length, Award.ORDER.length);
+});
+
+
+/* ------------------------------------------------------------------ */
+/* РІДКІСНІСТЬ                                                         */
+/* ------------------------------------------------------------------ */
+/*
+ * Вісім сходинок — це не оздоба, а шкала, і ламається вона тихо: досить
+ * забути tier в одному коді, і нагорода мовчки стане «звичайною». На
+ * екрані це виглядатиме як задум, а не як помилка.
+ */
+describe('рідкісність нагород', () => {
+  test('у КОЖНОЇ нагороди є сходинка — жодної без', () => {
+    const без = Award.ORDER.filter((k) => !Award.CODES[k].tier);
+    assert.equal(без.join(', '), '', 'без рідкості: ' + без.join(', '));
+  });
+
+  test('сходинок вісім, і вони пронумеровані підряд', () => {
+    assert.equal(Award.TIERS.length, 8);
+    assert.equal(Award.TIERS.map((t) => t.n).join(','), '1,2,3,4,5,6,7,8');
+  });
+
+  test('приглушені саме дві найнижчі', () => {
+    const soft = Award.TIERS.filter((t) => t.soft).map((t) => t.n);
+    assert.equal(soft.join(','), '1,2', 'приглушені: ' + soft.join(','));
+  });
+
+  test('усі вісім сходинок справді вживані — шкала без дірок', () => {
+    const used = new Set(Award.ORDER.map((k) => Award.tierOf(k).n));
+    assert.equal([...used].sort((a, b) => a - b).join(','), '1,2,3,4,5,6,7,8');
+  });
+
+  test('чорна сходинка одна, і вона не за сезон', () => {
+    const black = Award.ORDER.filter((k) => Award.tierOf(k).n === 8);
+    assert.equal(black.join(','), 'beta',
+      'чорну роздано не тільки за бету: ' + black.join(','));
+  });
+
+  test('рівні розкладені по шкалі рівномірно, а не скупчені', () => {
+    /* П’ять карток за рівень мусять зайняти п’ять РІЗНИХ сходинок і
+       зростати разом із рівнем — інакше L5 і L10 коштують однаково. */
+    const levels = ['level5', 'level7', 'level8', 'level9', 'level10'];
+    const t = levels.map((k) => Award.tierOf(k).n);
+    assert.equal(t.join(','), '1,2,3,4,5');
+  });
+
+  test('ELITE — золота', () => {
+    assert.equal(Award.tierOf('elite').id, 'gold');
+  });
+
+  test('рідкість видно в розмітці: клас, атрибут і слово', () => {
+    const h = Award.html({ kind: 'elite' });
+    assert.match(h, /awd--t7/);
+    assert.match(h, /data-tier="7"/);
+    assert.match(h, /awd__rar">Золота</, 'слова рідкості немає — лишився самий колір');
+  });
+
+  test('приглушені позначені класом, решта — ні', () => {
+    assert.match(Award.html({ kind: 'level5' }), /awd--soft/);
+    assert.ok(!/awd--soft/.test(Award.html({ kind: 'elite' })));
+  });
+
+  test('сезон їде атрибутом — сторінка фільтрує по ньому', () => {
+    assert.match(Award.html({ kind: 'top3', season: '2026-S1' }), /data-season="2026-S1"/);
+    assert.ok(!/data-season/.test(Award.html({ kind: 'top3' })),
+      'сезону немає — атрибута теж не має бути, інакше фільтр упіймає порожнечу');
+  });
+
+  test('невідомий код не вигадує рідкості', () => {
+    assert.equal(Award.tierOf('чогось такого немає').n, 1);
+    assert.match(Award.html({ kind: 'невідоме' }), /awd--t1/);
+  });
+
+  test('читалці рідкість теж дістається', () => {
+    assert.match(Award.html({ kind: 'beta' }), /aria-label="[^"]*Легендарна/);
+  });
 });

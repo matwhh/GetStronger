@@ -6026,6 +6026,37 @@ h1 > .h1-ico {
    ЧОРНО-БІЛА НАВМИСНО. Колір у Get Stronger означає дані й стан; нагорода —
    ні те, ні інше. Вона тримається на світлі, як решта скла проєкту.
    ===================================================================== */
+
+/* Смуга фільтрів над вітриною: два ряди чипів, сезон і рідкість. */
+.awd-filter { display: flex; flex-direction: column; gap: 8px; }
+.awd-filter__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.awd-chip {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 0.76rem;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.awd-chip:hover { border-color: var(--acc-line); color: var(--text); }
+.awd-chip.is-on { border-color: var(--acc-line); color: var(--text); background: rgba(var(--tint-rgb), 0.07); }
+/* Чип рідкості несе крапку свого кольору: інакше ряд із восьми слів
+   доводиться читати цілком, щоб знайти потрібне. */
+.awd-chip--t1, .awd-chip--t2, .awd-chip--t3, .awd-chip--t4,
+.awd-chip--t5, .awd-chip--t6, .awd-chip--t7, .awd-chip--t8 { padding-left: 8px; }
+.awd-chip[class*="awd-chip--t"]::before {
+  content: '';
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: 0.5px;
+  background: var(--aw-ink, currentColor);
+}
+.awd-grid__empty { margin-top: 14px; }
+
 .awd-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -6080,6 +6111,75 @@ h1 > .h1-ico {
   backface-visibility: hidden;
 }
 .awd__face--back { transform: rotateY(180deg); }
+
+
+/* ---------------------------------------------------------------------
+   РІДКІСНІСТЬ — КОЛІР ЛИЦЯ
+
+   Вісім сходинок, від сірої до чорної. Колір тут не оздоба й не виняток
+   із правила «колір = дані»: рідкість і Є даними — упорядкованою шкалою,
+   такою самою як «в нормі / увага». Виняток замкнений: ці змінні
+   вживаються ТІЛЬКИ на нагородах.
+
+   Перші дві сходинки навмисно приглушені й напівпрозорі (.awd--soft):
+   звичайне не має світитися, інакше шкала перестає бути шкалою й
+   перетворюється на вісім різних яскравих карток.
+
+   Кожна сходинка — три змінні: --aw-ink (світло знака й підпису),
+   --aw-a і --aw-b (верх і низ підкладки). Далі все лице малюється одним
+   правилом, і додати дев'яту сходинку означає дописати три рядки, а не
+   новий блок.
+   --------------------------------------------------------------------- */
+.awd--t1,
+.awd-chip--t1 { --aw-ink: #b9bec4; --aw-a: #232629; --aw-b: #0c0d0e; }   /* сіра       */
+.awd--t2,
+.awd-chip--t2 { --aw-ink: #8fc7e8; --aw-a: #17303d; --aw-b: #080f14; }   /* блакитна   */
+.awd--t3,
+.awd-chip--t3 { --aw-ink: #5aa2ff; --aw-a: #10265c; --aw-b: #060b1a; }   /* синя       */
+.awd--t4,
+.awd-chip--t4 { --aw-ink: #b57bff; --aw-a: #2c1259; --aw-b: #0c0518; }   /* фіолетова  */
+.awd--t5,
+.awd-chip--t5 { --aw-ink: #ff7ec8; --aw-a: #4d1240; --aw-b: #170512; }   /* рожева     */
+.awd--t6,
+.awd-chip--t6 { --aw-ink: #ff6b5e; --aw-a: #57140f; --aw-b: #190504; }   /* червона    */
+.awd--t7,
+.awd-chip--t7 { --aw-ink: #ffcc5c; --aw-a: #4a3608; --aw-b: #170f02; } /* золота   */
+.awd--t8,
+.awd-chip--t8 { --aw-ink: #d8d8d8; --aw-a: #0a0a0a; --aw-b: #000; }      /* чорна      */
+
+.awd__face--front {
+  background: linear-gradient(180deg, var(--aw-a, #171717) 0%, var(--aw-b, #000) 100%);
+  border-color: color-mix(in srgb, var(--aw-ink, #fff) 26%, transparent);
+  color: var(--aw-ink, #fff);
+}
+/* Приглушені сходинки: те саме лице, лише тихіше. Окремих кольорів для
+   них не заводимо — інакше «тихо» й «голосно» розійшлися б при першій же
+   правці палітри. */
+.awd--soft .awd__face--front {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--aw-a) 55%, #0b0b0b) 0%,
+    color-mix(in srgb, var(--aw-b) 70%, #000) 100%);
+  border-color: color-mix(in srgb, var(--aw-ink) 16%, transparent);
+  color: color-mix(in srgb, var(--aw-ink) 72%, transparent);
+}
+/* Золота й чорна світяться по краю — це те, за чим їх упізнають здалеку
+   в сітці, ще до того, як прочитано підпис. */
+.awd--t7 .awd__face--front { box-shadow: inset 0 0 0 1px rgba(255, 204, 92, 0.22), 0 10px 28px -14px rgba(255, 190, 60, 0.45); }
+.awd--t8 .awd__face--front { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13), 0 10px 30px -12px rgba(0, 0, 0, 1); }
+
+/* Підпис рідкості — на лиці, під знаком. Колір тут не єдиний носій
+   сенсу: дальтонік бачить рожеве й червоне однаково, а читалка кольору
+   не бачить узагалі. */
+.awd__rar {
+  position: absolute;
+  left: 0; right: 0; bottom: 9px;
+  text-align: center;
+  font-size: 0.62rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+.awd__when { margin-top: 4px; font-size: 0.68rem; opacity: 0.6; }
 
 /* ---------------------------------------------------------------------
    ЛИЦЕ — ЧОРНА ДІРА

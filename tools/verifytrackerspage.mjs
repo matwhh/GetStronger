@@ -1,13 +1,17 @@
 /**
- * Трекери — окрема сторінка, налаштування — окрема.
+ * «Трекери» — це НАЛАШТУВАННЯ. Ввід живе на «Сьогодні».
+ *
+ * Сторінок було дві: trackers.html (ввести значення) і
+ * trackers.html (що ввімкнено, цілі, добавки). Ввід переїхав на
+ * «Сьогодні» кубиками ще раніше — і сторінка вводу лишилась дублем: два
+ * місця для одного числа, жодне з яких не очевидне. Тепер адреса одна.
  *
  * Стереже:
- *   • на «Сьогодні» кубиків трекерів немає, поки їх туди не закріпили;
- *   • закріплений трекер зʼявляється кубиком і пише прямо звідти;
- *   • плитка «Трекери» веде на trackers.html (ввід), а не в налаштування;
- *   • на trackers.html праворуч угорі є «Налаштування» → trackers-settings.html;
- *   • ввід на новій сторінці зберігається й видно на плитці «Сьогодні»;
- *   • перемикач у налаштуваннях одразу міняє склад сторінки трекерів.
+ *   • на «Сьогодні» кубиків немає, поки їх туди не закріпили;
+ *   • закріплений кубик зʼявляється і пише прямо звідти;
+ *   • trackers.html — це налаштування: перемикачі є, полів вводу немає;
+ *   • стара адреса trackers.html веде на нову, а не в 404;
+ *   • заміри тіла прибираються з головної тією самою шпилькою.
  */
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
@@ -67,8 +71,9 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
      веде туди, де закріплення й вмикається, — і це єдиний натяк на
      можливість, який екран собі дозволяє. */
   const hint = p.locator('#today .twt-hint');
-  ok('1. підказка веде в налаштування трекерів',
-    await hint.count() === 1 && /trackers-settings\.html$/.test(await hint.getAttribute('href')));
+  ok('1. підказка веде в трекери',
+    await hint.count() === 1 && /trackers\.html$/.test(await hint.getAttribute('href')),
+    await hint.count() ? String(await hint.getAttribute('href')) : 'підказки немає');
   ok('1. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -142,75 +147,97 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await ctx.close();
 }
 
-/* ---- 2. Сторінка трекерів: ввід + «Налаштування» ---- */
+/* ---- 2. trackers.html — це НАЛАШТУВАННЯ, а не ввід ---- */
 {
   const { ctx, p, errs } = await open('trackers.html');
-  ok('2. заголовок «Трекери»', /^Трекери$/.test((await p.locator('h1').first().innerText()).trim()));
-  const st = p.locator('main a[href="trackers-settings.html"]').first();
-  ok('2. є посилання «Налаштування» праворуч угорі', await st.count() === 1 && /Налаштування/.test(await st.innerText()));
-  ok('2. рядки трекерів на місці', await p.locator('#trk-day .tdy-trk__row').count() >= 3,
-    String(await p.locator('#trk-day .tdy-trk__row').count()));
-  ok('2. тут немає перемикачів увімкнення (це не налаштування)',
-    await p.locator('#trk-day [data-toggle]').count() === 0);
-
-  await tap(p.locator('#trk-day [data-trk-add]').first());          // +0.25 води
-  await tap(p.locator('#trk-day [data-trk-scale="mood"][data-val="7"]'));
-  await p.waitForTimeout(600);
-  const saved = await p.evaluate(async () => {
-    const pr = await window.Store.getProfile();
-    const k = window.TrackerCore.todayKey();
-    return { water: (pr.trackerLog.water || {})[k], mood: (pr.trackerLog.mood || {})[k] };
-  });
-  ok('2. вода й настрій записались', saved.water === 0.25 && saved.mood === 7, JSON.stringify(saved));
-
-  /* Раніше тут перевірялось, що плитка на «Сьогодні» показує «2 / N».
-     Плиток більше немає (екран перебрано), тож питання переїхало туди, де
-     воно тепер і має ставитись: чи бачить САМА сторінка трекерів свої
-     дві позначки після перезавантаження. Це та сама суть — запис не
-     загубився, — але на живому екрані, а не на прибраному. */
-  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
-  await p.waitForTimeout(1300);
-  const again = await p.evaluate(async () => {
-    const pr = await window.Store.getProfile();
-    const k = window.TrackerCore.todayKey();
-    return { water: (pr.trackerLog.water || {})[k], mood: (pr.trackerLog.mood || {})[k] };
-  });
-  ok('2. позначки живі після перезавантаження', again.water === 0.25 && again.mood === 7, JSON.stringify(again));
+  ok('2. заголовок «Трекери»', /^Трекери$/.test((await p.locator('h1').first().innerText()).trim()),
+    (await p.locator('h1').first().innerText()).trim());
+  ok('2. перемикачі увімкнення на місці', await p.locator('#tr-builtins [data-toggle]').count() >= 5,
+    String(await p.locator('#tr-builtins [data-toggle]').count()));
+  ok('2. шпильки «винести на Сьогодні» на місці', await p.locator('#tr-builtins .tr-pin').count() >= 1);
+  /*
+   * ГОЛОВНЕ ТУТ. Сторінки вводу більше немає — і її розмітки тут бути не
+   * повинно. Якщо .tdy-trk__row колись повернеться на цю адресу, значить
+   * дубль відновили, і людина знову матиме два місця для одного числа.
+   */
+  ok('2. рядків щоденного вводу тут немає', await p.locator('.tdy-trk__row').count() === 0);
+  ok('2. і кубиків теж немає', await p.locator('.twt').count() === 0);
+  ok('2. окремого посилання «Налаштування» вже не треба',
+    await p.locator('main a[href="trackers.html"]').count() === 0);
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 
-/* ---- 3. Налаштування: вимкнув — зник зі сторінки трекерів ---- */
+/* ---- 3. Стара адреса веде на нову ---- */
 {
-  const { ctx, p, errs } = await open('trackers-settings.html');
-  ok('3. заголовок про налаштування', /Налаштування/.test(await p.locator('h1').first().innerText()));
-  ok('3. є шлях назад до трекерів', await p.locator('main a[href="trackers.html"]').count() >= 1);
-  const row = p.locator('.tr-row', { hasText: 'Настрій' }).first();
-  await tap(row.locator('input[type=checkbox]').first().locator('xpath=..'));
-  await p.waitForTimeout(700);
-  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
-  await p.waitForTimeout(1300);
-  ok('3. вимкнений «Настрій» зник зі сторінки трекерів',
-    await p.locator('#trk-day .tdy-trk__row', { hasText: 'Настрій' }).count() === 0);
+  const { ctx, p, errs } = await open('trackers.html');
+  ok('3. trackers.html перенаправляє на trackers.html',
+    /trackers\.html$/.test(p.url()), p.url().split('/').pop());
+  ok('3. і це справді сторінка налаштувань',
+    await p.locator('#tr-builtins [data-toggle]').count() >= 5);
   ok('3. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 
-/* ---- 4. Порожній стан ---- */
+/* ---- 4. Вимкнув у налаштуваннях — кубик зник із «Сьогодні» ---- */
 {
-  const { ctx, p, errs } = await open('trackers-settings.html');
-  for (const name of ['Вода', 'Сон', 'Настрій', 'Recovery']) {
-    const row = p.locator('.tr-row', { hasText: name }).first();
-    if (await row.count()) { await tap(row.locator('input[type=checkbox]').first().locator('xpath=..')); await p.waitForTimeout(250); }
-  }
-  /* Креатин з коробки вимикається перемикачем у списку добавок */
-  const cr = p.locator('#tr-supplements [data-toggle="creatine"]').first();
-  if (await cr.count()) { await cr.evaluate(e => { e.checked = false; e.dispatchEvent(new Event('change', { bubbles: true })); }); await p.waitForTimeout(400); }
+  const { ctx, p, errs } = await open('trackers.html');
+  await p.evaluate(async () => {
+    const T = window.TrackerCore;
+    const tr = T.setPinned(T.ensureBuiltins({}), 'water', true);
+    try { await window.Store.saveProfile({ trackers: tr }); } catch (e) { if (!e.queued) throw e; }
+  });
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  ok('4. закріплена вода на «Сьогодні» є', await p.locator('#today [data-trk-tile="water"]').count() === 1);
+
   await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
-  ok('4. порожній стан веде в налаштування',
-    await p.locator('#trk-day a[href="trackers-settings.html"]').count() === 1);
+  const row = p.locator('.tr-row', { hasText: 'Вода' }).first();
+  await tap(row.locator('input[type=checkbox]').first().locator('xpath=..'));
+  await p.waitForTimeout(700);
+
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  ok('4. вимкнена вода зникла з «Сьогодні»', await p.locator('#today [data-trk-tile="water"]').count() === 0);
   ok('4. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 5. Заміри тіла: та сама шпилька ---- */
+{
+  const { ctx, p, errs } = await open('trackers.html');
+  const row = p.locator('.tr-row', { hasText: 'Заміри тіла' }).first();
+  ok('5. заміри стоять у списку трекерів', await row.count() === 1);
+  ok('5. рядок веде на сторінку замірів',
+    await row.locator('a[href="measure.html"]').count() === 1);
+  /* У картки немає ні цілі, ні джерела, ні швидкого вводу — розгортати
+     нічого, тож кнопки-гармошки тут бути не повинно. */
+  ok('5. рядок не розгортається — розгортати нічого',
+    await row.locator('[data-expand]').count() === 0);
+  ok('5. типово закріплені', await row.locator('.tr-pin.is-on').count() === 1);
+
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  ok('5. картка замірів на «Сьогодні» є', await p.locator('#today .mez').count() === 1);
+
+  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  await tap(p.locator('.tr-row', { hasText: 'Заміри тіла' }).first().locator('.tr-pin'));
+  await p.waitForTimeout(700);
+
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  ok('5. знята шпилька прибрала картку з головної', await p.locator('#today .mez').count() === 0);
+
+  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  await tap(p.locator('.tr-row', { hasText: 'Заміри тіла' }).first().locator('.tr-pin'));
+  await p.waitForTimeout(700);
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  ok('5. і повернула назад', await p.locator('#today .mez').count() === 1);
+  ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 

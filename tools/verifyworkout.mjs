@@ -437,7 +437,7 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await p.waitForTimeout(1300);
   ok('9. вимкнений трекер — блоку немає взагалі', await p.locator('#wk-mood').count() === 0);
 
-  await p.goto('file://' + ROOT + '/trackers-settings.html', { waitUntil: 'load' });
+  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
   await p.waitForTimeout(1200);
   const row = p.locator('.tr-row', { hasText: 'Настрій до/після' }).first();
   ok('9. трекер є у списку «Трекери»', await row.count() === 1);

@@ -28,10 +28,21 @@ const creat = (p) => p.evaluate(async () => {
   return ((pr.trackerLog || {}).creatine || {})[window.TrackerCore.todayKey()];
 });
 
-/* ---- 1. Трекери: креатин є, галочка = 5 г, поле = скільки випив ---- */
+/* ---- 1. Кубик креатину на «Сьогодні»: галочка = 5 г, поле = скільки випив ---- */
+/*
+ * ПЕРЕЇХАЛО. Раніше це була окрема сторінка вводу (#trk-day). Її більше
+ * немає: ввід — кубик на «Сьогодні», «Трекери» стали налаштуваннями.
+ * Питання ті самі, місце інше.
+ */
 {
-  const { ctx, p, errs } = await open('trackers.html');
-  const row = p.locator('#trk-day .qi-check', { hasText: 'Креатин' }).first();
+  const { ctx, p, errs } = await open('index.html');
+  await p.evaluate(async () => {
+    const T = window.TrackerCore;
+    const tr = T.setPinned(T.ensureBuiltins({}), 'creatine', true);
+    try { await window.Store.saveProfile({ trackers: tr }); } catch (e) { if (!e.queued) throw e; }
+  });
+  await p.waitForTimeout(900);
+  const row = p.locator('#today [data-trk-tile="creatine"]').first();
   ok('1. креатин моногідрат є в добавках з коробки', await row.count() === 1);
   const dose = row.locator('[data-trk-dose]');
   ok('1. є поле грамів', await dose.count() === 1);
@@ -41,17 +52,17 @@ const creat = (p) => p.evaluate(async () => {
   await p.waitForTimeout(500);
   ok('1. галочка пише типову дозу 5 г', (await creat(p)) === 5, String(await creat(p)));
 
-  await fill(p.locator('#trk-day [data-trk-dose="creatine"]'), '7,5');
+  await fill(p.locator('#today [data-trk-dose="creatine"]'), '7,5');
   await p.waitForTimeout(600);
   ok('1. вписані 7,5 г записались', (await creat(p)) === 7.5, String(await creat(p)));
-  ok('1. галочка стоїть', await p.locator('#trk-day [data-trk-mark="creatine"]').isChecked());
+  ok('1. галочка стоїть', await p.locator('#today [data-trk-mark="creatine"]').isChecked());
 
-  await fill(p.locator('#trk-day [data-trk-dose="creatine"]'), '');
+  await fill(p.locator('#today [data-trk-dose="creatine"]'), '');
   await p.waitForTimeout(600);
   ok('1. порожнє поле = не приймав', (await creat(p)) === undefined, String(await creat(p)));
-  ok('1. галочка знята', !(await p.locator('#trk-day [data-trk-mark="creatine"]').isChecked()));
+  ok('1. галочка знята', !(await p.locator('#today [data-trk-mark="creatine"]').isChecked()));
 
-  await fill(p.locator('#trk-day [data-trk-dose="creatine"]'), '900');
+  await fill(p.locator('#today [data-trk-dose="creatine"]'), '900');
   await p.waitForTimeout(600);
   ok('1. 900 г не проходить', (await creat(p)) === undefined, String(await creat(p)));
   ok('1. без JS-помилок', errs.length === 0, errs.join(' | '));
@@ -60,7 +71,7 @@ const creat = (p) => p.evaluate(async () => {
 
 /* ---- 2. Налаштування: доза змінюється, нова добавка з дозою ---- */
 {
-  const { ctx, p, errs } = await open('trackers-settings.html');
+  const { ctx, p, errs } = await open('trackers.html');
   const row = p.locator('#tr-supplements .tr-row', { hasText: 'Креатин' }).first();
   ok('2. креатин у налаштуваннях з дозою 5', (await row.locator('[data-dose-set]').inputValue()) === '5');
   await fill(row.locator('[data-dose-set]'), '3');
@@ -79,10 +90,17 @@ const creat = (p) => p.evaluate(async () => {
   });
   ok('2. власна добавка з дозою 2 г', om === 2, String(om));
 
-  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
+  /* Відмічають тепер на «Сьогодні», кубиком. Закріплюємо його явно —
+     типово нічого не закріплено, і кубика на екрані просто не було б. */
+  await p.evaluate(async () => {
+    const T = window.TrackerCore;
+    const pr = await window.Store.getProfile();
+    const tr = T.setPinned(T.ensureBuiltins(pr.trackers), 'creatine', true);
+    try { await window.Store.saveProfile({ trackers: tr }); } catch (e) { if (!e.queued) throw e; }
+  });
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
-  const row2 = p.locator('#trk-day .qi-check', { hasText: 'Креатин' }).first();
-  await tap(row2.locator('input[type=checkbox]').locator('xpath=..'));
+  await tap(p.locator('#today [data-trk-mark="creatine"]').locator('xpath=..'));
   await p.waitForTimeout(500);
   ok('2. галочка тепер пише 3 г', (await creat(p)) === 3, String(await creat(p)));
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
@@ -91,14 +109,16 @@ const creat = (p) => p.evaluate(async () => {
 
 /* ---- 3. Легасі: старий запис true лічиться як прийнято ---- */
 {
-  const { ctx, p, errs } = await open('trackers.html');
+  const { ctx, p, errs } = await open('index.html');
   await p.evaluate(async () => {
-    const k = window.TrackerCore.todayKey();
+    const T = window.TrackerCore;
+    const k = T.todayKey();
     const log = { creatine: {} }; log.creatine[k] = true;
-    await window.Store.saveProfile({ trackerLog: log });
+    const tr = T.setPinned(T.ensureBuiltins({}), 'creatine', true);
+    await window.Store.saveProfile({ trackerLog: log, trackers: tr });
   });
   await p.reload({ waitUntil: 'load' }); await p.waitForTimeout(1300);
-  ok('3. true показує галочку', await p.locator('#trk-day [data-trk-mark="creatine"]').isChecked());
+  ok('3. true показує галочку', await p.locator('#today [data-trk-mark="creatine"]').isChecked());
   await p.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' }); await p.waitForTimeout(1500);
   const txt = await p.locator('#jr-trackers').innerText().catch(() => '');
   ok('3. прогрес рахує креатин у відсотках', /креатин/i.test(txt) && /%/.test(txt), txt.replace(/\n+/g, ' | ').slice(0, 160));

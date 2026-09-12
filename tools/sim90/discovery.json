@@ -733,7 +733,7 @@
    "workout.html",
    "meals.html",
    "plan.html",
-   "trackers-settings.html"
+   "trackers.html"
   ],
   "navLinks": [
    "index.html",
@@ -3556,9 +3556,9 @@
   "domNodes": 229,
   "errors": []
  },
- "trackers-settings.html": {
+ "trackers.html": {
   "title": "Налаштування трекерів — FORGE",
-  "url": "trackers-settings.html",
+  "url": "trackers.html",
   "h1": [
    "Налаштування трекерів"
   ],
@@ -3784,7 +3784,7 @@
   ],
   "h2": [],
   "links": [
-   "trackers-settings.html"
+   "trackers.html"
   ],
   "navLinks": [
    "index.html",

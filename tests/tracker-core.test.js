@@ -87,7 +87,11 @@ describe('увімкнення й ціль', () => {
     const names = T.list(trackers).map((t) => t.id);
     assert.equal(names.join(','), T.BUILTIN_ORDER.join(',') + ',creatine');
     const act = T.active(trackers).map((t) => t.id);
-    assert.equal(act.join(','), 'water,sleep,mood,recovery,creatine');
+    /* measure — «Заміри тіла»: увімкнений з коробки, бо це не кубик із
+       щоденним числом, а представництво розділу в реєстрі (kind 'card').
+       Він тут саме для того, щоб картку на «Сьогодні» можна було прибрати
+       тією самою шпилькою, що й решту. */
+    assert.equal(act.join(','), 'water,sleep,mood,recovery,measure,creatine');
   });
 });
 
@@ -473,7 +477,10 @@ describe('tracker-core: закріплення на «Сьогодні»', () =>
     const t = T.ensureBuiltins({});
     const next = T.setPinned(t, 'water', true);
     assert.equal(next.water.pinned, true);
-    assert.equal(t.water.pinned, undefined, 'вхідний реєстр не змінився');
+    /* false, а не undefined: ensureBuiltins тепер проставляє pinned явно —
+       інакше «закріплено» довелося б вгадувати з відсутності поля, а
+       відсутність поля означає й «старий профіль», і «зняли шпильку». */
+    assert.equal(t.water.pinned, false, 'вхідний реєстр не змінився');
     assert.deepEqual(T.pinnedList(next).map((x) => x.id), ['water']);
   });
 
@@ -522,5 +529,59 @@ describe('tracker-core: закріплення на «Сьогодні»', () =>
     const t = T.ensureBuiltins({});
     assert.equal(T.setPinned(t, 'нема-такого', true), t);
     assert.deepEqual(T.pinnedList(null), []);
+  });
+});
+
+describe('tracker-core: заміри як картка-розділ', () => {
+  const t = T.ensureBuiltins({});
+
+  it('заміри зареєстровані й типово увімкнені та закріплені', () => {
+    assert.equal(t.measure.enabled, true);
+    assert.equal(t.measure.pinned, true);
+    assert.equal(T.isPinned(t, 'measure'), true);
+  });
+
+  it('це картка, а не кубик', () => {
+    assert.equal(T.isCard(t.measure), true);
+    assert.equal(T.isCard(t.water), false);
+    assert.equal(T.defFor(t.measure).kind, 'card');
+  });
+
+  it('у сітку кубиків не потрапляє НІКОЛИ', () => {
+    /* Сітка малює поле вводу за значенням дня. У замірів такого значення
+       немає — їхній журнал окремий, — тож кубик показав би порожнечу й
+       писав би в trackerLog число, якого там бути не повинно. */
+    const pinned = T.setPinned(t, 'measure', true);
+    assert.equal(T.pinnedList(pinned).map((x) => x.id).join(','), '');
+    assert.equal(T.pinnedCards(pinned).map((x) => x.id).join(','), 'measure');
+  });
+
+  it('картка прибирається й повертається тією самою шпилькою', () => {
+    const off = T.setPinned(t, 'measure', false);
+    assert.equal(T.isPinned(off, 'measure'), false);
+    assert.equal(T.pinnedCards(off).length, 0);
+    const on = T.setPinned(off, 'measure', true);
+    assert.equal(T.isPinned(on, 'measure'), true);
+  });
+
+  it('вимкнений трекер замірів не лишає картку на головній', () => {
+    const off = T.setEnabled(t, 'measure', false);
+    assert.equal(T.isPinned(off, 'measure'), false, 'вимкнене не може бути закріпленим');
+    assert.equal(T.pinnedCards(off).length, 0);
+  });
+
+  it('старий профіль отримує заміри сам, нічого не втрачаючи', () => {
+    /* Реєстр, створений до появи замірів: людина вимкнула воду й
+       закріпила сон. ensureBuiltins має додати measure й НЕ зачепити
+       чужих рішень. */
+    const oldReg = {
+      water: { id: 'water', type: 'water', name: 'Вода', enabled: false, settings: {}, goal: 2, order: 0 },
+      sleep: { id: 'sleep', type: 'sleep', name: 'Сон', enabled: true, pinned: true, settings: {}, goal: 480, order: 1 }
+    };
+    const next = T.ensureBuiltins(oldReg);
+    assert.equal(next.measure.enabled, true);
+    assert.equal(next.water.enabled, false, 'чуже рішення переписано');
+    assert.equal(next.sleep.pinned, true, 'закріплення збите');
+    assert.equal(next.sleep.goal, 480);
   });
 });

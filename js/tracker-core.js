@@ -112,14 +112,47 @@
     workoutMood: {
       type: 'workoutMood', name: 'Настрій до/після тренування', kind: 'pair',
       fields: ['before', 'after'], min: 1, max: 10, linkedToSession: true
+    },
+
+    /*
+     * ЗАМІРИ ТІЛА — трекер іншої породи, і це навмисно.
+     *
+     * Усі решта записують ОДНЕ число за день у trackerLog. Заміри — це
+     * півтора десятка обхватів, які роблять раз на два-три тижні, і живуть
+     * вони у власному журналі (profile.measureLog). Втягувати їх у
+     * trackerLog означало б завести друге джерело правди про те саме тіло,
+     * а розходження двох джерел — найдорожча вада, яку тільки можна собі
+     * зробити в щоденнику.
+     *
+     * Тому тут зареєстровано не «ще один кубик», а ПРЕДСТАВНИЦТВО розділу
+     * в реєстрі трекерів: kind 'card' не має ні значення, ні цілі, ні
+     * швидкого вводу. Єдине, чим він користується, — спільний механізм
+     * «увімкнено / винесено на Сьогодні». Саме його людина і шукає, коли
+     * хоче прибрати картку з головної: вона йде в трекери, а не в код.
+     *
+     * external каже сторінкам прямо: значення НЕ в trackerLog, не шукайте
+     * його там і не рахуйте порожнечу за нуль.
+     */
+    measure: {
+      type: 'measure', name: 'Заміри тіла', kind: 'card', unit: 'см',
+      external: 'measureLog', page: 'measure.html'
     }
   };
 
-  const BUILTIN_ORDER = ['water', 'sleep', 'mood', 'steps', 'caffeine', 'recovery', 'painFatigue', 'workoutMood'];
+  const BUILTIN_ORDER = ['water', 'sleep', 'mood', 'steps', 'caffeine', 'recovery', 'painFatigue', 'workoutMood', 'measure'];
 
   /* Приклад із теху: користувач бачить чотири увімкнені й чотири вимкнені
      трекери одразу — це той самий набір, лише перелічений явно тут. */
-  const DEFAULT_ENABLED = { water: true, sleep: true, mood: true, recovery: true };
+  const DEFAULT_ENABLED = { water: true, sleep: true, mood: true, recovery: true, measure: true };
+
+  /*
+   * Єдиний трекер, закріплений з коробки. Решта зʼявляються на «Сьогодні»
+   * лише коли людина сама їх туди винесе — і це правильно для кубика, що
+   * просить щоденного вводу. Заміри нічого не просять: картка лише
+   * показує, коли міряли востаннє. Її прибирають тим самим перемикачем,
+   * яким закріплюють решту.
+   */
+  const DEFAULT_PINNED = { measure: true };
 
   /*
    * Добавки «з коробки». Це ті самі користувацькі трекери типу supplement —
@@ -157,6 +190,7 @@
       out[id] = {
         id: id, type: def.type, name: def.name,
         enabled: Boolean(DEFAULT_ENABLED[id]),
+        pinned: Boolean(DEFAULT_PINNED[id]),
         settings: {},
         goal: def.defaultGoal != null ? def.defaultGoal : null,
         source: def.hasSource ? 'manual' : null,
@@ -334,8 +368,32 @@
     return active(trackers).filter(function (t) {
       if (t.pinned !== true) return false;
       const def = defFor(t);
-      return Boolean(def) && def.linkedToSession !== true;
+      if (!def || def.linkedToSession === true) return false;
+      /* Картки — не кубики: у них немає значення, яке можна намалювати в
+         сітці плиток. Сітка, що отримала б таку, показала б порожнє поле
+         вводу для журналу, якого не існує. */
+      return def.kind !== 'card';
     });
+  }
+
+  /** Чи це представництво розділу, а не кубик із числом. */
+  function isCard(tracker) {
+    const def = defFor(tracker);
+    return Boolean(def) && def.kind === 'card';
+  }
+
+  /** Закріплені на «Сьогодні» картки-розділи, у своєму порядку. */
+  function pinnedCards(trackers) {
+    return active(trackers).filter(function (t) {
+      return t.pinned === true && isCard(t);
+    });
+  }
+
+  /** Чи закріплено конкретний трекер (і чи він узагалі увімкнений). */
+  function isPinned(trackers, id) {
+    const src = isPlain(trackers) ? trackers : {};
+    const t = src[id];
+    return Boolean(t && t.enabled === true && t.pinned === true);
   }
 
   /**
@@ -774,6 +832,9 @@
     setEnabled: setEnabled,
     setPinned: setPinned,
     pinnedList: pinnedList,
+    pinnedCards: pinnedCards,
+    isCard: isCard,
+    isPinned: isPinned,
     isDefaultSupplement: isDefaultSupplement,
     normDose: normDose,
     isDosed: isDosed,

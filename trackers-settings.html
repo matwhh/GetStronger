@@ -3,129 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Налаштування трекерів — Get Stronger</title>
-<meta name="description" content="Увімкніть лише те, що хочете відстежувати: вода, сон, настрій, кроки, кофеїн, добавки, recovery, біль і втома, звички.">
+<title>Трекери — Get Stronger</title>
 <meta name="author" content="Matthew Grace">
 <meta name="copyright" content="© 2026 Matthew Grace. Усі права застережено.">
-<!-- Картка для месенджерів і соцмереж. og:url і canonical додає
-     js/app.js, коли в config.js заповнено siteUrl: без домену
-     абсолютне посилання все одно було б неправильним. -->
-<!-- og:image статично, а не з JS: краулери превʼю в месенджерах
-     (Telegram, Slack, WhatsApp) JavaScript не виконують.
-     Адреса АБСОЛЮТНА: відносний og:image Telegram ще розбирає, а
-     Facebook, LinkedIn, X і Slack — ні, і в них картки лишались без
-     картинки. Домен той самий, що siteUrl у js/config.js.
-     og:title тут — коротка назва розділу, а не SEO-заголовок: у картці
-     месенджера потрібне «де я опинюсь», а не ключові слова. Довгі
-     варіанти лишаються в <title> і meta description — їх читає пошук.
-     og:site_name лишається: без нього Telegram друкує в синьому рядку
-     голий домен. Тому site_name = Get Stronger, а title = назва розділу —
-     разом вони не дублюють одне одного. -->
-<meta property="og:image" content="https://get-stronger.vercel.app/og-image.png?v=3">
-<meta property="og:image:secure_url" content="https://get-stronger.vercel.app/og-image.png?v=3">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Get Stronger — знак ковадла й назва на чорному тлі">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Get Stronger">
-<meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="Налаштування трекерів">
-<meta property="og:description" content="Тренування · Харчування · Прогрес">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#0b0b0b">
-<link rel="manifest" href="manifest.webmanifest">
+<!--
+  Налаштування трекерів переїхали на trackers.html: тепер «Трекери» — це
+  одне місце, а не розвилка «ввести» / «налаштувати», де жодна половина
+  не була очевидною. Ввід значень живе на «Сьогодні».
+
+  Сторінка лишилась перенаправленням, бо на неї ведуть закладки, історія
+  браузера й старі підказки всередині застосунку.
+
+  Перенаправляють обидва механізми: <meta http-equiv="refresh"> працює
+  без JS і на file://, а рядок скрипта спрацьовує швидше й замінює запис
+  в історії, щоб «Назад» не повертало сюди по колу.
+-->
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url=trackers.html">
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" href="icons/icon-32.png" type="image/png" sizes="32x32">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<!-- iOS не читає manifest для «На екран Home»: без цього рядка ярлик
-     отримував би зменшений скріншот сторінки замість знака Get Stronger. -->
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta name="apple-mobile-web-app-title" content="Get Stronger">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="mobile-web-app-capable" content="yes">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" media="print" data-async href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"></noscript>
-<link rel="stylesheet" href="css/style.css">
-<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
-     має бути ухвалене до того, як зʼявиться бодай рядок розмітки.
-     Логіка — js/agegate.js, джерело правди — profile.birthDate. -->
-<script src="js/agegate.js"></script>
 <script src="js/nosw.js"></script>
-<script src="js/theme-boot.js"></script>
-
+<script src="js/trackers-settings-redirect.js"></script>
+<!-- Віковий сторож. Без defer і найпершим: рішення «пускати чи ні»
+     має бути ухвалене до того, як зʼявиться бодай рядок розмітки. -->
+<script src="js/agegate.js"></script>
+<link rel="stylesheet" href="css/style.css">
 <!-- build-meta:start -->
 <link rel="canonical" href="https://get-stronger.vercel.app/trackers-settings.html">
 <meta property="og:url" content="https://get-stronger.vercel.app/trackers-settings.html">
 <!-- build-meta:end -->
 </head>
 <body>
-
-<a class="skip-link" href="#main">До вмісту</a>
-
-<div class="bg-fx"></div>
-
-<header id="site-nav"></header>
-
-<main id="main" tabindex="-1">
-  <section class="section">
-    <div class="wrap">
-
-      <div class="row reveal" style="justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
-        <h1 style="margin:0"><svg class="h1-ico" viewBox="-74.67 -60.90 1169.14 1169.14" fill="currentColor" aria-hidden="true"><clipPath id="gear"><path d="M1013.72 455.28 L1013.84 591.18 L929.07 629.35 L881.41 744.70 L914.51 831.57 L818.50 927.74 L731.57 894.79 L616.31 942.66 L578.29 1027.49 L442.39 1027.61 L404.22 942.84 L288.87 895.18 L202.00 928.28 L105.83 832.27 L138.78 745.34 L90.91 630.08 L6.08 592.06 L5.96 456.16 L90.73 417.99 L138.39 302.64 L105.29 215.77 L201.30 119.60 L288.23 152.55 L403.49 104.68 L441.51 19.85 L577.41 19.73 L615.58 104.50 L730.93 152.16 L817.80 119.06 L913.97 215.07 L881.02 302.00 L928.89 417.26 Z"/></clipPath><g fill="currentColor" stroke="none"><path fill-rule="evenodd" d="M1013.72 455.28 L1013.84 591.18 L929.07 629.35 L881.41 744.70 L914.51 831.57 L818.50 927.74 L731.57 894.79 L616.31 942.66 L578.29 1027.49 L442.39 1027.61 L404.22 942.84 L288.87 895.18 L202.00 928.28 L105.83 832.27 L138.78 745.34 L90.91 630.08 L6.08 592.06 L5.96 456.16 L90.73 417.99 L138.39 302.64 L105.29 215.77 L201.30 119.60 L288.23 152.55 L403.49 104.68 L441.51 19.85 L577.41 19.73 L615.58 104.50 L730.93 152.16 L817.80 119.06 L913.97 215.07 L881.02 302.00 L928.89 417.26 Z M483.20 154.61 A367.44 367.44 0 1 1 304.48 216.46 A103.75 103.75 0 0 1 483.20 154.61 Z"/><circle cx="407.80" cy="225.87" r="80.75"/></g><g clip-path="url(#gear)" fill="none" stroke="currentColor" stroke-linejoin="round"><g stroke-linecap="butt"><path stroke-width="147.0" d="M484.90 358.59 L589.16 550.72"/><path stroke-width="73.0" d="M617.25 515.60 L617.25 714.00 L792.00 714.00"/><path stroke-width="80.0" d="M552.85 514.01 L541.14 556.06"/><path stroke-width="80.0" d="M558.40 548.30 L294.40 900.30"/></g><g stroke-linecap="round"><path stroke-width="73.0" d="M551.75 519.68 L617.25 552.42"/><circle cx="792.00" cy="714.00" r="36.5" fill="currentColor" stroke="none"/><path stroke-width="60.0" d="M190.50 464.00 L329.09 466.31 L443.98 352.71 A127.5 127.5 0 0 1 531.20 315.90 L681.45 313.04 L753.90 443.20"/></g></g></svg>Налаштування трекерів</h1>
-        <a class="small" href="trackers.html">← До трекерів</a>
-      </div>
-      <p class="lead reveal" data-d="1">
-        Get Stronger не змушує вести все підряд. Увімкніть те, що для вас важливо, —
-        воно зʼявиться на сторінці «Трекери» й у «Прогресі». Решта лишається
-        вимкненою і не займає екран.
-      </p>
-
-      <!-- Убудовані трекери: список увімкнення + налаштування + історія -->
-      <div id="tr-builtins" class="mt-3 reveal" data-d="1"></div>
-
-      <!-- Добавки: власні позиції, статус прийнято/ні -->
-      <div id="tr-supplements" class="mt-3 reveal" data-d="2"></div>
-
-      <!-- Звички: власні позиції, щоденне виконання + streak -->
-      <div id="tr-habits" class="mt-3 reveal" data-d="2"></div>
-
-      <div class="mt-3" data-longform="Що Get Stronger робить із цими даними">
-        <h2 class="reveal">Навіщо це</h2>
-        <div class="card reveal">
-          <p class="small">
-            Трекери — самоспостереження, не діагностика. Get Stronger не робить
-            медичних висновків із болю, настрою, сну, втоми чи recovery:
-            тільки показує факти, які ви самі записали.
-          </p>
-        </div>
-      </div>
-
-    </div>
-  </section>
+<main id="main" class="section">
+  <div class="wrap wrap--narrow">
+    <p class="lead">Налаштування трекерів тепер на сторінці «Трекери».
+      <a href="trackers.html">Перейти →</a></p>
+  </div>
 </main>
-
-<footer id="site-footer"></footer>
-
-<script defer src="js/config.js"></script>
-<script defer src="js/errors.js"></script>
-<script defer src="js/age-core.js"></script>
-<script defer src="js/onboarding-core.js"></script>
-<script defer src="js/app.js"></script>
-<!-- Контекстна довідка: один механізм на весь сайт, вміст залежить від
-     сторінки. Вміст іде ПЕРЕД механізмом — інакше help.js на швидкому
-     кеші не знайшов би розділу й сховав би кнопку назавжди. -->
-<script defer src="js/help-content.js"></script>
-<script defer src="js/help-search-core.js"></script>
-<script defer src="js/help.js"></script>
-<script defer src="js/store.js"></script>
-<script defer src="js/elo-core.js"></script>
-<script defer src="js/elo-api.js"></script>
-<script defer src="js/elo-hooks.js"></script>
-<script defer src="js/tracker-core.js"></script>
-<script defer src="js/trackers-settings.js"></script>
 </body>
 </html>

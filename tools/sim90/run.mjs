@@ -369,7 +369,7 @@ A.calculator = async (p, u, rng, S) => {
 A.cardio = async (p, u, rng, S) => { await go(p, 'cardio.html', 900); await typeIn(p, '#c-rest', maybeGarbage(u, rng, String(Math.floor(rnd(rng, 50, 75)))), u, rng); const b = p.locator('button', { hasText: 'Зберегти мої дані' }).first(); if (await b.count()) await tap(p, b); await p.waitForTimeout(400); S.note('ok'); };
 
 A.trackerSettings = async (p, u, rng, S) => {
-  await go(p, 'trackers-settings.html', 1000);
+  await go(p, 'trackers.html', 1000);
   const what = pick(rng, ['toggle', 'habit', 'supplement', 'dose', 'delete']);
   if (what === 'toggle') { const t = p.locator('#tr-builtins [data-toggle]'); const c = await t.count(); if (c) await tap(p, t.nth(Math.floor(rng() * c)).locator('xpath=..')); }
   if (what === 'habit') { const nm = chance(rng, u.err) ? pick(rng, ['', ' ', 'x'.repeat(200), '<b>звичка</b>', '💤 сон до 23', '"quote"', 'Лягати до 23:00']) : pick(rng, ['Лягати до 23:00', 'Розтяжка', '10к кроків', 'Без цукру', 'Читати']); await p.fill('#add-habit', nm); await tap(p, '[data-add-custom="habit"]'); if (chance(rng, u.dup)) await tap(p, '[data-add-custom="habit"]').catch(() => {}); S.note('habit:' + nm.slice(0, 20)); }

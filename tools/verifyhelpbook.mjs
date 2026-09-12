@@ -49,9 +49,9 @@ async function page(ctx, url) {
   const ctx = await adultContext(b, { viewport: { width: 1100, height: 900 } });
   const PAGES = ['index.html', 'workout.html', 'plan.html', 'journal.html',
                  'meals.html', 'measure.html', 'calculator.html', 'account.html',
-                 'trackers-settings.html', 'periodization.html', 'nutrition.html',
+                 'trackers.html', 'periodization.html', 'nutrition.html',
                  'supplements.html', 'research.html', 'rating.html', 'awards.html',
-                 'programs.html', 'cardio.html', 'boxing.html', 'trackers.html'];
+                 'programs.html', 'cardio.html', 'boxing.html'];
   const missing = [];
   const covered = [];
   let glyph = null;

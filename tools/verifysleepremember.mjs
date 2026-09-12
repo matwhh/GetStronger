@@ -47,24 +47,34 @@ const fill = async (el, v) => {
   await el.evaluate(e => e.dispatchEvent(new Event('change', { bubbles: true })));
 };
 
-/* ---- 1. Сторінка «Трекери»: поля замість кнопок ---- */
+/* ---- 1. Кубик сну на «Сьогодні»: поля замість кнопок ---- */
+/*
+ * ПЕРЕЇХАЛО. Ці перевірки жили на окремій сторінці вводу (#trk-day). Її
+ * більше немає: ввід — це кубик на «Сьогодні», а «Трекери» стали суто
+ * налаштуваннями. Питання лишились ті самі, місце інше.
+ */
 {
-  const { ctx, p, errs } = await open('trackers.html');
-  ok('1. на «Сьогодні» трекерів більше немає', true);
-  ok('1. кнопок пресетів сну більше немає', await p.locator('#trk-day [data-trk-duration]').count() === 0);
-  const h = p.locator('#trk-day [data-trk-durh]');
-  const m = p.locator('#trk-day [data-trk-durm]');
+  const { ctx, p, errs } = await open('index.html');
+  await p.evaluate(async () => {
+    const T = window.TrackerCore;
+    const tr = T.setPinned(T.ensureBuiltins({}), 'sleep', true);
+    try { await window.Store.saveProfile({ trackers: tr }); } catch (e) { if (!e.queued) throw e; }
+  });
+  await p.waitForTimeout(900);
+  ok('1. кубиків із пресетами сну немає', await p.locator('#today [data-trk-duration]').count() === 0);
+  const h = p.locator('#today [data-trk-durh]');
+  const m = p.locator('#today [data-trk-durm]');
   ok('1. є поле годин і поле хвилин', await h.count() === 1 && await m.count() === 1);
 
   await fill(h, '6');
   await p.waitForTimeout(250);
-  await fill(p.locator('#trk-day [data-trk-durm]'), '47');
+  await fill(p.locator('#today [data-trk-durm]'), '47');
   await p.waitForTimeout(400);
   ok('1. 6 год 47 хв = 407 хв', await sleepVal(p) === 407, String(await sleepVal(p)));
 
-  await fill(p.locator('#trk-day [data-trk-durh]'), '');
+  await fill(p.locator('#today [data-trk-durh]'), '');
   await p.waitForTimeout(200);
-  await fill(p.locator('#trk-day [data-trk-durm]'), '');
+  await fill(p.locator('#today [data-trk-durm]'), '');
   await p.waitForTimeout(400);
   ok('1. порожні поля стирають запис, а не пишуть нуль',
     (await sleepVal(p)) == null, String(await sleepVal(p)));
@@ -72,9 +82,9 @@ const fill = async (el, v) => {
   await ctx.close();
 }
 
-/* ---- 2. Сторінка трекерів ---- */
+/* ---- 2. Налаштування: історія й правка того самого числа ---- */
 {
-  const { ctx, p, errs } = await open('trackers-settings.html');
+  const { ctx, p, errs } = await open('trackers.html');
   const exp = p.locator('[data-expand="sleep"]').first();
   if (await exp.count()) { await exp.click(); await p.waitForTimeout(300); }
   ok('2. кнопок пресетів сну немає', await p.locator('[data-duration]').count() === 0);

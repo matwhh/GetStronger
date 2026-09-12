@@ -88,7 +88,13 @@
   /** Перечитати трекери з профілю. Биті типи не мають валити екран. */
   function readTrackers() {
     const p = state.profile || {};
-    state.trackers = (p.trackers && typeof p.trackers === 'object') ? p.trackers : {};
+    const raw = (p.trackers && typeof p.trackers === 'object') ? p.trackers : {};
+    /* ensureBuiltins ПРИ ЧИТАННІ, а не міграцією: новий убудований трекер
+       зʼявляється сам при наступному відкритті сторінки й нічиїх
+       налаштувань не переписує (див. коментар у tracker-core.js).
+       Без цього рядка «Заміри тіла» не існували б для тих, чий профіль
+       створено раніше, — тобто для всіх наявних людей. */
+    state.trackers = (TC && TC.ensureBuiltins) ? TC.ensureBuiltins(raw) : raw;
     state.trackerLog = (p.trackerLog && typeof p.trackerLog === 'object') ? p.trackerLog : {};
   }
 
@@ -450,6 +456,10 @@
   function measuresHtml() {
     const MC = window.MeasureCore;
     if (!MC || !MC.homeSummary) return '';
+    /* Картку прибирають і повертають там само, де решту кубиків, —
+       у трекерах. Головна не має власного вимикача: два місця, що
+       керують одним, розходяться на першій же правці. */
+    if (TC && TC.isPinned && !TC.isPinned(state.trackers, 'measure')) return '';
     const sum = MC.homeSummary(state.profile && state.profile.measureLog, state.todayKey);
 
     /* Жодного заміру — не мовчимо й не соромимо: один рядок, що це таке
@@ -539,8 +549,11 @@
      * підказка про них — просто ще один рядок, який вона не просила:
      * тому за відсутності увімкнених трекерів тут немає нічого.
      */
-    if (!TC.active(state.trackers).length) return '';
-    return '<a class="twt-hint" href="trackers-settings.html">' +
+    /* Заміри в цю сітку не потрапляють (вони kind 'card'), тож
+       наявність самих лише замірів не робить підказку про кубики
+       доречною: рахуємо ті трекери, які справді можна закріпити. */
+    if (!TC.active(state.trackers).filter(function (t) { return !TC.isCard(t); }).length) return '';
+    return '<a class="twt-hint" href="trackers.html">' +
       '<span>Винести трекер на цей екран</span>' +
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
       'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -628,9 +641,24 @@
         /* Сміття в полі не пишемо й не перемальовуємо: перемальовка під
            фокусом забрала б у людини поле разом із тим, що вона набирає. */
         if (v === false) { pendingRender = true; return; }
+        const did = dose.dataset.trkDose;
         saveTrackerLog(v === null
-          ? TC.removeEntry(state.trackerLog, dose.dataset.trkDose, state.todayKey)
-          : TC.logValue(state.trackers, state.trackerLog, dose.dataset.trkDose, v, state.todayKey), true);
+          ? TC.removeEntry(state.trackerLog, did, state.todayKey)
+          : TC.logValue(state.trackers, state.trackerLog, did, v, state.todayKey), true);
+        /*
+         * ГАЛОЧКА — ПОХІДНА ВІД ЧИСЛА, і мусить це показувати одразу.
+         *
+         * Перемальовку тут ми свідомо відкладаємо (quiet), щоб не забрати
+         * поле з-під пальця. Але тоді галочка «прийнято» лишалась такою,
+         * якою була до вводу: вписав дозу — вона порожня, стер — вона
+         * стоїть. Кубик брехав рівно про те, заради чого існує, і ловилось
+         * це не на око, а лише перевіркою.
+         *
+         * Тому синхронізуємо один прапорець напряму, без рендера: DOM тут
+         * не джерело правди, а її відображення.
+         */
+        const box = host.querySelector('[data-trk-mark="' + did + '"]');
+        if (box) box.checked = v !== null;
         return;
       }
 

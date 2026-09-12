@@ -19,6 +19,10 @@
   const state = {
     trackers: {},
     log: {},
+    /* Журнал замірів лежить окремо від trackerLog (див. tracker-core.js,
+       kind 'card'): тримаємо його тут лише щоб показати «востаннє
+       міряли», а не щоб редагувати. */
+    measureLog: {},
     openId: null,
     wired: false
   };
@@ -60,6 +64,14 @@
   /* ------------------------------------------------------------------ */
 
   function metaLine(t, def) {
+    /*
+     * КАРТКА-РОЗДІЛ. Її дані лежать не в trackerLog, а у власному журналі
+     * (def.external), тож «сьогоднішнє значення» тут не існує в принципі.
+     * Показуємо те, що людина справді хоче знати, вирішуючи, лишати її на
+     * головній чи ні: коли востаннє щось записано.
+     */
+    if (def.kind === 'card') return cardMeta(def);
+
     const todayRaw = (state.log[t.id] || {})[todayKey()];
     // duration/value можуть зберігатися як {value, source, date} (джерело —
     // ручний ввід або, у майбутньому, Apple Health) — entryValue() читає
@@ -252,9 +264,45 @@
     '</button>';
   }
 
+  /* Підпис під назвою картки-розділу: коли там востаннє щось записали. */
+  function cardMeta(def) {
+    if (def.external === 'measureLog' && window.MeasureCore) {
+      const sum = window.MeasureCore.homeSummary(state.measureLog, todayKey(), { limit: 1 });
+      if (!sum) return 'ще без записів';
+      if (!Number.isFinite(sum.daysAgo)) return sum.total + ' ' + plural(sum.total, 'запис', 'записи', 'записів');
+      if (sum.daysAgo === 0) return 'востаннє: сьогодні';
+      if (sum.daysAgo === 1) return 'востаннє: учора';
+      return 'востаннє: ' + sum.daysAgo + ' ' + plural(sum.daysAgo, 'день', 'дні', 'днів') + ' тому';
+    }
+    return '';
+  }
+
   function builtinRow(t) {
     const def = T.defFor(t);
     if (!def) return '';
+
+    /*
+     * Рядок картки-розділу НЕ розгортається: розгортати нічого — ні цілі,
+     * ні джерела, ні швидкого вводу в неї немає. Замість кнопки-гармошки
+     * тут посилання в сам розділ, бо саме туди людина й хоче потрапити,
+     * тицьнувши в назву.
+     */
+    if (def.kind === 'card') {
+      return '<li class="tr-row' + (t.enabled ? '' : ' tr-row--off') + '">' +
+        '<div class="tr-row__top">' +
+          '<label class="switch" aria-label="Увімкнути: ' + esc(t.name) + '">' +
+            '<input type="checkbox" data-toggle="' + esc(t.id) + '"' + (t.enabled ? ' checked' : '') + '>' +
+            '<span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>' +
+          '</label>' +
+          '<a class="tr-row__btn" href="' + esc(def.page || '#') + '">' +
+            '<span class="tr-row__name">' + esc(t.name) + '</span>' +
+            '<span class="tr-row__meta small muted">' + esc(metaLine(t, def)) + '</span>' +
+          '</a>' +
+          pinBtn(t) +
+        '</div>' +
+      '</li>';
+    }
+
     const open = state.openId === t.id;
 
     return '<li class="tr-row' + (t.enabled ? '' : ' tr-row--off') + '">' +
@@ -292,7 +340,7 @@
           '<span class="small muted">' + rows.filter(function (t) { return t.enabled; }).length + ' із ' + rows.length + ' увімкнено</span>' +
         '</div>' +
         '<ul class="tr-list mt-2">' + rows.map(builtinRow).join('') + '</ul>' +
-        '<p class="small muted mb-0" style="margin-top:12px">Увімкнені трекери зʼявляються на сторінці «Трекери» й у «Прогресі». Вимкнені лишаються тут — історія нікуди не зникає.</p>' +
+        '<p class="small muted mb-0" style="margin-top:12px">Шпилька виносить трекер на «Сьогодні» — заповнювати будете там. Вимкнені лишаються в цьому списку: історія нікуди не зникає.</p>' +
       '</div>';
   }
 
@@ -620,6 +668,7 @@
     try { p = await Store.getProfile() || {}; } catch (_) {}
     state.trackers = T.ensureBuiltins(p.trackers);
     state.log = (p.trackerLog && typeof p.trackerLog === 'object') ? p.trackerLog : {};
+    state.measureLog = (p.measureLog && typeof p.measureLog === 'object') ? p.measureLog : {};
 
     // Реєстр міг бути порожнім/старим — записуємо догодований варіант
     // одразу, щоб наступне читання (напр. на «Трекерах») не вигадувало
@@ -635,6 +684,7 @@
       if (!profile) return;
       if (profile.trackers) { state.trackers = T.ensureBuiltins(profile.trackers); renderBuiltins(); renderSupplements(); renderHabits(); }
       if (profile.trackerLog) { state.log = profile.trackerLog; renderAll(); }
+      if (profile.measureLog) { state.measureLog = profile.measureLog; renderBuiltins(); }
     });
   }
 

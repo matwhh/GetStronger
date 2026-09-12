@@ -1269,40 +1269,10 @@ a.card > .btn {
 
 /* Плитки-галочки для добавок і звичок на «Трекерах»: великий квадрат
    під палець, уся плитка клікабельна, стан — акцентом теми. */
-.qi-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.qi-check {
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 12px 6px 8px;
-  border: 1px solid var(--line-2);
-  border-radius: 12px;
-  background: var(--field, var(--surface-2));
-  box-shadow: var(--neo-inset, none);
-  transition: border-color var(--t-fast), background var(--t-fast);
-}
-.qi-check.is-on { border-color: var(--acc-line, var(--acc)); }
-.qi-check__main {
-  flex: 1; min-width: 0;
-  display: flex; align-items: center; gap: 12px;
-  min-height: 44px; cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.qi-check__main input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.qi-check__box {
-  flex: 0 0 auto; width: 28px; height: 28px;
-  border-radius: 8px;
-  border: 2px solid var(--line-2);
-  background: var(--surface);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--on-acc, #fff);
-  transition: background var(--t-fast), border-color var(--t-fast);
-}
-.qi-check__box svg { width: 16px; height: 16px; opacity: 0; transform: scale(0.6); transition: opacity var(--t-fast), transform var(--t-fast); }
-.qi-check__main input:checked + .qi-check__box { background: var(--acc); border-color: transparent; box-shadow: var(--acc-raised-xs, none); }
-.qi-check__main input:checked + .qi-check__box svg { opacity: 1; transform: scale(1); }
-.qi-check__main input:focus-visible + .qi-check__box { outline: 2px solid var(--acc-ink); outline-offset: 2px; }
-.qi-check__name { font-weight: 600; line-height: 1.3; }
-.qi-check.is-on .qi-check__name { color: var(--text); }
-.qi-check .qi-dose .input--sm { width: 72px; }
+/* .qi-check* прибрано разом зі сторінкою щоденного вводу трекерів:
+   ввід переїхав на «Сьогодні» кубиками (.twt), і два набори правил на
+   одне й те саме розходяться на першій же правці. .qi-scale, .qi-bar і
+   .qi-dose лишились — ними користуються кубики. */
 .tdy-set { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .tdy-set__n {
   flex: 0 0 auto; width: 22px;
@@ -1659,17 +1629,8 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
    стоїть у шапці на два сантиметри вище, і другий раз воно з'їдало
    найкраще місце екрана. Замість нього розділ називає знак будинку в
    самому заголовку — правило для нього лежить у h1 > .h1-ico. */
-.dash__h1 {
-  margin: 0;
-  font-size: clamp(1.7rem, 5.5vw, 2.6rem);
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-}
-
-/* Головна дія дня. Одна картка-посилання, візуально найважча на сторінці:
-   на телефоні саме вона має ловити великий палець першою. */
-.dash-main__sub { font-size: 0.95rem; color: var(--text-2); }
-.dash-main__go { margin-top: 6px; font-size: 0.95rem; font-weight: 600; color: var(--acc-ink); }
+/* .dash__h1 і .dash-main__* прибрано: «Сьогодні» перебрано на .tdy-*,
+   і ці правила пережили свій екран на кілька релізів. */
 
 /* Смужка виконання всередині головної картки — той самий візуальний
    словник, що .qi-bar у трекерах, лише без числа поруч. */
@@ -1851,15 +1812,12 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .qi-scale__btn.is-on { background: var(--acc); color: var(--on-acc, #fff); border-color: transparent; box-shadow: var(--acc-raised-xs, none); }
 
 /* Добавки / звички: чек-лист власних позицій */
-.tr-custom-list { list-style: none; margin: 0; padding: 0; }
-.tr-custom-row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
-.tr-custom-row:last-child { border-bottom: 0; }
-.tr-custom-row__name { font-weight: 600; }
+/* .tr-custom-* прибрано: власні добавки й звички малюються тим самим
+   .tr-row, що й убудовані трекери. Другий набір правил на той самий
+   рядок списку розходився з першим при кожній правці вигляду. */
 
 /* «Сьогодні»: один компактний рядок на активний трекер */
-.tdy-trk__row { padding: 10px 0; border-bottom: 1px solid var(--line); }
-.tdy-trk__row:last-of-type { border-bottom: 0; }
-.tdy-trk__name { font-weight: 600; }
+/* .tdy-trk__* прибрано разом зі сторінкою вводу трекерів. */
 
 /* ---------- Результати / KPI ---------- */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
@@ -2622,9 +2580,8 @@ body.has-rest-timer { --rest-h: 86px; }
   border-radius: 50%;
   background: var(--g3);
 }
-.ev--strong i               { background: var(--acc-ink); }
-.ev--moderate i:nth-child(1),
-.ev--moderate i:nth-child(2) { background: var(--acc-ink); }
+/* .ev--strong і .ev--moderate прибрано: сторінка досліджень позначає
+   силу доказів самим числом крапок (.ev i), а не додатковим класом. */
 
 /* Джерело: PMID окремою колонкою, щоб посилання не тонуло в тексті */
 .src {
@@ -5024,13 +4981,8 @@ button.heatmap__cell::after {
 /* Підсумок тижня: три числа в ряд. На вузькому — так само в ряд,
    бо чисел рівно три й вони короткі. */
 .wk { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.wk__cell {
-  padding: 12px 10px;
-  border: 1px solid var(--line); border-radius: var(--r);
-  background: var(--surface); text-align: center;
-}
-.wk__val { display: block; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.03em; }
-.wk__lbl { display: block; margin-top: 4px; font-size: 0.72rem; color: var(--muted); line-height: 1.25; }
+/* .wk__* прибрано: підсумок тижня трьома числами малює тепер .hbt і
+   смуга тижня на «Сьогодні». Сітка .wk лишається — вона ще вживана. */
 
 @media (max-width: 380px) {
   .rating-hero__val { font-size: 2.1rem; }
@@ -5575,45 +5527,12 @@ button.heatmap__cell::after {
 }
 
 /* ==========================================================================
-   КАРТКА-ВХІД У ТРЕНУВАННЯ + ПОВЕРНЕННЯ НАЗАД
-   ==========================================================================
-   Нових кольорів, радіусів і тіней тут немає: .tdy-entry — це та сама
-   .card, лише як посилання, а всередині — наявні .vol і типографіка.
+   ПОВЕРНЕННЯ НАЗАД
    ========================================================================== */
 
-/* Уся картка клікабельна: у залі ціль дотику має бути картка, а не
-   кнопка в її кутку. */
-.tdy-entry {
-  display: block;
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color var(--t-fast), transform var(--t-fast);
-}
-.tdy-entry:hover, .tdy-entry:focus-visible { border-color: var(--acc-line); color: var(--text); }
-.tdy-entry:active { transform: translateY(1px); }
-
-.tdy-entry__head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-}
-.tdy-entry__title {
-  display: block;
-  font-family: var(--font-display); font-size: 1.6rem; line-height: 1.1;
-  letter-spacing: -0.01em;
-}
-.tdy-entry__meta { display: block; margin-top: 4px; font-size: 0.87rem; color: var(--muted); }
-.tdy-entry__focus { display: block; margin-top: 10px; font-size: 0.87rem; color: var(--text-2); }
-.tdy-entry__status { display: block; margin-top: 12px; font-size: 0.95rem; font-weight: 600; }
-.tdy-entry__cta { display: block; margin-top: 12px; font-weight: 700; color: var(--acc-ink); }
-
-/* Стрілка — не кнопка, а вказівник напрямку: колір як у підпису, щоб не
-   змагатися за увагу з самою назвою тренування. */
-.tdy-entry__go { flex: none; color: var(--muted); }
-.tdy-entry__go svg { width: 22px; height: 22px; display: block; }
-.tdy-entry:hover .tdy-entry__go { color: var(--acc-ink); }
-
-/* Виконане тренування читається рамкою, а не окремим кольором тексту:
-   правило «один відтінок плюс нейтральні» діє й тут. */
-.tdy-entry.is-done { border-color: var(--acc-line); }
+/* .tdy-entry* прибрано разом із карткою-входом: на «Сьогодні» її замінив
+   віджет дня (.tdy-card), і картка-вхід лишалась у стилях, хоча її ніхто
+   не малював уже кілька релізів. */
 
 /* Повернення на «Сьогодні» — окремим рядком над заголовком сторінки.
    Висота 44px: це головний шлях назад, і на телефоні в нього мають

@@ -205,7 +205,9 @@ async function page(earned) {
   const over = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   ok('27. на телефоні сторінка не їде вбік', over === false);
   const chip = await p.locator('.awd-chip').first().boundingBox();
-  ok('28. чипи натискабельні пальцем', chip && chip.height >= 26,
+  /* 32px — нижня межа цілі для пальця в цьому проєкті (її ж стереже
+     verifyresponsive). У 27px чип читався як текст, а не як кнопка. */
+  ok('28. чипи натискабельні пальцем', chip && chip.height >= 32,
     chip ? Math.round(chip.height) + 'px' : '—');
   /* Крапка на чипі мусить бути кольору СВОЄЇ сходинки: інакше ряд із
      восьми слів доводиться читати цілком, щоб знайти потрібне. */

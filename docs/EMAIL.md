@@ -55,7 +55,12 @@ Brevo підміняє кожне посилання своїм і рахує п
 
 ### 3. Тексти — українською
 
-Шаблони нижче. Де: **Supabase → Authentication → Emails → Templates**,
+**ЗРОБЛЕНО 12.09.2026.** Усі чотири шаблони й ім'я відправника вже стоять
+у дашборді. Тексти нижче лишаються джерелом: якщо правити листи — правити
+тут, а потім переносити в Supabase, інакше наступного разу ніхто не
+згадає, який варіант чинний.
+
+Де вони лежать: **Supabase → Authentication → Emails → Templates**,
 кожен у своїй вкладці.
 
 Змінні Supabase, які тут використані:
@@ -64,6 +69,7 @@ Brevo підміняє кожне посилання своїм і рахує п
 | --- | --- |
 | `{{ .ConfirmationURL }}` | готове посилання з токеном і redirect_to |
 | `{{ .Email }}` | адреса, на яку надіслано лист |
+| `{{ .NewEmail }}` | нова адреса — лише в листі про зміну пошти |
 | `{{ .SiteURL }}` | адреса сайту з налаштувань проєкту |
 
 Розмітка навмисно проста: таблиць немає, картинок немає, шрифти
@@ -179,7 +185,7 @@ Brevo підміняє кожне посилання своїм і рахує п
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;line-height:1.55;color:#111;max-width:520px;margin:0 auto;padding:24px">
   <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin:0 0 20px">Get Stronger</p>
 
-  <p style="margin:0 0 16px">Ви міняєте пошту акаунта на <b>{{ .Email }}</b>. Підтвердіть, що вона ваша:</p>
+  <p style="margin:0 0 16px">Ви міняєте пошту акаунта на <b>{{ .NewEmail }}</b>. Підтвердіть, що вона ваша:</p>
 
   <p style="margin:0 0 28px">
     <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:14px 26px;border-radius:10px;font-weight:600">Підтвердити нову пошту</a>

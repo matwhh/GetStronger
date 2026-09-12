@@ -309,7 +309,7 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 
 | Рівень | Чим | Скільки | Коли |
 |---|---|---|---|
-| Юніт | `node --test`, без залежностей | **48 файлів, 998 тестів** | `npm test`, ~6 с |
+| Юніт | `node --test`, без залежностей | **49 файлів, 1053 тести** | `npm test`, ~6 с |
 | Гігієна | `tools/ci-hygiene.mjs` | 16 перевірок по ~300 файлах | `node tools/ci-hygiene.mjs`, ~1 с |
 | Браузер | Playwright на справжньому Chromium | **54 файли `verify*.mjs`** | `bash tools/ci-browser.sh core` |
 

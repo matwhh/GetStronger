@@ -378,7 +378,23 @@ grant execute on function public.elo_try_clean_day(uid uuid, szn text, p_day dat
 --    міграції нарахування падало б із «function does not exist».
 drop function if exists public.elo_action_delta(kind text, payload jsonb, cfg jsonb, planned_days integer, grace boolean);
 
--- 7. Новий конфіг у бойову базу. Саме update, а не insert: рядок один і
+-- 7. Межі CHECK у таблицях. Стеля сезону продубльована не лише в конфігу:
+--    season_state.elo і elo_events.elo_after мають CHECK (<= 2500) ще з
+--    db/cron-log-and-guards.sql. Підняти seasonMax до 3000 і забути про них
+--    означало б 23514 всередині elo_submit — у людини під час звичайної дії,
+--    у той момент, коли рейтинг уперше перевалить за старі 2500 (DB-005).
+--    Тому межі піднімаються САМЕ ТУТ, до оновлення конфігу нижче: розширити
+--    обмеження можна в будь-якому порядку, а от конфіг поперед обмеження —
+--    це вже бомба з часовим механізмом. Стежить перевірка 10 гігієни, яка
+--    звіряє db/elo-config.json із CHECK у знімку db/live-schema.sql.
+alter table public.season_state drop constraint if exists season_state_elo_check;
+alter table public.season_state
+  add constraint season_state_elo_check check (elo >= 0 and elo <= 3000);
+alter table public.elo_events drop constraint if exists elo_events_elo_after_range;
+alter table public.elo_events
+  add constraint elo_events_elo_after_range check (elo_after >= 0 and elo_after <= 3000);
+
+-- 8. Новий конфіг у бойову базу. Саме update, а не insert: рядок один і
 --    він уже є, а `on conflict do nothing` тихо не зробив би нічого
 --    (INV-003 — рівно та пастка, на якій конфіг уже одного разу завис).
 update public.elo_config set data = '{"version":3,"seasonMax":3000,"levelSize":240,"levelCount":10,"levelPace":[2.1,1.9,1.75,1.6,1.45,1.3,1.2,1.1,1.0,0.9],"elitePace":0.8,"eliteFloor":2400,"weeklyBudget":200,"weights":{"training":0.3,"nutrition":0.3,"sleep":0.2,"recovery":0.1,"activity":0.1},"categoryShare":0.857,"cleanDayBonus":3,"cleanWeekBonus":9,"cleanThreshold":0.9,"nutritionSplit":{"kcal":0.55,"protein":0.45},"tolerance":{"training":[[0.99,1.0],[0.97,0.82],[0.9,0.45],[0.8,0.45],[0.65,0.3],[0.5,0.12],[0,0.05]],"kcalBand":[[0.02,1.0],[0.05,0.82],[0.1,0.5],[0.2,0.45],[0.35,0.15],[1,0.05]],"protein":[[0.99,1.0],[0.95,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]],"sleep":[[0.99,1.0],[0.97,0.82],[0.9,0.55],[0.8,0.5],[0.65,0.22],[0,0.05]],"activity":[[0.99,1.0],[0.97,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]]},"recoveryFillShare":0.6,"recoveryGoodValue":7,"missedWorkoutPenalty":-8,"openMealPenalty":-3,"dayLossFloor":-15,"dayGainCap":45,"graceWeeksPerSeason":2,"graceDays":7,"submitWindowDays":2,"minUsersForPercentile":8,"leaderboardTops":[0.1,0.05,0.01],"leaderboardRanks":[1000,100,10,3,1],"floors":{"sleepGoalMin":240,"sleepMax":960,"stepsGoalMin":3000,"stepsMax":100000,"workoutTotalMin":3}}'::jsonb where id = 1;

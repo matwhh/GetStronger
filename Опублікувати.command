@@ -114,17 +114,44 @@ fi
 
 git add -A || fail "git add не спрацював"
 
-MSG="${1:-оновлення $(date '+%d.%m.%Y %H:%M')}"
-if git diff --cached --quiet 2>/dev/null && git rev-parse HEAD >/dev/null 2>&1; then
-  # Змін у файлах немає — але кнопку натиснули, отже хочуть перезбірку.
-  # Порожній коміт дає Vercel привід зібрати сайт наново: без нового пуша
-  # він просто нічого не робить.
-  say "${Y}· змін у файлах немає — роблю порожній коміт для перезбірки${N}"
-  git -c commit.gpgsign=false commit -q --allow-empty -m "перезбірка $(date '+%d.%m.%Y %H:%M')" \
-    || fail "git commit не спрацював"
+# Скільки комітів іще не на GitHub. Якщо origin/main ще немає (найперший
+# пуш) — рахуємо всі.
+# RANGE рахуємо ОКРЕМО від pending(): pending викликається через $(...),
+# тобто в підоболонці, і присвоєння змінної звідти назовні не доїжджає —
+# RANGE лишався порожнім, а список комітів показувався не той.
+if git rev-parse --verify --quiet "origin/$BRANCH" >/dev/null 2>&1; then
+  RANGE="origin/$BRANCH..HEAD"
 else
+  RANGE="HEAD"
+fi
+pending() { git rev-list --count "$RANGE" 2>/dev/null || echo 0; }
+
+# 1 коміт, 2 коміти, 5 комітів — інакше кнопка говорить як робот.
+komit() {
+  case "$1" in
+    1)         printf 'коміт' ;;
+    2|3|4)     printf 'коміти' ;;
+    *)         printf 'комітів' ;;
+  esac
+}
+
+MSG="${1:-оновлення $(date '+%d.%m.%Y %H:%M')}"
+if ! git diff --cached --quiet 2>/dev/null; then
   say "· зберігаю зміни: $MSG"
   git -c commit.gpgsign=false commit -q -m "$MSG" || fail "git commit не спрацював"
+elif [ "$(pending)" -gt 0 ]; then
+  #
+  # ЧОМУ ЦЕ ТУТ. Раніше скрипт дивився лише на робочу теку: немає правок —
+  # ліпить порожній коміт «перезбірка …». Але коміти часто вже зроблені й
+  # просто не відправлені, і тоді порожній не потрібен — він лише засмічує
+  # історію записами ні про що. Тепер питання ставиться правильно: не «чи
+  # є незбережені правки», а «чи є що відправляти».
+  #
+  say "· нових правок немає — відправляю те, що вже готове"
+else
+  say "${Y}· публікувати нічого — роблю порожній коміт, щоб Vercel перезібрав${N}"
+  git -c commit.gpgsign=false commit -q --allow-empty -m "перезбірка $(date '+%d.%m.%Y %H:%M')" \
+    || fail "git commit не спрацював"
 fi
 
 # --- 4. Відправка ---------------------------------------------------------
@@ -142,6 +169,15 @@ if [ -n "$LAST_MAIL" ]; then
   say "${Y}· переписую підпис старого коміта ($LAST_MAIL)${N}"
   git -c commit.gpgsign=false commit -q --amend --reset-author --no-edit || fail "не вдалося переписати коміт"
   FORCE="--force-with-lease"
+fi
+
+# Показати, що саме поїде: інакше кнопка просить довіри наосліп.
+CNT="$(pending)"
+if [ "$CNT" -gt 0 ]; then
+  printf "\n${B}Поїде %s %s:${N}\n" "$CNT" "$(komit "$CNT")"
+  git log --format='  · %s' "$RANGE" | head -n 8
+  [ "$CNT" -gt 8 ] && printf "  … і ще %s\n" "$((CNT - 8))"
+  printf "\n"
 fi
 
 say "· відправляю на GitHub…"
@@ -175,7 +211,7 @@ if ! git push -u $FORCE origin "$BRANCH" 2>/tmp/forge-push.log; then
   printf "\nНатисни Enter, щоб закрити вікно."; read -r _; exit 1
 fi
 
-printf "\n${G}✓ Готово.${N} Усе на GitHub — Vercel уже збирає сайт.\n"
+printf "\n${G}✓ Готово.${N} %s %s на GitHub — Vercel уже збирає сайт.\n" "$CNT" "$(komit "$CNT")"
 printf "  Репозиторій: %s\n" "${REPO_URL%.git}"
 printf "  Сайт:        https://get-stronger.vercel.app\n"
 printf "\nЗбірка триває ~30 секунд. Можеш закривати це вікно.\n"

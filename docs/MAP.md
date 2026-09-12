@@ -4,8 +4,11 @@
 це міняти?» відповідь займала хвилину, а не годину читання коду.
 
 Правила й заборони — в [`../AGENTS.md`](../AGENTS.md).
+Як увійти в проєкт з нуля — в [`CONTINUE.md`](CONTINUE.md).
 Покрокові рецепти — в [`RECIPES.md`](RECIPES.md).
 Чому рішення саме такі — в [`ENGINEERING.md`](ENGINEERING.md).
+Як зроблене скло — в [`GLASS.md`](GLASS.md).
+Останній аудит — у [`audit/2026-09-12/AUDIT.md`](audit/2026-09-12/AUDIT.md).
 
 ---
 
@@ -25,18 +28,32 @@ window.Store           читає/пише профіль: localStorage або S
 `js/app.js` у рантаймі. Тому нова сторінка — це порожній каркас плюс
 свій скрипт, а не копія чужої розмітки.
 
-**Спільний префікс скриптів** є на всіх 20 «повних» сторінках, у цьому
+**Спільний префікс скриптів** є на 18 «повних» сторінках, у цьому
 порядку:
 
 ```
-agegate · nosw · theme-boot · config · errors · age-core ·
-onboarding-core · app · help-content · help · store ·
+agegate · nosw · theme-boot · config · date-core · errors ·
+age-core · onboarding-core · app · help · store ·
 elo-core · elo-api · elo-hooks
 ```
 
-Далі кожна сторінка додає своє. `js/liquid-glass.js` і
-`js/tabbar-glass.js` у розмітці **не підключені** — їх лінивo вантажить
-`app.js`, коли нижня панель справді видима.
+Далі кожна сторінка додає своє.
+
+Три файли в розмітці **не підключені** — їх вантажать ліниво:
+
+| Файл | Хто вантажить | Коли |
+|---|---|---|
+| `js/help-content.js` | `js/help.js` | при першому відкритті довідки |
+| `js/help-search-core.js` | `js/help.js` | там само, одразу після вмісту |
+| `js/liquid-glass.js` · `js/tabbar-glass.js` | `js/app.js` | коли нижня панель справді видима |
+
+Довідка важить 1058 рядків тексту, і до вересня 2026 вони їхали на
+кожну сторінку разом із рештою. Тепер — тільки тим, хто натиснув книжку.
+
+**`js/date-core.js` стоїть у префіксі перед усім, що рахує дні.** Це
+єдина реалізація `keyOf`, `todayKey`, `dateOf`, `mondayOf` і
+`daysBetween` у проєкті; решта модулів мають у себе лише делегат в один
+рядок. Сторожить `tools/ci-hygiene.mjs`, перевірки 14 і 15.
 
 ---
 
@@ -44,30 +61,37 @@ elo-core · elo-api · elo-hooks
 
 | Сторінка | Для користувача | Свої скрипти (після спільного префікса) |
 |---|---|---|
-| `index.html` | «Сьогодні»: огляд дня | history-core, exercises, reps-core, programs-data, foods, recipes-data, day-core, nutrition-core, tracker-core, workout-core, season-core, **today** |
-| `workout.html` | Екран тренування в залі | history-core, exercises, reps-core, programs-data, tracker-core, workout-core, **workout** |
+| `index.html` | «Сьогодні»: огляд дня | history-core, exercises, reps-core, programs-data, nutrition-core, tracker-core, tracker-tile-core, workout-core, progression-core, measure-core, **today** |
+| `workout.html` | Екран тренування в залі | history-core, exercises, reps-core, programs-data, tracker-core, workout-core, weight-limits-core, finish-core, **workout** |
 | `programs.html` | Вибір і редагування плану | history-core, exercises, reps-core, programs-data, workout-core, **programs** |
 | `plan.html` | Мій план + прогноз ваг | …, onerm-core, periodization-core, programs, projection, **plan-ui** |
 | `periodization.html` | Цикл на 8–16 тижнів | exercises, reps-core, programs-data, onerm-core, periodization-core, **periodization** |
-| `journal.html` | Прогрес: вага, сила, тренування | daycal-core, history-core, season-core, progress-core, adherence-core, onerm-core, exercise-core, tracker-core, **journal** |
+| `journal.html` | Прогрес: вага, сила, тренування | daycal-core, history-core, progression-core, season-core, progress-core, adherence-core, onerm-core, exercise-core, tracker-core, **journal** |
 | `nutrition.html` | План харчування: норма КБЖВ | donut-core, nutrition-core, **nutrition** |
 | `meals.html` | Раціон: продукти, рецепти, день | history-core, foods, recipes-data, donut-core, day-core, nutrition-core, **meals** |
 | `measure.html` | Заміри тіла | history-core, measure-core, **measure** |
-| `trackers.html` | Трекери дня: ввід значень | tracker-core, **trackers-day** |
-| `trackers-settings.html` | Що саме відстежувати | tracker-core, **trackers-settings** |
+| `trackers.html` | «Трекери»: **тільки налаштування** — що відстежувати й з якою ціллю | measure-core, tracker-core, **trackers-settings** |
+| `trackers-settings.html` | Стара адреса | nosw, **trackers-settings-redirect**, agegate |
 | `rating.html` | Сезонний рейтинг ELO | daycal-core, **season**, award-core |
-| `awards.html` | Вітрина нагород: отримані й силуети решти; місце під тамагочі | award-core, **awards** |
+| `awards.html` | Окрема вітрина нагород: фільтри за сезоном і рідкістю; місце під тамагочі | award-core, **awards** |
 | `calculator.html` | Калькулятор 1ПМ | onerm-core, **onerm** |
 | `cardio.html` | Пульсові зони, LISS vs HIIT | **cardio** |
 | `boxing.html` | Тренування на мішку | boxing-data, **boxing** |
 | `supplements.html` | Добавки: що працює | supplements, **supplements-view** |
-| `account.html` | Акаунт, профіль, експорт | nutrition-core, bmi-core, measure-core, programs-data, **account** |
-| `welcome.html` | Онбординг: вік і дані тіла | nutrition-core, bmi-core, password-core, legal-versions, **welcome** |
+| `account.html` | Акаунт, профіль, експорт/імпорт | nutrition-core, bmi-core, measure-core, programs-data, import-core, **account** |
+| `welcome.html` | Онбординг: вік і дані тіла | nutrition-core, bmi-core, password-core, auth-msg-core, legal-versions, **welcome** |
 | `admin.html` | Заявки й ручний ELO | admin, **admin-elo** |
 | `research.html` | Статті з PubMed | — (тільки спільний префікс) |
 | `legal.html` | Правові документи | nosw, theme-boot, **legal-back** |
 | `offline.html` | Немає звʼязку | **offline-retry** |
 | `today.html` | Стара адреса | nosw, **today-redirect**, agegate |
+
+**Трекери живуть на «Сьогодні», а не на своїй сторінці.** До вересня
+2026 їх було дві: `trackers.html` (вводити значення) і
+`trackers-settings.html` (вибирати, що відстежувати). Ввід переїхав на
+головну — саме там людина й відкриває застосунок, — і сторінки злились
+в одну, з налаштуваннями. Стара адреса лишилась редиректом, бо вона є в
+закладках і в історії браузера.
 
 ---
 
@@ -76,35 +100,55 @@ elo-core · elo-api · elo-hooks
 Без DOM, без `location`, без слухачів. Під юніт-тестами. Саме тому їх
 можна перенести в мобільний застосунок без переписування.
 
+32 файли, ~10 000 рядків.
+
 | Файл | Ряд. | Що робить | Глобал і ключові функції | Залежить від |
 |---|---:|---|---|---|
+| `programs-data.js` | 893 | каталог програм, розминка, доступ за статтю | `PROGRAMS`, `WARMUP`, `COOLDOWN`, `programAllowedFor` | — |
+| `tracker-core.js` | 869 | реєстр трекерів, записи, стріки, закріплення на «Сьогодні» | `TrackerCore`: `ensureBuiltins`, `logValue`, `entriesFor`, `streak`, `goalAdherence`, `setPinned`, `pinnedList`, `pinnedCards`, `isCard` | `DateCore` |
+| `import-core.js` | 851 | валідація імпортованого профілю: що взяти, що відкинути мовчки, що показати | `ImportCore`: `ALLOWED_KEYS`, `validate` | — |
 | `nutrition-core.js` | 585 | BMR/TDEE/ціль/макроси/прогноз маси | `NutritionCalc`: `targetFor`, `bmrMifflin`, `bmrKatch`, `macros`, `massForecast`, `LIMITS` | — |
-| `workout-core.js` | 488 | тренувальний день: план, галочки, підходи | `WorkoutCore`: `resolvePlan`, `readDay`/`writeDay`, `plannedSets`, `dayStats`, `weekStartKey` | `PROGRAMS`, `MUSCLES`, `RepsCore` |
+| `workout-core.js` | 485 | тренувальний день: план, галочки, підходи | `WorkoutCore`: `resolvePlan`, `readDay`/`writeDay`, `plannedSets`, `dayStats`, `weekStartKey` | `PROGRAMS`, `MUSCLES`, `RepsCore`, `DateCore` |
 | `periodization-core.js` | 470 | лінійний цикл, % від 1ПМ, дельоуд | `Periodization`: `buildCycle`, `pctForWeek`, `currentWeek`, `applyDeload`, `applyRaise` | `OneRM` |
-| `progress-core.js` | 427 | зведена аналітика над журналами | `ProgressCore`: `bodyStats`, `forecast`, `liftStats`, `trainingStats`, `prList` | `HistoryCore` |
+| `progress-core.js` | 428 | зведена аналітика над журналами | `ProgressCore`: `bodyStats`, `forecast`, `liftStats`, `trainingStats`, `prList` | `HistoryCore`, `DateCore` |
+| `tracker-tile-core.js` | 383 | кубик трекера на «Сьогодні»: свій ввід під кожен вид | `TrackerTile`: `html`, `grid`, `isWide` | `TrackerCore` |
 | `elo-core.js` | 374 | сезони, рівні, бюджети, дельти дій | `EloCore`: `seasonOf`, `seasonRange`, `levelFor`, `weeklyBudget`, `actionDelta`, `applyDayCaps` | — |
+| `award-core.js` | 352 | двобічна картка нагороди, 8 щаблів рідкості, вітрина з силуетами | `Award`: `html`, `grid`, `showcase`, `CODES`, `ORDER`, `TIERS`, `tierOf`, `gearIcon` | — |
 | `exercise-core.js` | 350 | прогрес однієї вправи зі знімків сесій | `ExerciseCore`: `series`, `stats`, `trend`, `prFromSessions`, `METRICS` | `OneRM` |
-| `history-core.js` | 321 | журнали: ваги, сесії, закриті дні | `HistoryCore`: `todayKey`, `appendWeight`, `weightSeries`, `upsertSession`, `closeDay` | — |
-| `tracker-core.js` | 808 | модульні трекери: реєстр, записи, стріки, закріплення на «Сьогодні» | `TrackerCore`: `ensureBuiltins`, `logValue`, `entriesFor`, `streak`, `goalAdherence`, `setPinned`, `pinnedList`, `mergeDay` | — |
-| `tracker-tile-core.js` | 339 | кубик трекера на «Сьогодні»: свій ввід під кожен вид | `TrackerTile`: `html`, `grid`, `isWide` | `TrackerCore` |
-| `award-core.js` | 290 | двобічна картка нагороди: лице за групою, вітрина з силуетами | `Award`: `html`, `grid`, `showcase`, `CODES`, `ORDER`, `gearIcon` | — |
+| `progression-core.js` | 335 | «пора підняти вагу»: коли підказати й на скільки | `ProgressionCore`: `due`, `hitTop`, `weekComplete`, `ages`, `snoozeUntil`, `STEP_LEGS`, `STEP_OTHER` | `DateCore` |
+| `history-core.js` | 320 | журнали: ваги, сесії, закриті дні | `HistoryCore`: `appendWeight`, `weightSeries`, `upsertSession`, `closeDay` | `DateCore` |
+| `boxing-data.js` | 267 | одна готова боксерська сесія | `BOXING`: `session`, `sessionText` | — |
 | `onerm-core.js` | 259 | математика 1ПМ, набір млинців | `OneRM`: `oneRepMax`, `estimates`, `percentOfMax`, `toPlates`, `PLATE_STEP` | — |
 | `password-core.js` | 256 | надійність пароля за правилами Supabase | `PasswordCore`: `check`, `MIN_LEN`, `MAX_LEN` | — |
-| `adherence-core.js` | 237 | % дисципліни за період | `AdherenceCore`: `trainingAdherence`, `nutritionAdherence`, `PERIODS` | `EloCore` |
-| `daycal-core.js` | 199 | спільна сітка календаря днів | `DayCal`: `html`, `keyOf`, `dateOf`, `mondayOf` | — (навмисно) |
+| `measure-core.js` | 236 | заміри тіла: поля, валідація, серії, зведення на «Сьогодні» | `MeasureCore`: `FIELDS`, `validValue`, `buildEntry`, `series`, `stats`, `homeSummary`, `STALE_DAYS` | `DateCore` |
+| `adherence-core.js` | 236 | % дисципліни за період | `AdherenceCore`: `trainingAdherence`, `nutritionAdherence`, `PERIODS` | `EloCore`, `DateCore` |
+| `daycal-core.js` | 198 | спільна сітка календаря днів | `DayCal`: `html`, `keyOf`, `dateOf`, `mondayOf` | `DateCore` |
+| `help-search-core.js` | 186 | пошук по довідці: нормалізація, індекс, ранжування | `HelpSearchCore`: `norm`, `buildIndex`, `search` | — |
 | `onboarding-core.js` | 176 | крок онбордингу з полів профілю | `OnboardingCore`: `stepFor`, `pageFor`, `isAllowed`, `LIMITS` | `AgeCore` |
 | `bmi-core.js` | 168 | BMI, категорія, попередження | `BmiCore`: `bmi`, `category`, `shouldWarn`, `showWarnModal` | `App.lockScroll` ⚠️ |
 | `donut-core.js` | 163 | SVG-кільце складу з анімацією | `Donut`: `html`, `animate` | — |
-| `season-core.js` | 152 | вікно періоду статистики | `SeasonCore`: `current`, `at`, `contains`, `clipSeries` | — |
+| `season-core.js` | 151 | вікно періоду статистики | `SeasonCore`: `current`, `at`, `contains`, `clipSeries` | `DateCore` |
 | `reps-core.js` | 151 | діапазон повторень зі стажу й групи | `RepsCore`: `repRangeFor`, `tierFor`, `applyPlan`, `RANGES` | `MUSCLES` |
-| `measure-core.js` | 150 | заміри: поля, валідація, серії | `MeasureCore`: `FIELDS`, `validValue`, `buildEntry`, `series` | — |
+| `date-core.js` | 149 | ⭐ **єдине джерело правди про дати** | `DateCore`: `keyOf`, `todayKey`, `dateOf`, `mondayOf`, `addDays`, `shiftKey`, `daysBetween`, `lastKeys` | — |
+| `auth-msg-core.js` | 148 | людські тексти помилок входу й реєстрації | `AuthMsg`: `emailProblem`, `loginPassProblem`, `signInProblem` | — |
 | `day-core.js` | 136 | арифметика КБЖВ дня, рецепти | `DayCore`: `dayTotals`, `recipeTotals`, `perContainer`, `MEAL_ITEM_CAP` | `Foods`, `BASE_RECIPES` |
-| `age-core.js` | 113 | вік і вердикт повноліття | `AgeCore`: `ageOn`, `isAdult`, `gateState` | — |
-| `programs-data.js` | 805 | каталог програм, розминка, доступ за статтю | `PROGRAMS`, `WARMUP`, `COOLDOWN`, `programAllowedFor` | — |
-| `boxing-data.js` | 267 | одна готова боксерська сесія | `BOXING`: `session`, `sessionText` | — |
 | `recipes-data.js` | 121 | вбудовані рецепти, лише читання | `BASE_RECIPES` | — |
+| `finish-core.js` | 121 | завершення тренування: чи питати про біль, яка цитата | `FinishCore`: `shouldAsk`, `painToday`, `pickQuote`, `QUOTES` | — |
+| `age-core.js` | 113 | вік і вердикт повноліття | `AgeCore`: `ageOn`, `isAdult`, `gateState` | — |
+| `weight-limits-core.js` | 110 | стеля робочої ваги за групою мʼязів | `WeightLimits`: `maxFor`, `check`, `message`, `BY_MUSCLE` | — |
 
 ⚠️ `bmi-core.js` — єдине ядро, що торкається DOM. Це борг, а не зразок.
+
+### Дві шкали часу, і їх не можна плутати
+
+Це найчастіше джерело помилок у проєкті, тож написано прямо в
+`js/date-core.js`, а тут — коротко:
+
+- **Ключ дня — МІСЦЕВИЙ.** `keyOf(new Date())` дає `2026-09-12` за
+  годинником людини. Усі журнали профілю ключовані саме так.
+- **Різниця днів — В UTC.** `daysBetween('2026-03-28','2026-03-29')` = 1,
+  хоча через перехід на літній час місцева доба тривала 23 години.
+  Рахувати різницю місцевими датами означає отримати 0 або 2 двічі на рік.
 
 ---
 
@@ -112,27 +156,26 @@ elo-core · elo-api · elo-hooks
 
 | Файл | Ряд. | Що робить | Де працює |
 |---|---:|---|---|
-| `store.js` | 2507 | сховище профілю: локально або Supabase | усюди |
-| `app.js` | 2148 | каркас: шапка, нав, таб-бар, тости, хелпери | усюди |
-| `journal.js` | 2804 | графіки, календарі, історія прогресу | journal |
-| `programs.js` | 2374 | вибір схеми, редактор плану, обʼєм | programs, plan |
+| `journal.js` | 2932 | графіки, календарі, історія прогресу | journal |
+| `programs.js` | 2582 | вибір схеми, редактор плану, обʼєм | programs, plan |
+| `store.js` | 2514 | сховище профілю: локально або Supabase | усюди |
+| `app.js` | 2263 | каркас: шапка, нав, таб-бар, тости, хелпери | усюди |
 | `meals.js` | 1880 | продукти, рецепти, план дня | meals |
-| `account.js` | 1711 | вхід/реєстрація, профіль, експорт | account |
-| `welcome.js` | 1498 | онбординг, заявка на акаунт | welcome |
-| `workout.js` | 1006 | підходи, ваги, таймер відпочинку | workout |
+| `welcome.js` | 1769 | онбординг, заявка на акаунт | welcome |
+| `workout.js` | 1144 | підходи, ваги, таймер відпочинку, завершення | workout |
+| `help-content.js` | 1058 | ТЕКСТ контекстної довідки (ліниво) | усюди |
+| `account.js` | 971 | вхід/реєстрація, профіль, експорт/імпорт | account |
+| `today.js` | 967 | складання головного екрана | index |
 | `nutrition.js` | 860 | норма калорій і макросів | nutrition |
-| `trackers-settings.js` | 604 | налаштування трекерів і цілей | trackers-settings |
-| `help-content.js` | 602 | ТЕКСТ контекстної довідки | усюди |
+| `help.js` | 749 | механізм довідки (кнопка-книжка) + ліниве довантаження | усюди |
+| `trackers-settings.js` | 708 | налаштування трекерів і цілей | trackers |
 | `periodization.js` | 519 | налаштування циклу й таблиця | periodization |
 | `foods.js` | 502 | довідник продуктів | index, meals |
-| `season.js` | 470 | показ ELO, рівня, лідерів, календар сезону | rating |
-| `help.js` | 468 | механізм довідки (кнопка-книжка) | усюди |
+| `season.js` | 497 | показ ELO, рівня, лідерів, календар сезону | rating |
+| `liquid-glass.js` | 492 | оптика «рідкого скла» (вендор, MIT) | таб-бар |
 | `projection.js` | 441 | прогноз робочих ваг на 6/12/24 міс. | plan |
-| `today.js` | 429 | складання головного екрана | index |
-| `measure.js` | 424 | ввід і історія замірів | measure |
-| `trackers-day.js` | 407 | шкали 1..10 за сьогодні | trackers |
-| `liquid-glass.js` | 401 | оптика «рідкого скла» (вендор, MIT) | таб-бар |
-| `tabbar-glass.js` | 400 | жест і геометрія нижньої панелі | таб-бар |
+| `tabbar-glass.js` | 429 | жест і геометрія нижньої панелі | таб-бар |
+| `measure.js` | 425 | ввід і історія замірів | measure |
 | `elo-api.js` | 380 | клієнт RPC сезонного ELO | усюди |
 | `agegate.js` | 367 | сторож віку й онбордингу перед сторінкою | усюди |
 | `exercises.js` | 328 | довідник груп мʼязів і вправ | workout, plan |
@@ -144,12 +187,13 @@ elo-core · elo-api · elo-hooks
 | `admin-elo.js` | 243 | ручне виставлення ELO | admin |
 | `boxing.js` | 219 | рендер сесії + копіювання | boxing |
 | `admin.js` | 191 | заявки й рішення адміна | admin |
+| `awards.js` | 187 | вітрина нагород, фільтри за сезоном і рідкістю | awards |
 | `supplements.js` | 180 | дані про добавки | supplements |
-| `config.js` | 47 | ключі Supabase, Sentry, домен | усюди |
+| `config.js` | 52 | ключі Supabase, Sentry, домен | усюди |
 | `theme-boot.js` | 43 | оформлення до розмітки, без миготіння | усюди |
 | `plan-ui.js` | 43 | порожній/заповнений стан плану | plan |
 | `nosw.js` | 34 | аварійне зняття SW (`?nosw=1`) | усюди |
-| `legal-back.js` · `legal-versions.js` · `offline-retry.js` · `today-redirect.js` | 8–15 | дрібні помічники | відповідні сторінки |
+| `trackers-settings-redirect.js` · `legal-back.js` · `legal-versions.js` · `offline-retry.js` · `today-redirect.js` | 8–16 | дрібні помічники | відповідні сторінки |
 
 ### Що конкретно робить `app.js`
 
@@ -197,6 +241,19 @@ elo-core · elo-api · elo-hooks
 структури, не при додаванні поля. `migrate()` веде профіль по одному
 кроку; версія 5 зайнята назавжди (прибране «Обране»).
 
+### Ключі профілю, що ростуть журналами
+
+| Ключ у профілі | Хто пише | Хто читає |
+|---|---|---|
+| `weightLog` | account, welcome, journal | `HistoryCore`, `ProgressCore` |
+| `sessions` | workout | `ExerciseCore`, `ProgressCore`, ELO |
+| `days` | workout, today | `WorkoutCore`, теплокарта, ELO |
+| `measureLog` | measure | `MeasureCore` (зокрема `homeSummary` на «Сьогодні») |
+| `trackers` · `trackerLog` | trackers, today | `TrackerCore` |
+| `mealsLog` | meals | `DayCore`, `AdherenceCore` |
+
+Усі вони ключовані **місцевим** днем — див. кінець розділу 3.
+
 ### Supabase
 
 | Назва | Звідки | Що робить |
@@ -234,19 +291,28 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 
 ## 6. Перевірки
 
-`tests/` — 34 файли юніт-тестів (708 тестів) на ядра й `store.js`.
-`tools/verify*.mjs` — 50 файлів: 46 браузерних перевірок на Playwright
-(46 файлів) і 4 SQL-набори.
+Три рівні, від найдешевшого до найдорожчого.
+
+| Рівень | Чим | Скільки | Коли |
+|---|---|---|---|
+| Юніт | `node --test`, без залежностей | **47 файлів, 960 тестів** | `npm test`, ~6 с |
+| Гігієна | `tools/ci-hygiene.mjs` | 16 перевірок по ~300 файлах | `node tools/ci-hygiene.mjs`, ~1 с |
+| Браузер | Playwright на справжньому Chromium | **52 файли `verify*.mjs`** | `bash tools/ci-browser.sh core` |
+
+Ще 5 файлів `verify*.mjs` — не браузерні: `verify-sql-suites.mjs`,
+`verify-schema-perms.mjs`, `verify-elo-week.mjs`,
+`verify-backup-roundtrip.mjs`, `verifyauthz.mjs`.
 
 Набори задає `tools/ci-browser.sh`:
 
-- **core** (кожен пуш, ~6 хв): `verifyhistory`, `verifyworkout`,
-  `verifydata`, `verifyroundtrip`, `verifyloop`, `verify7`,
-  `verifyaccountmix`, `verifylink`, `verifysw`, `verifyhelp`.
-- **full** (раз на добу): core + 31, зокрема `verifya11y`,
+- **core** (кожен пуш, ~7 хв), 12 наборів: `verifyhistory`,
+  `verifyworkout`, `verifydata`, `verifyroundtrip`, `verifyloop`,
+  `verify7`, `verifyaccountmix`, `verifylink`, `verifysw`, `verifyhelp`,
+  `verifymeasurewidget`, `verifyawards`.
+- **full** (раз на добу): core + 32, зокрема `verifya11y`,
   `verifythemes`, `verifyresponsive`, `verifyperf`, `verifychaos`,
-  `verifyhardening`, `verifytabbar`, `verifydonut`, `verifydaycal`,
-  `verifylevelicon`.
+  `verifychaos2`, `verifyhardening`, `verifytabbar`, `verifydonut`,
+  `verifydaycal`, `verifylevelicon`, `verifyprogression`.
 - **Тільки вручну, з дозволу власника — ходять у бойовий бекенд:**
   `verifyregister`, `verifyregfail`, `verifyregresume`, `verifyrecover`,
   `verifyproduction`, `verifyauthz`.
@@ -256,9 +322,34 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 розкладом; `pulse` — щоденний `curl` у Supabase, щоб free-план не
 заснув.
 
+### Що стереже гігієна
+
+1–11 — чужі ключі й токени, заборонені файли, розбір JWT Supabase,
+оболонка service worker проти `index.html`, inline-скрипти (їх забороняє
+CSP), дрейф барʼєрів між `db/*.sql` і бойовою схемою.
+Додані у вересні 2026:
+
+| № | Перевірка | Чому зʼявилась |
+|---:|---|---|
+| 12 | біт виконання `*.command` / `*.sh` **в індексі git** | кнопка публікації приїхала з хмари як 0644 і не запускалась |
+| 13 | адреса репозиторію написана однаково всюди | у скрипті стояло `Get-Stronger`, а репозиторій `GetStronger` |
+| 14 | лише `js/date-core.js` має власне тіло `keyOf`/`dateOf`/`mondayOf`/… | `mondayOf` жив у 4 файлах із 4 різними реалізаціями |
+| 15 | сторінка, що вантажить модуль із датами, вантажить і `date-core` | інакше делегат падає на `undefined` |
+| 16 | у CSS немає правил під класи, яких ніде немає | мертві правила лишались після кожного переписаного екрана |
+
 Інші скрипти в `tools/`: `adult.mjs` (садить пройдений профіль),
 `pw.mjs` (шляхи до Chromium), `ci-offline.sh` (вішає Supabase і Sentry
 на 127.0.0.1), `ci-hygiene.mjs`, `build-meta.js`, `og.mjs`, `shot.mjs`,
-`simelo.mjs` (баланс ELO, має лишатись 6/6), `restore-backup.mjs`,
-«Опублікувати.command» у корені теки релізу — кнопка публікації:
-тести → гігієна → коміт → пуш.
+`simelo.mjs` (баланс ELO, має лишатись 6/6), `restore-backup.mjs`.
+
+Кнопки в корені репозиторію — подвійний клік у Finder:
+
+| Кнопка | Що робить |
+|---|---|
+| `Опублікувати.command` | тести → гігієна → коміт → пуш. Червоні тести = нічого не відправлено |
+| `Токен GitHub.command` | записує новий токен у звʼязку ключів і одразу публікує |
+| `Прибрати-сміття.command` | чистить тимчасові файли перед релізом |
+| `Увімкнути-CI.command` | вмикає прогін GitHub Actions на цьому клоні |
+
+Біт виконання на них стереже перевірка 12 гігієни — і саме **в індексі
+git**, бо файл, що приїхав з хмари як 0644, у Finder не запускається.

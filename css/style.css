@@ -4965,6 +4965,106 @@ button.heatmap__cell::after {
 }
 .rating-hero__meta { display: inline-flex; align-items: center; gap: 8px; }
 
+/* ==========================================================================
+   ШКАЛА ДО НАСТУПНОГО РІВНЯ
+   ==========================================================================
+   Був просто відсоток: смуга на всю ширину картки, під нею окремим
+   рядком числа. Смуга відповідала на «яка частка рівня пройдена» й
+   мовчала про все інше — який це рівень, який наступний, скільки до
+   нього; зв'язати її з числами очима доводилось самому.
+
+   Тепер у шкали два кінці, і обидва — жетони рівнів: лівий
+   повнокольоровий (це ти зараз), правий приглушений (це ще не ти). Дві
+   опорні точки роблять зі смуги відрізок ШЛЯХУ, а не число у відсотках.
+
+   Жетони не отримують власних розмірів: обидва кінці носять .lvl-circle,
+   ту саму оправу, що в шапці й на картці. Інакше тут зʼявився б третій
+   розмір кульки, який розійшовся б із рештою на першій же правці.
+   ========================================================================== */
+.lvlbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+/* Наступний рівень приглушений, бо він ще не твій. Не сірий і не
+   безбарвний — саме тьмяніший: жетон має лишитись упізнаваним, інакше
+   правий кінець читається як заглушка. */
+.lvlbar__end--next,
+.lvlbar__end--top { opacity: 0.38; }
+/* Десятий рівень — далі жетонів немає, тільки стеля сезону. Позначка
+   словом чесніша за ще одну кульку: одинадцятого рівня не існує. */
+.lvlbar__end--top {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+/* Доріжка — та сама геометрія, що в .vol__bar: 12px і той самий жолоб.
+   Два різні написання однієї смуги розходяться на першій правці. */
+.lvlbar__track {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(var(--tint-rgb), 0.08);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.lvlbar__fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--acc-bar);
+  /* Заливка РОСТЕ від нуля до --to, а не зʼявляється готовою. Це єдина
+     анімація, яка тут щось пояснює: видно, що шкала має початок, і що
+     пройдено саме стільки. forwards обовʼязково — без нього смуга
+     схлопнулась би назад у нуль на останньому кадрі. */
+  animation: lvlbar-grow 0.9s var(--e-out) forwards;
+}
+@keyframes lvlbar-grow { from { width: 0; } to { width: var(--to, 0%); } }
+
+/* ПІДВИЩЕННЯ РІВНЯ — одноразова подія, а не постійний декор.
+   Клас вішається лише тоді, коли рівень виріс від попереднього
+   відкриття сторінки (js/season.js, levelJump). При наступному заході
+   його вже немає: свято, що триває вічно, перестає бути святом. */
+.lvlbar.is-levelup .lvl-circle:first-child { animation: lvl-pop 1.1s var(--e-out); }
+/* Блиск іде по ДОРІЖЦІ, а не по заливці: доріжка вже має overflow:hidden
+   і не змінює ширину під анімацією, тож промінь не смикається разом із
+   нею. Двічі — і досить: третій прохід перетворює подію на миготіння. */
+.lvlbar.is-levelup .lvlbar__track::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(var(--tint-rgb), 0.5) 50%, transparent 100%);
+  animation: lvlbar-sweep 1.4s var(--e-out) 0.5s 2;
+  pointer-events: none;
+}
+@keyframes lvl-pop {
+  0%   { transform: scale(1); }
+  28%  { transform: scale(1.16); }
+  58%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+@keyframes lvlbar-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* Рух тут — прикраса, а не сенс: без нього шкала показує те саме число.
+   Тому при вимкненій анімації вона просто стоїть на місці готовою. */
+@media (prefers-reduced-motion: reduce) {
+  .lvlbar__fill { animation: none; width: var(--to, 0%); }
+  .lvlbar.is-levelup .lvl-circle:first-child { animation: none; }
+  .lvlbar.is-levelup .lvlbar__track::after { display: none; }
+}
+
+@media (max-width: 380px) {
+  .lvlbar { gap: 9px; }
+}
+
 /* Розклад по сигналах: назва — смуга — «скільки з максимуму».
    Сітка, а не таблиця: три елементи в рядок, середній тягнеться. */
 .sig {

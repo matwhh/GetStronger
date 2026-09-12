@@ -27,14 +27,14 @@ set -u
 
 cd "$(dirname "$0")/.."
 
-CORE="verifyhistory verifyworkout verifydata verifyroundtrip verifyloop verify7 verifyaccountmix verifylink verifysw verifyhelp verifymeasurewidget verifyawards"
+CORE="verifyhistory verifyworkout verifydata verifyroundtrip verifyloop verify7 verifyaccountmix verifylink verifysw verifyhelp verifymeasurewidget verifyawards verifydaylogs"
 FULL="verifya11y verifyflows verifyimport verifythemes verifyonboard \
       verifyonboarding verifyagegate verifyresponsive verifyperf verifyreps \
       verifypersetweight verifyplanfields verifysexplans verifysleepremember \
       verifytrackerspage verifywomen3 verifycreatine verifyexercise \
       verifychaos verifychaos2 verifyfix90 verifyhardening verifyerrors \
       verifyheatmap verifyseg verifytilt verifydaycal verifytabbar verifydonut \
-      verifylevelicon verifyaward verifyprogression"
+      verifylevelicon verifyaward verifyprogression verifylvlbar"
 
 case "${1:-core}" in
   core) LIST="$CORE" ;;

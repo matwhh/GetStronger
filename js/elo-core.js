@@ -354,7 +354,42 @@
 
   function clampElo(elo, cfg) { return clamp(Math.round(elo), 0, cfg.seasonMax); }
 
+  /**
+   * Скільки ELO набрано з дня fromKey включно.
+   *
+   * НАВІЩО. Панель рейтингу показувала приріст ЗА СЬОГОДНІ, і це число
+   * майже завжди нуль або трійка: більшість днів дає одну-дві дії, а в
+   * день відпочинку — жодної. Людина дивилась на «+0 ELO» і робила з
+   * цього висновок про застій, хоч за тиждень набігало двадцять.
+   * Тиждень — природний крок цієї системи: бюджет ELO тижневий
+   * (weeklyBudget), план тренувань тижневий, штраф за пропуск теж
+   * рахується по тижню. Тому й підсумок має бути тижневий.
+   *
+   * events — те, що віддає elo_recent: [{day, delta, …}]. Порядок і
+   * зайві поля не важать; сміття ігнорується мовчки, бо єдина
+   * альтернатива — показати «—» замість числа через один зіпсований
+   * рядок історії.
+   *
+   * Порівняння рядків, а не дат: ключі 'YYYY-MM-DD' лексикографічно
+   * упорядковані так само, як хронологічно, і жодного розбору дати тут
+   * не потрібно.
+   */
+  function sumFrom(events, fromKey) {
+    if (!Array.isArray(events) || !/^\d{4}-\d{2}-\d{2}$/.test(String(fromKey))) return 0;
+    var from = String(fromKey);
+    var sum = 0;
+    for (var i = 0; i < events.length; i++) {
+      var e = events[i];
+      if (!e || typeof e !== 'object') continue;
+      var d = String(e.day || '');
+      var v = Number(e.delta);
+      if (d >= from && Number.isFinite(v)) sum += v;
+    }
+    return Math.round(sum);
+  }
+
   window.EloCore = {
+    sumFrom: sumFrom,
     seasonOf: seasonOf,
     seasonRange: seasonRange,
     seasonDay: seasonDay,

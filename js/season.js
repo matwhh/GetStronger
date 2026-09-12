@@ -46,9 +46,122 @@
      із закриттям сезону, смикати її на кожен refresh нема чого. */
   const ident = { awards: 0, seasons: 0, loaded: false };
 
-  async function renderHeader(st) {
+  /*
+   * Події сезону тягнуться ОДИН раз на оновлення й ділять їх двоє:
+   * підсумок тижня в шапці й список «останні події». Доти список ходив
+   * у базу власним запитом, і додати тижневе число означало б третій
+   * виклик elo_recent на кожне відкриття сторінки.
+   */
+  const recent = { events: null };
+
+  async function loadRecent() {
+    try {
+      const rows = await window.Store.rpc('elo_recent', { p_limit: 60 });
+      recent.events = Array.isArray(rows) ? rows : [];
+    } catch (_) {
+      /* Немає звʼязку — не привід ховати всю шапку. Тижневе число просто
+         не показується, решта панелі працює з кешованого стану. */
+      recent.events = null;
+    }
+  }
+
+  /** Понеділок поточного тижня — та сама межа, що й скрізь у проєкті. */
+  function mondayKey() {
+    return window.DateCore.keyOf(window.DateCore.mondayOf(new Date()));
+  }
+
+  /*
+   * ПАМʼЯТЬ ПРО РІВЕНЬ — щоб підвищення було ПОДІЄЮ, а не новим числом.
+   *
+   * Рівень росте тихо: людина закриває тренування, число збільшується на
+   * три, і межа рівня перетинається між двома поглядами на екран. Тому
+   * запамʼятовуємо останній побачений рівень і, якщо він виріс, вмикаємо
+   * анімацію один раз — при наступному відкритті вона вже не спрацює.
+   *
+   * Сезон у ключі обовʼязковий: на старті нового сезону ELO обнуляється,
+   * рівень падає з десятого на перший, і без сезону кожен новий сезон
+   * починався б «підвищенням» при поверненні на десятий.
+   */
+  const SEEN_KEY = 'ib.elo.lvlseen';
+
+  function levelJump(season, level) {
+    let prev = null;
+    try { prev = JSON.parse(localStorage.getItem(SEEN_KEY) || 'null'); } catch (_) {}
+    const up = !!(prev && prev.season === season && Number(prev.level) < level);
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify({ season: season, level: level })); }
+    catch (_) {}
+    return up;
+  }
+
+  /**
+   * ШКАЛА РІВНЯ: поточний жетон ліворуч, наступний праворуч, між ними —
+   * скільки пройдено.
+   *
+   * Була просто смуга на всю ширину картки. Смуга відповідала на «яка
+   * частка рівня пройдена» і мовчала про все інше: який це рівень, який
+   * наступний, скільки до нього. Числа стояли окремим рядком нижче, і
+   * зв'язати їх зі смугою очима доводилось самому.
+   *
+   * Тепер шкала має два кінці, і обидва — жетони рівнів. Лівий
+   * повнокольоровий (це ти зараз), правий приглушений (це ще не ти).
+   * Дві опорні точки роблять зі смуги відрізок ШЛЯХУ, а не відсоток.
+   *
+   * На десятому рівні наступного жетона немає — далі тільки ELITE, і
+   * правий кінець стає позначкою стелі. Раніше тут писалось «До Level
+   * 11», рівня, якого не існує.
+   */
+  function ladderHtml(st, lvl, up) {
+    const cfg = st.config;
+    const top = lvl.level >= cfg.levelCount;
+    /* Верхня межа відрізка. Для ELITE це стеля сезону, для решти —
+       перше число наступного рівня. */
+    const goal = lvl.elite ? cfg.seasonMax : lvl.ceil + 1;
+    const left = Math.max(0, goal - st.elo);
+    const pct = Math.max(0, Math.min(100, Number(lvl.pct) || 0));
+
+    const right = (top || lvl.elite)
+      ? '<span class="lvlbar__end lvlbar__end--top mono" aria-label="Стеля сезону">MAX</span>'
+      : '<span class="lvlbar__end lvl-circle">' +
+          window.App.levelIcon(lvl.level + 1, 'Level ' + (lvl.level + 1)) + '</span>';
+
+    const goalName = lvl.elite ? 'стелі сезону' : (top ? 'ELITE' : 'Level ' + (lvl.level + 1));
+
+    return '<div class="lvlbar mt-2' + (up ? ' is-levelup' : '') + '" role="group" ' +
+        'aria-label="Прогрес до наступного рівня">' +
+        '<span class="lvlbar__end lvl-circle">' +
+          window.App.levelIcon(lvl.level, lvl.name) + '</span>' +
+        '<span class="lvlbar__track">' +
+          /* Ширина приїжджає змінною, а не в style="width": заливка
+             росте від нуля анімацією, і фіксована ширина відразу
+             зупинила б її на місці. */
+          '<i class="lvlbar__fill" style="--to:' + pct + '%"></i>' +
+        '</span>' +
+        right +
+      '</div>' +
+      '<div class="row row--split small mt-1" style="gap:10px;flex-wrap:wrap">' +
+        '<span class="muted"><b class="mono">' + st.elo + '</b> / ' + goal + ' ELO</span>' +
+        '<span class="muted">ще <b class="mono">' + left + '</b> до ' + esc(goalName) + '</span>' +
+      '</div>';
+  }
+
+  /*
+   * ЧЕРГОВІСТЬ РЕНДЕРІВ ШАПКИ.
+   *
+   * Шапка малюється двічі поспіль: спершу з КЕШОВАНОГО стану (щоб не
+   * показувати порожнечу, поки йде запит), потім зі свіжого. Обидва
+   * рендери асинхронні — усередині await на history() і getProfile(), —
+   * і порядок їх завершення нічим не гарантований. Якщо кешований
+   * дорендерився ДРУГИМ, він затирав свіжі дані старими: людина бачила
+   * вчорашнє ELO при живому звʼязку, і виглядало це як «сервер не
+   * оновлює». Тому кожен рендер бере номер і мовчки виходить, якщо поки
+   * він чекав, почався новіший.
+   */
+  let headSeq = 0;
+
+  async function renderHeader(st, up) {
     const host = $('#sz-header');
     if (!host) return;
+    const my = ++headSeq;
 
     // Нік саме редагують — не зносимо картку під пальцями. Дебаунс
     // збереження сам домалює свіже значення наступним refresh-ом.
@@ -91,6 +204,17 @@
     const total = sd.total;
     const passed = sd.passed;
 
+    /* Тиждень — головна метрика панелі. «Сьогодні» майже завжди нуль або
+       трійка: більшість днів дає одну-дві дії, а день відпочинку —
+       жодної. Людина дивилась на «+0 ELO» і робила висновок про застій,
+       хоч за тиждень набігало двадцять. Бюджет ELO теж тижневий. */
+    const week = recent.events ? EC.sumFrom(recent.events, mondayKey()) : null;
+    /* Підвищення рівня вирішує ВИКЛИКАЧ, і тільки на свіжому стані:
+       кешований рендер не має права ні показати свято, ні зʼїсти його. */
+    const levelUp = !!up;
+
+    if (my !== headSeq) return;
+
     host.innerHTML = card(
       '<div class="row row--split" style="align-items:baseline;gap:10px;flex-wrap:wrap">' +
         '<h2 style="margin:0;text-transform:uppercase">' + esc(name || 'Атлет') + '</h2>' +
@@ -99,20 +223,16 @@
       '<div class="rating-hero mt-2">' +
         '<span class="rating-hero__val mono">' + st.elo + '<span class="tile__of"> ELO</span></span>' +
         '<span class="rating-hero__meta">' +
-          '<span class="lvl-circle">' + window.App.levelIcon(lvl.level, lvl.name) + '</span>' +
-          '<span class="small muted">' + esc(lvl.name) + '</span>' +
+          (week === null ? ''
+            : '<span class="chip chip--acc mono" title="Приріст ELO з понеділка">' +
+              signed(week) + ' ELO за тиждень</span>') +
         '</span>' +
       '</div>' +
-      '<div class="vol" style="margin-top:8px"><span class="vol__bar"><i style="width:' + lvl.pct + '%"></i></span></div>' +
+
+      ladderHtml(st, lvl, levelUp) +
+
       '<div class="row mt-2" style="gap:16px;flex-wrap:wrap">' +
         '<span class="small">Сьогодні: <b class="mono">' + signed(st.today || 0) + ' ELO</b></span>' +
-        (lvl.elite
-          ? '<span class="small"><b>ELITE</b> — до стелі ' + (st.config.seasonMax - st.elo) + ' ELO</span>'
-          /* На десятому рівні наступного рівня немає — далі тільки ELITE.
-             Раніше тут писалось «До Level 11», рівня, якого не існує. */
-          : '<span class="small">До ' +
-            (lvl.level >= st.config.levelCount ? 'ELITE' : 'Level ' + (lvl.level + 1)) +
-            ': <b class="mono">' + (lvl.ceil + 1 - st.elo) + ' ELO</b></span>') +
         (st.rank ? '<span class="small">Місце: <b class="mono">#' + st.rank + '</b> із ' + st.of + '</span>' : '') +
       '</div>' +
 
@@ -194,8 +314,11 @@
 
   async function renderEvents() {
     try {
-      const events = await window.Store.rpc('elo_recent', { p_limit: 14 });
-      if (!Array.isArray(events) || !events.length) {
+      /* Ті самі події, що дали тижневий підсумок у шапці: один запит на
+         оновлення, а не два. Показуємо останні 14 — довший список тут
+         ніхто не читає, він для «що мені щойно нарахували». */
+      const events = (recent.events || []).slice(0, 14);
+      if (!events.length) {
         $('#sz-events').innerHTML = card(
           '<h3 class="card__title">Події ELO</h3>' +
           '<p class="small muted mb-0">Ще порожньо. Закрийте тренування, день харчування ' +
@@ -454,7 +577,12 @@
   async function refresh() {
     const st = await Api.refresh();
     if (!st || !st.config) return;
-    renderHeader(st);
+    /* Події — ПЕРЕД шапкою: з них рахується тижневий підсумок, і без них
+       шапка намалювалась би без нього, а потім смикнулась. */
+    await loadRecent();
+    /* Рівень звіряється тут, на серверному стані: кешований рендер нижче
+       його не чіпає, інакше свято зʼїдалось би ще до показу. */
+    renderHeader(st, levelJump(st.season, EC.levelFor(st.elo, st.config).level));
     renderGrace(st);
     renderEvents();
     renderBoard(st);

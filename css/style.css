@@ -4757,7 +4757,7 @@ button.heatmap__cell::after {
   p.small.muted > a[href^="https://pubmed"],
   p.small > a[href^="https://pubmed"] {
     display: inline-flex; align-items: center;
-    min-height: 32px;
+    min-height: 34px;
   }
 
   /* ---- План: таблиця складається у стовпчик карток ----
@@ -5427,57 +5427,41 @@ button.heatmap__cell::after {
 
 
 /* ---- Заміри тіла на головній -----------------------------------------
-   Одна картка на всю ширину, а не третя плитка звички: питання тут інше
-   («коли востаннє і що змінилось»), і три-чотири підписи з числами в
-   половину екрана не влазять. Знак зміни НЕ фарбується — мінус на талії
-   й мінус на біцепсі означають протилежне, і вирішує людина. */
-.mez {
-  display: flex; flex-direction: column;
-  margin-top: 10px;
-  padding: clamp(12px, 2.5vw, 16px);
-  color: var(--text); text-decoration: none;
+   Картка живе в сітці кубиків трекерів і носить ЇХНІ класи (.twt): шапку,
+   тіло, підвал. Своє тут лише те, чого в кубиків немає, — рядок
+   параметрів: у них на цьому місці смуга до цілі або шкала 1..10.
+
+   Знак зміни НЕ фарбується: мінус на талії й мінус на біцепсі означають
+   протилежне, і вирішує людина. */
+.twt--measure { color: var(--text); text-decoration: none; }
+.twt--measure:hover { border-color: var(--acc-line); }
+/* Стан праворуч угорі («9 днів тому») — це не число, заради якого сюди
+   дивляться, а підпис. Тому тихіший за .twt__now у кубиків. */
+/* Два класи в селекторі навмисно: блок .twt__now описаний НИЖЧЕ в файлі,
+   і за однакової ваги він перебивав би це правило. Піднімати вагу
+   важливістю тут нічого — достатньо назвати обидва класи. */
+.twt__now.twt__now--soft {
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 400;
+  color: var(--muted);
 }
-.mez__head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 10px; min-width: 0;
-}
-.mez__title { font-size: 1.05rem; font-weight: 700; line-height: 1.2; }
-.mez__when { font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
-.mez__hint { margin-top: 6px; font-size: 0.82rem; color: var(--muted); }
+.mez__hint { font-size: 0.82rem; color: var(--muted); }
 /* Параметри в рядок, з переносом: скільки влізе, стільки й стане. */
-.mez__row {
-  display: flex; flex-wrap: wrap; gap: 8px 22px;
-  margin: 12px 0 10px;
-}
+.mez__row { display: flex; flex-wrap: wrap; gap: 8px 22px; min-width: 0; }
 .mez__item { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .mez__lbl { font-size: 0.72rem; color: var(--muted); }
 .mez__num { display: flex; align-items: baseline; gap: 4px; }
-.mez__num b { font-size: 1.15rem; font-weight: 800; }
+.mez__num b { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
 .mez__unit { font-size: 0.72rem; color: var(--muted); }
-.mez__d {
-  font-style: normal;
-  font-size: 0.74rem;
-  color: var(--muted);
-  padding-left: 4px;
-}
-.mez__cta {
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-  font-size: 0.78rem; color: var(--muted);
-}
-.mez:hover { border-color: var(--acc-line); }
-.mez:hover .mez__cta { color: var(--acc-ink); }
+.mez__d { font-style: normal; font-size: 0.74rem; color: var(--muted); padding-left: 4px; }
 /* Три тижні без заміру. Підсвічуємо рівно підказку, а не всю картку:
    це нагадування, а не помилка. */
-.mez.is-stale .mez__cta { color: var(--acc-ink); }
+.twt--measure.is-stale .twt__foot { color: var(--acc-ink); }
+.twt--measure:hover .twt__foot { color: var(--acc-ink); }
 
 @media (max-width: 460px) {
-  .mez { padding: 12px 11px; }
-  .mez__title { font-size: 0.92rem; }
   .mez__row { gap: 8px 16px; }
-  .mez__num b { font-size: 1.02rem; }
-  .mez__cta { font-size: 0.72rem; }
 }
 
 /* ---- Віджет дня -------------------------------------------------------
@@ -5950,12 +5934,14 @@ h1 > .h1-ico {
 .awd-filter { display: flex; flex-direction: column; gap: 8px; }
 .awd-filter__row { display: flex; flex-wrap: wrap; gap: 6px; }
 .awd-chip {
-  /* 32px — не оздоба, а нижня межа цілі для пальця, яку стереже
-     verifyresponsive. У 27px чип читався як текст, а не як кнопка, і
-     промахнутись повз нього на телефоні було легше, ніж влучити. */
+  /* 34px, а не рівно 32: межа в перевірці — «менше за 32», і елемент,
+     який дає рівно 32 у одному масштабі, в іншому округляється до 31,x і
+     знову червоний. Два пікселі запасу дешевші за плаваючу перевірку.
+     У 27px чип читався як текст, а не як кнопка, і промахнутись повз
+     нього на телефоні було легше, ніж влучити. */
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
+  min-height: 34px;
   border: 1px solid var(--line);
   background: transparent;
   color: var(--muted);

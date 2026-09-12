@@ -63,7 +63,11 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
     catch (e) { if (!e.queued) throw e; }
   });
   await p.waitForTimeout(700);
-  ok('1. типово на «Сьогодні» кубиків трекерів немає', await p.locator('#today .twt').count() === 0);
+  /* Картка замірів носить ті самі класи .twt (вона живе в тій же сітці),
+     тому рахуємо саме КУБИКИ — те, що просить щоденного числа. */
+  ok('1. типово на «Сьогодні» кубиків трекерів немає',
+    await p.locator('#today .twt:not(.twt--measure)').count() === 0,
+    String(await p.locator('#today .twt:not(.twt--measure)').count()));
   ok('1. на «Сьогодні» немає рядків зі сторінки трекерів', await p.locator('#today .tdy-trk__row').count() === 0);
   ok('1. на «Сьогодні» немає шкал зі сторінки трекерів', await p.locator('#today .qi-scale').count() === 0);
   ok('1. плиток стану на «Сьогодні» немає', await p.locator('#today .tile').count() === 0);
@@ -103,8 +107,9 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   });
   await p.waitForTimeout(900);
 
-  ok('1b. закріплені трекери зʼявились кубиками', await p.locator('#today .twt').count() === 2,
-    String(await p.locator('#today .twt').count()));
+  ok('1b. закріплені трекери зʼявились кубиками',
+    await p.locator('#today .twt:not(.twt--measure)').count() === 2,
+    String(await p.locator('#today .twt:not(.twt--measure)').count()));
   ok('1b. підказки більше немає', await p.locator('#today .twt-hint').count() === 0);
 
   /*
@@ -162,6 +167,8 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
    */
   ok('2. рядків щоденного вводу тут немає', await p.locator('.tdy-trk__row').count() === 0);
   ok('2. і кубиків теж немає', await p.locator('.twt').count() === 0);
+  ok('2. і картки замірів теж — це налаштування, а не екран дня',
+    await p.locator('.twt--measure').count() === 0);
   ok('2. окремого посилання «Налаштування» вже не треба',
     await p.locator('main a[href="trackers.html"]').count() === 0);
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
@@ -219,7 +226,7 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
-  ok('5. картка замірів на «Сьогодні» є', await p.locator('#today .mez').count() === 1);
+  ok('5. картка замірів на «Сьогодні» є', await p.locator('#today .twt--measure').count() === 1);
 
   await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
@@ -228,7 +235,7 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
 
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
-  ok('5. знята шпилька прибрала картку з головної', await p.locator('#today .mez').count() === 0);
+  ok('5. знята шпилька прибрала картку з головної', await p.locator('#today .twt--measure').count() === 0);
 
   await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
@@ -236,7 +243,7 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await p.waitForTimeout(700);
   await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
   await p.waitForTimeout(1300);
-  ok('5. і повернула назад', await p.locator('#today .mez').count() === 1);
+  ok('5. і повернула назад', await p.locator('#today .twt--measure').count() === 1);
   ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

@@ -462,16 +462,33 @@
     if (TC && TC.isPinned && !TC.isPinned(state.trackers, 'measure')) return '';
     const sum = MC.homeSummary(state.profile && state.profile.measureLog, state.todayKey);
 
-    /* Жодного заміру — не мовчимо й не соромимо: один рядок, що це таке
-       й куди тиснути. Порожнє місце на головній нічого не пояснює. */
+    /*
+     * ТА САМА МОВА, ЩО В КУБИКІВ ТРЕКЕРІВ — класи .twt, а не свої.
+     *
+     * Спершу картка мала власне оформлення: інші відступи, інша рамка,
+     * інша типографіка. Поруч із кубиком води це читалось як два різні
+     * застосунки на одному екрані. Копіювати вигляд «схоже» теж не
+     * годиться — дві схожі, але окремі системи розходяться на першій же
+     * правці палітри.
+     *
+     * Тому тут рівно ті самі класи: шапка з назвою й станом праворуч,
+     * тіло, підвал. Своє лишилось тільки те, чого в кубиків немає, —
+     * рядок параметрів (.mez__row), бо в них замість нього смуга або
+     * шкала.
+     *
+     * twt--wide: заміри — це три числа з підписами, і в половину екрана
+     * вони не влазять за жодного розумного кегля.
+     */
     if (!sum) {
-      return '<a class="card mez mez--empty" href="measure.html">' +
-          '<span class="mez__head">' +
-            '<span class="mez__title">Заміри тіла</span>' +
-            '<span class="mez__when">ще не робили</span>' +
+      return '<a class="twt twt--wide twt--measure" href="measure.html" data-trk-tile="measure">' +
+          '<span class="twt__head">' +
+            '<span class="twt__name">Заміри тіла</span>' +
+            '<span class="twt__now twt__now--soft">ще не робили</span>' +
           '</span>' +
-          '<span class="mez__hint">Обхвати показують зміну форми там, де вага мовчить.</span>' +
-          '<span class="mez__cta">Зробити перший замір →</span>' +
+          '<span class="twt__body">' +
+            '<span class="mez__hint">Обхвати показують зміну форми там, де вага мовчить.</span>' +
+          '</span>' +
+          '<span class="twt__foot">Зробити перший замір →</span>' +
         '</a>';
     }
 
@@ -486,13 +503,14 @@
         '</span>';
     }).join('');
 
-    return '<a class="card mez' + (sum.stale ? ' is-stale' : '') + '" href="measure.html">' +
-        '<span class="mez__head">' +
-          '<span class="mez__title">Заміри тіла</span>' +
-          '<span class="mez__when">' + esc(agoLabel(sum.daysAgo)) + '</span>' +
+    return '<a class="twt twt--wide twt--measure' + (sum.stale ? ' is-stale' : '') +
+        '" href="measure.html" data-trk-tile="measure">' +
+        '<span class="twt__head">' +
+          '<span class="twt__name">Заміри тіла</span>' +
+          '<span class="twt__now twt__now--soft">' + esc(agoLabel(sum.daysAgo)) + '</span>' +
         '</span>' +
-        '<span class="mez__row">' + items + '</span>' +
-        '<span class="mez__cta">' +
+        '<span class="twt__body"><span class="mez__row">' + items + '</span></span>' +
+        '<span class="twt__foot">' +
           esc(sum.stale ? 'Три тижні без заміру — час зміряти →' : 'Записати заміри →') +
         '</span>' +
       '</a>';
@@ -537,9 +555,12 @@
     const grid = window.TrackerTile.grid(state.trackers, {
       log: state.trackerLog,
       todayKey: state.todayKey,
-      now: new Date()
+      now: new Date(),
+      /* Заміри — перша картка ТІЄЇ САМОЇ сітки, а не окремий блок над
+         нею: інакше між ними лишався б чужий відступ, а картки стояли б
+         у різних сітках із різними правилами переносу. */
+      lead: measuresHtml()
     });
-    if (grid) return grid;
 
     /*
      * ПІДКАЗКА ЗАМІСТЬ ПОРОЖНЕЧІ — і тільки тоді, коли є що закріплювати.
@@ -548,17 +569,27 @@
      * екран нічого не скаже. Людині, яка трекерів не веде взагалі,
      * підказка про них — просто ще один рядок, який вона не просила:
      * тому за відсутності увімкнених трекерів тут немає нічого.
+     *
+     * ЧОМУ ПІДКАЗКА РАХУЄТЬСЯ ОКРЕМО ВІД СІТКИ. Відколи в сітці стоїть
+     * картка замірів, сітка майже ніколи не порожня — і підказка, яка
+     * показувалась «замість» неї, перестала зʼявлятись узагалі. Питання
+     * в неї інше: чи є закріплені КУБИКИ. Заміри на нього не відповідають
+     * (вони kind 'card' і в сітку кубиків не потрапляють), тому й
+     * рахуємо окремо.
      */
-    /* Заміри в цю сітку не потрапляють (вони kind 'card'), тож
-       наявність самих лише замірів не робить підказку про кубики
-       доречною: рахуємо ті трекери, які справді можна закріпити. */
-    if (!TC.active(state.trackers).filter(function (t) { return !TC.isCard(t); }).length) return '';
-    return '<a class="twt-hint" href="trackers.html">' +
-      '<span>Винести трекер на цей екран</span>' +
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M9 18l6-6-6-6"/></svg>' +
-    '</a>';
+    const tiles = TC.pinnedList(state.trackers).length;
+    const canPin = TC.active(state.trackers)
+      .filter(function (t) { return !TC.isCard(t); }).length;
+    const hint = (!tiles && canPin)
+      ? '<a class="twt-hint" href="trackers.html">' +
+          '<span>Винести трекер на цей екран</span>' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<path d="M9 18l6-6-6-6"/></svg>' +
+        '</a>'
+      : '';
+
+    return grid + hint;
   }
 
   /*
@@ -811,7 +842,7 @@
     const host = $('#today');
     if (!host) return;
     host.innerHTML = headHtml() + weekHtml() + widgetHtml() + progressionHtml() +
-      habitsHtml() + measuresHtml() + trackersHtml();
+      habitsHtml() + trackersHtml();
     /* Нахил вішається на щойно створений віджет: initTilt позначає вже
        оброблені контейнери, тож повторний виклик безпечний. */
     if (window.App && window.App.initTilt) window.App.initTilt(host);

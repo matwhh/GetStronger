@@ -360,8 +360,21 @@
     const TC = window.TrackerCore;
     if (!TC) return '';
     const items = TC.pinnedList(trackers);
-    if (!items.length) return '';
-    return '<div class="twt-grid">' +
+    /*
+     * lead — готова розмітка, яка стає ПЕРШОЮ карткою сітки.
+     *
+     * Потрібна карткам-розділам (kind 'card'): у них немає значення дня,
+     * тож звичайним кубиком їх не зробити, але виглядати вони мусять
+     * рівно так само. Два схожі, але окремі набори стилів на сусідніх
+     * картках розходяться на першій же правці — і людина бачить дві
+     * різні мови на одному екрані.
+     *
+     * Порожня сітка з самим lead — чинний випадок: заміри закріплені з
+     * коробки, а кубики — ні.
+     */
+    const lead = (o && o.lead) || '';
+    if (!items.length && !lead) return '';
+    return '<div class="twt-grid">' + lead +
       items.map(function (t) { return html(t, o); }).join('') +
     '</div>';
   }

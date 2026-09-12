@@ -53,9 +53,12 @@ const errs = [];
   });
   p.on('pageerror', (e) => errs.push(e.message));
 
-  ok('1. картка замірів є на головній', (await p.locator('#today .mez').count()) === 1);
-  const t = await p.locator('#today .mez').innerText();
-  ok('2. названа людською мовою', /Заміри тіла/.test(t), t.split('\n')[0]);
+  ok('1. картка замірів є на головній', (await p.locator('#today .twt--measure').count()) === 1);
+  const t = await p.locator('#today .twt--measure').innerText();
+  /* Регістр малює CSS (text-transform у .twt__name), а в розмітці слова
+     лишаються звичайними — тому innerText приходить великими літерами, а
+     читалка вимовляє слово, а не літери. Порівнюємо без регістру. */
+  ok('2. названа людською мовою', /заміри тіла/i.test(t), t.split('\n')[0]);
   ok('3. каже, коли міряли востаннє', /9 днів тому/.test(t), t.replace(/\n/g, ' | ').slice(0, 90));
   ok('4. показує саме останнє значення, а не перше', /84,5/.test(t) && !/\b86\b/.test(t), t.replace(/\n/g, ' '));
   ok('5. показує зміну від попереднього заміру', /−1,5/.test(t));
@@ -63,19 +66,19 @@ const errs = [];
   /* Десяткова кома, як і скрізь у проєкті. */
   ok('7. числа з комою, а не з крапкою', !/\d\.\d/.test(t), t.replace(/\n/g, ' '));
   ok('8. веде на сторінку замірів',
-     (await p.locator('#today .mez').getAttribute('href')) === 'measure.html');
+     (await p.locator('#today .twt--measure').getAttribute('href')) === 'measure.html');
   /* Головна показує стан, а не редагує: полів введення тут бути не може. */
-  ok('9. картка нічого не вводить', (await p.locator('#today .mez input').count()) === 0);
+  ok('9. картка нічого не вводить', (await p.locator('#today .twt--measure input').count()) === 0);
   ok('10. поки не час — нагадування немає',
-     (await p.locator('#today .mez.is-stale').count()) === 0);
+     (await p.locator('#today .twt--measure.is-stale').count()) === 0);
   await p.close();
 }
 
 /* ---- 2. Давно не міряли ---- */
 {
   const p = await home(ctx, { [key(30)]: { waist: 84 } });
-  const t = await p.locator('#today .mez').innerText();
-  ok('11. через три тижні картка нагадує', (await p.locator('#today .mez.is-stale').count()) === 1);
+  const t = await p.locator('#today .twt--measure').innerText();
+  ok('11. через три тижні картка нагадує', (await p.locator('#today .twt--measure.is-stale').count()) === 1);
   ok('12. і каже це словами, а не кольором', /час зміряти/.test(t), t.replace(/\n/g, ' | '));
   await p.close();
 }
@@ -83,12 +86,12 @@ const errs = [];
 /* ---- 3. Жодного заміру ---- */
 {
   const p = await home(ctx, {});
-  ok('13. новачкові картка теж показана', (await p.locator('#today .mez').count()) === 1);
-  const t = await p.locator('#today .mez').innerText();
+  ok('13. новачкові картка теж показана', (await p.locator('#today .twt--measure').count()) === 1);
+  const t = await p.locator('#today .twt--measure').innerText();
   ok('14. пояснює, навіщо це', /ще не робили/.test(t) && /зміну форми/.test(t),
      t.replace(/\n/g, ' | '));
   ok('15. і кличе зробити перший', /перший замір/.test(t));
-  ok('16. без вигаданих чисел', (await p.locator('#today .mez .mez__num').count()) === 0);
+  ok('16. без вигаданих чисел', (await p.locator('#today .twt--measure .mez__num').count()) === 0);
   await p.close();
 }
 
@@ -96,12 +99,33 @@ const errs = [];
 {
   const m = await adultContext(b, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const p = await home(m, { [key(3)]: { waist: 84.5, chest: 101, bicepsR: 38.6 } });
-  const box = await p.locator('#today .mez').boundingBox();
+  const box = await p.locator('#today .twt--measure').boundingBox();
   ok('17. картка вміщається в екран', box && box.width <= 390, box ? Math.round(box.width) + 'px' : '—');
+  /*
+   * ТА САМА МОВА, ЩО В КУБИКІВ. Дві схожі, але окремі системи оформлення
+   * розходяться на першій же правці палітри, і людина бачить два різні
+   * застосунки на одному екрані. Тому картка не «схожа» на кубик — вона
+   * носить його класи й живе в його ж сітці.
+   */
+  ok('17б. картка носить класи кубика, а не свої',
+    await p.locator('#today .twt.twt--measure').count() === 1);
+  ok('17в. і стоїть у сітці кубиків, а не окремим блоком',
+    await p.locator('#today .twt-grid > .twt--measure').count() === 1);
+  /* Стан праворуч угорі — підпис, а не число, заради якого дивляться:
+     він мусить бути ТИХІШИЙ за значення кубика. Блок .twt__now лежить у
+     файлі нижче, тож за однакової ваги селекторів він перебивав би це
+     правило — і «9 днів тому» кричало б моноширинним жирним. */
+  const soft = await p.locator('#today .twt--measure .twt__now').first()
+    .evaluate((e) => ({ w: getComputedStyle(e).fontWeight, s: getComputedStyle(e).fontSize }));
+  ok('17д. стан угорі тихіший за значення кубика',
+    Number(soft.w) <= 500 && parseFloat(soft.s) <= 14, JSON.stringify(soft));
+  ok('17г. шапка й підвал — ті самі, що в кубиків',
+    await p.locator('#today .twt--measure .twt__head .twt__name').count() === 1 &&
+    await p.locator('#today .twt--measure .twt__foot').count() === 1);
   const over = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   ok('18. і не тягне сторінку вбік', over === false);
   ok('19. усі три параметри лишились видимі',
-     (await p.locator('#today .mez .mez__item').count()) === 3);
+     (await p.locator('#today .twt--measure .mez__item').count()) === 3);
   await p.close();
   await m.close();
 }

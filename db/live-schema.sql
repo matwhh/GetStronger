@@ -133,7 +133,7 @@ alter table public.cron_log add constraint cron_log_pkey PRIMARY KEY (id);
 alter table public.elo_config add constraint elo_config_id_check CHECK ((id = 1));
 alter table public.elo_config add constraint elo_config_pkey PRIMARY KEY (id);
 alter table public.elo_events add constraint elo_events_category_check CHECK ((category = ANY (ARRAY['training'::text, 'nutrition'::text, 'sleep'::text, 'recovery'::text, 'activity'::text, 'penalty'::text, 'bonus'::text, 'admin'::text])));
-alter table public.elo_events add constraint elo_events_elo_after_range CHECK (((elo_after >= 0) AND (elo_after <= 2500)));
+alter table public.elo_events add constraint elo_events_elo_after_range CHECK (((elo_after >= 0) AND (elo_after <= 3000)));
 alter table public.elo_events add constraint elo_events_event_type_check CHECK ((event_type = ANY (ARRAY['workout'::text, 'meal'::text, 'sleep'::text, 'recovery'::text, 'activity'::text, 'cleanday'::text, 'week'::text, 'admin'::text, 'legacy'::text])));
 alter table public.elo_events add constraint elo_events_pkey PRIMARY KEY (id);
 alter table public.elo_events add constraint elo_events_quality_range CHECK (((quality >= (0)::numeric) AND (quality <= (1)::numeric)));
@@ -148,7 +148,7 @@ alter table public.profiles add constraint profiles_pkey PRIMARY KEY (user_id);
 alter table public.profiles add constraint profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 alter table public.season_history add constraint season_history_pkey PRIMARY KEY (user_id, season);
 alter table public.season_history add constraint season_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-alter table public.season_state add constraint season_state_elo_check CHECK (((elo >= 0) AND (elo <= 2500)));
+alter table public.season_state add constraint season_state_elo_check CHECK (((elo >= 0) AND (elo <= 3000)));
 alter table public.season_state add constraint season_state_grace_used_check CHECK (((grace_used >= 0) AND (grace_used <= 2)));
 alter table public.season_state add constraint season_state_pkey PRIMARY KEY (user_id, season);
 alter table public.season_state add constraint season_state_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
@@ -438,14 +438,38 @@ $function$
 grant execute on function public.delete_account() to authenticated;
 grant execute on function public.delete_account() to service_role;
 
-CREATE OR REPLACE FUNCTION public.elo_action_delta(kind text, payload jsonb, cfg jsonb, planned_days integer, grace boolean)
+CREATE OR REPLACE FUNCTION public.elo_pace(p_elo numeric, cfg jsonb)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  select case
+    when p_elo is null then 1
+    when cfg->'levelPace' is null or jsonb_typeof(cfg->'levelPace') <> 'array' then 1
+    when p_elo >= (cfg->>'eliteFloor')::numeric
+      then coalesce((cfg->>'elitePace')::numeric, 1)
+    else coalesce(
+      (cfg->'levelPace' ->> (
+        least((cfg->>'levelCount')::int,
+              floor(greatest(0, p_elo) / (cfg->>'levelSize')::numeric)::int + 1) - 1
+      ))::numeric, 1)
+  end;
+$function$
+;
+grant execute on function public.elo_pace(p_elo numeric, cfg jsonb) to service_role;
+
+CREATE OR REPLACE FUNCTION public.elo_action_delta(kind text, payload jsonb, cfg jsonb, planned_days integer, grace boolean, p_elo numeric)
  RETURNS TABLE(quality numeric, delta integer)
  LANGUAGE plpgsql
  IMMUTABLE
  SET search_path TO 'public'
 AS $function$
 declare
-  weekly numeric := (cfg->>'weeklyBudget')::numeric * (cfg->>'categoryShare')::numeric;
+  -- Темп за рівнем: та сама крива, що в js/elo-core.js (pace). Множиться
+  -- саме тижневий бюджет, тож усі пʼять категорій масштабуються разом.
+  weekly numeric := (cfg->>'weeklyBudget')::numeric * public.elo_pace(p_elo, cfg)
+                    * (cfg->>'categoryShare')::numeric;
   daily  numeric;
   q numeric := 0; m numeric := 0; d numeric := 0;
   target numeric; ptarget numeric; dev numeric; qk numeric := 0; qp numeric := 0;
@@ -506,7 +530,7 @@ begin
 end;
 $function$
 ;
-grant execute on function public.elo_action_delta(kind text, payload jsonb, cfg jsonb, planned_days integer, grace boolean) to service_role;
+grant execute on function public.elo_action_delta(kind text, payload jsonb, cfg jsonb, planned_days integer, grace boolean, p_elo numeric) to service_role;
 
 CREATE OR REPLACE FUNCTION public.elo_activate_grace()
  RETURNS jsonb
@@ -1261,7 +1285,7 @@ begin
                               'retry', not coalesce(has_row, false));
   end if;
   select t.quality, t.delta into q, d
-  from elo_action_delta(p_kind, facts, cfg, planned, grace) t;
+  from elo_action_delta(p_kind, facts, cfg, planned, grace, st.elo) t;
   inc := greatest(0, d - paid);
   if p_kind = 'workout' and inc > 0 then
     wk_start := date_trunc('week', p_day)::date;
@@ -1270,7 +1294,8 @@ begin
       where user_id = uid and season = szn and category = 'training' and delta > 0
         and day between wk_start and wk_start + 6;
     week_budget := round(
-      (cfg->>'weeklyBudget')::numeric * (cfg->>'categoryShare')::numeric
+      (cfg->>'weeklyBudget')::numeric * public.elo_pace(st.elo, cfg)
+      * (cfg->>'categoryShare')::numeric
       * (cfg#>>'{weights,training}')::numeric)::int;
     inc := least(inc, greatest(0, week_budget - week_spent));
   end if;
@@ -1278,7 +1303,12 @@ begin
     select coalesce(sum(delta), 0) into day_sum
     from elo_events
     where user_id = uid and season = szn and day = p_day and delta > 0 and category <> 'admin';
-    room := least(greatest(0, (cfg->>'dayGainCap')::int - day_sum), public.elo_week_room(uid, p_day, cfg));
+    -- Стеля дня масштабується темпом, підлога втрат — ні: інакше плаский
+    -- dayGainCap зрізав би весь розгін перших рівнів (див. js/elo-core.js,
+    -- applyDayCaps).
+    room := least(greatest(0, round((cfg->>'dayGainCap')::numeric
+                                    * public.elo_pace(st.elo, cfg))::int - day_sum),
+                  public.elo_week_room(uid, p_day, cfg));
     inc := least(inc, room);
   end if;
 
@@ -1391,7 +1421,14 @@ begin
   select coalesce(sum(delta), 0) into day_sum
   from elo_events
   where user_id = uid and season = szn and day = p_day and delta > 0 and category <> 'admin';
-  room := least(greatest(0, (cfg->>'dayGainCap')::int - day_sum), public.elo_week_room(uid, p_day, cfg));
+  -- Стан потрібен ДО розрахунку кімнати: від поточного ELO залежить темп,
+  -- а отже й стеля дня. Доти st заповнювався лише після update, і
+  -- elo_pace(null) мовчки давав би одиницю — тобто бонус чистого дня
+  -- рахувався б за старою, плаcкою стелею.
+  select * into st from season_state where user_id = uid and season = szn;
+  room := least(greatest(0, round((cfg->>'dayGainCap')::numeric
+                                  * public.elo_pace(st.elo, cfg))::int - day_sum),
+                public.elo_week_room(uid, p_day, cfg));
   bonus := least((cfg->>'cleanDayBonus')::int, room);
   if bonus <= 0 then return; end if;
   update season_state
@@ -1441,14 +1478,29 @@ grant execute on function public.elo_week_ready(uid uuid, p_week_start date, cfg
 
 CREATE OR REPLACE FUNCTION public.elo_week_room(uid uuid, p_day date, cfg jsonb)
  RETURNS integer
- LANGUAGE sql
+ LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  select greatest(0, (cfg ->> 'weeklyBudget')::int - coalesce((
-    select sum(delta) from elo_events
+declare
+  cur numeric;
+  spent int;
+begin
+  -- ЧОМУ plpgsql, А НЕ sql. Тіло sql-функції розбирається в момент
+  -- створення, а season_of у знімку схеми оголошена нижче: дамп
+  -- упорядкований за іменами, а не за залежностями. Плоска версія цієї
+  -- функції залежностей не мала й проблеми не помічала; щойно зʼявився
+  -- темп за рівнем — розгортання знімка впало на «function does not exist».
+  select s.elo into cur from season_state s
+    where s.user_id = uid and s.season = public.season_of(p_day);
+  select coalesce(sum(delta), 0) into spent from elo_events
     where user_id = uid and delta > 0 and category <> 'admin'
-      and day between date_trunc('week', p_day)::date and date_trunc('week', p_day)::date + 6), 0))::int;
+      and day between date_trunc('week', p_day)::date and date_trunc('week', p_day)::date + 6;
+  -- Тижнева стеля масштабується темпом так само, як вартість дії:
+  -- інакше на першому рівні дії дорожчі, а кімнати під них немає.
+  return greatest(0, floor((cfg ->> 'weeklyBudget')::numeric
+                           * public.elo_pace(cur, cfg))::int - spent);
+end;
 $function$
 ;
 grant execute on function public.elo_week_room(uid uuid, p_day date, cfg jsonb) to service_role;

@@ -302,7 +302,7 @@ try {
       const got = val("select quality || '|' || delta from public.elo_action_delta(" +
         lit(c.kind) + ", " + lit(JSON.stringify(c.payload)) + "::jsonb," +
         " (select data from elo_config where id = 1), " + Number(c.plannedDays) + ", " +
-        (c.grace ? 'true' : 'false') + ")");
+        (c.grace ? 'true' : 'false') + ", " + Number(c.elo) + ")");
       const [q, d] = got.split('|');
       const qNum = Math.round(Number(q) * 1000) / 1000;
       if (Number(d) !== c.delta || qNum !== c.quality) {

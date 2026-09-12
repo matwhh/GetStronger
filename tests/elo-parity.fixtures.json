@@ -12,6 +12,35 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 0,
+        "total": 5,
+        "doneSets": 0,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 0,
+        "total": 5,
+        "doneSets": 0,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 0,
       "delta": 0
     },
@@ -25,8 +54,37 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
       "quality": 1,
-      "delta": 13
+      "delta": 27
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 19
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
+      "quality": 1,
+      "delta": 10
     },
     {
       "kind": "workout",
@@ -38,8 +96,37 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
       "quality": 0.55,
-      "delta": 7
+      "delta": 15
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 3,
+        "total": 5,
+        "doneSets": 11,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0.55,
+      "delta": 10
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 3,
+        "total": 5,
+        "doneSets": 11,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
+      "quality": 0.55,
+      "delta": 6
     },
     {
       "kind": "workout",
@@ -51,8 +138,37 @@
       },
       "plannedDays": 7,
       "grace": false,
+      "elo": 0,
       "quality": 1,
-      "delta": 7
+      "delta": 15
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 7,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 11
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 7,
+      "grace": false,
+      "elo": 2600,
+      "quality": 1,
+      "delta": 6
     },
     {
       "kind": "workout",
@@ -64,6 +180,35 @@
       },
       "plannedDays": 4,
       "grace": true,
+      "elo": 0,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": true,
+      "elo": 1000,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 20,
+        "totalSets": 20
+      },
+      "plannedDays": 4,
+      "grace": true,
+      "elo": 2600,
       "quality": 0,
       "delta": 0
     },
@@ -77,8 +222,37 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
       "quality": 1,
-      "delta": 13
+      "delta": 27
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 0,
+        "totalSets": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 19
+    },
+    {
+      "kind": "workout",
+      "payload": {
+        "done": 5,
+        "total": 5,
+        "doneSets": 0,
+        "totalSets": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
+      "quality": 1,
+      "delta": 10
     },
     {
       "kind": "meal",
@@ -90,8 +264,37 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
       "quality": 1,
-      "delta": 7
+      "delta": 15
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2000,
+        "target": 2000,
+        "protein": 150,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 11
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2000,
+        "target": 2000,
+        "protein": 150,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
+      "quality": 1,
+      "delta": 6
     },
     {
       "kind": "meal",
@@ -103,8 +306,37 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
       "quality": 0.725,
-      "delta": 5
+      "delta": 11
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2200,
+        "target": 2000,
+        "protein": 150,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0.725,
+      "delta": 8
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2200,
+        "target": 2000,
+        "protein": 150,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
+      "quality": 0.725,
+      "delta": 4
     },
     {
       "kind": "meal",
@@ -116,6 +348,35 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 0.05,
+      "delta": 1
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 1200,
+        "target": 2000,
+        "protein": 60,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0.05,
+      "delta": 1
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 1200,
+        "target": 2000,
+        "protein": 60,
+        "proteinTarget": 150
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 0.05,
       "delta": 0
     },
@@ -129,8 +390,37 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
       "quality": 1,
-      "delta": 7
+      "delta": 15
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2000,
+        "target": 2000,
+        "protein": 0,
+        "proteinTarget": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 11
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 2000,
+        "target": 2000,
+        "protein": 0,
+        "proteinTarget": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
+      "quality": 1,
+      "delta": 6
     },
     {
       "kind": "meal",
@@ -142,6 +432,35 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 0,
+        "target": 0,
+        "protein": 0,
+        "proteinTarget": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0,
+      "delta": 0
+    },
+    {
+      "kind": "meal",
+      "payload": {
+        "kcal": 0,
+        "target": 0,
+        "protein": 0,
+        "proteinTarget": 0
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 0,
       "delta": 0
     },
@@ -153,8 +472,33 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
       "quality": 1,
-      "delta": 5
+      "delta": 10
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 480,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 7
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 480,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
+      "quality": 1,
+      "delta": 4
     },
     {
       "kind": "sleep",
@@ -164,6 +508,31 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 0.625,
+      "delta": 1
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 300,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0.625,
+      "delta": 0
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 300,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 0.625,
       "delta": 0
     },
@@ -175,6 +544,42 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 1,
+      "delta": 10
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 960,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 7
+    },
+    {
+      "kind": "sleep",
+      "payload": {
+        "minutes": 960,
+        "goal": 480
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
+      "quality": 1,
+      "delta": 4
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 10
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 0,
       "quality": 1,
       "delta": 5
     },
@@ -185,6 +590,18 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 4
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 10
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 1,
       "delta": 2
     },
@@ -195,6 +612,29 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 0.6,
+      "delta": 3
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 5
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0.6,
+      "delta": 2
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 5
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 0.6,
       "delta": 1
     },
@@ -205,6 +645,29 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 0.6,
+      "delta": 3
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 1
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0.6,
+      "delta": 2
+    },
+    {
+      "kind": "recovery",
+      "payload": {
+        "value": 1
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 0.6,
       "delta": 1
     },
@@ -216,6 +679,31 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 1,
+      "delta": 5
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 8000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 4
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 8000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 1,
       "delta": 2
     },
@@ -227,6 +715,31 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 0.25,
+      "delta": 0
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 2000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 0.25,
+      "delta": 0
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 2000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 0.25,
       "delta": 0
     },
@@ -238,6 +751,31 @@
       },
       "plannedDays": 4,
       "grace": false,
+      "elo": 0,
+      "quality": 1,
+      "delta": 5
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 100000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 1000,
+      "quality": 1,
+      "delta": 4
+    },
+    {
+      "kind": "activity",
+      "payload": {
+        "steps": 100000,
+        "goal": 8000
+      },
+      "plannedDays": 4,
+      "grace": false,
+      "elo": 2600,
       "quality": 1,
       "delta": 2
     }

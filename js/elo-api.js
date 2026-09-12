@@ -186,8 +186,13 @@
     if (window.EloCore && st && st.config) {
       const planned = payloadPlanned();
       const grace = st.graceUntil && day <= st.graceUntil;
+      /* ELO обовʼязково: відколи вартість дії залежить від рівня
+         (levelPace), без нього клієнт показав би число з найнижчого
+         рівня — на першому рівні вдвічі більше за правду, в ELITE
+         навпаки. Сервер усе одно перерахує, але людина встигла б
+         побачити «+8», а отримати «+3». */
       optimistic = window.EloCore.actionDelta(kind, payload, st.config,
-        { plannedDays: planned, grace: grace }).delta;
+        { plannedDays: planned, grace: grace, elo: st.elo }).delta;
     }
 
     try {

@@ -6,7 +6,7 @@
  * is_admin() на сервері. Сховати цю вкладку від не-адміна — питання
  * охайності, а не безпеки: навіть викликана вручну, вона дістане FORBIDDEN.
  *
- * НАВІЩО ВОНО ІСНУЄ. Рівні, ELITE-зона (2000+), таблиця лідерів і закриття
+ * НАВІЩО ВОНО ІСНУЄ. Рівні, ELITE-зона, таблиця лідерів і закриття
  * сезону — це стани, до яких «чесно» треба йти місяцями. Без можливості
  * поставити число їх неможливо ні побачити, ні перевірити.
  *
@@ -42,6 +42,24 @@
     backdated:      'половина подій заднім числом'
   };
 
+  /* Межі шкали — з бойового конфігу, а не з памʼяті. Якщо конфіг ще не
+     приїхав, беремо консервативні значення: краще недодати прав, ніж
+     дозволити виставити число поза сезонною стелею. */
+  function cfgNum(key, dflt) {
+    try {
+      const st = window.EloApi && window.EloApi.cached();
+      const v = Number(st && st.config && st.config[key]);
+      return Number.isFinite(v) && v > 0 ? v : dflt;
+    } catch (_) { return dflt; }
+  }
+  function seasonMax()  { return cfgNum('seasonMax', 3000); }
+  function eliteFloor() { return cfgNum('eliteFloor', 2400); }
+
+  function quick(uid, v, tail) {
+    return '<button class="btn btn--ghost btn--sm" type="button" data-ae="quick" data-uid="' +
+      esc(uid) + '" data-v="' + v + '">' + v + esc(tail || '') + '</button>';
+  }
+
   function anomalyHtml(uid) {
     const a = state.anomalies && state.anomalies[uid];
     if (!a) return '';
@@ -70,18 +88,20 @@
       anomalyHtml(r.userId) +
       '<div class="row mt-2" style="gap:8px;flex-wrap:wrap;align-items:center">' +
         '<label class="sr-only" for="ae-v-' + esc(r.userId) + '">Нове значення ELO</label>' +
-        '<input class="input" type="number" inputmode="numeric" min="0" max="2500" step="1" ' +
+        '<input class="input" type="number" inputmode="numeric" min="0" max="' + seasonMax() + '" step="1" ' +
           'style="max-width:120px" id="ae-v-' + esc(r.userId) + '" ' +
           'value="' + r.elo + '" aria-label="Нове значення ELO для ' + esc(who) + '">' +
         '<button class="btn btn--primary btn--sm" type="button" ' +
           'data-ae="set" data-uid="' + esc(r.userId) + '">Поставити</button>' +
         /* Швидкі значення — межі, які й треба перевіряти: початок,
-           середина, поріг ELITE, стеля сезону. */
-        '<button class="btn btn--ghost btn--sm" type="button" data-ae="quick" data-uid="' + esc(r.userId) + '" data-v="0">0</button>' +
-        '<button class="btn btn--ghost btn--sm" type="button" data-ae="quick" data-uid="' + esc(r.userId) + '" data-v="750">750</button>' +
-        '<button class="btn btn--ghost btn--sm" type="button" data-ae="quick" data-uid="' + esc(r.userId) + '" data-v="1500">1500</button>' +
-        '<button class="btn btn--ghost btn--sm" type="button" data-ae="quick" data-uid="' + esc(r.userId) + '" data-v="2000">2000 (ELITE)</button>' +
-        '<button class="btn btn--ghost btn--sm" type="button" data-ae="quick" data-uid="' + esc(r.userId) + '" data-v="2500">2500</button>' +
+           середина, поріг ELITE, стеля сезону. Числа рахуються з конфігу:
+           зашиті 2000 і 2500 стали неправдою тієї миті, коли перебаланс
+           розтягнув шкалу до 3000 (ELITE від 2400). */
+        quick(r.userId, 0, '0') +
+        quick(r.userId, Math.round(eliteFloor() / 3), '') +
+        quick(r.userId, Math.round(eliteFloor() / 3 * 2), '') +
+        quick(r.userId, eliteFloor(), ' (ELITE)') +
+        quick(r.userId, seasonMax(), '') +
       '</div>' +
     '</div>';
   }
@@ -111,7 +131,7 @@
       '<div class="card">' +
         '<h2 class="card__title">Рейтинг вручну</h2>' +
         '<p class="small muted" style="margin:6px 0 0">' +
-          'Сезон <b class="mono">' + esc(state.season) + '</b>. Значення затискається в 0–2500. ' +
+          'Сезон <b class="mono">' + esc(state.season) + '</b>. Значення затискається в 0–' + seasonMax() + '. ' +
           'Кожна зміна лягає в історію окремою подією з причиною — вона видна ' +
           'і вам, і власнику акаунта. Денний бюджет чесних дій це не витрачає.' +
         '</p>' +

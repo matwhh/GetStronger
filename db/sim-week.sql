@@ -167,23 +167,51 @@ begin
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'ELO = сума власних подій :: розбіжностей ' || n || E'\n';
 
   -- ---- стелі --------------------------------------------------------------
-  select coalesce(max(s),0) into mx from (select sum(delta) s from public.elo_events
+  /*
+   * СТЕЛІ БІЛЬШЕ НЕ ПЛОСКІ. Відколи зʼявився темп за рівнем (db/elo-pace.sql),
+   * і денна, і тижнева стеля множаться на elo_pace поточного рівня: на
+   * першому рівні дії дорожчі, і кімнати під них має бути більше. Порівняння
+   * з голим dayGainCap ловило б саме те, що ми навмисно зробили.
+   *
+   * Темп беремо від НАЙМЕНШОГО elo_after у вікні — це найближче до стану на
+   * ПОЧАТКУ дня (чи тижня), тобто від того рівня, за яким сервер і рахував
+   * стелю. Якщо рівень усередині вікна виріс, межа виходить трохи щедрішою —
+   * для перевірки «ніхто не набрав понад дозволене» це безпечний бік.
+   */
+  select coalesce(max(over_cap),0) into mx from (
+    select sum(delta) - round((cfg->>'dayGainCap')::numeric
+                              * public.elo_pace(min(elo_after - delta), cfg))::int as over_cap
+    from public.elo_events
     where user_id = any(uids) and delta > 0 group by user_id, day) x;
-  c := mx <= (cfg->>'dayGainCap')::int; alln:=alln+1; okn:=okn+c::int;
+  c := mx <= 0; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end
-            || 'денна стеля :: ' || mx || ' (ліміт ' || (cfg->>'dayGainCap') || ')' || E'\n';
+            || 'денна стеля :: перевищення на ' || mx || ' (з урахуванням темпу рівня)' || E'\n';
 
-  select coalesce(max(s),0) into mx from (select sum(delta) s from public.elo_events
-    where user_id = any(uids) and delta > 0 and category <> 'admin' and day between wk and wk+6 group by user_id) x;
-  c := mx <= (cfg->>'weeklyBudget')::int; alln:=alln+1; okn:=okn+c::int;
+  select coalesce(max(over_cap),0) into mx from (
+    select sum(delta) - floor((cfg->>'weeklyBudget')::numeric
+                              * public.elo_pace(min(elo_after - delta), cfg))::int as over_cap
+    from public.elo_events
+    where user_id = any(uids) and delta > 0 and category <> 'admin' and day between wk and wk+6
+    group by user_id) x;
+  c := mx <= 0; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end
-            || 'тижневий бюджет :: ' || mx || ' (ліміт ' || (cfg->>'weeklyBudget') || ')' || E'\n';
+            || 'тижневий бюджет :: перевищення на ' || mx || ' (з урахуванням темпу рівня)' || E'\n';
 
-  select coalesce(max(s),0) into mx from (select sum(delta) s from public.elo_events
-    where user_id = any(uids) and delta > 0 and category = 'training' and day between wk and wk+6 group by user_id) x;
-  c := mx <= trainbudget; alln:=alln+1; okn:=okn+c::int;
+  select coalesce(max(over_cap),0) into mx from (
+    /* Округлення РАЗ і в тому самому порядку, що на сервері
+       (elo_submit): round(бюджет × темп × частка × вага). Два послідовні
+       округлення дають розбіжність в одиницю — і перевірка червоніє на
+       рівному місці. */
+    select sum(delta) - round((cfg->>'weeklyBudget')::numeric
+                              * public.elo_pace(min(elo_after - delta), cfg)
+                              * (cfg->>'categoryShare')::numeric
+                              * (cfg #>> '{weights,training}')::numeric)::int as over_cap
+    from public.elo_events
+    where user_id = any(uids) and delta > 0 and category = 'training' and day between wk and wk+6
+    group by user_id) x;
+  c := mx <= 0; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end
-            || 'тижневий бюджет тренувань :: ' || mx || ' (ліміт ' || trainbudget || ')' || E'\n';
+            || 'тижневий бюджет тренувань :: перевищення на ' || mx || ' (з урахуванням темпу)' || E'\n';
 
   -- ---- порядок за старанністю ---------------------------------------------
   select elo into elo_a from public.season_state where user_id = uids[1] and season = szn;

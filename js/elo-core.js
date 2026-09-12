@@ -212,12 +212,51 @@
 
   function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
 
-  /** Тижневий бюджет категорії в ELO (без бонусної частки). */
-  function weeklyBudget(cat, cfg) {
-    return cfg.weeklyBudget * cfg.categoryShare * cfg.weights[cat];
+  /**
+   * ТЕМП ЗА РІВНЕМ: на початку дія коштує більше, далі — менше.
+   *
+   * ЧОМУ ВЗАГАЛІ. Доти бюджет був плаский: 200 ELO на тиждень і на
+   * першому рівні, і на девʼятому. Наслідків два, обидва погані. Старт
+   * нудний: перші два тижні людина робить усе як треба й бачить Level 2 —
+   * нагороди за найважчий період (коли звички ще немає) майже немає. І
+   * стеля недосяжна: сильний гравець із 90–95% виконання закінчував сезон
+   * на ~1800 із 2500, тобто верхня третина шкали не належала нікому,
+   * крім бездоганного.
+   *
+   * Тепер темп спадає з рівнем. Перші рівні беруться швидко — це аванс за
+   * те, що людина тільки входить у режим; далі кожні наступні 200 очок
+   * коштують дорожче. Крива в конфігу (levelPace), а не в коді: балансом
+   * крутять цифри, а не логіку.
+   *
+   * ШТРАФИ НЕ МАСШТАБУЮТЬСЯ навмисно. Пропущене тренування коштує ті самі
+   * −8 і на другому рівні, і на девʼятому. Разом зі спадним темпом це і
+   * дає «далі тільки важче»: нагорода меншає, ціна помилки — ні.
+   *
+   * БЕЗ ELO В КОНТЕКСТІ МНОЖНИК ДОРІВНЮЄ ОДИНИЦІ. Так рахують місця, яким
+   * рівень невідомий або не потрібен: попередній показ дії в довідці,
+   * оцінка дотримання плану. Мовчазне множення там дало б число, якого
+   * сервер не підтвердить.
+   */
+  function pace(elo, cfg) {
+    const curve = cfg && cfg.levelPace;
+    if (!Array.isArray(curve) || !curve.length) return 1;
+    /* null окремо від undefined: Number(null) — це 0, тобто «перший
+       рівень», і викликач, який чесно сказав «рівень невідомий», мовчки
+       отримував би найщедріший множник у грі. */
+    if (elo === null || elo === undefined) return 1;
+    if (!Number.isFinite(Number(elo))) return 1;
+    const lv = levelFor(elo, cfg);
+    const raw = lv.elite ? cfg.elitePace : curve[lv.level - 1];
+    const v = Number(raw);
+    return (Number.isFinite(v) && v > 0) ? v : 1;
   }
 
-  function dailyBudget(cat, cfg) { return weeklyBudget(cat, cfg) / 7; }
+  /** Тижневий бюджет категорії в ELO (без бонусної частки). */
+  function weeklyBudget(cat, cfg, elo) {
+    return cfg.weeklyBudget * pace(elo, cfg) * cfg.categoryShare * cfg.weights[cat];
+  }
+
+  function dailyBudget(cat, cfg, elo) { return weeklyBudget(cat, cfg, elo) / 7; }
 
   /** Драбина якості: [[поріг, множник], …] згори вниз. */
   function ladder(steps, x) {
@@ -248,14 +287,15 @@
     const total = Math.max(1, Number(bySets ? payload.totalSets : payload.total) || 0);
     const done = Number(bySets ? payload.doneSets : payload.done) || 0;
     const q = clamp(done / total, 0, 1);
-    const per = weeklyBudget('training', cfg) / Math.max(1, Number(ctx && ctx.plannedDays) || 3);
+    const per = weeklyBudget('training', cfg, ctx && ctx.elo) /
+                Math.max(1, Number(ctx && ctx.plannedDays) || 3);
     return { quality: q, mult: q, delta: Math.round(per * q) };
   }
 
-  function mealDelta(payload, cfg) {
+  function mealDelta(payload, cfg, ctx) {
     const target = Number(payload.target) || 0;
     const pTarget = Number(payload.proteinTarget) || 0;
-    const day = dailyBudget('nutrition', cfg);
+    const day = dailyBudget('nutrition', cfg, ctx && ctx.elo);
     /*
      * Без цільового білка (старі записи до етапу authoritative) калорії
      * беруть УСЮ вагу категорії — як на сервері (db/elo-authoritative.sql,
@@ -282,18 +322,19 @@
     return { quality: mult, mult: mult, delta: Math.round(day * mult) };
   }
 
-  function sleepDelta(payload, cfg) {
+  function sleepDelta(payload, cfg, ctx) {
     const goal = Math.max(1, Number(payload.goal) || 480);
     const q = clamp((Number(payload.minutes) || 0) / goal, 0, 1);
     const mult = ladder(cfg.tolerance.sleep, q);
-    return { quality: q, mult: mult, delta: Math.round(dailyBudget('sleep', cfg) * mult) };
+    return { quality: q, mult: mult,
+             delta: Math.round(dailyBudget('sleep', cfg, ctx && ctx.elo) * mult) };
   }
 
-  function recoveryDelta(payload, cfg) {
+  function recoveryDelta(payload, cfg, ctx) {
     /* Заповнити трекер — більша частина цінності (звичка помічати стан);
        гарний стан (≥ recoveryGoodValue) — решта. Не карати за чесне
        «мені погано» — інакше трекер брехатиме. */
-    const day = dailyBudget('recovery', cfg);
+    const day = dailyBudget('recovery', cfg, ctx && ctx.elo);
     const filled = payload.value !== null && payload.value !== undefined;
     if (!filled) return { quality: 0, mult: 0, delta: 0 };
     const good = Number(payload.value) >= cfg.recoveryGoodValue;
@@ -301,11 +342,12 @@
     return { quality: mult, mult: mult, delta: Math.round(day * mult) };
   }
 
-  function activityDelta(payload, cfg) {
+  function activityDelta(payload, cfg, ctx) {
     const goal = Math.max(1, Number(payload.goal) || 10000);
     const q = clamp((Number(payload.steps) || 0) / goal, 0, 1);
     const mult = ladder(cfg.tolerance.activity, q);
-    return { quality: q, mult: mult, delta: Math.round(dailyBudget('activity', cfg) * mult) };
+    return { quality: q, mult: mult,
+             delta: Math.round(dailyBudget('activity', cfg, ctx && ctx.elo) * mult) };
   }
 
   const ACTIONS = {
@@ -346,10 +388,25 @@
     return workoutsDone >= plannedDays && mealDaysClosed >= 7 ? cfg.cleanWeekBonus : 0;
   }
 
-  /** Застосувати денні межі і стелю сезону. */
-  function applyDayCaps(deltas, cfg) {
+  /**
+   * Застосувати денні межі і стелю сезону.
+   *
+   * СТЕЛЯ ДНЯ МАСШТАБУЄТЬСЯ ТЕМПОМ, ПІДЛОГА — НІ.
+   *
+   * Без цього крива темпу не працює зовсім: на першому рівні бездоганний
+   * день коштує під шістдесят очок, а плаский dayGainCap зрізав би його
+   * до сорока пʼяти — і весь розгін, заради якого крива й існує,
+   * зʼїдався б стелею. Саме на цьому перший підбір крив тупцював:
+   * множник рік, а швидкість та сама.
+   *
+   * Підлога втрат лишається плаcкою навмисно. Разом зі спадним темпом це
+   * і є «далі тільки важче»: нагорода меншає з рівнем, ціна пропущеного
+   * дня — ні.
+   */
+  function applyDayCaps(deltas, cfg, elo) {
     const sum = deltas.reduce(function (a, d) { return a + d; }, 0);
-    return clamp(sum, cfg.dayLossFloor, cfg.dayGainCap);
+    const cap = Math.round(cfg.dayGainCap * pace(elo, cfg));
+    return clamp(sum, cfg.dayLossFloor, cap);
   }
 
   function clampElo(elo, cfg) { return clamp(Math.round(elo), 0, cfg.seasonMax); }
@@ -396,6 +453,7 @@
     seasonLabel: seasonLabel,
     levelFor: levelFor,
     previousSeasonCode: previousSeasonCode,
+    pace: pace,
     weeklyBudget: weeklyBudget,
     dailyBudget: dailyBudget,
     ladder: ladder,

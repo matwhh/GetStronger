@@ -141,42 +141,51 @@ describe('ELO: сезон закінчується в неділю', () => {
   });
 });
 
-describe('ELO: рівні 0–2500', () => {
-  it('рівні рівномірні по 200', () => {
+describe('ELO: драбина рівнів', () => {
+  /*
+   * Числа беруться З КОНФІГУ, а не зашиті. Зашиті вже протухли один раз: у
+   * вересні 2026 перебаланс розтягнув шкалу (крок 240 замість 200, ELITE
+   * від 2400, стеля 3000), і чотири перевірки почервоніли на правильній
+   * поведінці — вони стерегли не правило, а конкретні числа.
+   */
+  const S = CFG.levelSize;
+
+  it('рівні рівномірні по levelSize', () => {
     assert.equal(E.levelFor(0, CFG).level, 1);
-    assert.equal(E.levelFor(199, CFG).level, 1);
-    assert.equal(E.levelFor(200, CFG).level, 2);
-    assert.equal(E.levelFor(999, CFG).level, 5);
-    assert.equal(E.levelFor(1799, CFG).level, 9);
-    assert.equal(E.levelFor(1800, CFG).level, 10);
+    assert.equal(E.levelFor(S - 1, CFG).level, 1);
+    assert.equal(E.levelFor(S, CFG).level, 2);
+    assert.equal(E.levelFor(S * 5 - 1, CFG).level, 5);
+    assert.equal(E.levelFor(S * (CFG.levelCount - 1) - 1, CFG).level, CFG.levelCount - 1);
+    assert.equal(E.levelFor(S * (CFG.levelCount - 1), CFG).level, CFG.levelCount);
   });
 
-  it('2000+ — Level 10 ELITE, а не Level 11', () => {
-    const a = E.levelFor(1942, CFG), b = E.levelFor(2247, CFG);
-    assert.equal(a.level, 10); assert.equal(a.elite, false); assert.equal(a.name, 'Level 10');
-    assert.equal(b.level, 10); assert.equal(b.elite, true); assert.equal(b.name, 'Level 10 — ELITE');
+  it('вище eliteFloor — останній рівень ELITE, а не рівень N+1', () => {
+    const a = E.levelFor(CFG.eliteFloor - 100, CFG);
+    const b = E.levelFor(CFG.eliteFloor + 100, CFG);
+    const last = 'Level ' + CFG.levelCount;
+    assert.equal(a.level, CFG.levelCount); assert.equal(a.elite, false); assert.equal(a.name, last);
+    assert.equal(b.level, CFG.levelCount); assert.equal(b.elite, true);
+    assert.equal(b.name, last + ' — ELITE');
   });
 
   it('межа ELITE — РІВНО на eliteFloor, не на одиницю далі', () => {
     /*
      * TST-003: тести брали 1942 і 2247, тобто саму межу не чіпали. Мутант
-     * «>= → >» виживав: людина з рівно 2000 ELO переставала бути ELITE, і
+     * «>= → >» виживав: людина з рівно eliteFloor переставала бути ELITE, і
      * помітити це можна було тільки очима — levelFor читають season.js,
      * app.js, today.js і admin-elo.js.
      */
-    assert.equal(E.levelFor(1999, CFG).elite, false);
-    assert.equal(E.levelFor(2000, CFG).elite, true);
-    assert.equal(E.levelFor(2000, CFG).floor, 2000);
-    assert.equal(E.levelFor(2000, CFG).name, 'Level 10 — ELITE');
-    /* Межа береться з конфігу, а не з числа 2000 у коді. */
-    assert.equal(E.levelFor(CFG.eliteFloor, CFG).elite, true);
     assert.equal(E.levelFor(CFG.eliteFloor - 1, CFG).elite, false);
+    assert.equal(E.levelFor(CFG.eliteFloor, CFG).elite, true);
+    assert.equal(E.levelFor(CFG.eliteFloor, CFG).floor, CFG.eliteFloor);
+    assert.equal(E.levelFor(CFG.eliteFloor, CFG).name,
+                 'Level ' + CFG.levelCount + ' — ELITE');
   });
 
-  it('стеля 2500', () => {
-    assert.equal(E.clampElo(2600, CFG), 2500);
+  it('стеля сезону затискає зверху й знизу', () => {
+    assert.equal(E.clampElo(CFG.seasonMax + 100, CFG), CFG.seasonMax);
     assert.equal(E.clampElo(-50, CFG), 0);
-    assert.equal(E.levelFor(2500, CFG).pct, 100);
+    assert.equal(E.levelFor(CFG.seasonMax, CFG).pct, 100);
   });
 });
 
@@ -394,5 +403,98 @@ describe('sumFrom — приріст ELO з дня', () => {
   it('результат цілий', () => {
     assert.equal(E.sumFrom([{ day: '2026-09-08', delta: 1.4 },
                             { day: '2026-09-08', delta: 1.4 }], '2026-09-07'), 3);
+  });
+});
+
+/* ==========================================================================
+   ТЕМП ЗА РІВНЕМ — levelPace
+   ==========================================================================
+   Вересень 2026. Бюджет був плаский: 200 ELO на тиждень і на першому рівні,
+   і на девʼятому. Старт нудний (два тижні бездоганної роботи — Level 2 із
+   десяти), а верхня третина шкали не належала нікому, крім бездоганного:
+   сильний гравець із 90–95% закінчував сезон на ~1800 із 2500.
+
+   Тепер темп спадає з рівнем. Тут стережеться саме те, що ламається тихо:
+   множник має БРАТИСЬ із конфігу, спадати монотонно, множити і вартість
+   дії, і стелю дня — і НЕ чіпати штрафи.
+   ========================================================================== */
+describe('ELO: темп за рівнем', () => {
+  const CTX = { plannedDays: 4 };
+  const meal = (elo) => E.actionDelta('meal',
+    { kcal: 2000, target: 2000, protein: 150, proteinTarget: 150 },
+    CFG, Object.assign({ elo: elo }, CTX)).delta;
+
+  it('крива є в конфігу і має по множнику на кожен рівень', () => {
+    assert.ok(Array.isArray(CFG.levelPace), 'levelPace має бути масивом');
+    assert.equal(CFG.levelPace.length, CFG.levelCount);
+    assert.ok(Number(CFG.elitePace) > 0, 'elitePace має бути додатним');
+  });
+
+  it('множник спадає монотонно — інакше «далі важче» неправда', () => {
+    for (let i = 1; i < CFG.levelPace.length; i++) {
+      assert.ok(CFG.levelPace[i] <= CFG.levelPace[i - 1],
+        'рівень ' + (i + 1) + ' дорожчий за попередній: ' +
+        CFG.levelPace[i] + ' > ' + CFG.levelPace[i - 1]);
+    }
+    assert.ok(CFG.elitePace <= CFG.levelPace[CFG.levelPace.length - 1],
+      'ELITE має бути не щедрішим за останній рівень');
+  });
+
+  it('pace бере множник саме того рівня, у якому стоїть ELO', () => {
+    assert.equal(E.pace(0, CFG), CFG.levelPace[0]);
+    assert.equal(E.pace(CFG.levelSize - 1, CFG), CFG.levelPace[0]);
+    assert.equal(E.pace(CFG.levelSize, CFG), CFG.levelPace[1]);
+    assert.equal(E.pace(CFG.eliteFloor, CFG), CFG.elitePace);
+    assert.equal(E.pace(CFG.seasonMax, CFG), CFG.elitePace);
+  });
+
+  /* Регресія: без ELO в контексті множник мусить бути 1. Так рахують
+     довідка й оцінка дотримання плану — місця, яким рівень невідомий.
+     Мовчазне множення там дало б число, якого сервер не підтвердить. */
+  it('без ELO множник дорівнює одиниці', () => {
+    assert.equal(E.pace(undefined, CFG), 1);
+    assert.equal(E.pace(null, CFG), 1);
+    assert.equal(E.pace('багато', CFG), 1);
+    assert.equal(E.actionDelta('meal',
+      { kcal: 2000, target: 2000, protein: 150, proteinTarget: 150 }, CFG, CTX).delta,
+      Math.round(CFG.weeklyBudget * CFG.categoryShare * CFG.weights.nutrition / 7));
+  });
+
+  it('конфіг без кривої нічого не масштабує', () => {
+    const flat = Object.assign({}, CFG); delete flat.levelPace;
+    assert.equal(E.pace(0, flat), 1);
+    assert.equal(E.pace(1000, flat), 1);
+  });
+
+  it('та сама дія на першому рівні коштує дорожче, ніж на останньому', () => {
+    const first = meal(0);
+    const last = meal(CFG.levelSize * (CFG.levelCount - 1));
+    const elite = meal(CFG.eliteFloor);
+    assert.ok(first > last, 'перший рівень має коштувати більше: ' + first + ' vs ' + last);
+    assert.ok(last >= elite, 'ELITE має бути не щедрішим за останній рівень');
+    /* І рівно у стільки разів, скільки каже крива. */
+    assert.equal(first, Math.round(
+      CFG.weeklyBudget * CFG.levelPace[0] * CFG.categoryShare * CFG.weights.nutrition / 7));
+  });
+
+  it('стеля дня теж масштабується темпом', () => {
+    const many = [40, 40, 40];
+    assert.equal(E.applyDayCaps(many, CFG, 0),
+      Math.round(CFG.dayGainCap * CFG.levelPace[0]));
+    assert.equal(E.applyDayCaps(many, CFG, CFG.eliteFloor),
+      Math.round(CFG.dayGainCap * CFG.elitePace));
+  });
+
+  /* ГОЛОВНЕ ПРАВИЛО БАЛАНСУ: нагорода меншає з рівнем, ціна помилки — ні.
+     Якщо підлога втрат поїде за темпом, «далі важче» перетвориться на
+     «далі все дешевше», і сенс кривої зникне. */
+  it('підлога втрат НЕ масштабується', () => {
+    const loss = [-50, -50];
+    assert.equal(E.applyDayCaps(loss, CFG, 0), CFG.dayLossFloor);
+    assert.equal(E.applyDayCaps(loss, CFG, CFG.eliteFloor), CFG.dayLossFloor);
+  });
+
+  it('штраф за пропущене тренування однаковий на всіх рівнях', () => {
+    assert.equal(E.weekPenalty(0, 4, 0, CFG), 4 * CFG.missedWorkoutPenalty);
   });
 });

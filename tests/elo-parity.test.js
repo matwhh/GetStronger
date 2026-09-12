@@ -35,10 +35,10 @@ describe('ELO: ядро дає ті самі числа, що зафіксова
 
   for (const c of FX.cases) {
     const label = c.kind + ' ' + JSON.stringify(c.payload) +
-      ' planned=' + c.plannedDays + (c.grace ? ' grace' : '');
+      ' planned=' + c.plannedDays + ' elo=' + c.elo + (c.grace ? ' grace' : '');
     it(label, () => {
       const r = EC.actionDelta(c.kind, c.payload, CFG,
-        { plannedDays: c.plannedDays, grace: c.grace });
+        { plannedDays: c.plannedDays, grace: c.grace, elo: c.elo });
       assert.equal(Math.round(Number(r.delta)), c.delta, 'delta');
       assert.equal(Math.round(Number(r.quality) * 1000) / 1000, c.quality, 'quality');
     });

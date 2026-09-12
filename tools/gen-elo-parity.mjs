@@ -58,14 +58,26 @@ const CASES = [
   { kind: 'activity', payload: { steps: 100000, goal: 8000 }, planned: 4, grace: false }
 ];
 
-const out = CASES.map(function (c) {
-  const r = EC.actionDelta(c.kind, c.payload, CFG,
-    { plannedDays: c.planned, grace: c.grace });
-  return {
-    kind: c.kind, payload: c.payload, plannedDays: c.planned, grace: c.grace,
-    quality: Math.round(Number(r.quality) * 1000) / 1000,
-    delta: Math.round(Number(r.delta))
-  };
+/*
+ * ТРИ ТОЧКИ ШКАЛИ НА КОЖЕН ВИПАДОК.
+ *
+ * Відколи вартість дії залежить від рівня (levelPace), одного входу мало:
+ * розбіжність JS і SQL могла б жити лише на високих рівнях і не показатись
+ * на нулі. Беремо початок (перший рівень), середину й ELITE.
+ */
+const ELOS = [0, 1000, 2600];
+
+const out = [];
+CASES.forEach(function (c) {
+  ELOS.forEach(function (elo) {
+    const r = EC.actionDelta(c.kind, c.payload, CFG,
+      { plannedDays: c.planned, grace: c.grace, elo: elo });
+    out.push({
+      kind: c.kind, payload: c.payload, plannedDays: c.planned, grace: c.grace, elo: elo,
+      quality: Math.round(Number(r.quality) * 1000) / 1000,
+      delta: Math.round(Number(r.delta))
+    });
+  });
 });
 
 const file = path.join(ROOT, 'tests/elo-parity.fixtures.json');

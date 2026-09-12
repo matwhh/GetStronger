@@ -18,6 +18,29 @@ declare
   ub uuid := '00000000-0000-4000-8000-00000000f002';
   y date := current_date - 1; wk date := date_trunc('week', current_date)::date;
   r jsonb; out text := E'\n'; okn int := 0; alln int := 0; st record; c boolean; w1 int := 0;
+  cfg jsonb; per int; tb int; expect int; sleep_floor int; act_floor int;
+  /* Денні вартості категорій рахуються з конфігу: після db/elo-pace.sql
+     вони залежать від рівня, і зашиті 5/2/2 ловили б навмисну зміну як
+     помилку. Темп — на нулі: у цих тестах користувач не виходить із
+     першого рівня. Рахується в declare, до `set local role authenticated`:
+     elo_pace видана лише service_role, як і решта чистих помічників. */
+  cfgd jsonb := (select data from public.elo_config where id = 1);
+  d_sleep int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                       * (cfgd->>'categoryShare')::numeric
+                       * (cfgd#>>'{weights,sleep}')::numeric / 7)::int;
+  d_rec int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                     * (cfgd->>'categoryShare')::numeric
+                     * (cfgd#>>'{weights,recovery}')::numeric / 7)::int;
+  d_act int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                     * (cfgd->>'categoryShare')::numeric
+                     * (cfgd#>>'{weights,activity}')::numeric / 7)::int;
+  d_meal int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                      * (cfgd->>'categoryShare')::numeric
+                      * (cfgd#>>'{weights,nutrition}')::numeric / 7)::int;
+  d_work6 int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                       * (cfgd->>'categoryShare')::numeric
+                       * (cfgd#>>'{weights,training}')::numeric / 6)::int;
+
   -- Payload, у якому підроблено ВСЕ, що колись впливало на розрахунок.
   forged jsonb := jsonb_build_object('minutes',480,'goal',1,'steps',20000,'kcal',2500,
     'target',2500,'protein',300,'proteinTarget',1,'done',999999,'total',1,'value',10);
@@ -46,11 +69,27 @@ begin
   /* ---------- АТАКИ: підроблений payload не впливає ні на що ---------- */
   perform set_config('request.jwt.claims', json_build_object('sub', ua)::text, true);
   set local role authenticated;
+  /*
+   * ПІДРОБЛЕНИЙ PAYLOAD ДАЄ НЕ БІЛЬШЕ, НІЖ НИЖНЯ СХОДИНКА ДРАБИНИ.
+   *
+   * Доти тут стояло «рівно 0», і це працювало випадково: реальна якість
+   * (ціль сну підтягується до підлоги 240 хв, факт — 1 хв) давала 0,05
+   * від денного бюджету, тобто 0,25 очка, і округлення з'їдало її. Щойно
+   * бюджет виріс удвічі, та сама чесна крихта стала одиницею — і
+   * перевірка почервоніла на правильній поведінці.
+   *
+   * Питання ж було не про нуль, а про те, що підробка не купує повної
+   * вартості. Так і перевіряємо: не більше за найгіршу сходинку.
+   */
+  sleep_floor := round(d_sleep * (cfgd#>'{tolerance,sleep}' -> -1 ->> 1)::numeric)::int;
+  act_floor   := round(d_act   * (cfgd#>'{tolerance,activity}' -> -1 ->> 1)::numeric)::int;
   r := public.elo_submit('sleep','t:sleep',y,forged);
-  c := coalesce((r->>'delta')::int,0) = 0; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'ціль сну = 1 хв не дає нарахування' || E'\n';
+  c := coalesce((r->>'delta')::int,0) <= sleep_floor; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'ціль сну = 1 хв дає не більше нижньої сходинки (' || sleep_floor || ') :: '
+            || coalesce(r->>'delta','—') || E'\n';
   r := public.elo_submit('activity','t:act',y,forged);
-  c := coalesce((r->>'delta')::int,0) = 0; alln:=alln+1; okn:=okn+c::int;
+  c := coalesce((r->>'delta')::int,0) <= act_floor; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'ціль кроків = 1 не дає нарахування' || E'\n';
   r := public.elo_submit('workout','t:wk',y,forged);
   c := r->>'error' = 'no_data'; alln:=alln+1; okn:=okn+c::int;
@@ -69,29 +108,32 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', ub)::text, true);
   set local role authenticated;
   r := public.elo_submit('workout','h:wk',y,'{}');
-  c := (r->>'delta')::int = 9; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесне тренування = 9 (план 6)' || E'\n';
+  c := (r->>'delta')::int = d_work6; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесне тренування = ' || d_work6 || ' (план 6)' || E'\n';
   r := public.elo_submit('meal','h:meal',y,'{}');
-  c := (r->>'delta')::int = 7; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесне харчування = 7' || E'\n';
+  c := (r->>'delta')::int = d_meal; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесне харчування = ' || d_meal || E'\n';
   r := public.elo_submit('sleep','h:sleep',y,'{}');
-  c := (r->>'delta')::int = 5; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесний сон = 5' || E'\n';
+  c := (r->>'delta')::int = d_sleep; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесний сон = ' || d_sleep || E'\n';
   r := public.elo_submit('recovery','h:rec',y,'{}');
-  c := (r->>'delta')::int = 2; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесний recovery = 2' || E'\n';
+  c := (r->>'delta')::int = d_rec; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесний recovery = ' || d_rec || E'\n';
   r := public.elo_submit('activity','h:act',y,'{}');
-  c := (r->>'delta')::int = 2; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесна активність = 2' || E'\n';
+  c := (r->>'delta')::int = d_act; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесна активність = ' || d_act || E'\n';
   select elo as e into st from public.season_state where user_id = ub;
-  c := st.e = 28; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесний день = 25 + 3 бонус = 28' || E'\n';
+  expect := d_work6 + d_meal + d_sleep + d_rec + d_act + (cfgd->>'cleanDayBonus')::int;
+  c := st.e = expect; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'чесний день = сума пʼяти категорій + бонус = ' || expect || ' :: ' || st.e || E'\n';
   r := public.elo_submit('sleep','h:sleep',y,'{}');
   c := (r->>'duplicate')::boolean is true; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'повторний сабміт → duplicate' || E'\n';
   select elo as e into st from public.season_state where user_id = ub;
-  c := st.e = 28; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'повторний сабміт не змінює ELO' || E'\n';
+  c := st.e = expect; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'повторний сабміт не змінює ELO :: ' || st.e || E'\n';
   r := public.elo_submit('sleep','oow',current_date - 30,'{}');
   c := r->>'error' = 'out_of_window'; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'подія поза вікном відхилена' || E'\n';
@@ -112,27 +154,49 @@ begin
   insert into public.season_state (user_id, season) values (ua, season_of(current_date)) on conflict do nothing;
   update public.season_state set elo = 0 where user_id = ua;
 
+  /*
+   * ВАРТІСТЬ ТРЕНУВАННЯ БІЛЬШЕ НЕ КОНСТАНТА. Доти тут стояло 17 — рівно
+   * 200 × 0.857 × 0.3 / 3 при плаcкому бюджеті. Відколи бюджет залежить від
+   * рівня (db/elo-pace.sql), на нульовому ELO те саме тренування коштує
+   * вдвічі більше, і зашите число ловило б саме ту зміну, яку ми зробили
+   * навмисно. Рахуємо з конфігу, у тому самому порядку, що й сервер.
+   *
+   * Темп беремо на нулі й не перераховуємо: три тренування не виводять
+   * користувача навіть із першого рівня, тож множник за весь тест один.
+   */
+  select data into cfg from public.elo_config where id = 1;
+  tb  := round((cfg->>'weeklyBudget')::numeric * public.elo_pace(0, cfg)
+               * (cfg->>'categoryShare')::numeric
+               * (cfg#>>'{weights,training}')::numeric)::int;
+  per := round((cfg->>'weeklyBudget')::numeric * public.elo_pace(0, cfg)
+               * (cfg->>'categoryShare')::numeric
+               * (cfg#>>'{weights,training}')::numeric / 3)::int;
+
   perform set_config('request.jwt.claims', json_build_object('sub', ua)::text, true);
   set local role authenticated;
   r := public.elo_submit('workout','wb1',current_date - 2,'{}');
   -- На 1–2 день сезону «позавчора» належить минулому сезону → out_of_window;
   -- це не регресія, тому день просто не рахується в тижневу суму.
-  c := coalesce((r->>'delta')::int = 17, r->>'error' = 'out_of_window', false); alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'план=1 у профілі: сервер бере план ≥ 3 → 17 (db/elo-integrity.sql)' ||
+  c := coalesce((r->>'delta')::int = per, r->>'error' = 'out_of_window', false); alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'план=1 у профілі: сервер бере план ≥ 3 → ' || per || ' (db/elo-integrity.sql)' ||
          case when r->>'error' = 'out_of_window' then ' [позавчора — минулий сезон, пропущено]' else '' end || E'\n';
   w1 := coalesce((r->>'delta')::int, 0);
   r := public.elo_submit('workout','wb2',current_date - 1,'{}');
-  c := (r->>'delta')::int = 17; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'друге тренування = 17' || E'\n';
+  c := (r->>'delta')::int = per; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'друге тренування = ' || per || E'\n';
   r := public.elo_submit('workout','wb3',current_date,'{}');
-  c := (r->>'delta')::int = 17; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'третє = 17 (тижневий бюджет тренувань 51 вичерпано)' || E'\n';
+  c := (r->>'delta')::int = per; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'третє = ' || per || ' (тижневий бюджет тренувань ' || tb || ' вичерпано)' || E'\n';
   reset role;
   select coalesce(sum(delta),0) as s into st from public.elo_events
     where user_id = ua and category='training' and day between wk and wk + 6;
   -- У понеділок «учора/позавчора» — інший ISO-тиждень, у сумі лише сьогоднішнє.
-  c := st.s = case when date_trunc('week', current_date - 1)::date = wk then 34 + w1 else 17 end; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'тижневий бюджет тренувань = 51 незалежно від плану (факт ' || st.s || ' при ' || (2 + (w1 > 0)::int) || ' тренуваннях у вікні)' || E'\n';
+  c := st.s = case when date_trunc('week', current_date - 1)::date = wk then per * 2 + w1 else per end;
+  alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'тижневий бюджет тренувань = ' || tb || ' незалежно від плану (факт ' || st.s
+            || ' при ' || (2 + (w1 > 0)::int) || ' тренуваннях у вікні)' || E'\n';
 
   raise exception E'ELO-ТЕСТИ: % з % пройдено\n%', okn, alln, out;
 end $$;

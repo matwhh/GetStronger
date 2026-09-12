@@ -14,6 +14,40 @@ declare
   t date := current_date; y date := current_date - 1;
   wk date := date_trunc('week', current_date)::date;
   r jsonb; out text := E'\n'; okn int := 0; alln int := 0; n int; s int; c boolean; k text; i int;
+  budget int;                 -- тижнева стеля з урахуванням темпу рівня
+  /* Рахується в declare, тобто ДО перших `set local role authenticated`:
+     elo_pace, як і решта чистих помічників (elo_ladder, elo_band), видана
+     лише service_role — клієнту вона не потрібна й не належить. */
+  cfgj jsonb := (select data from public.elo_config where id = 1);
+  wfull int := round((cfgj->>'weeklyBudget')::numeric * public.elo_pace(0, cfgj)
+                     * (cfgj->>'categoryShare')::numeric
+                     * (cfgj#>>'{weights,training}')::numeric / 3)::int;
+  whalf int := round((cfgj->>'weeklyBudget')::numeric * public.elo_pace(0, cfgj)
+                     * (cfgj->>'categoryShare')::numeric
+                     * (cfgj#>>'{weights,training}')::numeric / 3 * 0.5)::int;
+  lvl int;
+  /* Денні вартості категорій рахуються з конфігу: після db/elo-pace.sql
+     вони залежать від рівня, і зашиті 5/2/2 ловили б навмисну зміну як
+     помилку. Темп — на нулі: у цих тестах користувач не виходить із
+     першого рівня. Рахується в declare, до `set local role authenticated`:
+     elo_pace видана лише service_role, як і решта чистих помічників. */
+  cfgd jsonb := (select data from public.elo_config where id = 1);
+  d_sleep int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                       * (cfgd->>'categoryShare')::numeric
+                       * (cfgd#>>'{weights,sleep}')::numeric / 7)::int;
+  d_rec int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                     * (cfgd->>'categoryShare')::numeric
+                     * (cfgd#>>'{weights,recovery}')::numeric / 7)::int;
+  d_act int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                     * (cfgd->>'categoryShare')::numeric
+                     * (cfgd#>>'{weights,activity}')::numeric / 7)::int;
+  d_meal int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                      * (cfgd->>'categoryShare')::numeric
+                      * (cfgd#>>'{weights,nutrition}')::numeric / 7)::int;
+  d_work6 int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+                       * (cfgd->>'categoryShare')::numeric
+                       * (cfgd#>>'{weights,training}')::numeric / 6)::int;
+
   kinds1 text; kinds2 text;   -- TST-016: набір нагород до і після повторного закриття
 begin
   insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
@@ -35,27 +69,31 @@ begin
 
   -- ---- F-01: ротація ключів ----
   r := public.elo_submit('sleep','sleep:'||y, y, '{}');
-  c := (r->>'delta')::int = 5; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесний сон = 5' || E'\n';
+  c := (r->>'delta')::int = d_sleep; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'чесний сон = ' || d_sleep || E'\n';
   s := 0;
   foreach k in array array['', ' ', 'x1', 'SLEEP:'||y, 'ѕleep:'||y, repeat('k',5000), gen_random_uuid()::text, 'week:'||wk, 'cleanday:'||y] loop
     r := public.elo_submit('sleep', k, y, '{}'); s := s + coalesce((r->>'delta')::int, 0);
   end loop;
   select elo into n from public.season_state where user_id = ua and season = season_of(y);
-  c := n = 5; alln:=alln+1; okn:=okn+c::int;   -- відповідь duplicate повторює delta події, ELO не росте
-  out := out || case when c then 'OK   ' else 'FAIL ' end || '9 повторів з іншими ключами (включно з week:/cleanday:): ELO лишається 5' || E'\n';
+  c := n = d_sleep; alln:=alln+1; okn:=okn+c::int;   -- duplicate повторює delta події, ELO не росте
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || '9 повторів з іншими ключами (включно з week:/cleanday:): ELO лишається ' || d_sleep || E'\n';
   select count(*) into n from public.elo_events where user_id = ua and day = y; c := n = 1; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'одна подія в elo_events, ключ серверний' || E'\n';
   select count(*) into n from public.elo_events where user_id = ua and action_key like 'week:%'; c := n = 0; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'F-B: клієнт не створив service-ключ week:' || E'\n';
   r := public.elo_submit('sleep','sleep:'||y, y, '{"minutes":100000,"goal":1}');
-  c := (r->>'duplicate')::boolean is true and (r->>'delta')::int = 5; alln:=alln+1; okn:=okn+c::int;
+  c := (r->>'duplicate')::boolean is true and (r->>'delta')::int = d_sleep; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'повтор → duplicate, payload ігнорується' || E'\n';
 
   -- ---- F-A: planned=1 → сервер бере ≥3 і фіксує знімок ----
+  /* wfull / whalf порахувалися в declare — вартість тренування залежить
+     від рівня, і зашите 17 ловило б навмисну зміну як помилку. */
   r := public.elo_submit('workout','w', y, '{}');
-  c := (r->>'delta')::int = 17; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'план=1 у профілі → тренування = 17 (план ≥ 3)' || E'\n';
+  c := (r->>'delta')::int = wfull; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'план=1 у профілі → тренування = ' || wfull || ' (план ≥ 3)' || E'\n';
   reset role;
   update public.profiles set data = jsonb_set(data, '{activePlan,days}', '7') where user_id = ua;
   select planned into n from public.elo_week_plan where user_id = ua and week_start = date_trunc('week', y)::date;
@@ -82,15 +120,17 @@ begin
 
   -- ---- Реконсиляція: часткове → повне тренування доплачує різницю ----
   r := public.elo_submit('workout','w2', t, '{}');
-  c := (r->>'delta')::int = 9; alln:=alln+1; okn:=okn+c::int;   -- 5/10 → q 0.5 → 8.57 → 9
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'часткове тренування (q .5) = 9' || E'\n';
+  c := (r->>'delta')::int = whalf; alln:=alln+1; okn:=okn+c::int;   -- 5/10 → q 0.5
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'часткове тренування (q .5) = ' || whalf || E'\n';
   reset role;
   update public.profiles set data = jsonb_set(data, array['sessionLog', t::text], '{"total":10,"done":10}'::jsonb) where user_id = ua;
   perform set_config('request.jwt.claims', json_build_object('sub', ua)::text, true);
   set local role authenticated;
   r := public.elo_submit('workout','w3', t, '{}');
-  c := (r->>'delta')::int = 8 and (r->>'paid')::int = 17; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'завершене тренування доплачує 8 → paid 17' || E'\n';
+  c := (r->>'delta')::int = wfull - whalf and (r->>'paid')::int = wfull; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'завершене тренування доплачує ' || (wfull - whalf) || ' → paid ' || wfull || E'\n';
   reset role;
   update public.profiles set data = jsonb_set(data, array['sessionLog', t::text], '{"total":10,"done":1}'::jsonb) where user_id = ua;
   perform set_config('request.jwt.claims', json_build_object('sub', ua)::text, true);
@@ -99,8 +139,9 @@ begin
   c := (r->>'duplicate')::boolean is true; alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'гірші факти нічого не змінюють (paid ≤ intended)' || E'\n';
   select delta into n from public.elo_events where user_id = ua and event_type = 'workout' and day = t;
-  c := n = 17; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'подія дня одна, delta = 17' || E'\n';
+  c := n = wfull; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'подія дня одна, delta = ' || wfull || E'\n';
 
   -- ---- Тижневий бюджет тренувань 51 незалежно від плану ----
   r := public.elo_submit('meal','m5', t, '{}');   -- mealLog за сьогодні немає → no_data
@@ -120,9 +161,25 @@ begin
       'steps',    (select jsonb_object_agg(d::date::text, 12000) from generate_series(wk, wk + 6, '1 day') d),
       'recovery', (select jsonb_object_agg(d::date::text, 8) from generate_series(wk, wk + 6, '1 day') d)));
   insert into public.season_state (user_id, season, elo) values (ub, season_of(current_date), 0);
-  -- Емуляція «майже повного тижня»: 6 інших днів по 30 = 180 із 200.
+  /*
+   * Емуляція «майже повного тижня»: лишаємо рівно 20 очок до стелі.
+   *
+   * Доти тут стояло «6 днів по 30 = 180 із 200». Відколи бюджет залежить
+   * від рівня (db/elo-pace.sql), двохсот немає: на нульовому ELO тижнева
+   * стеля вдвічі більша. Тому засів рахується від конфігу, а перевірки
+   * нижче питають про ІНВАРІАНТ — «сума тижня не перевищує стелю, остання
+   * дія обрізається до лишку, далі нуль» — а не про конкретні 199 і 200.
+   * Саме ці два числа й були єдиним, що тут ламалось при зміні балансу.
+   */
+  budget := floor((cfgj->>'weeklyBudget')::numeric * public.elo_pace(0, cfgj))::int;
+  -- Залишок від ділення додається ПЕРШОМУ дню в тому ж операторі: окремим
+  -- рядком його не вставиш — на (user_id, event_type, day) стоїть унікальність.
   insert into public.elo_events (user_id, season, day, category, event_type, action_key, quality, delta, elo_after, reason)
-  select ub, season_of(d::date), d::date, 'sleep', 'legacy', 'legacy:'||d::date, 1, 30, 0, 't'
+  select ub, season_of(d::date), d::date, 'sleep', 'legacy', 'legacy:'||d::date, 1,
+         ((budget - 20) / 6)::int
+           + case when row_number() over (order by d) = 1
+                  then (budget - 20) - ((budget - 20) / 6)::int * 6 else 0 end,
+         0, 't'
     from generate_series(wk, wk + 6, '1 day') d where d::date <> t;
   perform set_config('request.jwt.claims', json_build_object('sub', ub)::text, true);
   set local role authenticated;
@@ -130,20 +187,25 @@ begin
   foreach k in array array['meal','sleep','activity','recovery'] loop
     r := public.elo_submit(k, k, t, '{}'); s := s + coalesce((r->>'delta')::int, 0);
   end loop;
-  c := s = 16; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'у межах бюджету нараховується повністю (16)' || E'\n';
+  c := s > 0 and s <= 20; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'у межах бюджету нараховується повністю :: ' || s || ' із 20, що лишались' || E'\n';
   select coalesce(sum(delta),0) into n from public.elo_events where user_id = ub and delta > 0 and category <> 'admin' and day between wk and wk + 6;
-  c := n = 199; alln:=alln+1; okn:=okn+c::int;   -- 180 + 16 + cleanday 3
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'тиждень = 199 (з чистим днем)' || E'\n';
+  c := n <= budget; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'тиждень не перевищив стелю :: ' || n || ' із ' || budget || E'\n';
   r := public.elo_submit('workout', 'w', t, '{}');
-  c := (r->>'delta')::int = 1; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'тренування 17 обрізано до лишку бюджету 1' || E'\n';
+  c := (r->>'delta')::int = greatest(0, budget - n); alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'тренування обрізано рівно до лишку бюджету :: ' || (r->>'delta')
+            || ', лишалось ' || greatest(0, budget - n) || E'\n';
   select coalesce(sum(delta),0) into n from public.elo_events where user_id = ub and delta > 0 and category <> 'admin' and day between wk and wk + 6;
-  c := n = 200; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'сума позитивного ELO тижня = 200 (weeklyBudget)' || E'\n';
+  c := n = budget; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+            || 'сума позитивного ELO тижня = стеля :: ' || n || E'\n';
   r := public.elo_submit('sleep', 'again', case when t < wk + 6 then t + 1 else t - 1 end, '{}');
   c := coalesce((r->>'delta')::int, 0) = 0; alln:=alln+1; okn:=okn+c::int;
-  out := out || case when c then 'OK   ' else 'FAIL ' end || 'після 200 — +0 навіть за інший день тижня (або no_data поза тижнем)' || E'\n';
+  out := out || case when c then 'OK   ' else 'FAIL ' end || 'після стелі — +0 навіть за інший день тижня (або no_data поза тижнем)' || E'\n';
   reset role;
 
   -- ---- F-02: закриття сезону ----
@@ -187,12 +249,24 @@ begin
   out := out || case when c then 'OK   ' else 'FAIL ' end
             || 'повторне закриття не додало нагород :: ' || kinds2 || E'\n';
 
-  /* Рівневі нагороди — не «щось видали», а конкретний перелік для 1234 ELO
-     (Level 5 = 800, Level 7 = 1200; Level 8 = 1400 вже ні). */
-  c := kinds2 like '%level5%' and kinds2 like '%level7%' and kinds2 not like '%level8%';
+  /*
+   * Рівневі нагороди — не «щось видали», а конкретний перелік для 1234 ELO.
+   * Пороги БЕРУТЬСЯ З КОНФІГУ: зашиті числа (Level 5 = 800, Level 7 = 1200)
+   * протухли тієї ж миті, коли рівень став 240 замість 200, і перевірка
+   * почала червоніти на правильній поведінці.
+   */
+  n := (select (data->>'levelSize')::int from public.elo_config where id = 1);
+  lvl := least(10, 1234 / n + 1);
+  /* Нагороди є не за кожен рівень, а за віхи: 5, 7, 8, 9, 10. Кожна має
+     бути видана тоді й тільки тоді, коли рівень її досяг. */
+  c := true;
+  foreach i in array array[5,7,8,9,10] loop
+    if (kinds2 like ('%level' || i::text || '%')) <> (lvl >= i) then c := false; end if;
+  end loop;
   alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end
-            || 'рівневі нагороди відповідають 1234 ELO' || E'\n';
+            || 'рівневі нагороди відповідають 1234 ELO (рівень ' || lvl
+            || ' при кроці ' || n || ') :: ' || kinds2 || E'\n';
   -- submit у закритий сезон неможливий навіть у вікні (емуляція: історія є)
   reset role;
   insert into public.season_history (user_id, season, final_elo, level, elite, grace_weeks_used, stats)

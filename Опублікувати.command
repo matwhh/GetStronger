@@ -185,6 +185,14 @@ if ! git push -u $FORCE origin "$BRANCH" 2>/tmp/forge-push.log; then
   ERR="$(cat /tmp/forge-push.log)"
   printf "\n${R}Не вдалося відправити.${N}\n%s\n" "$ERR"
   case "$ERR" in
+    # Мережу перевіряємо ПЕРШОЮ. Інакше «немає інтернету» ловилось нижче
+    # як «потрібен вхід», і людина йшла перевипускати цілком живий токен.
+    *"Could not resolve host"*|*"Failed to connect"*|*"Operation timed out"*|\
+    *"proxy"*|*"Network is unreachable"*|*"Connection refused"*)
+      printf "\n${Y}Схоже, немає звʼязку з GitHub.${N}\n"
+      printf "Перевір інтернет і запусти ще раз. Токен тут ні до чого:\n"
+      printf "твої коміти нікуди не зникли, вони чекають на диску.\n"
+      ;;
     *"Repository not found"*|*"not found"*)
       # Для ПРИВАТНОГО репозиторію GitHub навмисно віддає «not found» і
       # тоді, коли він існує, але доступ протух: щоб не підказувати
@@ -198,14 +206,14 @@ if ! git push -u $FORCE origin "$BRANCH" 2>/tmp/forge-push.log; then
       printf "     Якщо там інша — виправ рядок REPO_URL на початку цього файла.\n\n"
       printf "  ${B}2. Доступ протух.${N} Токен GitHub має строк придатності; коли він\n"
       printf "     минає, приватний репозиторій починає виглядати як неіснуючий.\n"
-      printf "     Лікується новим входом: tools/github-token.command\n\n"
+      printf "     Лікується так: запусти «Токен GitHub.command».\n\n"
       printf "  3. І лише якщо репозиторію справді немає — створи його з назвою\n"
       printf "     ${B}%s${N}, тип Private, без README і без .gitignore.\n" "$REPO_NAME"
       open "https://github.com/${REPO_OWNER}?tab=repositories" 2>/dev/null
       ;;
     *"could not read Username"*|*"Authentication"*|*"denied"*|*"403"*)
       printf "\n${Y}GitHub не пустив: потрібен вхід.${N}\n"
-      printf "Запусти ${B}tools/github-token.command${N} — він проведе по кроках.\n"
+      printf "Запусти ${B}«Токен GitHub.command»${N} — він усе зробить сам.\n"
       ;;
   esac
   printf "\nНатисни Enter, щоб закрити вікно."; read -r _; exit 1

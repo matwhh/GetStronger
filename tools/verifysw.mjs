@@ -9,6 +9,14 @@ import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
+/*
+ * Шлях до браузера — звідти ж, звідки й решта перевірок (аудит 13.09.2026).
+ * Цей файл був єдиним, хто кликав chromium.launch() без executablePath —
+ * тобто рівно з тією проблемою, заради якої tools/pw.mjs і зроблено: на
+ * машині без завантаженого Playwright-браузера набір падав до першого
+ * рядка, і перевірка офлайн-оболонки не запускалась ніде, крім CI.
+ */
+import { CHROME } from './pw.mjs';
 
 const TYPES = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css',
   '.svg':'image/svg+xml', '.png':'image/png', '.ico':'image/x-icon',
@@ -43,7 +51,7 @@ const base = 'http://127.0.0.1:' + srv.address().port + '/';
 const R = [];
 const ok = (n, c, x) => { R.push(c); console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
-const b = await chromium.launch();
+const b = await chromium.launch({ executablePath: CHROME });
 const ctx = await b.newContext();
 /* Зовнішні походження блокуємо: шрифти й Supabase до перевірки не належать. */
 await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, r => r.abort());

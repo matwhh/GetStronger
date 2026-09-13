@@ -35,6 +35,8 @@ node tools/verify7.mjs           # 16 сторінок × 2 ширини: overfl
 node tools/verifydata.mjs        # міграції, legacy-поле, offline, reload
 node tools/verifyimport.mjs      # export → clear → import → verify + биті файли
 node tools/verifya11y.mjs        # focus trap, Escape, aria, мобільне меню
+                                 # + рейтинг, сезони й нагороди: заголовки,
+                                 #   імена контролів, tabindex, skip-link, inert
 node tools/verifyflows.mjs       # наскрізні сценарії + друк
 node tools/verifyhardening.mjs   # пошкоджене сховище, швидкі кліки, offline, крайні числа
 node tools/verifyonboard.mjs     # шлях нового користувача: онбординг → тиждень

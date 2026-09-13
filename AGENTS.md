@@ -162,7 +162,7 @@ bash tools/ci-browser.sh full               # core + 33, ~50 хв
 | `sw.js` | `verifysw` + `sw-core.test.js` |
 | `store.js` | `store-core.test.js`, `sync-owner.test.js`, `verifydata`, `verifyroundtrip`, `verifyaccountmix` |
 | ELO / сезони | `elo-*.test.js`, `node tools/simelo.mjs` (має лишатись 6/6) |
-| рейтинг, стрічка подій, `seasons.html` | `verifyseasons`, `verifylvlbar`, `verifydaycal` |
+| рейтинг, стрічка подій, `seasons.html` | `verifyseasons`, `verifylvlbar`, `verifydaycal`, `verifya11y` |
 | нагороди | `verifyawards`, `verifyaward`, `award-core.test.js` |
 | `db/*.sql` | `verify-sql-suites.mjs`, `verify-schema-perms.mjs`, `verify-elo-week.mjs` |
 

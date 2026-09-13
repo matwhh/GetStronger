@@ -15,7 +15,7 @@
 |---|---|---|
 | **Знімок бойової схеми** | `live-schema.sql` | Джерело правди про те, що ЗАРАЗ у базі. Згенеровано, руками не редагується. Цілком по продакшену не виконується. |
 | **Історія змін** | `schema.sql`, `elo-*.sql`, `admin-elo*.sql`, `account-approval.sql`, `security-hardening*.sql`, `nick-length.sql`, `leaderboard-name.sql`, `cron.sql` | Те, чим базу доводили до нинішнього стану. Читати — так. Виконувати по продакшену — ні. |
-| **Інструменти** | `backup-export.sql`, `restore-skeleton.sql`, `RESTORE.md`, `*-tests.sql`, `sim-week.sql` | Виконуються свідомо й окремо. Див. `RESTORE.md`. |
+| **Інструменти** | `backup-export.sql`, `snapshot-before-plan.sql`, `restore-skeleton.sql`, `RESTORE.md`, `*-tests.sql`, `sim-week.sql` | Виконуються свідомо й окремо. Див. `RESTORE.md`. |
 
 ## Як міняти базу
 

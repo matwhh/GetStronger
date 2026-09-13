@@ -153,6 +153,7 @@ alter table public.season_state add constraint season_state_grace_used_check CHE
 alter table public.season_state add constraint season_state_pkey PRIMARY KEY (user_id, season);
 alter table public.season_state add constraint season_state_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
+CREATE INDEX account_status_decided_by_idx ON public.account_status USING btree (decided_by);
 CREATE INDEX account_status_status_requested_idx ON public.account_status USING btree (status, requested_at DESC);
 CREATE UNIQUE INDEX account_status_username_key ON public.account_status USING btree (lower(username)) WHERE (username IS NOT NULL);
 CREATE UNIQUE INDEX consent_log_uniq ON public.consent_log USING btree (user_id, document, version);

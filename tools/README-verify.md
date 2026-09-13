@@ -18,8 +18,8 @@ npm i playwright
 із 41).
 
 ```bash
-bash tools/ci-browser.sh core   # 9 наборів, кожен пуш, ~5 хв
-bash tools/ci-browser.sh full   # + 23, раз на добу, ~40 хв
+bash tools/ci-browser.sh core   # 14 наборів, кожен пуш, ~8 хв
+bash tools/ci-browser.sh full   # + 33, раз на добу, ~50 хв
 ```
 
 **Поза CI навмисно** (пояснення — у шапці `ci-browser.sh`):
@@ -54,6 +54,8 @@ node tools/verifyperf.mjs        # вага сторінок, час заван�
 node tools/verifysw.mjs          # service worker: оболонка, офлайн, аварійний вимикач
 node tools/verifyhelp.mjs        # контекстна довідка: кнопка на кожній сторінці, різний вміст, модальність
 node tools/verifylink.mjs        # вхід за посиланням із листа, чужий токен, beacon
+node tools/verifyawards.mjs      # вітрина нагород: рідкість кольором, слово на звороті, фільтри
+node tools/verifyseasons.mjs     # стрічка подій (згортається й памʼятає), плитки-входи, seasons.html
 node tools/verifyerrors.mjs      # що саме летить у Sentry: без пошти, токенів і профілю
 node tools/verify-schema-perms.mjs  # права й політики: справжні запити клієнта по копії схеми
 ```

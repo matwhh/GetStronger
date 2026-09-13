@@ -236,9 +236,23 @@
         (st.rank ? '<span class="small">Місце: <b class="mono">#' + st.rank + '</b> із ' + st.of + '</span>' : '') +
       '</div>' +
 
+      /*
+       * ДВІ ПЛИТКИ — ЦЕ ВХОДИ, А НЕ ПІДСУМКИ.
+       *
+       * «7 нагород» і «2 сезони завершено» — числа, після яких одразу
+       * виникає «а які саме». Доти відповіді не було: плитка була
+       * мертвим числом, а до нагород доводилось шукати посилання в
+       * іншій картці нижче. Тепер кожна веде туди, де відповідь:
+       * нагороди — на свою вітрину, сезони — на розбір по сезонах.
+       *
+       * Стрілку в підписі додає CSS (.kpi--link), а не цей рядок: вона
+       * оздоба посилання, а не частина слова.
+       */
       '<div class="kpis mt-2">' +
-        '<div class="kpi"><div class="kpi__val mono">' + ident.awards + '</div><p class="kpi__lbl">нагород</p></div>' +
-        '<div class="kpi"><div class="kpi__val mono">' + ident.seasons + '</div><p class="kpi__lbl">сезонів завершено</p></div>' +
+        '<a class="kpi kpi--link" href="awards.html">' +
+          '<div class="kpi__val mono">' + ident.awards + '</div><p class="kpi__lbl">нагород</p></a>' +
+        '<a class="kpi kpi--link" href="seasons.html">' +
+          '<div class="kpi__val mono">' + ident.seasons + '</div><p class="kpi__lbl">сезонів завершено</p></a>' +
       '</div>' +
 
       '<div class="field mt-2" style="max-width:340px">' +
@@ -312,29 +326,176 @@
     }
   }
 
-  async function renderEvents() {
-    try {
-      /* Ті самі події, що дали тижневий підсумок у шапці: один запит на
-         оновлення, а не два. Показуємо останні 14 — довший список тут
-         ніхто не читає, він для «що мені щойно нарахували». */
-      const events = (recent.events || []).slice(0, 14);
-      if (!events.length) {
-        $('#sz-events').innerHTML = card(
-          '<h3 class="card__title">Події ELO</h3>' +
-          '<p class="small muted mb-0">Ще порожньо. Закрийте тренування, день харчування ' +
-          'чи відміть сон — і перші очки прийдуть одразу.</p>');
-        return;
-      }
-      $('#sz-events').innerHTML = card(
+  /* ---------------- Останні події ---------------- */
+  /*
+   * ЧОМУ СТРІЧКА ЗГОРТАЄТЬСЯ.
+   *
+   * Це єдине місце, де можна дізнатись, ЗА ЩО прийшло число. Але потрібне
+   * воно рідко — раз на тиждень, коли щось здалось дивним, — а місця
+   * займало найбільше на сторінці: чотирнадцять рядків між шапкою й
+   * таблицею лідерів. Хто відкривав рейтинг, щоб глянути своє ELO, щодня
+   * гортав повз відповідь на питання, якого не ставив.
+   *
+   * Тому стрічка стала акордеоном — тим самим (.acc + initAccordions),
+   * що згортає довгі пояснення внизу сторінки: нового компонента тут не
+   * зʼявляється. І стан ЗАПАМʼЯТОВУЄТЬСЯ: той, хто раз відкрив стрічку,
+   * читає її й наступного разу, а хто закрив — більше не бачить.
+   *
+   * ГОЛОВА КАЖЕ ГОЛОВНЕ НАВІТЬ ЗАКРИТОЮ. Заголовок із самим словом
+   * «Останні події» над згорнутим тілом не повідомляє нічого — його
+   * доводилось відкривати, щоб дізнатись, чи є там узагалі щось. Тому в
+   * голові стоїть підсумок: скільком подіям і на скільки ELO за тиждень.
+   *
+   * ЩО ЗМІНИЛОСЬ У САМИХ РЯДКАХ. Було: причина, дата й дельта одним
+   * рядком. Три проблеми, усі однакові — рядок не відповідав на
+   * очевидне питання:
+   *   • дата стояла в кожному рядку («2026-09-13» тринадцять разів),
+   *     хоч питання «котрого дня» стосується дня, а не події. Тепер
+   *     події згорнуті в ДНІ (js/elo-view-core.js), у дня — своя сума;
+   *   • не було видно КАТЕГОРІЇ: «Чистий день» і «Сон 7.5 год» стояли
+   *     поруч без ознаки, що одне — бонус, а друге — сон;
+   *   • не було видно РАХУНКУ: дельта є, а «скільки стало» — ні, хоч
+   *     сервер віддає elo_after у тій самій відповіді.
+   */
+  const EVENTS_KEY = 'ib.elo.events.open';
+  /* Чотири дні — приблизно стільки, скільки видно на екрані телефона без
+     гортання. Решта за кнопкою: обрізати історію зовсім не можна, бо
+     питання «а що було в понеділок» законне. */
+  const EVENTS_DAYS = 4;
+  let eventsAll = false;
+
+  function eventsOpen() {
+    try { return localStorage.getItem(EVENTS_KEY) !== '0'; } catch (_) { return true; }
+  }
+  function eventsRemember(open) {
+    try { localStorage.setItem(EVENTS_KEY, open ? '1' : '0'); } catch (_) {}
+  }
+
+  /* Той самий знак, що ставить initLongform: акордеони сайту мусять
+     виглядати однаково, інакше «це згортається» перестає читатись. */
+  const CHEVRON = '<svg class="acc__ico" viewBox="0 0 24 24" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
+    '<path d="M6 9l6 6 6-6"/></svg>';
+
+  function toneVar(n) { return n >= 0 ? '--ok' : '--acc-ink'; }
+
+  function eventRow(e) {
+    const V = window.EloView;
+    const d = Math.round(Number(e.delta) || 0);
+    const after = Number(e.eloAfter);
+    return '<div class="szev">' +
+      '<span class="szev__l">' +
+        '<span class="szev__cat">' + esc(V.catLabel(e.category)) + '</span>' +
+        '<span class="szev__what">' + esc(e.reason || '—') + '</span>' +
+      '</span>' +
+      '<span class="szev__r">' +
+        '<b class="szev__d mono" style="color:var(' + toneVar(d) + ')">' + signed(d) + '</b>' +
+        /* Рахунок після події показуємо лише коли він справжній: тижнева
+           оцінка приходить із elo_after = 0 (це підсумок тижня, а не стан
+           рахунку), і надрукувати той нуль означало б сказати людині, що
+           вона обнулилась. */
+        (Number.isFinite(after) && after > 0
+          ? '<span class="szev__elo mono">' + after + '</span>' : '') +
+      '</span>' +
+    '</div>';
+  }
+
+  function eventDayHtml(g, todayKey) {
+    const V = window.EloView;
+    return '<div class="szday">' +
+      '<div class="szday__h">' +
+        '<span class="szday__when">' + esc(V.dayLabel(g.day, todayKey)) + '</span>' +
+        '<span class="szday__r">' +
+          '<b class="mono" style="color:var(' + toneVar(g.sum) + ')">' + signed(g.sum) + '</b>' +
+          (g.eloAfter ? '<span class="szday__elo mono">' + g.eloAfter + ' ELO</span>' : '') +
+        '</span>' +
+      '</div>' +
+      g.events.map(eventRow).join('') +
+    '</div>';
+  }
+
+  function renderEvents() {
+    const host = $('#sz-events');
+    if (!host) return;
+    const V = window.EloView;
+    const all = recent.events || [];
+
+    /*
+     * ПОРОЖНЬО — ЦЕ НЕ ЗГОРНУТО. Акордеон, у якому нічого немає, лише
+     * пропонує відкрити порожнечу. Тому тут звичайна картка з поясненням,
+     * що зробити, щоб перші очки прийшли.
+     */
+    if (!all.length || !V) {
+      /*
+       * «Порожньо» і «не приїхало» — різні речі, і сказати треба різне.
+       * recent.events === null означає, що запит не вдався (loadRecent
+       * ковтає помилку навмисно: без звʼязку решта панелі працює з кешу).
+       * Написати такій людині «закрийте тренування» означало б порадити
+       * зробити те, що вона, можливо, уже зробила.
+       */
+      host.innerHTML = card(
         '<h3 class="card__title">Останні події</h3>' +
-        '<div class="mt-1">' + events.map(function (e) {
-          return '<div class="row row--split small" style="padding:7px 0;border-bottom:1px solid var(--line);gap:10px">' +
-            '<span>' + esc(e.reason) + ' <span class="muted">· ' + esc(e.day) + '</span></span>' +
-            '<b class="mono" style="color:var(' + (e.delta >= 0 ? '--ok' : '--acc-ink') + ')">' +
-              signed(e.delta) + '</b>' +
-          '</div>';
-        }).join('') + '</div>');
-    } catch (_) { $('#sz-events').innerHTML = ''; }
+        (recent.events === null
+          ? '<p class="small muted mb-0">Стрічку не вдалося завантажити — немає звʼязку ' +
+            'з сервером. Нарахування від цього не губляться: події лежать на сервері, ' +
+            'а зроблене офлайн дошлеться саме.</p>'
+          : '<p class="small muted mb-0">Ще порожньо. Закрийте тренування, день харчування ' +
+            'чи відмітьте сон — і перші очки прийдуть одразу. Тут буде видно кожне ' +
+            'нарахування окремо: день, категорія, причина й дельта.</p>'));
+      return;
+    }
+
+    const todayKey = window.DateCore.keyOf(new Date());
+    const groups = V.groupByDay(all);
+    const shown = eventsAll ? groups : groups.slice(0, EVENTS_DAYS);
+    const hiddenDays = groups.length - shown.length;
+    const sum = V.eventsSummary(all, mondayKey());
+    const open = eventsOpen();
+
+    host.innerHTML =
+      '<div class="acc' + (open ? ' is-open' : '') + '">' +
+        '<button class="acc__head" type="button">' +
+          '<span>' +
+            '<h3>Останні події</h3>' +
+            '<span class="small muted">' +
+              signed(sum.sum) + ' ELO за тиждень · ' +
+              sum.count + ' ' + window.App.plural(sum.count, 'подія', 'події', 'подій') +
+              ' за ' + sum.days + ' ' + window.App.plural(sum.days, 'день', 'дні', 'днів') +
+            '</span>' +
+          '</span>' +
+          CHEVRON +
+        '</button>' +
+        '<div class="acc__body"><div class="acc__inner"><div class="acc__pad">' +
+          shown.map(function (g) { return eventDayHtml(g, todayKey); }).join('') +
+          (hiddenDays > 0
+            ? '<button class="btn btn--ghost btn--sm mt-2" type="button" id="sz-ev-more">' +
+                'Показати ще ' + hiddenDays + ' ' +
+                window.App.plural(hiddenDays, 'день', 'дні', 'днів') + '</button>'
+            : (eventsAll && groups.length > EVENTS_DAYS
+                ? '<button class="btn btn--ghost btn--sm mt-2" type="button" id="sz-ev-less">' +
+                    'Показати менше</button>'
+                : '')) +
+          '<p class="small muted mt-2 mb-0">Сервер нараховує за день, тому й підсумок ' +
+            'тут денний. Праворуч від дельти — рахунок після події.</p>' +
+        '</div></div></div>' +
+      '</div>';
+
+    window.App.initAccordions(host);
+
+    /* Стан памʼятаємо ПІСЛЯ initAccordions: він сам нічого не зберігає,
+       і це правильно — більшість акордеонів сайту й не мусить. */
+    const head = host.querySelector('.acc__head');
+    const box = host.querySelector('.acc');
+    if (head && box) {
+      head.addEventListener('click', function () {
+        eventsRemember(box.classList.contains('is-open'));
+      });
+    }
+
+    const more = $('#sz-ev-more');
+    if (more) more.addEventListener('click', function () { eventsAll = true; renderEvents(); });
+    const less = $('#sz-ev-less');
+    if (less) less.addEventListener('click', function () { eventsAll = false; renderEvents(); });
   }
 
   async function renderBoard(st) {
@@ -361,49 +522,95 @@
     } catch (_) { $('#sz-board').innerHTML = ''; }
   }
 
+  /*
+   * ІСТОРІЯ Й НАГОРОДИ РОЗʼЇХАЛИСЬ ПО ДВОХ БЛОКАХ — І ЦЕ НАВМИСНО.
+   *
+   * Досі це була одна картка: список сезонів, а під ним сітка нагород.
+   * Дві різні розмови в одній рамці, і жодна не на своєму місці.
+   * Нагороди — найкраще, що в людини є; стояти вони мусять там, де на них
+   * дивляться, а не в хвості службового списку. Тому:
+   *
+   *   • історія сезонів лишається тут, стислим списком, і веде на
+   *     seasons.html — там той самий список із розбором кожного сезону;
+   *   • нагороди переїхали в САМИЙ НИЗ сторінки (#sz-awards), окремою
+   *     вітриною на всю ширину.
+   *
+   * Чому саме в низ, а не в шапку: рейтинг читають зверху вниз — «скільки
+   * в мене зараз», «як іде тиждень», «де я в таблиці». Нагороди не
+   * відповідають ні на що з цього, вони нагорода за вже пройдене, і
+   * правильне місце для неї — кінець, а не початок.
+   */
   async function renderHistory() {
     try {
       const data = await Api.history();
       const hist = (data && data.history) || [];
       const awards = (data && data.awards) || [];
-      if (!hist.length && !awards.length) { $('#sz-history').innerHTML = ''; return; }
+      renderAwards(awards);
+      if (!hist.length) {
+        /* Перший сезон ще триває: сказати про це один раз варто — інакше
+           людина шукає історію, якої за задумом поки немає. */
+        $('#sz-history').innerHTML = card(
+          '<h3 class="card__title">Історія сезонів</h3>' +
+          '<p class="small muted mb-0">Перший сезон ще триває — підсумок зʼявиться ' +
+          'після його завершення. Що саме в ньому буде, видно на ' +
+          '<a href="seasons.html">сторінці сезонів</a>.</p>');
+        return;
+      }
+      /* У рейтингу — три останні сезони. Це не обрізана історія, а
+         превʼю: повний розбір із підсумками, графіком і категоріями
+         живе на seasons.html, і вести туди один раз честніше, ніж
+         тримати тут список, який із роками не має кінця. */
+      const top = hist.slice(0, 3);
       $('#sz-history').innerHTML = card(
-        '<h3 class="card__title">Історія сезонів</h3>' +
-        (hist.length
-          ? '<div class="mt-1">' + hist.map(function (h) {
-              return '<div class="row row--split small" style="padding:7px 0;border-bottom:1px solid var(--line);gap:10px">' +
-                '<span>' + esc(EC.seasonLabel(h.season)) +
-                  (h.rank ? ' <span class="muted">· #' + h.rank + ' із ' + h.of + '</span>' : '') +
-                  (h.percentile ? ' <span class="muted">· Top ' + h.percentile + '%</span>' : '') +
-                '</span>' +
-                '<b class="mono">' + h.elo + ' ELO · L' + h.level + (h.elite ? ' ELITE' : '') + '</b>' +
-              '</div>';
-            }).join('') + '</div>'
-          : '<p class="small muted">Перший сезон ще триває — історія зʼявиться після його завершення.</p>') +
-        /*
-         * Нагороди — КАРТКИ, а не чипи. Чип виглядав як мітка на речі, а
-         * не як сама річ: рядок однакових сірих капсул неможливо
-         * прочитати як «я це заслужив». Компонент — js/award-core.js.
-         */
-        /*
-         * Тут ПРЕВʼЮ, а розмова про нагороди — на awards.html. Тому
-         * картка веде туди, а не перевертається: тап не може означати
-         * одночасно «перевернути» і «перейти», і з двох значень корисніше
-         * друге — на сторінці нагород видно ще й те, чого в тебе немає.
-         */
-        (awards.length
-          ? '<div class="row row--split mt-2" style="align-items:baseline;gap:10px">' +
-              '<h3 class="card__title" style="margin:0">Нагороди</h3>' +
-              '<a class="small" href="awards.html">Усі нагороди</a>' +
-            '</div>' +
-            (window.Award
-              ? window.Award.grid(awards, { seasonLabel: EC.seasonLabel, href: 'awards.html' })
-              /* Модуль не завантажився — краще сірі капсули, ніж порожньо. */
-              : '<div class="row mt-1" style="gap:8px;flex-wrap:wrap">' + awards.map(function (a) {
-                  return '<span class="chip">' + esc(a.label) + ' · ' + esc(EC.seasonLabel(a.season)) + '</span>';
-                }).join('') + '</div>')
+        '<div class="row row--split" style="align-items:baseline;gap:10px;flex-wrap:wrap">' +
+          '<h3 class="card__title" style="margin:0">Історія сезонів</h3>' +
+          '<a class="small" href="seasons.html">Усі сезони →</a>' +
+        '</div>' +
+        '<div class="mt-1">' + top.map(function (h) {
+          return '<div class="row row--split small" style="padding:7px 0;border-bottom:1px solid var(--line);gap:10px">' +
+            '<span>' + esc(EC.seasonLabel(h.season)) +
+              (h.rank ? ' <span class="muted">· #' + h.rank + ' із ' + h.of + '</span>' : '') +
+              (h.percentile ? ' <span class="muted">· Top ' + h.percentile + '%</span>' : '') +
+            '</span>' +
+            '<b class="mono">' + h.elo + ' ELO · L' + h.level + (h.elite ? ' ELITE' : '') + '</b>' +
+          '</div>';
+        }).join('') + '</div>' +
+        (hist.length > top.length
+          ? '<p class="small muted mt-1 mb-0">Показано ' + top.length + ' із ' + hist.length +
+            ' — решта на <a href="seasons.html">сторінці сезонів</a>.</p>'
           : ''));
     } catch (_) { $('#sz-history').innerHTML = ''; }
+  }
+
+  /*
+   * НАГОРОДИ — ВІТРИНА В САМОМУ НИЗУ.
+   *
+   * Тут ПРЕВʼЮ, а розмова про нагороди — на awards.html: тому картка веде
+   * туди, а не перевертається. Тап не може означати одночасно
+   * «перевернути» і «перейти», і з двох значень корисніше друге — на
+   * сторінці нагород видно ще й те, чого в тебе немає.
+   *
+   * Нагороди — КАРТКИ, а не чипи. Чип виглядав як мітка на речі, а не як
+   * сама річ: рядок однакових сірих капсул неможливо прочитати як «я це
+   * заслужив». Компонент — js/award-core.js.
+   */
+  function renderAwards(awards) {
+    const host = $('#sz-awards');
+    if (!host) return;
+    if (!awards.length) { host.innerHTML = ''; return; }
+    host.innerHTML = card(
+      '<div class="row row--split" style="align-items:baseline;gap:10px;flex-wrap:wrap">' +
+        '<h2 style="margin:0">Нагороди</h2>' +
+        '<a class="small" href="awards.html">Усі нагороди →</a>' +
+      '</div>' +
+      '<p class="small muted mt-1">Видає сервер за підсумком сезону. Колір лиця — ' +
+        'рідкість; назва й сезон — на звороті.</p>' +
+      (window.Award
+        ? window.Award.grid(awards, { seasonLabel: EC.seasonLabel, href: 'awards.html' })
+        /* Модуль не завантажився — краще сірі капсули, ніж порожньо. */
+        : '<div class="row mt-1" style="gap:8px;flex-wrap:wrap">' + awards.map(function (a) {
+            return '<span class="chip">' + esc(a.label) + ' · ' + esc(EC.seasonLabel(a.season)) + '</span>';
+          }).join('') + '</div>'));
   }
 
   /*
@@ -416,10 +623,19 @@
    * розійшлися б на першому ж виправленні.
    */
 
-  var CAT_UA = {
-    training: 'Тренування', nutrition: 'Харчування', sleep: 'Сон',
-    recovery: 'Відновлення', activity: 'Активність'
-  };
+  /* Категорії підсумку сезону — ті самі пʼять, що рахує сервер у stats
+     (db/elo-engine.sql). Підписи беруться з одного місця
+     (js/elo-view-core.js): два списки тих самих пʼяти слів розійшлися б
+     на першій же правці, і в стрічці подій та в підсумку сезону одна
+     категорія називалась би по-різному. */
+  var CAT_UA = {};
+  ['training', 'nutrition', 'sleep', 'recovery', 'activity'].forEach(function (c) {
+    /* Запасний варіант — сам код: якщо модуль не доїхав, у підсумку
+       сезону стоятиме «training» замість «Тренування», і це негарно, але
+       сторінка малюється. Кинути виняток тут означало б не намалювати
+       взагалі нічого, включно з ELO. */
+    CAT_UA[c] = window.EloView ? window.EloView.catLabel(c) : c;
+  });
 
   /** Деталі підсумку сезону (§19): категорії, дні, grace, екстремуми. */
   /* Число або порожньо. Звіт приходить із localStorage, а туди його могла
@@ -505,13 +721,10 @@
    * (EloCore.seasonRange), тому картка малюється і без входу. Людині без
    * акаунта питання «а коли той сезон закінчується» цікаве не менше.
    */
-  const HUMAN_MON = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
-                     'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'];
-
-  function human(k, withYear) {
-    const p = String(k).split('-').map(Number);
-    return p[2] + ' ' + HUMAN_MON[p[1] - 1] + (withYear ? ' ' + p[0] : '');
-  }
+  /* Делегат: назви місяців і «13 вересня» живуть в одному місці
+     (js/elo-view-core.js). Тут була третя копія списку місяців у проєкті,
+     і саме так копії дати одного разу вже розійшлись по семи файлах. */
+  function human(k, withYear) { return window.EloView.human(k, withYear); }
 
   function renderSeasonCal() {
     const host = $('#sz-cal');

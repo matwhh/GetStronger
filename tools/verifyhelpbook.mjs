@@ -50,7 +50,7 @@ async function page(ctx, url) {
   const PAGES = ['index.html', 'workout.html', 'plan.html', 'journal.html',
                  'meals.html', 'measure.html', 'calculator.html', 'account.html',
                  'trackers.html', 'periodization.html', 'nutrition.html',
-                 'supplements.html', 'research.html', 'rating.html', 'awards.html',
+                 'supplements.html', 'research.html', 'rating.html', 'seasons.html', 'awards.html',
                  'programs.html', 'cardio.html', 'boxing.html'];
   const missing = [];
   const covered = [];

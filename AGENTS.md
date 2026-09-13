@@ -137,11 +137,11 @@ Get Stronger — особистий інструмент для тренуван
 
 ```bash
 node --check js/файл.js                     # синтаксис, миттєво
-npm test                                    # 998 юніт-тестів, ~6 с
+npm test                                    # 1087 юніт-тестів, ~6 с
 TZ=Europe/Kyiv npm test                     # той самий набір в іншому поясі
 node tools/ci-hygiene.mjs                   # гігієна репозиторію, ~1 с
 node tools/verify<назва>.mjs                # одна браузерна перевірка, 10–60 с
-bash tools/ci-browser.sh core               # 13 наборів, ~8 хв
+bash tools/ci-browser.sh core               # 14 наборів, ~8 хв
 bash tools/ci-browser.sh full               # core + 33, ~50 хв
 ```
 
@@ -162,6 +162,8 @@ bash tools/ci-browser.sh full               # core + 33, ~50 хв
 | `sw.js` | `verifysw` + `sw-core.test.js` |
 | `store.js` | `store-core.test.js`, `sync-owner.test.js`, `verifydata`, `verifyroundtrip`, `verifyaccountmix` |
 | ELO / сезони | `elo-*.test.js`, `node tools/simelo.mjs` (має лишатись 6/6) |
+| рейтинг, стрічка подій, `seasons.html` | `verifyseasons`, `verifylvlbar`, `verifydaycal` |
+| нагороди | `verifyawards`, `verifyaward`, `award-core.test.js` |
 | `db/*.sql` | `verify-sql-suites.mjs`, `verify-schema-perms.mjs`, `verify-elo-week.mjs` |
 
 ### 2.4. Коміти

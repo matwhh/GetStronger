@@ -74,7 +74,8 @@ elo-core · elo-api · elo-hooks
 | `weight-log.html` | «Зважування»: поле вводу й календар | daycal-core, daylog-core, **weight-log** |
 | `trackers.html` | «Трекери»: **тільки налаштування** — що відстежувати й з якою ціллю | measure-core, tracker-core, **trackers-settings** |
 | `trackers-settings.html` | Стара адреса | nosw, **trackers-settings-redirect**, agegate |
-| `rating.html` | Сезонний рейтинг ELO | daycal-core, **season**, award-core |
+| `rating.html` | Сезонний рейтинг ELO: стрічка подій (згортається), таблиця лідерів, нагороди в самому низу | daycal-core, award-core, elo-view-core, **season** |
+| `seasons.html` | Розбір завершених сезонів: підсумки, драбина, категорії, нагороди сезону | award-core, elo-view-core, **seasons** |
 | `awards.html` | Окрема вітрина нагород: фільтри за сезоном і рідкістю; місце під тамагочі | award-core, **awards** |
 | `calculator.html` | Калькулятор 1ПМ | onerm-core, **onerm** |
 | `cardio.html` | Пульсові зони, LISS vs HIIT | **cardio** |
@@ -102,7 +103,7 @@ elo-core · elo-api · elo-hooks
 Без DOM, без `location`, без слухачів. Під юніт-тестами. Саме тому їх
 можна перенести в мобільний застосунок без переписування.
 
-33 файли, ~10 350 рядків.
+34 файли, ~10 700 рядків.
 
 | Файл | Ряд. | Що робить | Глобал і ключові функції | Залежить від |
 |---|---:|---|---|---|
@@ -115,7 +116,8 @@ elo-core · elo-api · elo-hooks
 | `progress-core.js` | 428 | зведена аналітика над журналами | `ProgressCore`: `bodyStats`, `forecast`, `liftStats`, `trainingStats`, `prList` | `HistoryCore`, `DateCore` |
 | `tracker-tile-core.js` | 383 | кубик трекера на «Сьогодні»: свій ввід під кожен вид | `TrackerTile`: `html`, `grid`, `isWide` | `TrackerCore` |
 | `elo-core.js` | 374 | сезони, рівні, бюджети, дельти дій | `EloCore`: `seasonOf`, `seasonRange`, `levelFor`, `weeklyBudget`, `actionDelta`, `applyDayCaps` | — |
-| `award-core.js` | 352 | двобічна картка нагороди, 8 щаблів рідкості, вітрина з силуетами | `Award`: `html`, `grid`, `showcase`, `CODES`, `ORDER`, `TIERS`, `tierOf`, `gearIcon` | — |
+| `award-core.js` | 376 | двобічна картка нагороди, 8 щаблів рідкості (Common…Legendary), вітрина з силуетами | `Award`: `html`, `grid`, `showcase`, `CODES`, `ORDER`, `TIERS`, `tierOf`, `gearIcon` | — |
+| `elo-view-core.js` | 335 | показ серверних даних рейтингу: події → дні, підсумки сезонів, драбина | `EloView`: `groupByDay`, `eventsSummary`, `seasonStats`, `seasonLadder`, `dayLabel`, `human`, `catLabel` | `DateCore` |
 | `exercise-core.js` | 350 | прогрес однієї вправи зі знімків сесій | `ExerciseCore`: `series`, `stats`, `trend`, `prFromSessions`, `METRICS` | `OneRM` |
 | `progression-core.js` | 335 | «пора підняти вагу»: коли підказати й на скільки | `ProgressionCore`: `due`, `hitTop`, `weekComplete`, `ages`, `snoozeUntil`, `STEP_LEGS`, `STEP_OTHER` | `DateCore` |
 | `history-core.js` | 320 | журнали: ваги, сесії, закриті дні | `HistoryCore`: `appendWeight`, `weightSeries`, `upsertSession`, `closeDay` | `DateCore` |
@@ -185,7 +187,8 @@ elo-core · elo-api · elo-hooks
 | `trackers-settings.js` | 708 | налаштування трекерів і цілей | trackers |
 | `periodization.js` | 519 | налаштування циклу й таблиця | periodization |
 | `foods.js` | 502 | довідник продуктів | index, meals |
-| `season.js` | 592 | показ ELO, шкала рівня, лідери, календар сезону | rating |
+| `season.js` | 827 | показ ELO, шкала рівня, стрічка подій по днях, лідери, календар сезону | rating |
+| `seasons.js` | 416 | підсумки завершених сезонів, драбина, розбір кожного | seasons |
 | `liquid-glass.js` | 492 | оптика «рідкого скла» (вендор, MIT) | таб-бар |
 | `projection.js` | 441 | прогноз робочих ваг на 6/12/24 міс. | plan |
 | `tabbar-glass.js` | 429 | жест і геометрія нижньої панелі | таб-бар |
@@ -279,7 +282,7 @@ elo-core · elo-api · elo-hooks
 | `register_request` · `username_free` | `welcome.js` | заявка й перевірка ніка |
 | `elo_state` · `elo_submit` | `elo-api.js` | стан сезону; **єдина точка запису події** |
 | `elo_catch_up` · `elo_close_season` · `elo_activate_grace` | `elo-api.js` | пропущені тижні, закриття сезону, пільговий тиждень |
-| `elo_leaderboard` · `elo_set_name` · `elo_history` · `elo_recent` | `elo-api.js`, `season.js` | дошка, імʼя, історія |
+| `elo_leaderboard` · `elo_set_name` · `elo_history` · `elo_recent` | `elo-api.js`, `season.js`, `seasons.js` | дошка, імʼя, історія сезонів, стрічка подій |
 | `admin_requests` · `admin_decide` | `admin.js` | заявки й рішення |
 | `admin_elo_list` · `admin_elo_anomalies` · `admin_elo_set` | `admin-elo.js` | адмінський ELO |
 
@@ -309,9 +312,9 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 
 | Рівень | Чим | Скільки | Коли |
 |---|---|---|---|
-| Юніт | `node --test`, без залежностей | **49 файлів, 1053 тести** | `npm test`, ~6 с |
+| Юніт | `node --test`, без залежностей | **50 файлів, 1087 тестів** | `npm test`, ~6 с |
 | Гігієна | `tools/ci-hygiene.mjs` | 16 перевірок по ~300 файлах | `node tools/ci-hygiene.mjs`, ~1 с |
-| Браузер | Playwright на справжньому Chromium | **54 файли `verify*.mjs`** | `bash tools/ci-browser.sh core` |
+| Браузер | Playwright на справжньому Chromium | **55 файлів `verify*.mjs`** | `bash tools/ci-browser.sh core` |
 
 Ще 5 файлів `verify*.mjs` — не браузерні: `verify-sql-suites.mjs`,
 `verify-schema-perms.mjs`, `verify-elo-week.mjs`,
@@ -319,10 +322,10 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 
 Набори задає `tools/ci-browser.sh`:
 
-- **core** (кожен пуш, ~8 хв), 13 наборів: `verifyhistory`,
+- **core** (кожен пуш, ~8 хв), 14 наборів: `verifyhistory`,
   `verifyworkout`, `verifydata`, `verifyroundtrip`, `verifyloop`,
   `verify7`, `verifyaccountmix`, `verifylink`, `verifysw`, `verifyhelp`,
-  `verifymeasurewidget`, `verifyawards`, `verifydaylogs`.
+  `verifymeasurewidget`, `verifyawards`, `verifyseasons`, `verifydaylogs`.
 - **full** (раз на добу): core + 33, зокрема `verifylvlbar`, `verifya11y`,
   `verifythemes`, `verifyresponsive`, `verifyperf`, `verifychaos`,
   `verifychaos2`, `verifyhardening`, `verifytabbar`, `verifydonut`,

@@ -27,7 +27,7 @@ set -u
 
 cd "$(dirname "$0")/.."
 
-CORE="verifyhistory verifyworkout verifydata verifyroundtrip verifyloop verify7 verifyaccountmix verifylink verifysw verifyhelp verifymeasurewidget verifyawards verifydaylogs"
+CORE="verifyhistory verifyworkout verifydata verifyroundtrip verifyloop verify7 verifyaccountmix verifylink verifysw verifyhelp verifymeasurewidget verifyawards verifyseasons verifydaylogs"
 FULL="verifya11y verifyflows verifyimport verifythemes verifyonboard \
       verifyonboarding verifyagegate verifyresponsive verifyperf verifyreps \
       verifypersetweight verifyplanfields verifysexplans verifysleepremember \

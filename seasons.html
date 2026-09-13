@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Рейтинг — Get Stronger</title>
-<meta name="description" content="Сезонний рейтинг Get Stronger: 0–2500 ELO за три місяці, 10 рівнів, ELITE-зона після 2000, таблиця лідерів і нагороди сезону.">
+<title>Сезони — Get Stronger</title>
+<meta name="description" content="Сезони Get Stronger: підсумок кожного завершеного сезону — фінальне ELO й рівень, місце в таблиці, активні дні, Grace Weeks, розклад по категоріях і нагороди сезону.">
 <meta name="author" content="Matthew Grace">
 <meta name="copyright" content="© 2026 Matthew Grace. Усі права застережено.">
 <!-- Картка для месенджерів і соцмереж. og:url і canonical додає
@@ -29,7 +29,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Get Stronger">
 <meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="Рейтинг">
+<meta property="og:title" content="Сезони">
 <meta property="og:description" content="Тренування · Харчування · Прогрес">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0b0b0b">
@@ -58,8 +58,8 @@
 <script src="js/theme-boot.js"></script>
 
 <!-- build-meta:start -->
-<link rel="canonical" href="https://get-stronger.vercel.app/rating.html">
-<meta property="og:url" content="https://get-stronger.vercel.app/rating.html">
+<link rel="canonical" href="https://get-stronger.vercel.app/seasons.html">
+<meta property="og:url" content="https://get-stronger.vercel.app/seasons.html">
 <!-- build-meta:end -->
 </head>
 <body>
@@ -74,87 +74,65 @@
   <section class="section">
     <div class="wrap">
 
-      <h1 class="reveal">Рейтинг</h1>
+      <div class="row reveal" style="justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <h1 style="margin:0">Сезони</h1>
+        <!-- Єдине посилання звідси — у рейтинг: сезони й рахує він. -->
+        <a class="small" href="rating.html">Рейтинг</a>
+      </div>
+
       <p class="lead reveal" data-d="1">
-        Сезонний рейтинг Get Stronger: три місяці, старт із 0 ELO, стеля 2500.
-        Очки приходять одразу за виконані дії вашого власного плану —
-        тренування, харчування, сон, recovery, кроки — і залежать від
-        якості виконання, а не від кількості кліків.
+        Кожен сезон Get Stronger триває три місяці й закінчується в неділю.
+        Тут — усе, що сервер порахував за нього: фінальне ELO й рівень,
+        місце в таблиці, активні дні, витрачені Grace Weeks, розклад по
+        категоріях із якістю виконання і нагороди саме за цей сезон.
       </p>
 
-      <!-- Звіт за минулий сезон (зʼявляється після його закриття) -->
-      <div id="sz-report" class="mt-3 reveal" data-d="1"></div>
+      <!-- Поточний сезон: скільком він пройдений і коли буде підсумок -->
+      <div id="szs-now" class="mt-3 reveal" data-d="1"></div>
 
-      <!-- ELO, рівень, прогрес сезону, сьогодні -->
-      <div id="sz-header" class="mt-3 reveal" data-d="1"></div>
+      <!-- Підсумки за всі завершені сезони одним рядом чисел -->
+      <div id="szs-sum" class="mt-3 reveal" data-d="1"></div>
 
-      <!-- Календар сезону: коли почався, коли закінчиться, де я зараз -->
-      <div id="sz-cal" class="mt-3 reveal" data-d="1"></div>
+      <!-- Драбина: по смузі на сезон, частка від стелі сезону -->
+      <div id="szs-ladder" class="mt-3 reveal" data-d="2"></div>
 
-      <!-- Grace Week -->
-      <div id="sz-grace" class="mt-3 reveal" data-d="1"></div>
+      <!-- Розбір кожного сезону окремо (акордеон) -->
+      <div id="szs-list" class="mt-3 reveal" data-d="2"></div>
 
-      <!-- Останні події ELO -->
-      <div id="sz-events" class="mt-3 reveal" data-d="2"></div>
-
-      <!-- Таблиця лідерів сезону -->
-      <div id="sz-board" class="mt-3 reveal" data-d="2"></div>
-
-      <!-- Історія сезонів (превʼю; повний розбір — seasons.html) -->
-      <div id="sz-history" class="mt-3 reveal" data-d="2"></div>
-
-      <div class="mt-3" data-longform="Правила сезону й чесні межі">
-        <h2 class="reveal">Як це працює</h2>
+      <div class="mt-3" data-longform="Звідки беруться ці числа">
+        <h2 class="reveal">Як це читати</h2>
         <div class="grid grid-2 mt-2">
           <div class="card reveal" data-d="1">
-            <h3 class="card__title">Сезони і рівні</h3>
+            <h3 class="card__title">Підсумок підбиває сервер</h3>
             <p class="small">
-              Чотири сезони на рік: весна, літо, осінь, зима. Сезон
-              <b>закінчується в неділю</b>, а наступний починається в
-              понеділок — тому межа сезону збігається з межею тижня, і
-              жоден тиждень не виходить обрубком. Через це сезон триває
-              12–14 тижнів, а не рівно квартал. Кожен починається з 0 ELO —
-              минулий результат лишається в історії профілю і ні на що
-              не впливає.
+              Рядок сезону зʼявляється тут не в день його закінчення, а
+              кількома днями пізніше. Сезон закінчується в неділю, після
+              чого сервер ще чекає на дії, надіслані офлайн — інакше
+              останній тиждень зарахувався б неповним. Точну дату видно
+              в картці поточного сезону.
             </p>
             <p class="small mb-0">
-              Рівні рівномірні: Level 1 = 0–199, і так по 200 до
-              Level 10 = 1800–1999. Понад 2000 — <b>ELITE</b>: рівень уже не
-              росте, боротьба йде за місце в таблиці лідерів. 2500 — стеля
-              сезону, досяжна лише майже бездоганним сезоном.
+              Поточний сезон у підсумки «за весь час» не входить
+              навмисно: поки він триває, він не результат, і «найкращий
+              сезон» змінювався б щодня.
             </p>
           </div>
           <div class="card reveal" data-d="2">
-            <h3 class="card__title">Свій план, а не чужий</h3>
+            <h3 class="card__title">Смуга, а не графік</h3>
             <p class="small">
-              Оцінюється виконання ВАШОГО плану: 4 тренування на тиждень,
-              виконані повністю, коштують стільки ж, скільки 6 у того, хто
-              запланував 6. Кожна дія має tolerance-зони: 171 г білка при
-              цілі 180 — це майже повна нагорода, а не нуль.
+              Смуга сезону показує, яку частину стелі сезону вибрано.
+              Стеля однакова для всіх сезонів, тому дві смуги можна
+              порівнювати очима: удвічі довша означає удвічі більше ELO.
             </p>
             <p class="small mb-0">
-              Хвороба чи відпустка — активуйте <b>Grace Week</b>: 7 днів без
-              вимог і штрафів за тренування, двічі на сезон. Звичайний
-              пропуск без grace чесно коштує очок.
+              Прочерк замість числа означає «такого не було», а не нуль.
+              Місця немає, коли в сезоні було замало учасників, щоб
+              рахувати ранг — нуль на його місці читався б як перше
+              місце.
             </p>
           </div>
         </div>
       </div>
-
-      <!--
-        НАГОРОДИ — У САМОМУ НИЗУ, І ЦЕ НЕ ВИПАДОК.
-
-        Досі вони були хвостом картки «Історія сезонів» — тобто відповіддю
-        на питання, якого в тому місці ніхто не ставить. Рейтинг читають
-        зверху вниз: скільки в мене зараз, як іде тиждень, де я в таблиці.
-        Нагороди не відповідають ні на що з цього — вони про вже пройдене,
-        і місце для такого — кінець сторінки, а не середина.
-
-        Нижче за правила сезону навмисно: правила потрібні тому, хто
-        розбирається В ЧИСЛАХ вище, і стояти між числами й нагородами
-        вони мусять саме тут. Вітрину малює js/season.js (renderAwards).
-      -->
-      <div id="sz-awards" class="mt-3 reveal" data-d="2"></div>
 
     </div>
   </section>
@@ -173,16 +151,13 @@
      кеші не знайшов би розділу й сховав би кнопку назавжди. -->
 <script defer src="js/help.js"></script>
 <script defer src="js/store.js"></script>
-<!-- Стандартна сітка днів: та сама, що в тренуваннях і вазі тіла -->
-<script defer src="js/daycal-core.js"></script>
 <script defer src="js/award-core.js"></script>
-<!-- Чисті перетворення серверних даних рейтингу: дні подій, підсумки
-     сезонів, геометрія графіка. Іде ПЕРЕД season.js — той читає підписи
-     категорій уже при завантаженні. -->
+<!-- Чисті перетворення серверних даних: дні подій, підсумки сезонів,
+     драбина. Іде ПЕРЕД seasons.js — той читає підписи вже на старті. -->
 <script defer src="js/elo-view-core.js"></script>
 <script defer src="js/elo-core.js"></script>
 <script defer src="js/elo-api.js"></script>
 <script defer src="js/elo-hooks.js"></script>
-<script defer src="js/season.js"></script>
+<script defer src="js/seasons.js"></script>
 </body>
 </html>

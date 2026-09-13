@@ -294,6 +294,10 @@
       { href: 'train-log.html',        label: 'Дні тренувань' },
       { href: 'weight-log.html',       label: 'Зважування' },
       { href: 'rating.html',           label: 'Рейтинг' },
+      /* «Сезони» стоять між рейтингом і нагородами не за алфавітом:
+         це три кроки одного шляху — скільки в мене зараз, як пройшли
+         минулі сезони, що я з них зібрав. */
+      { href: 'seasons.html',          label: 'Сезони' },
       { href: 'awards.html',           label: 'Нагороди' },
       { href: 'journal.html#history',  label: 'Історія' },
       { href: 'measure.html',          label: 'Заміри тіла' }
@@ -329,6 +333,7 @@
     { href: 'weight-log.html', label: 'Зважування' },
     { href: 'measure.html',    label: 'Заміри тіла' },
     { href: 'rating.html',     label: 'Рейтинг' },
+    { href: 'seasons.html',    label: 'Сезони' },
     { href: 'awards.html',     label: 'Нагороди' },
     { href: 'boxing.html',     label: 'Бокс' },
     { href: 'cardio.html',     label: 'Кардіо' },

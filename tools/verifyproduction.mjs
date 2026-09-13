@@ -40,7 +40,7 @@ function seedScript() {
 }
 
 const PAGES = ['index.html','plan.html','workout.html','programs.html','periodization.html',
-  'meals.html','nutrition.html','trackers.html','trackers.html','journal.html','measure.html','rating.html','awards.html',
+  'meals.html','nutrition.html','trackers.html','trackers.html','journal.html','measure.html','rating.html','seasons.html','awards.html',
   'account.html','admin.html','legal.html','calculator.html','boxing.html','cardio.html',
   'supplements.html','research.html','welcome.html'];
 

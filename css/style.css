@@ -4965,6 +4965,69 @@ button.heatmap__cell::after {
 }
 .rating-hero__meta { display: inline-flex; align-items: center; gap: 8px; }
 
+/* ---------------------------------------------------------------------
+   ПЛИТКА KPI, ЯКА ВЕДЕ КУДИСЬ
+
+   «7 нагород» і «2 сезони завершено» — числа, після яких одразу виникає
+   «а які саме». Доти плитка була мертвим числом: відповідь існувала (є
+   вітрина нагород і є розбір сезонів), але дороги до неї з цього місця
+   не було.
+
+   Стани беруться ті самі, що в .tile — інший набір підсвіток на ту саму
+   дію («це натискається») читався б як інший елемент. Стрілку додає CSS,
+   а не розмітка: вона ознака посилання, а не частина слова.
+   --------------------------------------------------------------------- */
+.kpi--link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.kpi--link:hover,
+.kpi--link:focus-visible { border-color: var(--line-2); color: inherit; }
+.kpi--link:active { background: var(--surface-2); }
+.kpi--link .kpi__lbl::after { content: ' \2192'; opacity: 0.65; }
+
+/* ---------------------------------------------------------------------
+   СТРІЧКА ПОДІЙ ELO
+
+   Було: причина, дата й дельта одним рядком, чотирнадцять разів підряд —
+   і дата в кожному рядку, хоч стосується вона дня, а не події.
+
+   Тепер події згорнуті в ДНІ (js/elo-view-core.js), у дня своя сума й
+   свій рахунок на кінець. Рядок події має дві половини: ліва — категорія
+   над причиною, права — дельта над рахунком. Саме дві, а не чотири
+   колонки: на телефоні чотири колонки або ламаються, або з'їдають
+   причину до «Закрито трен…».
+   --------------------------------------------------------------------- */
+.szday + .szday { margin-top: 16px; }
+.szday__h {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; padding-bottom: 4px;
+}
+.szday__when { font-size: 0.92rem; font-weight: 700; }
+.szday__r { display: inline-flex; align-items: baseline; gap: 8px; }
+.szday__elo { font-size: 0.72rem; color: var(--muted); }
+
+.szev {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+/* min-width: 0 обовʼязково: без нього довга причина не дає рядку
+   стиснутись і виштовхує дельту за край картки. */
+.szev__l { min-width: 0; }
+.szev__r { flex: 0 0 auto; text-align: right; }
+.szev__cat {
+  display: block;
+  font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--muted);
+}
+.szev__what { display: block; font-size: 0.9rem; }
+.szev__d { display: block; font-weight: 700; }
+.szev__elo { display: block; font-size: 0.72rem; color: var(--muted); }
+
 /* ==========================================================================
    ШКАЛА ДО НАСТУПНОГО РІВНЯ
    ==========================================================================
@@ -6178,17 +6241,24 @@ h1 > .h1-ico {
 .awd--t7 .awd__face--front { box-shadow: inset 0 0 0 1px rgba(255, 204, 92, 0.22), 0 10px 28px -14px rgba(255, 190, 60, 0.45); }
 .awd--t8 .awd__face--front { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13), 0 10px 30px -12px rgba(0, 0, 0, 1); }
 
-/* Підпис рідкості — на лиці, під знаком. Колір тут не єдиний носій
-   сенсу: дальтонік бачить рожеве й червоне однаково, а читалка кольору
-   не бачить узагалі. */
+/* Підпис рідкості — на ЗВОРОТІ, під назвою, і тим самим кольором, що
+   лице. На лиці його немає: колір лиця вже відповідає «наскільки
+   рідкісна», і слово поверх нього казало те саме двічі. Прибрати слово
+   зовсім не можна — колір сам по собі недоступний (дальтонік не
+   відрізнить рожеве від червоного, читалка не бачить кольору взагалі),
+   тому воно лишається там, де решта пояснень.
+
+   Колір саме звідси, а не з --text: слово й лице мусять бути однієї
+   барви, інакше шкалу не вивчиш — щоб зв'язати «рожеве» з «Mythic»,
+   їх треба побачити разом. */
 .awd__rar {
-  position: absolute;
-  left: 0; right: 0; bottom: 9px;
-  text-align: center;
+  display: block;
+  margin-top: 6px;
   font-size: 0.62rem;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  opacity: 0.72;
+  opacity: 0.8;
+  color: var(--aw-ink, var(--muted));
 }
 .awd__when { margin-top: 4px; font-size: 0.68rem; opacity: 0.6; }
 
@@ -6398,7 +6468,12 @@ h1 > .h1-ico {
   color: var(--text);
 }
 .awd__mark svg { display: block; width: 100%; height: auto; }
+/* Назва, рідкість і сезон — один блок, а не три ряди сітки: між рядами
+   зворота стоїть gap 14px, і кожен новий ряд відсував би підпис від
+   назви, якій він належить. */
+.awd__txt { display: block; text-align: center; }
 .awd__name {
+  display: block;
   font-family: var(--font-display);
   font-size: clamp(1.1rem, 3.6vw, 1.5rem);
   line-height: 1;

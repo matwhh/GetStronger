@@ -20,7 +20,7 @@ const page = (u) => String(u).split('/').pop().split('#')[0];
 const b = await chromium.launch({ executablePath: CHROME });
 
 const PAGES = ['index.html', 'workout.html', 'plan.html', 'programs.html', 'nutrition.html',
-               'meals.html', 'journal.html', 'trackers.html', 'trackers.html', 'rating.html', 'periodization.html',
+               'meals.html', 'journal.html', 'trackers.html', 'trackers.html', 'rating.html', 'seasons.html', 'periodization.html',
                'boxing.html', 'cardio.html', 'calculator.html', 'supplements.html',
                'research.html', 'account.html', 'today.html'];
 

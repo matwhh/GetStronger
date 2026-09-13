@@ -105,6 +105,70 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
  await ctx.close();
 }
 
+// 6. Копія дня харчування (F1): знімок із історії → у поточний день
+//
+// Перевіряється саме те, що ламається тихо: позиція, чийого продукту вже
+// немає в довіднику, мусить принести з собою калорії, а не нуль, і мусить
+// пережити перезавантаження — інакше копія дня живе до першого reload.
+{
+ const ctx=await adultContext(b); const p=await ctx.newPage(); const errs=[];
+ p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
+ await p.goto(`file://${ROOT}/meals.html`); await p.waitForTimeout(900);
+
+ await p.evaluate(async()=>{
+   await window.Store.saveProfile({
+     mealLog:{'2026-09-01':{kcal:530,p:70,f:14,c:30,fiber:1,target:2200,pTarget:150,
+       meals:[{name:'Сніданок',items:[
+         {kind:'snap',name:'Куряча грудка',unit:'g',qty:200,
+          per:{kcal:1.65,p:0.31,f:0.036,c:0,fiber:0},foodId:'chicken-breast',cooked:false},
+         {kind:'snap',name:'Зниклий продукт',unit:'g',qty:100,
+          per:{kcal:2,p:0.1,f:0.05,c:0.3,fiber:0.01}}
+       ]}]}},
+     day:{meals:[],date:null}});
+ });
+ await p.reload(); await p.waitForTimeout(900);
+
+ const hasBtn=await p.locator('#d-copy').count();
+ ok('кнопка «Скопіювати день» є на сторінці', hasBtn===1);
+
+ await p.click('#d-copy'); await p.waitForTimeout(250);
+ const rows=await p.locator('#d-copy-list [data-copy-add]').count();
+ ok('список джерел показує закритий день зі знімком', rows===1, 'рядків='+rows);
+
+ await p.click('[data-copy-add="2026-09-01"]'); await p.waitForTimeout(600);
+ const after=await p.evaluate(async()=>{
+   const pr=await window.Store.getProfile();
+   const items=(pr.day.meals||[]).reduce((a,m)=>a.concat(m.items||[]),[]);
+   return {items:items,
+           kcal:window.DayCore.dayTotals(pr.day, pr.recipes||[]).kcal,
+           /* Очікуване рахуємо ТУТ, із самого довідника: 200 г курки за
+              її власним КБЖВ плюс 100 × 2 ккал замороженої позиції. Зашите
+              число в тесті означало б, що тест ловить правку довідника
+              замість правки копії. */
+           want:window.Foods.amount(window.Foods.byId('chicken-breast'),200,false).kcal+200};
+ });
+ ok('скопійовано дві позиції', after.items.length===2, JSON.stringify(after.items));
+ ok('живий продукт лягає посиланням', after.items[0]?.kind==='food' && after.items[0]?.foodId==='chicken-breast', JSON.stringify(after.items[0]));
+ ok('зниклий продукт лягає замороженим', after.items[1]?.kind==='snap' && after.items[1]?.qty===100, JSON.stringify(after.items[1]));
+ /* Заморожена позиція мусить принести свої 200 ккал. Якби вона
+    рахувалась як нуль — саме та тиха помилка, проти якої все це є, —
+    підсумок дорівнював би лише курці, і цей рядок це побачить. */
+ ok('копія рахує і живу, і заморожену позицію', Math.abs(after.kcal-after.want)<0.5, 'kcal='+after.kcal+' очікувалось '+after.want);
+ ok('заморожена позиція додала свої калорії', after.kcal-200>1 && after.kcal>200, 'kcal='+after.kcal);
+
+ await p.reload(); await p.waitForTimeout(900);
+ /* Читаємо РОЗМІТКУ, а не localStorage: у сховищі позиція лежить хоч би
+    що, а от sanitizeDay могла її викинути при читанні профілю — і тоді
+    людина бачить на екрані менше, ніж зберегла, поки наступний persist
+    не зробить цю втрату остаточною. Перевірка через Store.getProfile
+    цього не бачила: вона проходила і без гілки snap у sanitizeDay. */
+ const kept=await p.locator('#day tbody tr').count();
+ const snapShown=await p.locator('#day tbody tr', {hasText:'Зниклий продукт'}).count();
+ ok('заморожена позиція переживає перезавантаження', kept===2 && snapShown===1, 'рядків='+kept+' заморожених='+snapShown);
+ ok('копія дня без JS-помилок', errs.length===0, errs.join('|'));
+ await ctx.close();
+}
+
 await b.close();
 const bad=R.filter(r=>!r[1]);
 console.log('\n'+(R.length-bad.length)+'/'+R.length+' перевірок даних пройшло.');

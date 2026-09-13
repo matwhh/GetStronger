@@ -15,10 +15,15 @@
  *               Виконання плану по днях: який день програми робили і
  *               скільки вправ закрито. Один запис на день.
  *
- *   mealLog:    { 'YYYY-MM-DD': { kcal, p, f, c, fiber, target } }
+ *   mealLog:    { 'YYYY-MM-DD': { kcal, p, f, c, fiber, target, meals? } }
  *               Закриті дні харчування: підсумок дня і ціль, яка діяла
  *               того дня. Ціль зберігається В ЗАПИСІ навмисно: профіль
  *               зміниться, а історія має памʼятати, проти чого їли.
+ *               `meals` — знімок позицій (DayCore.freezeMeals), з якого
+ *               робиться копія дня. Живе SNAPSHOT_DAYS днів і зникає зі
+ *               старих записів: підсумок дня важить сорок байтів, а
+ *               позиції — кілограм на рік, і читати їх далі, ніж дотягує
+ *               копія, однаково нікому.
  *
  * Це доповнення до вже наявних журналів bodyLog/workLog (journal.js) —
  * форма та сама: ключ — локальна дата, значення — факт.
@@ -286,13 +291,78 @@
     return out;
   }
 
-  /** Закрити день: повертає НОВИЙ mealLog із записом за дату */
-  function closeDay(log, date, totals, targetKcal, targetProtein) {
+  /*
+   * Скільки останніх закритих днів тримають знімок позицій.
+   *
+   * Те саме число, що й глибина списку джерел у копії дня: тримати знімок
+   * довше, ніж до нього можна дотягнутись, — це платити памʼяттю профілю
+   * за те, чого ніхто не побачить. Чотирнадцять днів — це два тижні, тобто
+   * «той самий день минулого тижня» дістається завжди.
+   */
+  const SNAPSHOT_DAYS = 14;
+
+  /**
+   * Закрити день: повертає НОВИЙ mealLog із записом за дату.
+   *
+   * @param {object} log поточний mealLog
+   * @param {string} date локальна дата дня
+   * @param {object} totals підсумок дня
+   * @param {number|null} targetKcal ціль калорій ТОГО дня
+   * @param {number|null} targetProtein ціль білка ТОГО дня
+   * @param {Array} [frozenMeals] знімок позицій (DayCore.freezeMeals)
+   */
+  function closeDay(log, date, totals, targetKcal, targetProtein, frozenMeals) {
     const src = (log && typeof log === 'object') ? log : {};
     const d = DATE_KEY.test(date) ? date : todayKey();
     const out = Object.assign({}, src);
     out[d] = summarizeDay(totals, targetKcal, targetProtein);
+    if (Array.isArray(frozenMeals) && frozenMeals.length) out[d].meals = frozenMeals;
+    return pruneSnapshots(out);
+  }
+
+  /**
+   * Прибрати знімки позицій зі старих записів, лишивши підсумки.
+   *
+   * Викликається на кожному закритті, а не «колись потім»: прибирання, що
+   * запускається окремою кнопкою, не запускається ніколи.
+   */
+  function pruneSnapshots(log) {
+    if (!log || typeof log !== 'object') return log;
+    const withMeals = Object.keys(log)
+      .filter(function (k) { return DATE_KEY.test(k) && log[k] && log[k].meals; })
+      .sort();
+    if (withMeals.length <= SNAPSHOT_DAYS) return log;
+
+    const out = Object.assign({}, log);
+    withMeals.slice(0, withMeals.length - SNAPSHOT_DAYS).forEach(function (k) {
+      const copy = Object.assign({}, out[k]);
+      delete copy.meals;
+      out[k] = copy;
+    });
     return out;
+  }
+
+  /**
+   * Дні, з яких можна скопіювати раціон: новіші — першими.
+   *
+   * Тільки ті, де знімок позицій справді є. Показувати в списку джерел
+   * день, із якого скопіюється порожньо, — це обіцянка, яку копія не
+   * виконає: до знімків історія тримала лише підсумки, тож такі дні в
+   * mealLog є і будуть.
+   */
+  function copySources(log, limit) {
+    if (!log || typeof log !== 'object') return [];
+    const n = Math.max(1, limit || SNAPSHOT_DAYS);
+    return Object.keys(log)
+      .filter(function (k) {
+        const e = log[k];
+        return DATE_KEY.test(k) && e && Array.isArray(e.meals) &&
+          e.meals.some(function (m) { return m && Array.isArray(m.items) && m.items.length; });
+      })
+      .sort()
+      .reverse()
+      .slice(0, n)
+      .map(function (k) { return { d: k, v: log[k] }; });
   }
 
   /** Останні N датованих записів будь-якого журналу-мапи, нові — першими */
@@ -315,6 +385,9 @@
     sparklinePath: sparklinePath,
     upsertSession: upsertSession,
     closeDay: closeDay,
+    SNAPSHOT_DAYS: SNAPSHOT_DAYS,
+    pruneSnapshots: pruneSnapshots,
+    copySources: copySources,
     lastEntries: lastEntries
   };
 })();

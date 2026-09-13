@@ -166,3 +166,74 @@ describe('не мутує вхідний файл', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(src)), copy);
   });
 });
+
+/*
+ * Заморожені позиції (F1) на імпорті.
+ *
+ * Валідатор — білий список: усе, чого він не знає, ЗНИКАЄ мовчки. Тому
+ * поява нового поля в профілі — це завжди ще й правка тут, інакше
+ * відновлення з резервної копії тихо забирає в людини те, що вона
+ * бачила на екрані до експорту.
+ */
+describe('копія дня: заморожені позиції', () => {
+  const snapItem = {
+    kind: 'snap', name: 'Курка (знімок)', unit: 'g', qty: 200,
+    per: { kcal: 1.65, p: 0.31, f: 0.036, c: 0, fiber: 0 },
+    foodId: 'chicken-breast', cooked: true
+  };
+
+  test('snap у поточному дні проходить і не втрачає КБЖВ', () => {
+    const r = V({ day: { meals: [{ name: 'Обід', items: [snapItem] }], date: '2026-09-10' } });
+    const it = r.patch.day.meals[0].items[0];
+    assert.equal(it.kind, 'snap');
+    assert.equal(it.qty, 200);
+    assert.equal(it.unit, 'g');
+    assert.equal(it.per.kcal, 1.65);
+    assert.equal(it.per.p, 0.31);
+    /* id джерела — підказка для копії: без нього скопійований рис
+       перестав би перераховуватись у готовий */
+    assert.equal(it.foodId, 'chicken-breast');
+    assert.equal(it.cooked, true);
+  });
+
+  test('snap без per і без qty валить день, а не тихо кладе нуль', () => {
+    const r = V({ day: { meals: [{ name: 'Обід', items: [{ kind: 'snap', name: 'X' }] }] } });
+    assert.ok(r.rejected.includes('day'), 'битий snap мусить відкинути день цілком');
+  });
+
+  test('знімок прийомів у mealLog доживає до профілю', () => {
+    const r = V({ mealLog: { '2026-09-10': {
+      kcal: 2100, p: 150, f: 60, c: 210, fiber: 25, target: 2200, pTarget: 150,
+      meals: [{ name: 'Сніданок', items: [snapItem] }]
+    } } });
+    const e = r.patch.mealLog['2026-09-10'];
+    assert.equal(e.kcal, 2100);
+    assert.ok(Array.isArray(e.meals), 'знімок позицій зник на імпорті');
+    assert.equal(e.meals[0].items[0].qty, 200);
+    assert.equal(e.meals[0].name, 'Сніданок');
+  });
+
+  test('битий знімок не тягне за собою підсумок дня', () => {
+    const r = V({ mealLog: { '2026-09-10': {
+      kcal: 2100, p: 150, f: 60, c: 210, fiber: 25,
+      meals: [{ name: 'Сніданок', items: [{ kind: 'food', foodId: 'x', grams: 10 }] }]
+    } } });
+    const e = r.patch.mealLog['2026-09-10'];
+    assert.equal(e.kcal, 2100, 'підсумок дня мусить лишитись');
+    assert.equal(e.meals, undefined, 'знімок із чужими позиціями не приймається');
+  });
+
+  test('знімок без жодної позиції не зберігається', () => {
+    const r = V({ mealLog: { '2026-09-10': {
+      kcal: 2100, p: 150, f: 60, c: 210, fiber: 25,
+      meals: [{ name: 'Сніданок', items: [] }]
+    } } });
+    assert.equal(r.patch.mealLog['2026-09-10'].meals, undefined);
+  });
+
+  test('qty і per за межами — позиція не проходить', () => {
+    const huge = Object.assign({}, snapItem, { qty: 999999 });
+    const r = V({ day: { meals: [{ name: 'Обід', items: [huge] }] } });
+    assert.ok(r.rejected.includes('day'));
+  });
+});

@@ -136,6 +136,17 @@
               portions: clamp(Number(it.portions) || 0, PORTIONS_MIN, PORTIONS_MAX)
             };
           }
+          if (it.kind === 'snap') {
+            /* Заморожена позиція (копія дня, F1): джерела в довіднику
+               немає, КБЖВ лежить у самій позиції. Без цієї гілки
+               скопійована позиція зникала б при першому ж читанні
+               профілю — тобто копія дня жила б до перезавантаження. */
+            const snap = window.DayCore.freezeItem(it, state.recipes);
+            if (!snap) return null;
+            snap.qty = clamp(snap.qty, 0,
+              snap.unit === 'portion' ? PORTIONS_MAX : GRAMS_MAX);
+            return snap;
+          }
           if (typeof it.foodId !== 'string') return null;
           return {
             kind: 'food',
@@ -181,6 +192,7 @@
     folds: {},              // які блоки згорнуто (памʼять у localStorage)
     openRecipe: null,
     quickMeal: null,        // прийом, з якого почали «+ Додати продукт» (null = останній)
+    copyOpen: false,        // чи розгорнуто список днів-джерел для копії (F1)
     modal: null             // чернетка додавання в день, див. блок «Вікно додавання»
   };
 
@@ -916,6 +928,33 @@
      * існувало. Позиція лишалась у профілі назавжди й воскресала зі
      * старими порціями, щойно рецепт із тим самим id зʼявлявся знову.
      */
+    /*
+     * Заморожена позиція (kind:'snap') — джерела немає за визначенням,
+     * тому перевірка «зникло» до неї не застосовується: вона не зникла,
+     * вона й записувалась як число. Підпис це і каже, щоб людина не
+     * шукала, чому цей рядок не перераховується в готовий.
+     */
+    if (it.kind === 'snap') {
+      const unitLbl = window.DayCore.SNAP_UNIT_LABEL[it.unit === 'portion' ? 'portion' : 'g'];
+      const snapTot = window.DayCore.itemNutrition(it, state.recipes);
+      return '<tr>' +
+        '<td>' + esc(it.name || 'Позиція') +
+          '<div class="small muted">' + round(it.qty, it.unit === 'portion' ? 2 : 0) + ' ' + esc(unitLbl) +
+          ' · збережено з копії дня</div></td>' +
+        '<td class="num">' +
+          '<input class="input input--sm num mono" type="text" inputmode="decimal" ' +
+                 'style="width:88px" value="' + esc(it.qty) + '" ' +
+                 'data-di="' + mi + '" data-dj="' + ii + '" data-df="amount" ' +
+                 'aria-label="' + (it.unit === 'portion' ? 'Контейнерів' : 'Грамів') + ': ' + esc(it.name || 'позиція') + '">' +
+        '</td>' +
+        '<td class="num mono">' + round(snapTot.kcal, 0) + '</td>' +
+        '<td class="num mono">' + round(snapTot.p, 1) + '</td>' +
+        '<td class="num">' +
+          '<button class="btn btn--ghost btn--sm" type="button" data-di="' + mi + '" data-dj="' + ii + '" data-df="del">✕</button>' +
+        '</td>' +
+      '</tr>';
+    }
+
     const missing = it.kind === 'recipe' ? !recipeById(it.recipeId) : !Foods.byId(it.foodId);
     if (missing) {
       return '<tr>' +
@@ -958,6 +997,90 @@
         '<button class="btn btn--ghost btn--sm" type="button" data-di="' + mi + '" data-dj="' + ii + '" data-df="del">✕</button>' +
       '</td>' +
     '</tr>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Копія дня (F1)                                                      */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Джерела — закриті дні, у яких є знімок позицій (HistoryCore.copySources).
+   * Днів у mealLog більше: до знімків історія тримала лише підсумки, і з
+   * такого дня копіювати нічого. Показувати його в списку означало б
+   * обіцяти копію, якої не буде.
+   */
+  function copySources() {
+    const log = state.profile.mealLog;
+    const today = (state.day && state.day.date) || window.HistoryCore.todayKey();
+    return window.HistoryCore.copySources(log)
+      /* Копія в той самий день заборонена: вона або нічого не змінює,
+         або подвоює день — і те, й те людина сприйме як збій. */
+      .filter(function (e) { return e.d !== today; });
+  }
+
+  function copyPanel() {
+    if (!state.copyOpen) return '';
+    const list = copySources();
+    if (!list.length) {
+      return '<div class="notice mt-2" id="d-copy-list">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5m0-3h.01"/></svg>' +
+        '<div>Копіювати поки нема з чого: позиції зберігаються з дня, ' +
+        'закритого вже з цією версією. Закрийте день — і наступний можна буде ' +
+        'зібрати одним натисканням.</div></div>';
+    }
+    return '<div class="card mt-2" id="d-copy-list">' +
+      '<p class="small muted" style="margin:0 0 8px">Звідки взяти позиції. ' +
+      'Ціль дня не копіюється — вона беруться з поточної.</p>' +
+      '<div class="table-wrap">' +
+        '<table class="tbl">' +
+          '<thead><tr><th>День</th><th class="num">ккал</th><th class="num">Б/Ж/В</th><th></th></tr></thead>' +
+          '<tbody>' + list.map(function (e) {
+            const v = e.v || {};
+            return '<tr>' +
+              '<td class="mono">' + esc(e.d) + '</td>' +
+              '<td class="num mono">' + round(v.kcal, 0) + '</td>' +
+              '<td class="num mono small">' + round(v.p, 0) + '/' + round(v.f, 0) + '/' + round(v.c, 0) + '</td>' +
+              '<td class="num" style="white-space:nowrap">' +
+                '<button class="btn btn--primary btn--sm" type="button" data-copy-add="' + esc(e.d) + '">Додати</button> ' +
+                '<button class="btn btn--ghost btn--sm" type="button" data-copy-set="' + esc(e.d) + '">Замінити</button>' +
+              '</td>' +
+            '</tr>';
+          }).join('') + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
+  }
+
+  /**
+   * Скопіювати день-джерело в поточний день.
+   * @param {string} date дата джерела
+   * @param {'add'|'replace'} mode додати до наявного чи замінити
+   */
+  async function copyDayFrom(date, mode) {
+    const entry = (state.profile.mealLog || {})[date];
+    const frozen = entry && Array.isArray(entry.meals) ? entry.meals : null;
+    if (!frozen) { toast('У дня ' + date + ' немає збережених позицій', 'err'); return; }
+
+    const today = (state.day && state.day.date) || window.HistoryCore.todayKey();
+    if (date === today) { toast('Це той самий день — копіювати нема куди', 'err'); return; }
+
+    const hasItems = state.day.meals.some(function (m) { return m.items && m.items.length; });
+    if (mode === 'replace' && hasItems &&
+        !confirm('Замінити все, що вже є в дні, позиціями з ' + date + '?')) return;
+
+    const report = {};
+    state.day = {
+      meals: window.DayCore.copyDayInto(state.day.meals, frozen, mode, state.recipes, report),
+      date: state.day.date
+    };
+    state.copyOpen = false;
+
+    await persist();
+    renderDay();
+
+    if (!report.added) { toast('Копіювати було нічого', 'err'); return; }
+    toast('Скопійовано позицій: ' + report.added +
+      (report.frozen ? ' (' + report.frozen + ' без джерела в довіднику)' : '') +
+      (report.dropped ? '. Не влізло: ' + report.dropped : ''), 'ok');
   }
 
   function renderDay() {
@@ -1012,9 +1135,16 @@
                лягає в історію (mealLog), день очищається під наступний.
                «Очистити» лишилась для помилково набраного дня — БЕЗ запису. */
             '<button class="btn btn--primary btn--sm" type="button" id="d-close">Закрити день</button>' +
+            /* «Скопіювати день» (F1): однакові дні набивались руками
+               щоразу, бо копіювався тільки рецепт, а день — ні. */
+            '<button class="btn btn--ghost btn--sm" type="button" id="d-copy" ' +
+                    'aria-expanded="' + (state.copyOpen ? 'true' : 'false') + '" ' +
+                    'aria-controls="d-copy-list">Скопіювати день</button>' +
             '<button class="btn btn--ghost btn--sm" type="button" id="d-clear">Очистити</button>' +
           '</div>' +
         '</div>' +
+
+        copyPanel() +
 
         (staleKey
           ? '<div class="notice mt-2" id="d-stale-note">' +
@@ -1409,8 +1539,13 @@
         ' г) ляже в історію, день очиститься.';
     if (!confirm(q)) return;
 
+    /* Разом із підсумком у запис лягає знімок позицій — те, з чого потім
+       робиться копія дня (F1). Підсумок історія тримала завжди, позицій у
+       ній не було взагалі, тому «скопіювати день» не мало з чого робитись. */
+    const frozen = window.DayCore.freezeMeals(state.day, state.recipes);
     const log = window.HistoryCore.closeDay(
-      state.profile.mealLog, key, got, t ? t.kcal : null, t ? t.protein : null);
+      state.profile.mealLog, key, got, t ? t.kcal : null, t ? t.protein : null,
+      window.DayCore.hasFrozenItems(frozen) ? frozen : null);
     state.profile.mealLog = log;
     state.day = EMPTY_DAY();
 
@@ -1758,6 +1893,17 @@
         closeCurrentDay();
         return;
       }
+      if (e.target.closest('#d-copy')) {
+        state.copyOpen = !state.copyOpen;
+        renderDay();
+        const list = $('#d-copy-list');
+        if (list) list.scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      const cAdd = e.target.closest('[data-copy-add]');
+      if (cAdd) { copyDayFrom(cAdd.dataset.copyAdd, 'add'); return; }
+      const cSet = e.target.closest('[data-copy-set]');
+      if (cSet) { copyDayFrom(cSet.dataset.copySet, 'replace'); return; }
       if (e.target.closest('#d-clear')) {
         if (!confirm('Очистити весь день БЕЗ запису в історію? Рецепти залишаться.')) return;
         state.day = EMPTY_DAY();
@@ -1780,7 +1926,14 @@
         const it = state.day.meals[Number(el.dataset.di)].items[Number(el.dataset.dj)];
         // Верхня межа тут раніше була відсутня зовсім, і показане число
         // розходилось із порахованим у десять разів.
-        if (it.kind === 'recipe') {
+        if (it.kind === 'snap') {
+          /* Заморожена позиція: одиниця своя (грами або контейнери), тому
+             й межа своя. Кома як роздільник — так само, як у решті полів. */
+          const maxQ = it.unit === 'portion' ? PORTIONS_MAX : GRAMS_MAX;
+          const rawQ = Number(String(el.value == null ? '' : el.value).trim().replace(',', '.')) || 0;
+          it.qty = clamp(rawQ, 0, maxQ);
+          if (String(rawQ) !== String(it.qty)) el.value = it.qty;
+        } else if (it.kind === 'recipe') {
           /* Кома як десятковий роздільник (TIM-005). Грами йшли через
              parseGrams із заміною коми, а контейнери — через голий
              Number(): «1,5» → NaN → 0. Поле при цьому не перезаписувалось

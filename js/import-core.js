@@ -194,6 +194,67 @@
     return out;
   }
 
+  /*
+   * Заморожена позиція (DayCore, kind:'snap') — та, що не посилається ні
+   * на продукт, ні на рецепт: КБЖВ на одну одиницю лежить у ній самій.
+   * Валідатор мусить її знати у двох місцях — у поточному дні й у знімку
+   * прийомів у mealLog, — тому перевірка тут одна.
+   *
+   * Межі: per — на ОДНУ одиницю (один грам або один контейнер), тож
+   * стеля мусить покривати і те, й те: 20000 ккал — це вже не контейнер,
+   * а помилка, а 9 ккал на грам жиру в неї вкладається із запасом.
+   */
+  function cleanSnapItem(it) {
+    if (!isPlain(it) || it.kind !== 'snap') return null;
+    const qty = finite(it.qty, 0, 5000);
+    if (qty === null) return null;
+    const src = isPlain(it.per) ? it.per : {};
+    const per = {
+      kcal: finite(src.kcal, 0, 20000) || 0,
+      p: finite(src.p, 0, 2000) || 0,
+      f: finite(src.f, 0, 2000) || 0,
+      c: finite(src.c, 0, 4000) || 0,
+      fiber: finite(src.fiber, 0, 500) || 0
+    };
+    const out = {
+      kind: 'snap',
+      name: str(it.name, 120) || 'Позиція',
+      unit: it.unit === 'portion' ? 'portion' : 'g',
+      qty: qty,
+      per: per
+    };
+    /* id джерела — підказка, а не посилання: якщо продукт у довіднику ще
+       є, копія дня віддасть перевагу живій позиції. Без цих полів
+       скопійований рис перестав би перераховуватись у готовий. */
+    const foodId = str(it.foodId, 80);
+    if (foodId) { out.foodId = foodId; out.cooked = it.cooked === true; }
+    const recipeId = str(it.recipeId, 80);
+    if (recipeId) out.recipeId = recipeId;
+    return out;
+  }
+
+  /** Знімок прийомів у записі mealLog. null — знімка немає або він битий. */
+  function cleanFrozenMeals(meals) {
+    if (!Array.isArray(meals) || !meals.length || meals.length > 12) return null;
+    const out = [];
+    let any = false;
+    for (let i = 0; i < meals.length; i++) {
+      const m = meals[i];
+      if (!isPlain(m) || !Array.isArray(m.items) || m.items.length > 60) return null;
+      const items = [];
+      for (let j = 0; j < m.items.length; j++) {
+        const snap = cleanSnapItem(m.items[j]);
+        if (!snap) return null;
+        items.push(snap);
+      }
+      if (items.length) any = true;
+      out.push({ name: str(m.name, 60) || ('Прийом ' + (i + 1)), items: items });
+    }
+    /* Знімок без жодної позиції — це не знімок: копіювати з нього нічого,
+       а в списку джерел він обіцяв би день, якого немає. */
+    return any ? out : null;
+  }
+
   function cleanDay(day) {
     if (!isPlain(day) || !Array.isArray(day.meals) || day.meals.length > 12) return null;
     const meals = [];
@@ -205,7 +266,11 @@
       for (let j = 0; j < m.items.length; j++) {
         const it = m.items[j];
         if (!isPlain(it)) return null;
-        if (it.kind === 'recipe') {
+        if (it.kind === 'snap') {
+          const snap = cleanSnapItem(it);
+          if (!snap) return null;
+          items.push(snap);
+        } else if (it.kind === 'recipe') {
           const p = finite(it.portions, 0.25, 10);
           if (!str(it.recipeId, 80) || p === null) return null;
           items.push({ kind: 'recipe', recipeId: it.recipeId, portions: p });
@@ -548,6 +613,12 @@
                nutrition-core: нижче 20 г це не ціль, вище 500 — помилка. */
             const pTarget = finite(s.pTarget, 20, 500);
             if (pTarget !== null) entry.pTarget = Math.round(pTarget);
+            /* Знімок позицій дня (HistoryCore.closeDay) — з нього робиться
+               копія дня. Білий список полів означає, що все не перелічене
+               тут при імпорті ЗНИКАЄ: без цієї гілки відновлення з копії
+               мовчки забирало б у людини можливість скопіювати день. */
+            const snap = cleanFrozenMeals(s.meals);
+            if (snap) entry.meals = snap;
             out[d] = entry;
           }
           return accept(k, out);

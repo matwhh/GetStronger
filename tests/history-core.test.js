@@ -302,3 +302,78 @@ describe('sessionLog: підходи в знімку сесії', () => {
     }
   });
 });
+
+/*
+ * Знімок позицій дня (F1).
+ *
+ * mealLog тримав лише підсумки, і «скопіювати день» не мало з чого
+ * робитись. Тепер запис може нести ще й позиції — але саме тому мусить
+ * їх ВІДПУСКАТИ: підсумок дня важить сорок байтів, позиції — кілобайт,
+ * і профіль, який тільки росте, одного дня не збережеться.
+ */
+describe('mealLog: знімок позицій', () => {
+  const snap = (kcal) => [{ name: 'Сніданок', items: [
+    { kind: 'snap', name: 'Щось', unit: 'g', qty: 100, per: { kcal: kcal / 100 } }
+  ] }];
+  const T = { kcal: 2000, p: 150, f: 60, c: 200, fiber: 25 };
+
+  it('знімок лягає в запис, а без нього запис лишається підсумком', () => {
+    const withSnap = H.closeDay({}, '2026-09-01', T, 2200, 150, snap(500));
+    assert.ok(Array.isArray(withSnap['2026-09-01'].meals));
+    const без = H.closeDay({}, '2026-09-01', T, 2200, 150);
+    assert.equal(без['2026-09-01'].meals, undefined);
+    assert.equal(без['2026-09-01'].kcal, 2000, 'підсумок мусить лишитись на місці');
+  });
+
+  it('порожній масив знімком не вважається', () => {
+    const log = H.closeDay({}, '2026-09-01', T, 2200, 150, []);
+    assert.equal(log['2026-09-01'].meals, undefined);
+  });
+
+  it('знімки старших за SNAPSHOT_DAYS днів зникають, підсумки лишаються', () => {
+    let log = {};
+    /* SNAPSHOT_DAYS + 3 закриті дні підряд */
+    for (let i = 1; i <= H.SNAPSHOT_DAYS + 3; i++) {
+      const d = '2026-09-' + String(i).padStart(2, '0');
+      log = H.closeDay(log, d, T, 2200, 150, snap(400));
+    }
+    const dates = Object.keys(log).sort();
+    assert.equal(dates.length, H.SNAPSHOT_DAYS + 3);
+    const withMeals = dates.filter((d) => log[d].meals);
+    assert.equal(withMeals.length, H.SNAPSHOT_DAYS);
+    /* Зникнути мусять НАЙСТАРШІ, а не випадкові */
+    assert.equal(withMeals[0], dates[3]);
+    /* Підсумок найстаршого дня на місці — історія не коротшає */
+    assert.equal(log[dates[0]].kcal, 2000);
+    assert.equal(log[dates[0]].target, 2200);
+  });
+
+  it('closeDay не мутує вхідний журнал', () => {
+    const before = H.closeDay({}, '2026-09-01', T, 2200, 150, snap(400));
+    const frozen = JSON.stringify(before);
+    H.closeDay(before, '2026-09-02', T, 2200, 150, snap(400));
+    assert.equal(JSON.stringify(before), frozen);
+  });
+
+  it('copySources віддає лише дні зі знімком, новіші першими', () => {
+    let log = { '2026-08-01': { kcal: 1800, p: 120, f: 50, c: 180, fiber: 20 } };
+    log = H.closeDay(log, '2026-09-01', T, 2200, 150, snap(400));
+    log = H.closeDay(log, '2026-09-03', T, 2200, 150, snap(400));
+    const src = H.copySources(log);
+    assert.equal(src.length, 2, 'день без знімка потрапив у джерела');
+    assert.equal(src[0].d, '2026-09-03');
+    assert.equal(src[1].d, '2026-09-01');
+  });
+
+  it('copySources не пропонує день, у знімку якого нема жодної позиції', () => {
+    const log = { '2026-09-01': { kcal: 100, p: 1, f: 1, c: 1, fiber: 0,
+                                  meals: [{ name: 'A', items: [] }] } };
+    assert.equal(H.copySources(log).length, 0);
+  });
+
+  it('copySources не падає на смітті замість журналу', () => {
+    for (const bad of [null, undefined, 'ні', 42, []]) {
+      assert.equal(H.copySources(bad).length, 0);
+    }
+  });
+});

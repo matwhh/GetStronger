@@ -52,6 +52,36 @@ async function seed(p, fn, arg) {
   return undefined;
 }
 
+/*
+ * ПЕРЕХІД, ЯКИЙ НЕ ПАДАЄ ВІД ЧУЖОГО РЕДИРЕКТУ.
+ *
+ * Той самий сторож віку, що псує evaluate (див. seed вище), псує і саму
+ * навігацію. Якщо сторінка, яка ще відкрита, вирішить піти на index.html
+ * рівно тоді, коли ми вантажимо welcome.html, Chromium скасовує НАШ
+ * перехід: page.goto падає з net::ERR_ABORTED — і не як провал перевірки,
+ * а як смерть усього скрипта. У прогоні #110 через це не виконалось
+ * двадцять перевірок після B5, і набір виглядав «червоним», хоч жодна з
+ * них навіть не спробувала.
+ *
+ * Лікування те саме, що в пастці «другий goto на ту саму сторінку»:
+ * спершу about:blank. Це доводить до кінця все, що попередня сторінка ще
+ * збиралась зробити, і робить наступний перехід справжнім переходом між
+ * документами. Сховище не страждає: origin у file:// той самий.
+ */
+async function go(p, file, opts) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      await p.goto('about:blank');
+      return await p.goto(url(file), Object.assign({ waitUntil: 'load' }, opts));
+    } catch (e) {
+      if (!/ERR_ABORTED|Execution context was destroyed|frame was detached|Target closed/
+            .test(String(e && e.message))) throw e;
+      await p.waitForTimeout(300);
+    }
+  }
+  throw new Error('не вдалося відкрити ' + file + ' — тричі скасовано чужою навігацією');
+}
+
 /** Профіль у сховищі (як його бачить Store, синхронно). */
 const localProfile = (p) => p.evaluate(() => window.Store.localProfile() || {});
 async function setProfile(p, patch) {
@@ -98,7 +128,7 @@ const browser = await chromium.launch({ executablePath: EXE });
     return route.fulfill({ status: 204, body: '' });
   });
   const p = await ctx.newPage(); p.on('dialog', d => d.accept());
-  await p.goto(url('account.html'), { waitUntil: 'load' }); await p.waitForTimeout(600);
+  await go(p, 'account.html'); await p.waitForTimeout(600);
   await p.click('#a-signout'); await p.waitForTimeout(800);
   check('B1 після виходу — форма входу', await p.locator('#a-form').count() === 1, last(p));
   await p.fill('#a-email', 'u@test.local'); await p.fill('#a-pass', 'password123');
@@ -121,13 +151,13 @@ const browser = await chromium.launch({ executablePath: EXE });
   await p2.goto(url('workout.html'), { waitUntil: 'load' }).catch(() => {}); await p2.waitForTimeout(900);
   check('B1 нова вкладка без галочки → welcome (сесія не на диску)', last(p2) === 'welcome.html', last(p2));
   await p2.close();
-  await p.goto(url('account.html'), { waitUntil: 'load' }); await p.waitForTimeout(600);
+  await go(p, 'account.html'); await p.waitForTimeout(600);
   await p.click('#a-signout'); await p.waitForTimeout(600);
   await p.fill('#a-email', 'u@test.local'); await p.fill('#a-pass', 'password123');
   await p.check('#a-remember'); await p.click('button[data-act="in"]'); await p.waitForTimeout(1500);
   const st2 = await p.evaluate(() => ({ ls: !!localStorage.getItem('ib.session'), ss: !!sessionStorage.getItem('ib.session'), rem: localStorage.getItem('ib.remember') }));
   check('B1 вихід → вхід із галочкою → сесія в localStorage', st2.ls && st2.rem !== '0', JSON.stringify(st2));
-  await p.goto(url('workout.html'), { waitUntil: 'load' }); await p.waitForTimeout(600);
+  await go(p, 'workout.html'); await p.waitForTimeout(600);
   check('B1 після повторного входу сторінки відкриваються', last(p) === 'workout.html', last(p));
   await ctx.close();
 }
@@ -136,7 +166,7 @@ const browser = await chromium.launch({ executablePath: EXE });
 {
   const ctx = await adultContext(browser, { viewport: VP });
   const p = await ctx.newPage();
-  await p.goto(url('programs.html'), { waitUntil: 'load' });
+  await go(p, 'programs.html');
   const matrix = await p.evaluate(() => {
     const out = [];
     for (const sex of ['male', 'female']) {
@@ -169,7 +199,7 @@ const browser = await chromium.launch({ executablePath: EXE });
   }
   for (const sex of ['male', 'female']) {
     await setProfile(p, { sex });
-    await p.goto(url('programs.html'), { waitUntil: 'load' }); await p.waitForTimeout(500);
+    await go(p, 'programs.html'); await p.waitForTimeout(500);
     const vis = await p.evaluate(() => Array.from(document.querySelectorAll('input[name="days"]')).map(r => {
       const lab = r.closest('label') || r.parentElement;
       const cs = getComputedStyle(lab);
@@ -194,10 +224,10 @@ const browser = await chromium.launch({ executablePath: EXE });
     ['5000', 5000], ['5000.1', null], ['9999', null], ['99999', null], ['-1', null],
     ['0', 0], ['0.5', 0.5], ['58,5', 58.5], ['58.5', 58.5], ['1e3', null], ['abc', null], ['', null]
   ];
-  await p.goto(url('meals.html'), { waitUntil: 'load' });
+  await go(p, 'meals.html');
   for (const [raw, expect] of cases) {
     await setProfile(p, { day: null });
-    await p.goto(url('meals.html'), { waitUntil: 'load' }); await p.waitForTimeout(500);
+    await go(p, 'meals.html'); await p.waitForTimeout(500);
     const before = ((await localProfile(p)).day || { meals: [] });
     const nBefore = (before.meals || []).reduce((s, m) => s + (m.items || []).length, 0);
     await openFoods(p); await p.locator('[data-add-food]').first().click(); await p.waitForTimeout(300);
@@ -216,7 +246,7 @@ const browser = await chromium.launch({ executablePath: EXE });
   }
   /* Редагування в таблиці дня: 99999 не проходить, значення лишається. */
   await setProfile(p, { day: null });
-  await p.goto(url('meals.html'), { waitUntil: 'load' }); await p.waitForTimeout(400);
+  await go(p, 'meals.html'); await p.waitForTimeout(400);
   await openFoods(p); await p.locator('[data-add-food]').first().click(); await p.waitForTimeout(200);
   await p.fill('#m-grams', '120'); await p.click('#m-add'); await p.waitForTimeout(400);
   const cell = p.locator('[data-df="amount"]').first();
@@ -234,16 +264,16 @@ const browser = await chromium.launch({ executablePath: EXE });
   const ctx = await adultContext(browser, { viewport: VP });
   const p = await ctx.newPage(); p.on('dialog', d => d.accept());
   const Y = today(-1);
-  await p.goto(url('meals.html'), { waitUntil: 'load' });
+  await go(p, 'meals.html');
   await setProfile(p, { age: 36 });   // картка «Харчування» на index потребує віку
-  await p.goto(url('meals.html'), { waitUntil: 'load' }); await p.waitForTimeout(400);
+  await go(p, 'meals.html'); await p.waitForTimeout(400);
   await openFoods(p); await p.locator('[data-add-food]').first().click(); await p.waitForTimeout(200);
   await p.fill('#m-grams', '100'); await p.click('#m-add'); await p.waitForTimeout(400);
   const d0 = (await localProfile(p)).day;
   check('B4 відкритий день має дату', d0 && d0.date === today(0), String(d0 && d0.date));
   /* «Опівніч минула»: день лишився відкритим із вчорашньою датою. */
   await setProfile(p, { day: Object.assign({}, d0, { date: Y }) });
-  await p.goto(url('meals.html'), { waitUntil: 'load' }); await p.waitForTimeout(500);
+  await go(p, 'meals.html'); await p.waitForTimeout(500);
   check('B4 чип «за ' + Y + '» видимий', await p.locator('#d-stale').isVisible() && (await p.locator('#d-stale').innerText()).includes(Y));
   check('B4 нотатка про незакритий день видима', await p.locator('#d-stale-note').isVisible());
   await openFoods(p); await p.locator('[data-add-food]').first().click(); await p.waitForTimeout(200);
@@ -255,12 +285,12 @@ const browser = await chromium.launch({ executablePath: EXE });
      лишається там, де воно й виникає: на самому «Раціоні». Обидві
      позначки (чип із датою й нотатка) вже перевірені вище, тут
      звіряємо, що вони переживають перехід і повернення. */
-  await p.goto(url('index.html'), { waitUntil: 'load' }); await p.waitForTimeout(400);
-  await p.goto(url('meals.html'), { waitUntil: 'load' }); await p.waitForTimeout(600);
+  await go(p, 'index.html'); await p.waitForTimeout(400);
+  await go(p, 'meals.html'); await p.waitForTimeout(600);
   const stale = await p.locator('#d-stale').innerText();
   check('B4 «Раціон» і далі попереджає про незакритий день',
         (await p.locator('#d-stale').isVisible()) && stale.includes(Y), stale);
-  await p.goto(url('meals.html'), { waitUntil: 'load' }); await p.waitForTimeout(400);
+  await go(p, 'meals.html'); await p.waitForTimeout(400);
   await p.click('#d-close'); await p.waitForTimeout(700);
   const prof = await localProfile(p);
   const logged = (prof.mealLog || {})[Y];
@@ -275,7 +305,7 @@ const browser = await chromium.launch({ executablePath: EXE });
   const ctx = await adultContext(browser, { viewport: VP });
   const p = await ctx.newPage(); p.on('dialog', d => d.accept());
   for (const [raw, expect] of [['58,5', 58.5], ['58.5', 58.5], ['72,25', 72.25], ['72.25', 72.25], ['abc', 72.25], ['1,5', 72.25]]) {
-    await p.goto(url('account.html'), { waitUntil: 'load' }); await p.waitForTimeout(500);
+    await go(p, 'account.html'); await p.waitForTimeout(500);
     const type = await p.getAttribute('#p-weight', 'type');
     await p.fill('#p-weight', raw); await p.dispatchEvent('#p-weight', 'change'); await p.waitForTimeout(600);
     const w = (await localProfile(p)).weight;
@@ -287,9 +317,9 @@ const browser = await chromium.launch({ executablePath: EXE });
   const ctx2 = await adultContext(browser, { viewport: VP }, { local: true });
   const p2 = await ctx2.newPage(); p2.on('dialog', d => d.accept());
   for (const [w, h, expW, expH] of [['58,5', '170', 58.5, 170], ['58.5', '170,0', 58.5, 170], ['72,25', '181', 72.25, 181]]) {
-    await p2.goto(url('welcome.html'), { waitUntil: 'load' });
+    await go(p2, 'welcome.html');
     await p2.evaluate((seed) => { localStorage.setItem('ib.profile', JSON.stringify({ version: seed.version, birthDate: seed.birthDate })); }, ONBOARDED);
-    await p2.goto(url('welcome.html'), { waitUntil: 'load' }); await p2.waitForTimeout(500);
+    await go(p2, 'welcome.html'); await p2.waitForTimeout(500);
     if (await p2.locator('#gate-go').count()) {
       await p2.fill('[data-dob="d"]', '15'); await p2.fill('[data-dob="m"]', '06'); await p2.fill('[data-dob="y"]', '1990');
       await p2.click('#gate-go'); await p2.waitForTimeout(500);
@@ -313,13 +343,13 @@ const browser = await chromium.launch({ executablePath: EXE });
   const ctx = await adultContext(browser, { viewport: VP });
   await approvedRpc(ctx);
   const p = await ctx.newPage(); p.on('dialog', d => d.accept());
-  await p.goto(url('welcome.html'), { waitUntil: 'load' });
+  await go(p, 'welcome.html');
   await seed(p, () => { localStorage.setItem('ib.profile', JSON.stringify({ version: 6 })); });
-  await p.goto(url('welcome.html'), { waitUntil: 'load' }); await p.waitForTimeout(800);
+  await go(p, 'welcome.html'); await p.waitForTimeout(800);
   check('B6 крок віку показано залогіненому', await p.locator('#gate-go').count() === 1, last(p));
   check('B6 «Вийти» є на кроці віку', await p.locator('#au-out').count() === 1);
   await seed(p, () => { localStorage.setItem('ib.profile', JSON.stringify({ version: 6, birthDate: '1990-06-15' })); });
-  await p.goto(url('welcome.html'), { waitUntil: 'load' }); await p.waitForTimeout(800);
+  await go(p, 'welcome.html'); await p.waitForTimeout(800);
   check('B6 крок тіла показано залогіненому', await p.locator('#body-go').count() === 1, last(p));
   check('B6 «Вийти» є на кроці тіла', await p.locator('#au-out').count() === 1);
   await p.click('#au-out'); await p.waitForTimeout(800);
@@ -330,9 +360,9 @@ const browser = await chromium.launch({ executablePath: EXE });
   /* Локальний режим: кнопки бути не повинно. */
   const ctx2 = await adultContext(browser, { viewport: VP }, { local: true });
   const p2 = await ctx2.newPage();
-  await p2.goto(url('welcome.html'), { waitUntil: 'load' });
+  await go(p2, 'welcome.html');
   await p2.evaluate(() => { localStorage.setItem('ib.profile', JSON.stringify({ version: 6, birthDate: '1990-06-15' })); });
-  await p2.goto(url('welcome.html'), { waitUntil: 'load' }); await p2.waitForTimeout(600);
+  await go(p2, 'welcome.html'); await p2.waitForTimeout(600);
   check('B6 локальний режим: «Вийти» відсутня', (await p2.locator('#au-out').count()) === 0, last(p2));
   await ctx2.close();
 }
@@ -341,11 +371,11 @@ const browser = await chromium.launch({ executablePath: EXE });
 {
   const ctx = await adultContext(browser, { viewport: VP });
   const p = await ctx.newPage();
-  await p.goto(url('journal.html'), { waitUntil: 'load' });
+  await go(p, 'journal.html');
   const log = {};   // sessionLog: { 'YYYY-MM-DD': { doneSets, totalSets, ... } }
   for (let i = 1; i <= 5; i++) log[today(-i)] = { day: 1, doneSets: 2, totalSets: 2 };
   await setProfile(p, { sessionLog: log, activePlan: { programId: 'fullbody', days: 3 }, daysPerWeek: 3 });
-  await p.goto(url('journal.html'), { waitUntil: 'load' }); await p.waitForTimeout(700);
+  await go(p, 'journal.html'); await p.waitForTimeout(700);
   const txt = ((await p.locator('#adh-training').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
   check('B7 текст адхеренсу без «N із M запланованих» при перевиконанні',
     txt.length > 0 && !/із \d+ запланованих/.test(txt) && /за планом на період/.test(txt), txt.slice(0, 140));
@@ -359,7 +389,7 @@ const browser = await chromium.launch({ executablePath: EXE });
   await approvedRpc(ctx, rpc);
   const p = await ctx.newPage();
   for (const pg of ['index.html', 'workout.html', 'journal.html', 'meals.html', 'index.html']) {
-    await p.goto(url(pg), { waitUntil: 'load' }); await p.waitForTimeout(600);
+    await go(p, pg); await p.waitForTimeout(600);
   }
   check('B8 elo_close_season ≤ 1 за 5 завантажень (неостаточна відповідь)', (rpc.elo_close_season || 0) <= 1, JSON.stringify(rpc));
   check('B8 elo_state усе ще на кожне завантаження (бейдж)', (rpc.elo_state || 0) >= 5, 'elo_state=' + rpc.elo_state);

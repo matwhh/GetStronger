@@ -66,7 +66,7 @@ elo-core · elo-api · elo-hooks
 | `programs.html` | Вибір і редагування плану | history-core, exercises, reps-core, programs-data, workout-core, **programs** |
 | `plan.html` | Мій план + прогноз ваг | …, onerm-core, periodization-core, programs, projection, **plan-ui** |
 | `periodization.html` | Цикл на 8–16 тижнів | exercises, reps-core, programs-data, onerm-core, periodization-core, **periodization** |
-| `journal.html` | Прогрес: вага, сила, тренування | daycal-core, history-core, daylog-core, progression-core, season-core, progress-core, adherence-core, onerm-core, exercise-core, tracker-core, **journal** |
+| `journal.html` | Прогрес: вага, сила, тренування | daycal-core, history-core, daylog-core, progression-core, statwindow-core, progress-core, adherence-core, onerm-core, exercise-core, tracker-core, **journal** |
 | `nutrition.html` | План харчування: норма КБЖВ | donut-core, nutrition-core, **nutrition** |
 | `meals.html` | Раціон: продукти, рецепти, день | history-core, foods, recipes-data, donut-core, day-core, nutrition-core, **meals** |
 | `measure.html` | Заміри тіла | history-core, measure-core, **measure** |
@@ -132,7 +132,7 @@ elo-core · elo-api · elo-hooks
 | `onboarding-core.js` | 176 | крок онбордингу з полів профілю | `OnboardingCore`: `stepFor`, `pageFor`, `isAllowed`, `LIMITS` | `AgeCore` |
 | `bmi-core.js` | 168 | BMI, категорія, попередження | `BmiCore`: `bmi`, `category`, `shouldWarn`, `showWarnModal` | `App.lockScroll` ⚠️ |
 | `donut-core.js` | 163 | SVG-кільце складу з анімацією | `Donut`: `html`, `animate` | — |
-| `season-core.js` | 151 | вікно періоду статистики | `SeasonCore`: `current`, `at`, `contains`, `clipSeries` | `DateCore` |
+| `statwindow-core.js` | 160 | вікно, за яке рахується статистика (НЕ сезон рейтингу) | `StatWindow`: `current`, `at`, `contains`, `clipSeries` | `DateCore` |
 | `reps-core.js` | 151 | діапазон повторень зі стажу й групи | `RepsCore`: `repRangeFor`, `tierFor`, `applyPlan`, `RANGES` | `MUSCLES` |
 | `date-core.js` | 149 | ⭐ **єдине джерело правди про дати** | `DateCore`: `keyOf`, `todayKey`, `dateOf`, `mondayOf`, `addDays`, `shiftKey`, `daysBetween`, `lastKeys` | — |
 | `auth-msg-core.js` | 148 | людські тексти помилок входу й реєстрації | `AuthMsg`: `emailProblem`, `loginPassProblem`, `signInProblem` | — |

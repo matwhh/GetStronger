@@ -550,7 +550,7 @@
     if (!host || !window.ProgressCore) return;
 
     const tiles = overviewTiles();
-    const SC = window.SeasonCore;
+    const SC = window.StatWindow;
     host.innerHTML =
       '<div class="card">' +
         (SC
@@ -1965,7 +1965,7 @@
   /* Сезонне вікно аналітики                                             */
   /* ------------------------------------------------------------------ */
   /*
-   * «Огляд прогресу» рахує статистику ЗА СЕЗОН (js/season-core.js), а не
+   * «Огляд прогресу» рахує статистику за ВІКНО (js/statwindow-core.js), а не
    * за весь час: інакше метрики першого тижня Сезону 1 були б розмиті
    * роками попередніх даних. Історія при цьому НЕ чіпається — календар,
    * підсумок дня і графік ваги тіла й далі бачать усе.
@@ -1979,7 +1979,7 @@
   };
 
   function seasonize() {
-    const SC = window.SeasonCore;
+    const SC = window.StatWindow;
     if (!SC) {
       sn.sessionLog = state.sessionLog; sn.workLog = state.workLog;
       sn.weightLog = state.weightLog;   sn.mealLog = state.mealLog;
@@ -2015,11 +2015,11 @@
     return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
 
-  const MONTHS_NOM = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
-                      'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
-  const MONTHS_GEN = ['січня','лютого','березня','квітня','травня','червня',
-                      'липня','серпня','вересня','жовтня','листопада','грудня'];
-  const WEEKDAYS = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
+  /* Словники дати — з js/date-core.js, одним списком на весь проєкт.
+     MONTHS_NOM звідси прибрано зовсім: він був оголошений і не вживався
+     жодного разу. */
+  const MONTHS_GEN = window.DateCore.MONTHS_GEN;
+  const WEEKDAYS = window.DateCore.WEEKDAYS;
 
   /* ------------------------------------------------------------------ */
   /* Виконання плану: тренування і харчування, у відсотках               */

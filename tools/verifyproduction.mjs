@@ -72,7 +72,7 @@ const b = await chromium.launch();
   await p.goto(ROOT + 'journal.html', { waitUntil: 'load' });
   await p.waitForTimeout(1500);
   const s = await p.evaluate(() => ({
-    floor: window.SeasonCore.floorKey(),
+    floor: window.StatWindow.floorKey(),
     overview: (document.querySelector('#jr-overview') || {}).innerText || '',
     adh: (document.querySelector('#jr-adherence') || {}).innerText || '',
     adhPeriods: document.querySelectorAll('#jr-adherence input[name="adh-period"]').length,
@@ -130,7 +130,7 @@ for (const [when, expect] of [['2026-08-31T23:59:59', null], ['2026-09-01T00:00:
   await p.evaluate(seedScript);
   await p.goto(ROOT + 'journal.html', { waitUntil: 'load' });
   await p.waitForTimeout(900);
-  const got = await p.evaluate(() => { const s = window.SeasonCore.current(); return s ? s.id : null; });
+  const got = await p.evaluate(() => { const s = window.StatWindow.current(); return s ? s.id : null; });
   ok('о ' + when.slice(11) + ' ' + when.slice(0, 10) + ' сезон = ' + expect, got === expect, String(got));
   await ctx.close();
 }

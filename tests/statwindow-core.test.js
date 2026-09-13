@@ -1,5 +1,9 @@
 /**
- * Періоди статистики: межа 2026-09-01 і обрізання журналів.
+ * Вікно статистики: межа 2026-09-01 і обрізання журналів.
+ *
+ * Модуль звався season-core.js, а глобал — SeasonCore; перейменовано
+ * 13.09.2026, бо до сезонів РЕЙТИНГУ він стосунку не має, а поруч уже
+ * лежать js/seasons.js і seasons.html.
  *
  * Найважливіший тест тут — межа доби. Записи підписані ЛОКАЛЬНИМИ датами,
  * тож 31 серпня має лишитись поза періодом, а 1 вересня — увійти, у будь-якому
@@ -9,7 +13,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const { SeasonCore: S } = loadModules(['js/date-core.js', 'js/season-core.js']);
+const { StatWindow: S } = loadModules(['js/date-core.js', 'js/statwindow-core.js']);
 
 /* Локальний полудень: дата не «переїде» в сусідню добу через пояс. */
 const at = (iso) => new Date(iso + 'T12:00:00');

@@ -5021,7 +5021,10 @@ button.heatmap__cell::after {
 .szev__r { flex: 0 0 auto; text-align: right; }
 .szev__cat {
   display: block;
-  font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase;
+  /* 0.7rem, а не 0.66: на 0.66 це був найдрібніший текст сайту (10,6px),
+     тобто нова нижня межа читабельності, встановлена мимохідь. Контраст
+     тут і так 7,45:1, але розмір теж носій сенсу. */
+  font-size: 0.7rem; letter-spacing: 0.09em; text-transform: uppercase;
   color: var(--muted);
 }
 .szev__what { display: block; font-size: 0.9rem; }

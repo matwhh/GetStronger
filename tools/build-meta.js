@@ -1,18 +1,31 @@
 #!/usr/bin/env node
 /**
- * Проставити canonical, og:url і sitemap.xml у СТАТИЧНУ розмітку.
+ * Проставити `og:url` у СТАТИЧНУ розмітку сторінок.
  *
  * НАВІЩО ЦЕ ПОТРІБНО
  * ------------------
- * js/app.js уміє додавати canonical і og:url з config.siteUrl, але робить це
- * після виконання JavaScript. Для Google це прийнятно, а для краулерів
- * превʼю в месенджерах — ні: Telegram, Slack, WhatsApp, Signal JS не
- * виконують узагалі. Тому посилання на сайт відкривалось у чаті без картки,
- * і жодне заповнення config.siteUrl цього не міняло.
+ * js/app.js уміє додати og:url із config.siteUrl, але робить це після
+ * виконання JavaScript. Для браузера це прийнятно, а для краулерів превʼю
+ * в месенджерах — ні: Telegram, Slack, WhatsApp, Signal JS не виконують
+ * узагалі. Без og:url посилання на сайт відкривалось у чаті без картки, і
+ * жодне заповнення config.siteUrl цього не міняло.
  *
- * Цей скрипт запускається РУКАМИ один раз перед викладенням і вписує теги
- * прямо в HTML. Сайт лишається статичним і далі відкривається подвійним
- * кліком по index.html — жодної збірки в робочому процесі не зʼявляється.
+ * ЧОГО ТУТ БІЛЬШЕ НЕМАЄ І ЧОМУ (13.09.2026)
+ * -----------------------------------------
+ * Скрипт раніше вписував ще й `<link rel="canonical">`, збирав `sitemap.xml`
+ * і дописував рядок `Sitemap:` у robots.txt. Усе троє — інструменти ПОШУКУ,
+ * а Get Stronger у пошук не йде: vercel.json віддає
+ * `X-Robots-Tag: noindex, nofollow` на кожну адресу.
+ *
+ * Тобто половина цього файла обслуговувала те, що вимкнене заголовком, —
+ * і, що гірше, брехала наступному читачеві: у переліку сторінок стояв
+ * коментар «Сторінки, які має бачити пошук». Рішення ухвалене свідомо:
+ * сайт приватний, для вузького кола, і індексації не хоче. Тому апарат
+ * прибрано, а не полагоджено.
+ *
+ * og:* лишається, і це не суперечність: превʼю в месенджері — не пошук.
+ * `X-Robots-Tag` краулери превʼю не читають, вони просто тягнуть сторінку
+ * заради картки. Саме тому og:image лежить статично, а не додається з JS.
  *
  * ЯК КОРИСТУВАТИСЬ
  * ----------------
@@ -20,8 +33,8 @@
  *   2. node tools/build-meta.js
  *   3. Виклади сайт
  *
- * Скрипт ідемпотентний: повторний запуск оновлює вже проставлені теги,
- * а не додає другі. Запуск без siteUrl — навпаки, ПРИБИРАЄ теги, щоб у
+ * Скрипт ідемпотентний: повторний запуск оновлює вже проставлений тег,
+ * а не додає другий. Запуск без siteUrl — навпаки, ПРИБИРАЄ теги, щоб у
  * розмітці не лишалось посилань на старий домен.
  */
 /* package.json має "type": "module", тож файл виконується як ES-модуль:
@@ -41,29 +54,6 @@ function readSiteUrl() {
   return m ? m[1].replace(/\/+$/, '') : '';
 }
 
-/* Сторінки, які має бачити пошук. account.html навмисно поза списком:
-   він під noindex, бо це особистий кабінет, а не публічна сторінка. */
-const PAGES = [
-  /* index.html і є «Сьогодні». today.html лишився перенаправленням для
-     старих посилань — під noindex, тому в мапі його немає. */
-  { file: 'index.html',          priority: '1.0', changefreq: 'daily' },
-  { file: 'workout.html',        priority: '0.9', changefreq: 'monthly' },
-  { file: 'programs.html',       priority: '0.9', changefreq: 'monthly' },
-  { file: 'plan.html',           priority: '0.8', changefreq: 'monthly' },
-  { file: 'periodization.html',  priority: '0.8', changefreq: 'monthly' },
-  { file: 'boxing.html',         priority: '0.7', changefreq: 'monthly' },
-  { file: 'journal.html',        priority: '0.7', changefreq: 'monthly' },
-  { file: 'trackers.html',       priority: '0.7', changefreq: 'monthly' },
-
-  { file: 'rating.html',         priority: '0.6', changefreq: 'monthly' },
-  { file: 'nutrition.html',      priority: '0.9', changefreq: 'monthly' },
-  { file: 'meals.html',          priority: '0.8', changefreq: 'monthly' },
-  { file: 'supplements.html',    priority: '0.8', changefreq: 'monthly' },
-  { file: 'cardio.html',         priority: '0.7', changefreq: 'monthly' },
-  { file: 'calculator.html',     priority: '0.8', changefreq: 'monthly' },
-  { file: 'research.html',       priority: '0.6', changefreq: 'yearly' }
-];
-
 const MARK_OPEN  = '<!-- build-meta:start -->';
 const MARK_CLOSE = '<!-- build-meta:end -->';
 
@@ -76,10 +66,9 @@ function inject(html, url) {
   const cleaned = stripBlock(html);
   const block =
     '\n' + MARK_OPEN +
-    '\n<link rel="canonical" href="' + url + '">' +
     '\n<meta property="og:url" content="' + url + '">' +
     '\n' + MARK_CLOSE;
-  // Перед </head>: canonical має стояти в head, а точне місце значення не має.
+  // Перед </head>: точне місце значення не має, головне — всередині head.
   return cleaned.replace(/\n?<\/head>/, block + '\n</head>');
 }
 
@@ -95,16 +84,8 @@ function main() {
       const out = stripBlock(src);
       if (out !== src) { fs.writeFileSync(p, out); cleaned++; }
     });
-    const sm = path.join(ROOT, 'sitemap.xml');
-    if (fs.existsSync(sm)) fs.unlinkSync(sm);
-    /* Рядок Sitemap теж прибираємо: інакше після зміни домену в robots.txt
-       лишається адреса старого сайту, вже без самого sitemap.xml. */
-    const robotsPath = path.join(ROOT, 'robots.txt');
-    const robotsSrc = fs.readFileSync(robotsPath, 'utf8');
-    const robotsOut = robotsSrc.replace(/^\s*Sitemap:.*$\n?/mi, '');
-    if (robotsOut !== robotsSrc) fs.writeFileSync(robotsPath, robotsOut);
     console.log('siteUrl порожній у js/config.js.');
-    console.log('Прибрано теги зі сторінок: ' + cleaned + '; sitemap.xml видалено; рядок Sitemap у robots.txt прибрано.');
+    console.log('Прибрано теги зі сторінок: ' + cleaned + '.');
     console.log('Впиши домен у config.js і запусти знову.');
     return;
   }
@@ -116,34 +97,8 @@ function main() {
     touched++;
   });
 
-  // Дата збірки — сьогоднішня: lastmod без реальної дати змісту все одно
-  // приблизний, і це чесніше за вигадану точність до файлу.
-  const today = new Date().toISOString().slice(0, 10);
-  const xml =
-    '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-    PAGES.map(function (p) {
-      return '  <url>\n' +
-             '    <loc>' + base + '/' + p.file + '</loc>\n' +
-             '    <lastmod>' + today + '</lastmod>\n' +
-             '    <changefreq>' + p.changefreq + '</changefreq>\n' +
-             '    <priority>' + p.priority + '</priority>\n' +
-             '  </url>';
-    }).join('\n') +
-    '\n</urlset>\n';
-  fs.writeFileSync(path.join(ROOT, 'sitemap.xml'), xml);
-
-  // robots.txt має вказувати на sitemap реальним доменом, а не плейсхолдером
-  const robotsPath = path.join(ROOT, 'robots.txt');
-  let robots = fs.readFileSync(robotsPath, 'utf8');
-  robots = robots.replace(/^\s*#?\s*Sitemap:.*$/mi, 'Sitemap: ' + base + '/sitemap.xml');
-  if (!/^Sitemap:/mi.test(robots)) robots = robots.trimEnd() + '\nSitemap: ' + base + '/sitemap.xml\n';
-  fs.writeFileSync(robotsPath, robots);
-
   console.log('Домен: ' + base);
   console.log('Сторінок оброблено: ' + touched);
-  console.log('sitemap.xml: ' + PAGES.length + ' адрес');
-  console.log('robots.txt: рядок Sitemap оновлено');
 }
 
 main();

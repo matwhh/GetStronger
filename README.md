@@ -168,7 +168,7 @@ bash tools/ci-browser.sh full   # усі 46, ~50 хв
 ```js
 window.APP_CONFIG = {
   siteName: 'Get Stronger',
-  siteUrl:  'https://приклад.вашдомен',   // для canonical, og:url і sitemap
+  siteUrl:  'https://приклад.вашдомен',   // для og:url у картці месенджера
   supabase: { url: '', anonKey: '' }      // порожні = локальний режим
 };
 ```
@@ -222,7 +222,7 @@ TZ=Europe/Kyiv npm test                 # частина логіки рахує
 Єдиний крок перед публікацією — метатеги:
 
 ```bash
-npm run build:meta    # canonical, og:url і sitemap.xml із домену в config.js
+npm run build:meta    # og:url у розмітку з домену в config.js
 ```
 
 Публікація: `git push` у `main` → Vercel збирає статику. На Mac для цього

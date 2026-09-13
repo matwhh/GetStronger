@@ -343,92 +343,48 @@
     { href: 'account.html',    label: 'Акаунт' }
   ];
   /**
-   * canonical і og:url можна проставити тільки маючи домен: відносний
-   * canonical формально дозволений, але половина інструментів його
-   * ігнорує, а неправильний абсолютний — гірше за відсутній.
-   * Тому теги додаються лише коли в config.js заповнено siteUrl.
+   * og:url — адреса сторінки для картки в месенджері.
+   *
+   * Проставити його можна лише маючи домен: відносне посилання в картці
+   * нічого не означає, а неправильне абсолютне гірше за відсутнє. Тому
+   * тег додається, тільки коли в config.js заповнено siteUrl.
+   *
+   * CANONICAL ЗВІДСИ ПРИБРАНО (13.09.2026). Це директива для ПОШУКУ, а
+   * Get Stronger у пошук не йде: vercel.json віддає X-Robots-Tag:
+   * noindex, nofollow на кожній адресі. Тег, який читає лише той, кого
+   * ми не пускаємо, — мертвий вантаж; разом із ним пішли sitemap.xml і
+   * JSON-LD. Рішення записане в robots.txt і стережеться
+   * tests/noindex.test.js.
+   *
+   * Месенджерів це не стосується: краулер превʼю X-Robots-Tag не читає,
+   * він просто тягне сторінку заради картки. Саме тому og:* лишається —
+   * і статично в розмітці (build-meta), бо JS ті краулери не виконують.
    */
-  function injectCanonical() {
+  function injectOgUrl() {
     const base = String((window.APP_CONFIG || {}).siteUrl || '').replace(/\/+$/, '');
     if (!base) return;
-
-    const url = base + '/' + currentPage();
-
-    if (!document.querySelector('link[rel="canonical"]')) {
-      const link = document.createElement('link');
-      link.rel = 'canonical';
-      link.href = url;
-      document.head.appendChild(link);
-    }
-    if (!document.querySelector('meta[property="og:url"]')) {
-      const meta = document.createElement('meta');
-      meta.setAttribute('property', 'og:url');
-      meta.content = url;
-      document.head.appendChild(meta);
-    }
+    if (document.querySelector('meta[property="og:url"]')) return;
+    const meta = document.createElement('meta');
+    meta.setAttribute('property', 'og:url');
+    meta.content = base + '/' + currentPage();
+    document.head.appendChild(meta);
   }
 
-  /**
-   * Структуровані дані (JSON-LD).
+  /*
+   * СТРУКТУРОВАНИХ ДАНИХ (JSON-LD) ТУТ БІЛЬШЕ НЕМАЄ.
    *
-   * Їх не було ніде. Googlebot JS виконує, тому вставляти звідси прийнятно —
-   * на відміну від og:image і canonical, які потрібні краулерам месенджерів
-   * (Telegram, Slack, WhatsApp), а ті JS НЕ виконують. Саме тому og:image
-   * лежить статично в розмітці кожної сторінки, а це — тут.
+   * Вони існують рівно для одного читача — пошукового робота, який із них
+   * будує «розширений результат» у видачі. Get Stronger у видачу не йде:
+   * vercel.json віддає X-Robots-Tag: noindex, nofollow на кожній адресі
+   * (рішення 13.09.2026). Тобто цей блок описував сайт тому, кого ми не
+   * пускаємо, і виконувався на кожному завантаженні кожної сторінки.
+   *
+   * Прибрано разом із canonical і sitemap.xml — це один апарат, і
+   * лишати від нього третину означало б тримати брехливу підказку
+   * наступному читачеві. Історія блока (включно з WEB-007, де голий
+   * масив замість @graph давав три однакові TypeError у Sentry) лежить у
+   * git.
    */
-  function injectJsonLd() {
-    if (document.querySelector('script[type="application/ld+json"]')) return;
-    const base = String((window.APP_CONFIG || {}).siteUrl || '').replace(/\/+$/, '');
-
-    const site = {
-      '@context': 'https://schema.org',
-      '@type': 'WebSite',
-      name: CFG.siteName || 'Get Stronger',
-      inLanguage: 'uk'
-    };
-    if (base) site.url = base + '/';
-
-    const page = currentPage();
-    const CALC = { 'calculator.html': 'Калькулятор 1ПМ', 'nutrition.html': 'Калькулятор калорій і макронутрієнтів', 'cardio.html': 'Калькулятор пульсових зон' };
-
-    const graph = [site];
-    if (CALC[page]) {
-      graph.push({
-        '@context': 'https://schema.org',
-        '@type': 'WebApplication',
-        name: CALC[page],
-        applicationCategory: 'HealthApplication',
-        operatingSystem: 'Any',
-        inLanguage: 'uk',
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
-      });
-    }
-
-    /*
-     * НАБІР ОБʼЄКТІВ — ЦЕ @graph, А НЕ МАСИВ.
-     *
-     * Голий масив не має @context на верхньому рівні й не є валідним
-     * JSON-LD. Він зʼявлявся рівно на трьох сторінках (calculator,
-     * nutrition, cardio) — і саме звідти в Sentry три однакові
-     * TypeError: undefined is not an object (evaluating
-     * 'r["@context"].toLowerCase') (WEB-007). Змінна навіть зветься graph,
-     * але @graph не писався.
-     *
-     * Усередині @graph власний @context кожного обʼєкта зайвий: він один
-     * на весь документ.
-     */
-    const el = document.createElement('script');
-    el.type = 'application/ld+json';
-    el.textContent = JSON.stringify(graph.length === 1 ? graph[0] : {
-      '@context': 'https://schema.org',
-      '@graph': graph.map(function (o) {
-        const copy = Object.assign({}, o);
-        delete copy['@context'];
-        return copy;
-      })
-    });
-    document.head.appendChild(el);
-  }
 
   /* ------------------------------------------------------------------ */
   /* Довгі пояснення — під розкриття                                     */
@@ -2254,9 +2210,9 @@
      * зламана навігація — прикро, зламана навігація ПЛЮС порожня сторінка —
      * зовсім інша річ.
      */
-    [buildNav, buildFooter, function () { initReveal(document); }, injectCanonical,
+    [buildNav, buildFooter, function () { initReveal(document); }, injectOgUrl,
      function () { initAccordions(document); }, initSegWatch,
-     function () { initTilt(document); }, initCardGlow, initBadgeGlass, injectJsonLd,
+     function () { initTilt(document); }, initCardGlow, initBadgeGlass,
      warnCorruptProfile]
       .forEach(function (step) {
         try { step(); } catch (e) { console.error('[app] крок ініціалізації впав:', e); }

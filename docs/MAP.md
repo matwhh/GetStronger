@@ -216,7 +216,7 @@ elo-core · elo-api · elo-hooks
 
 Шапка й підвал (`buildNav`, `buildFooter`) · бургер до 1060px ·
 нижня панель розділів (`buildTabBar` + ліниве довантаження скла) ·
-жетон рівня й стан синхронізації в шапці · `canonical` і JSON-LD ·
+жетон рівня й стан синхронізації в шапці · `og:url` ·
 ефекти (`initReveal`, `initTilt`, `initSegs`, `initAccordions`,
 `initBadgeGlass`, `initLongform`) · тости · таймер відпочинку ·
 реєстрація service worker · перехід через північ (`onDayChange`) ·

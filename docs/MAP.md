@@ -116,7 +116,7 @@ elo-core · elo-api · elo-hooks
 | `progress-core.js` | 428 | зведена аналітика над журналами | `ProgressCore`: `bodyStats`, `forecast`, `liftStats`, `trainingStats`, `prList` | `HistoryCore`, `DateCore` |
 | `tracker-tile-core.js` | 383 | кубик трекера на «Сьогодні»: свій ввід під кожен вид | `TrackerTile`: `html`, `grid`, `isWide` | `TrackerCore` |
 | `elo-core.js` | 374 | сезони, рівні, бюджети, дельти дій | `EloCore`: `seasonOf`, `seasonRange`, `levelFor`, `weeklyBudget`, `actionDelta`, `applyDayCaps` | — |
-| `award-core.js` | 376 | двобічна картка нагороди, 8 щаблів рідкості (Common…Legendary), вітрина з силуетами | `Award`: `html`, `grid`, `showcase`, `CODES`, `ORDER`, `TIERS`, `tierOf`, `gearIcon` | — |
+| `award-core.js` | 361 | двобічна картка нагороди, 8 щаблів рідкості (Common…Legendary), вітрина з силуетами | `Award`: `html`, `grid`, `showcase`, `CODES`, `ORDER`, `TIERS`, `tierOf` | — |
 | `elo-view-core.js` | 335 | показ серверних даних рейтингу: події → дні, підсумки сезонів, драбина | `EloView`: `groupByDay`, `eventsSummary`, `seasonStats`, `seasonLadder`, `dayLabel`, `human`, `catLabel` | `DateCore` |
 | `exercise-core.js` | 350 | прогрес однієї вправи зі знімків сесій | `ExerciseCore`: `series`, `stats`, `trend`, `prFromSessions`, `METRICS` | `OneRM` |
 | `progression-core.js` | 335 | «пора підняти вагу»: коли підказати й на скільки | `ProgressionCore`: `due`, `hitTop`, `weekComplete`, `ages`, `snoozeUntil`, `STEP_LEGS`, `STEP_OTHER` | `DateCore` |

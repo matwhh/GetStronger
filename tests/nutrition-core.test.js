@@ -278,3 +278,72 @@ describe('ІМТ', () => {
     assert.equal(N.bmiInfo(100, 180).label, 'Ожиріння');
   });
 });
+
+/*
+ * ДАТА ФІНІШУ (A6)
+ *
+ * Питання «коли я дійду до 75 кг» — похідне від прогнозу маси, а не нова
+ * математика. Тому etaToWeight не має власної моделі: він ганяє той самий
+ * massForecast і шукає місяць, у якому крива перетинає ціль.
+ *
+ * Це не оптимізація, а гарантія: окрема формула для дати розійшлася б із
+ * прогнозом на першій же правці моделі (адаптація, стеля, підлога ІМТ,
+ * кінець режиму), і сторінка показувала б дві відповіді на одне питання.
+ * Головне, що тут під охороною, — саме ця незалежність.
+ */
+describe('Дата фінішу: коли вага дійде до цілі', () => {
+  const cut = { sex: 'male', weight: 90, height: 180, age: 30, activity: 1.55, goal: 'cut', trainingAge: 'inter' };
+
+  it('ціль уже досягнута — нуль місяців', () => {
+    const e = N.etaToWeight(cut, 90);
+    assert.equal(e.reachable, true);
+    assert.equal(e.months, 0);
+  });
+
+  it('на дефіциті ціль нижче ваги досяжна, і це додатний строк', () => {
+    const e = N.etaToWeight(cut, 85);
+    assert.equal(e.reachable, true);
+    assert.ok(e.months > 0, 'строк не додатний');
+    assert.ok(e.months < 60, 'строк за горизонтом');
+  });
+
+  it('відповідь НЕ розходиться з прогнозом — це та сама крива', () => {
+    /* Головна перевірка файла: на місяць, що його повертає etaToWeight,
+       massForecast мусить показати вагу не вищу за ціль. Якби дата
+       рахувалась окремою формулою, саме тут вони б і розʼїхались. */
+    const target = 85;
+    const e = N.etaToWeight(cut, target);
+    const m = Math.ceil(e.months);
+    assert.ok(N.massForecast(cut, m).weightEnd <= target + 0.01,
+      'прогноз на цей місяць не дотягує до цілі');
+    if (m > 1) {
+      assert.ok(N.massForecast(cut, m - 1).weightEnd > target,
+        'ціль була досягнута раніше — строк завищений');
+    }
+  });
+
+  it('ціль у протилежний бік від режиму недосяжна', () => {
+    const e = N.etaToWeight(cut, 95);
+    assert.equal(e.reachable, false);
+    assert.ok(e.reason, 'причина не названа');
+  });
+
+  it('на підтриманні вага стоїть — недосяжно, і сказано чому', () => {
+    const e = N.etaToWeight(Object.assign({}, cut, { goal: 'maintain' }), 85);
+    assert.equal(e.reachable, false);
+    assert.match(e.reason, /стоїть/);
+  });
+
+  it('надто далека ціль — недосяжна за горизонт, а не «колись»', () => {
+    const e = N.etaToWeight(cut, 40);
+    assert.equal(e.reachable, false);
+    assert.ok(e.reason, 'причина не названа');
+    assert.equal(e.months, null);
+  });
+
+  it('сміття замість цілі не дає строку', () => {
+    for (const bad of [0, -5, NaN, null, undefined, 'скоро']) {
+      assert.equal(N.etaToWeight(cut, bad).reachable, false, String(bad));
+    }
+  });
+});

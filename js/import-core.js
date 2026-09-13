@@ -30,7 +30,7 @@
    * Перед записом — confirm: імпорт ПЕРЕЗАПИСУЄ поточні дані, і зробити
    * це випадково подвійним кліком не можна.
    */
-  const ALLOWED_KEYS = ['birthDate','sex','age','height','weight','bodyfat','daysPerWeek',
+  const ALLOWED_KEYS = ['birthDate','sex','age','height','weight','goalWeight','bodyfat','daysPerWeek',
     'programId','goal','customPlans','weights','activePlan','trainingAge',
     'activity','meals','recipes','day','hrRest','hrMax','records',
     'displayName','pet','scheme',
@@ -62,6 +62,9 @@
 
   const NUM_LIMITS = {
     age: [10, 100], height: [120, 250], weight: [30, 300], bodyfat: [3, 60],
+    /* Ті самі межі, що у ваги: ціль — це вага, лише в майбутньому.
+       Ширший діапазон дозволив би поставити ціль, якої модель не рахує. */
+    goalWeight: [30, 300],
     daysPerWeek: [1, 7], meals: [1, 8],
     hrRest: [30, 120], hrMax: [120, 230]
   };
@@ -70,7 +73,7 @@
      порожню форму {} або [], і підміна їх на null — це втрата даних. */
   const NULLABLE = {
     birthDate: 1,
-    sex: 1, age: 1, height: 1, weight: 1, bodyfat: 1, daysPerWeek: 1,
+    sex: 1, age: 1, height: 1, weight: 1, goalWeight: 1, bodyfat: 1, daysPerWeek: 1,
     programId: 1, goal: 1, activity: 1, meals: 1, trainingAge: 1,
     hrRest: 1, hrMax: 1, theme: 1, scheme: 1,
     activePlan: 1, day: 1, periodization: 1, deload: 1

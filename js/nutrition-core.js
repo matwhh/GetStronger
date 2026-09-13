@@ -560,6 +560,102 @@
     };
   }
 
+  /*
+   * ГОРИЗОНТ ПОШУКУ ДАТИ ФІНІШУ.
+   *
+   * Пʼять років. Не тому, що далі неможливо, а тому, що далі відповідь
+   * перестає бути відповіддю: модель адаптації калібрована на місяцях, а
+   * не на роках, і «дійдете за 74 місяці» — це не план, а шум із виглядом
+   * точності. За горизонтом чесніше сказати «не за цим режимом».
+   */
+  const ETA_HORIZON = 60;
+
+  /**
+   * Коли вага дійде до цілі.
+   *
+   * ЦЕ НЕ НОВА МОДЕЛЬ. Функція ганяє той самий massForecast і шукає
+   * місяць, у якому крива перетинає ціль. Окрема формула для дати
+   * розійшлася б із прогнозом на першій же правці самої моделі —
+   * адаптація, стеля набору, підлога ІМТ, кінець агресивного режиму, — і
+   * сторінка показувала б дві різні відповіді на одне питання. Тут вони
+   * не можуть розійтись за побудовою.
+   *
+   * Ціна — 60 прогонів прогнозу замість одного. Кожен дешевий (цикл по
+   * місяцях із арифметикою), і рахується це раз на ввід, а не в циклі
+   * малювання.
+   *
+   * Місяці повертаються ДРОБОМ: перетин майже ніколи не випадає рівно на
+   * межу місяця, і округлення вгору до цілого зсувало б дату на три тижні.
+   *
+   * @param {object} profile той самий профіль, що для massForecast
+   * @param {number} targetWeight ціль, кг
+   * @param {number} [horizon] горизонт у місяцях
+   * @returns {{reachable:boolean, months:number|null, reason:string|null}}
+   */
+  function etaToWeight(profile, targetWeight, horizon) {
+    const target = Number(targetWeight);
+    if (!Number.isFinite(target) || target <= 0) {
+      return { reachable: false, months: null, reason: 'ціль не задана' };
+    }
+
+    const h = Math.max(1, Math.min(ETA_HORIZON, Math.round(Number(horizon) || 36)));
+    const first = massForecast(profile, 1);
+    if (!first) return { reachable: false, months: null, reason: 'замало даних про профіль' };
+
+    const start = first.weightNow;
+    if (!Number.isFinite(start)) {
+      return { reachable: false, months: null, reason: 'замало даних про профіль' };
+    }
+
+    /* Похибка ваги в пів кіло — це коливання води за день, а не прогрес.
+       Ціль у цьому коридорі вважається вже досягнутою. */
+    if (Math.abs(target - start) < 0.5) {
+      return { reachable: true, months: 0, reason: null };
+    }
+
+    if (first.belowNorm) {
+      return { reachable: false, months: null,
+               reason: 'за цієї ваги така мета не рахується' };
+    }
+
+    const down = target < start;
+    const end = massForecast(profile, h);
+    if (!end) return { reachable: false, months: null, reason: 'замало даних про профіль' };
+
+    const crossedAtEnd = down ? end.weightEnd <= target : end.weightEnd >= target;
+    if (!crossedAtEnd) {
+      /* Причина називається, а не ховається за «недосяжно». Порядок
+         перевірок від найконкретнішої до найзагальнішої. */
+      let reason;
+      if (end.flat) reason = 'за цим режимом вага стоїть';
+      else if (end.hitFloor) reason = 'вага впирається в мінімальну для вашого зросту';
+      else if (down !== (end.weightEnd < start)) reason = 'цей режим веде вагу в інший бік';
+      else reason = 'за цим режимом не встигає за ' + h + ' міс.';
+      return { reachable: false, months: null, reason: reason };
+    }
+
+    let prev = start;
+    for (let m = 1; m <= h; m++) {
+      const w = massForecast(profile, m).weightEnd;
+      const crossed = down ? w <= target : w >= target;
+      if (crossed) {
+        /* Лінійна інтерполяція всередині місяця: усередині кроку модель
+           однаково лінійна, тож це не вигадка точності, а той самий крок. */
+        const span = w - prev;
+        const frac = span === 0 ? 0 : (target - prev) / span;
+        return { reachable: true,
+                 months: (m - 1) + Math.max(0, Math.min(1, frac)),
+                 reason: null };
+      }
+      prev = w;
+    }
+
+    /* Сюди дійти не можна: crossedAtEnd уже сказав, що перетин є. Але
+       мовчазний вихід із циклу — це саме той випадок, коли «не може
+       статись» одного дня стається. */
+    return { reachable: false, months: null, reason: 'за цим режимом не встигає за ' + h + ' міс.' };
+  }
+
   window.NutritionCalc = {
     ACTIVITY: ACTIVITY,
     LIMITS: LIMITS,
@@ -580,6 +676,8 @@
     bmiInfo: bmiInfo,
     targetFor: targetFor,
     massForecast: massForecast,
+    etaToWeight: etaToWeight,
+    ETA_HORIZON: ETA_HORIZON,
     LEAN_CEILING: LEAN_CEILING
   };
 })();

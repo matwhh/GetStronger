@@ -209,6 +209,11 @@
       // харчування й пульсу; воно похідне, а не друге джерело.
       birthDate: null,
       sex: null, age: null, height: null, weight: null, bodyfat: null,
+      /* Цільова вага. Не бере участі в жодному розрахунку норми —
+         лише відповідає на питання «коли», через NutritionCalc.etaToWeight.
+         Нове поле, а не зміна форми, тож SCHEMA_VERSION не росте
+         (інваріант 10). */
+      goalWeight: null,
       // Нік для таблиці лідерів сезону (не email — його нікому не показуємо)
       displayName: null,
       // Місце під майбутнього маскота (pixel-art companion). Структура

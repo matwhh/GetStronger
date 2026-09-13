@@ -280,3 +280,30 @@ describe('тижнева ціль трекера', () => {
     assert.equal(t.name, 'Розтяжка');
   });
 });
+
+/*
+ * Цільова вага (A6). Поле додане, а не змінене — SCHEMA_VERSION не росте
+ * (інваріант 10: версія піднімається на зміну ФОРМИ, не на нове поле).
+ * Але імпорт мусить його знати: ключ, якого немає в ALLOWED_KEYS, тихо
+ * викидається, і копія, зроблена новою версією, втрачала б ціль.
+ */
+describe('Імпорт: цільова вага', () => {
+  test('приймається в межах ваги', () => {
+    const r = V({ goalWeight: 78 });
+    assert.equal(r.patch.goalWeight, 78);
+    assert.ok(r.taken.includes('goalWeight'));
+  });
+
+  test('null — чинне «не задано»', () => {
+    const r = V({ goalWeight: null });
+    assert.equal(r.patch.goalWeight, null);
+  });
+
+  test('поза межами відхиляється ГУЧНО, а не мовчки', () => {
+    for (const bad of [0, 29, 301, -5, 'скоро']) {
+      const r = V({ goalWeight: bad });
+      assert.equal(r.patch.goalWeight, undefined, String(bad));
+      assert.ok(r.rejected.includes('goalWeight'), 'не в переліку відхилених: ' + bad);
+    }
+  });
+});

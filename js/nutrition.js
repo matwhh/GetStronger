@@ -529,6 +529,9 @@
 
   /* Стаж живе в профілі: його ж використовує прогноз робочих ваг. */
   let trainingAge = 'inter';
+  /* Цільова вага. Живе тут, а не в readInput(): вона не бере участі в
+     жодному розрахунку норми — лише відповідає на питання «коли». */
+  let goalWeight = null;
 
   /** Смуга «мʼязи проти жиру» в межах набраної ваги */
   function splitBar(f) {
@@ -548,16 +551,55 @@
     return (n > 0 ? '+' : '') + v;
   }
 
-  function renderForecast(input) {
-    const host = $('#nutri-forecast');
-    if (!host) return;
-
-    const profile = {
+  /* Профіль для прогнозу — в одному місці: його читають і малювання
+     блока, і обробник цілі. Дві копії розійшлися б на першому ж полі. */
+  function forecastProfile(input) {
+    return {
       sex: input.sex, age: input.age, height: input.height,
       weight: input.weight, bodyfat: input.bodyfat,
       activity: input.activity, goal: input.goalKey,
       trainingAge: trainingAge
     };
+  }
+
+  /*
+   * Строк у слова. МІСЯЦЬ І РІК, А НЕ КОНКРЕТНИЙ ДЕНЬ.
+   *
+   * Модель помиляється на ±10–15% уже в оцінці витрат, тож «17 березня»
+   * було б вигаданою точністю: людина прочитала б це як обіцянку, якою
+   * воно не є. Місяць — найдрібніша одиниця, за яку тут можна ручатись.
+   */
+  function etaLabel(months) {
+    const d = new Date();
+    d.setDate(d.getDate() + Math.round(months * 30.44));
+    const M = window.DateCore.MONTHS_NOM[d.getMonth()].toLowerCase();
+    const whole = Math.round(months);
+    const word = whole === 1 ? 'місяць' : (whole < 5 ? 'місяці' : 'місяців');
+    return months < 0.5
+      ? 'цього місяця'
+      : M + ' ' + d.getFullYear() + ' — приблизно ' + whole + ' ' + word;
+  }
+
+  /** Рядок під полем цілі: або строк, або чому строку немає. */
+  function etaHint(profile) {
+    if (goalWeight === null) {
+      return 'Впишіть ціль — і побачите, коли за цією нормою до неї дійдете.';
+    }
+    const e = window.NutritionCalc.etaToWeight(profile, goalWeight);
+    if (!e.reachable) {
+      /* Причина, а не «недосяжно». «Недосяжно» без причини читається як
+         поломка сторінки, а не як відповідь моделі. */
+      return 'До ' + round(goalWeight, 1) + ' кг за цією нормою не дійдете: ' + e.reason + '.';
+    }
+    if (e.months === 0) return 'Ви вже на цій вазі.';
+    return 'До ' + round(goalWeight, 1) + ' кг — ' + etaLabel(e.months) + '.';
+  }
+
+  function renderForecast(input) {
+    const host = $('#nutri-forecast');
+    if (!host) return;
+
+    const profile = forecastProfile(input);
 
     const rows = HORIZONS.map(function (m) { return window.NutritionCalc.massForecast(profile, m); });
     /* Мовчазне зникнення блока читається як поламана сторінка. Кажемо, чого
@@ -600,6 +642,14 @@
             round(window.NutritionCalc.LEAN_CEILING[trainingAge], 2) + ' кг сухої маси на місяць. ' +
             'Зберігається в профіль — той самий стаж використовує прогноз робочих ваг.' +
           '</span>' +
+        '</div>' +
+
+        '<div class="field mt-3">' +
+          '<label class="field__label" for="n-goalw">Цільова вага, кг</label>' +
+          '<input class="input" id="n-goalw" name="goalw" type="text" inputmode="decimal" ' +
+            'min="30" max="300" step="0.1" placeholder="напр. 78"' +
+            (goalWeight === null ? '' : ' value="' + round(goalWeight, 1) + '"') + '>' +
+          '<span class="field__hint">' + esc(etaHint(profile)) + '</span>' +
         '</div>' +
 
         '<div class="table-wrap mt-2">' +
@@ -770,6 +820,25 @@
       if (p.height)  $('#n-height').value = p.height;
       if (p.weight)  $('#n-weight').value = p.weight;
       if (p.bodyfat) $('#n-bodyfat').value = p.bodyfat;
+      if (Number.isFinite(Number(p.goalWeight)) && Number(p.goalWeight) > 0) {
+        goalWeight = Number(p.goalWeight);
+      }
+      /*
+       * МЕТА ВІДНОВЛЮЄТЬСЯ З ПРОФІЛЮ.
+       *
+       * Сторінка мету ЗБЕРІГАЛА (saveProfile → goal: i.goalKey), а при
+       * відкритті ставила «Підтримання» — воно жорстко позначене в
+       * розмітці перемикача. Тобто людина обирала «Скидання», поверталась
+       * назавтра й бачила чужу норму, не розуміючи, чому вона змінилась.
+       *
+       * Знайдено браузерною перевіркою дати фінішу: строк щоразу виходив
+       * «за цим режимом вага стоїть», бо режимом за замовчуванням було
+       * підтримання, а не те, що людина обрала.
+       */
+      if (p.goal && GOALS[p.goal]) {
+        const g = $$('#n-goal-seg input[name="goal"]').find(x => x.value === p.goal);
+        if (g) g.checked = true;
+      }
       if (p.activity && act) {
         act.value = p.activity;
         /* Значення поза списком не «не обирається» — воно робить select
@@ -807,6 +876,40 @@
     const fc = $('#nutri-forecast');
     if (fc) {
       fc.addEventListener('change', function (e) {
+        if (e.target.name === 'goalw') {
+          /* Саме change, а не input: renderForecast перемальовує блок
+             цілком, і на кожному натисканні клавіші поле втрачало б фокус. */
+          const raw = String(e.target.value || '').replace(',', '.').trim();
+          const v = Number(raw);
+          const L = window.NutritionCalc.LIMITS.weight;
+          if (raw === '') {
+            goalWeight = null;
+          } else if (!Number.isFinite(v) || v < L[0] || v > L[1]) {
+            window.App.toast('Цільова вага: від ' + L[0] + ' до ' + L[1] + ' кг', 'err');
+            return;
+          } else {
+            goalWeight = v;
+          }
+          window.Store.saveProfile({ goalWeight: goalWeight }).catch(function (err) {
+            if (!(err && err.queued)) window.App.toast('Не збереглося: ' + err.message, 'err');
+          });
+          /*
+           * ОНОВЛЮЄМО ЛИШЕ ПІДКАЗКУ, А НЕ ВЕСЬ БЛОК.
+           *
+           * update() перемальовує #nutri-forecast через innerHTML — разом
+           * із полем, у якому щойно сталася подія. Браузер кидає на цьому
+           * «The node to be removed is no longer a child of this node»:
+           * change прилітає з blur, і вузол зникає посеред обробки.
+           *
+           * Але й без помилки перемальовувати було б нема чого: від цілі
+           * не залежить жодне інше число на екрані — ні норма, ні прогноз.
+           * Міняється рівно один рядок, його й міняємо.
+           */
+          const hint = e.target.parentElement
+            && e.target.parentElement.querySelector('.field__hint');
+          if (hint) hint.textContent = etaHint(forecastProfile(readInput()));
+          return;
+        }
         if (e.target.name !== 'tage') return;
         trainingAge = e.target.value;
         window.Store.saveProfile({ trainingAge: trainingAge }).catch(function (e) { if (!(e && e.queued)) window.App.toast('Не збереглося: ' + e.message, 'err'); });

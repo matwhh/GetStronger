@@ -1836,10 +1836,16 @@
       const diff = hasTarget ? Math.round(v.kcal - v.target) : null;
       const over = hasTarget && v.kcal > v.target * 1.05;
       const under = hasTarget && v.kcal < v.target * 0.95;
+      /* Швидкий запис (F2) підписується, а не підсвічується: це не
+         помилка людини, а чесно позначена приблизність. Червоне тут
+         читалося б як «ти зробив не так», і наступного разу людина
+         лишила б день порожнім — тобто збрехала б аналітиці. */
+      const partial = v.partial === true;
       return '<tr>' +
-        '<td>' + esc(dateLabel(dateOf(e.d))) + '</td>' +
+        '<td>' + esc(dateLabel(dateOf(e.d))) +
+          (partial ? ' <span class="small muted">приблизно</span>' : '') + '</td>' +
         '<td class="num mono">' + v.kcal + '</td>' +
-        '<td class="num mono">' + (v.p || 0) + '</td>' +
+        '<td class="num mono">' + (partial && !Number(v.p) ? '—' : (v.p || 0)) + '</td>' +
         '<td class="num">' + (hasTarget
           ? '<span class="chip chip--sm' + ((over || under) ? ' chip--warn' : ' chip--ok') + '">' +
               (diff > 0 ? '+' + diff : '−' + Math.abs(diff)) + '</span>'
@@ -1860,7 +1866,16 @@
               (st.avgTarget
                 ? '<span class="small">Середнє / ціль: <b class="mono">' + st.avgKcal + ' / ' + st.avgTarget + '</b></span>'
                 : '<span class="small">Середнє: <b class="mono">' + st.avgKcal + ' ккал</b></span>') +
-              '<span class="small">Білок: <b class="mono">' + st.avgP + ' г/день</b></span>' +
+              /* Білок рахується лише по днях, де він відомий (див.
+                 ProgressCore.foodStats). Показати нуль замість «невідомо»
+                 означало б, що приблизні дні — це дні без білка. */
+              (st.avgP === null
+                ? '<span class="small">Білок: <b>невідомий</b> ' +
+                  '<span class="muted">— усі дні періоду приблизні</span></span>'
+                : '<span class="small">Білок: <b class="mono">' + st.avgP + ' г/день</b>' +
+                  (st.partialDays
+                    ? ' <span class="muted">— по ' + st.proteinDays + ' із ' + st.count + ' днів</span>'
+                    : '') + '</span>') +
               (st.withTarget
                 ? '<span class="small">У межах ±5%: <b class="mono">' + st.inTarget + ' із ' + st.withTarget + '</b> днів</span>'
                 : '') +
@@ -2417,13 +2432,24 @@
     if (meal && Number.isFinite(Number(meal.kcal))) {
       const hasT = Number(meal.target) > 0;
       const diff = hasT ? Math.round(meal.kcal - meal.target) : null;
+      const partialDay = meal.partial === true;
       parts.push('<h3 style="margin:0">Харчування</h3>' +
         '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
           '<span class="small">Калорії: <b class="mono">' + meal.kcal + '</b>' +
             (hasT ? ' із цілі <b class="mono">' + meal.target + '</b> (' + (diff > 0 ? '+' : '') + diff + ')' : '') + '</span>' +
-          '<span class="small">Б <b class="mono">' + (meal.p || 0) + '</b> · Ж <b class="mono">' + (meal.f || 0) +
-            '</b> · В <b class="mono">' + (meal.c || 0) + '</b> г</span>' +
-        '</div>');
+          /* У приблизному дні жир і вуглеводи не нулі, а НЕВІДОМІ. Нуль
+             тут прочитався б як «не їв жиру» — і так само прочитала б це
+             будь-яка майбутня модель. */
+          (partialDay
+            ? '<span class="small">Білок: <b class="mono">' + (Number(meal.p) || '—') + '</b>' +
+              ' · жир і вуглеводи <b>невідомі</b></span>'
+            : '<span class="small">Б <b class="mono">' + (meal.p || 0) + '</b> · Ж <b class="mono">' + (meal.f || 0) +
+              '</b> · В <b class="mono">' + (meal.c || 0) + '</b> г</span>') +
+        '</div>' +
+        (partialDay
+          ? '<p class="small muted" style="margin:6px 0 0">Неповний запис: калорії ' +
+            'вказані приблизно, без розбору по грамах.</p>'
+          : ''));
     }
 
     // Трекери дня

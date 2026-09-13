@@ -169,6 +169,54 @@ const R=[]; const ok=(n,c,x)=>{R.push([n,c]);console.log((c?'OK   ':'FAIL ')+n+(
  await ctx.close();
 }
 
+// 7. Швидкий запис дня (F2): ккал без розбору по грамах
+//
+// Головне, що тут ловиться: приблизний день мусить лягти в історію
+// ПОЗНАЧЕНИМ. Без прапорця його нульовий жир і нульовий білок стають
+// «виміряними» — і брешуть уже назавжди, бо історія append-only.
+{
+ const ctx=await adultContext(b); const p=await ctx.newPage(); const errs=[];
+ p.on('pageerror',e=>errs.push(e.message)); p.on('dialog',d=>d.accept());
+ await p.goto(`file://${ROOT}/meals.html`); await p.waitForTimeout(900);
+
+ ok('перемикач режиму є на сторінці', await p.locator('input[name="d-mode"]').count()===2);
+
+ await p.click('.seg__item:has-text("Швидко") span'); await p.waitForTimeout(300);
+ ok('швидкий режим показує поле калорій', await p.locator('#q-kcal').count()===1);
+ ok('швидкий режим прибирає картки прийомів', await p.locator('#day .card__title').count()===0);
+ ok('ціль дня лишається на екрані', /Ціль дня|Ціль дня не порахована/.test(await p.locator('#d-quick-form').innerText()));
+
+ await p.fill('#q-kcal','2400');
+ await p.click('#q-save'); await p.waitForTimeout(700);
+ const q1=await p.evaluate(async()=>{
+   const pr=await window.Store.getProfile();
+   const k=Object.keys(pr.mealLog||{}).sort().pop();
+   return {k:k, e:(pr.mealLog||{})[k], dayItems:(pr.day.meals||[]).reduce((a,m)=>a.concat(m.items||[]),[]).length};
+ });
+ ok('день ліг в історію', q1.e && q1.e.kcal===2400, JSON.stringify(q1.e));
+ ok('день позначено приблизним', q1.e && q1.e.partial===true, JSON.stringify(q1.e));
+ ok('жир і вуглеводи не вигадані', q1.e && q1.e.f===0 && q1.e.c===0);
+ ok('поточний день очищено', q1.dayItems===0, 'позицій='+q1.dayItems);
+
+ /* Межі: 50 ккал — це не день, а описка; запис не мусить зʼявитись */
+ const before=await p.evaluate(async()=>Object.keys((await window.Store.getProfile()).mealLog||{}).length);
+ await p.fill('#q-kcal','50'); await p.click('#q-save'); await p.waitForTimeout(400);
+ const afterN=await p.evaluate(async()=>Object.keys((await window.Store.getProfile()).mealLog||{}).length);
+ ok('50 ккал за день не приймається', afterN===before, before+' → '+afterN);
+
+ await p.reload(); await p.waitForTimeout(900);
+ ok('вибраний режим памʼятається', await p.locator('#q-kcal').count()===1);
+
+ /* Журнал мусить сказати «приблизно» — тихо, без червоного */
+ await p.goto(`file://${ROOT}/journal.html`); await p.waitForTimeout(1200);
+ const jr=await p.locator('#jr-food').innerText();
+ ok('журнал підписує приблизний день', /приблизно/.test(jr), jr.slice(0,200));
+ ok('приблизний день не підсвічено як помилку',
+    await p.locator('#jr-food .chip--err').count()===0);
+ ok('швидкий запис без JS-помилок', errs.length===0, errs.join('|'));
+ await ctx.close();
+}
+
 await b.close();
 const bad=R.filter(r=>!r[1]);
 console.log('\n'+(R.length-bad.length)+'/'+R.length+' перевірок даних пройшло.');

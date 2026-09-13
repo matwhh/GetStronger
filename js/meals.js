@@ -37,6 +37,15 @@
   const PORTIONS_MIN = 0, PORTIONS_MAX = 20;
   const CONTAINERS_MIN = 1, CONTAINERS_MAX = 20;
 
+  /*
+   * Межі швидкого запису дня (F2). Верхня — та сама, що у валідаторі
+   * імпорту для mealLog: 20 000 ккал — це вже не день, а зайвий нуль.
+   * Білок необовʼязковий, тому нижня межа в нього своя: 20 г — не ціль, а
+   * описка, і приймати її як «білковий день» означало б збрехати рейтингу.
+   */
+  const QUICK_KCAL_MIN = 200, QUICK_KCAL_MAX = 20000;
+  const QUICK_P_MIN = 20, QUICK_P_MAX = 500;
+
   /**
    * Грами з поля вводу → число в межах, або null.
    *
@@ -193,6 +202,9 @@
     openRecipe: null,
     quickMeal: null,        // прийом, з якого почали «+ Додати продукт» (null = останній)
     copyOpen: false,        // чи розгорнуто список днів-джерел для копії (F1)
+    quick: false,           // режим швидкого запису дня (F2)
+    quickKcal: '',          // що набрано в полі «ккал» швидкого запису
+    quickP: '',             // що набрано в полі «білок» швидкого запису
     modal: null             // чернетка додавання в день, див. блок «Вікно додавання»
   };
 
@@ -316,6 +328,22 @@
    * а не дані користувача, і синхронізувати його між пристроями сенсу немає.
    */
   const FOLD_KEY = 'ib.meals.fold';
+
+  /*
+   * Режим запису дня памʼятається (F2). Режим, що скидається на кожному
+   * відкритті, — це та сама робота двічі для людини, яка вже вирішила, як
+   * веде облік. Ризик «перейдуть на швидкий назавжди» знімається не
+   * забуванням, а тим, що перемикач і ціль білка лишаються на екрані.
+   */
+  const QUICK_KEY = 'ib.meals.quick';
+
+  function loadQuick() {
+    try { return localStorage.getItem(QUICK_KEY) === '1'; } catch (_) { return false; }
+  }
+
+  function saveQuick(on) {
+    try { localStorage.setItem(QUICK_KEY, on ? '1' : '0'); } catch (_) {}
+  }
 
   function loadFolds() {
     /*
@@ -1083,6 +1111,116 @@
       (report.dropped ? '. Не влізло: ' + report.dropped : ''), 'ok');
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Швидкий запис дня (F2)                                              */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Навіщо: ресторан, гості, чужа кухня. Досі вибір був «розібрати все по
+   * грамах» або «лишити день порожнім», а порожній день для аналітики
+   * означає «не їв» — і середнє спожите просідало саме за ті дні, коли
+   * людина їла найбільше. Приблизне число тут не «менш точні дані», а
+   * єдині правдиві.
+   *
+   * Жир і вуглеводи не питаються навмисно: вгадане число потім рахується
+   * як факт. Білок питається, бо він єдиний, кого люди справді знають
+   * («стейк на 200 г»), і бо без нього білкова частина рейтингу за цей
+   * день не рахується — про що форма й каже, замість тихо дати нуль.
+   */
+  function quickForm() {
+    const t = target();
+    return '<div class="card mt-2" id="d-quick-form">' +
+      '<div class="row" style="gap:12px;flex-wrap:wrap">' +
+        '<div class="field" style="margin:0;flex:1 1 140px">' +
+          '<label class="field__label" for="q-kcal">Калорії за день</label>' +
+          '<input class="input mono" id="q-kcal" type="text" inputmode="numeric" ' +
+                 'autocomplete="off" value="' + esc(state.quickKcal) + '" placeholder="2100">' +
+        '</div>' +
+        '<div class="field" style="margin:0;flex:1 1 140px">' +
+          '<label class="field__label" for="q-p">Білок, г <span class="muted">— якщо знаєте</span></label>' +
+          '<input class="input mono" id="q-p" type="text" inputmode="numeric" ' +
+                 'autocomplete="off" value="' + esc(state.quickP) + '" placeholder="' +
+                 (t ? String(Math.round(t.protein)) : '150') + '">' +
+        '</div>' +
+      '</div>' +
+      /* Ціль лишається на екрані навмисно: швидкий режим не має ставати
+         способом не бачити, наскільки день розійшовся з нормою. */
+      (t
+        ? '<p class="small muted mt-1" style="margin-bottom:0">Ціль дня: <b class="mono">' +
+            Math.round(t.kcal) + '</b> ккал, білок <b class="mono">' + Math.round(t.protein) + '</b> г.</p>'
+        : '<p class="small muted mt-1" style="margin-bottom:0">Ціль дня не порахована — ' +
+          'заповніть дані на сторінці <a href="nutrition.html">Харчування</a>, ' +
+          'інакше день ляже в історію без цілі.</p>') +
+      '<p class="small muted" style="margin:8px 0 0">Жир і вуглеводи не питаємо: ' +
+        'вгадане число далі рахувалося б як виміряне. День ляже в історію позначеним ' +
+        'як приблизний' + '.</p>' +
+      '<button class="btn btn--primary mt-2" type="button" id="q-save">Записати день</button>' +
+    '</div>';
+  }
+
+  /** Перемикач «докладно / швидко» */
+  function modeSeg() {
+    return '<div class="seg mt-2" role="radiogroup" aria-label="Як записати день">' +
+      '<label class="seg__item"><input type="radio" name="d-mode" value="full"' +
+        (state.quick ? '' : ' checked') + '><span>Докладно</span></label>' +
+      '<label class="seg__item"><input type="radio" name="d-mode" value="quick"' +
+        (state.quick ? ' checked' : '') + '><span>Швидко</span></label>' +
+    '</div>';
+  }
+
+  /**
+   * Записати день приблизно: ккал і, якщо відомо, білок.
+   *
+   * Розібрані позиції дня при цьому ЗНИКАЮТЬ — і саме тому їхня сума
+   * заздалегідь підставлена в поле: людина або лишає її, або виправляє,
+   * але не втрачає непомітно.
+   */
+  async function saveQuickDay() {
+    const kcal = Number(String(state.quickKcal).trim().replace(',', '.'));
+    if (!Number.isFinite(kcal) || kcal < QUICK_KCAL_MIN || kcal > QUICK_KCAL_MAX) {
+      toast('Калорії: від ' + QUICK_KCAL_MIN + ' до ' + QUICK_KCAL_MAX, 'err');
+      return;
+    }
+    const rawP = String(state.quickP).trim().replace(',', '.');
+    let prot = null;
+    if (rawP) {
+      const n = Number(rawP);
+      if (!Number.isFinite(n) || n < QUICK_P_MIN || n > QUICK_P_MAX) {
+        toast('Білок: від ' + QUICK_P_MIN + ' до ' + QUICK_P_MAX + ' г, або лишіть порожнім', 'err');
+        return;
+      }
+      prot = n;
+    }
+
+    const today = window.HistoryCore.todayKey();
+    const key = (state.day && state.day.date) || today;
+    const existing = state.profile.mealLog && state.profile.mealLog[key];
+    const stale = key !== today;
+    const q = (existing
+      ? 'День ' + key + ' уже записаний (' + existing.kcal + ' ккал). Перезаписати приблизним?'
+      : 'Записати день' + (stale ? ' за ' + key : '') + ' як приблизний: ' +
+        Math.round(kcal) + ' ккал' + (prot ? ', білок ' + Math.round(prot) + ' г' : ' (без білка)') + '?');
+    if (!confirm(q)) return;
+
+    const t = target();
+    const log = window.HistoryCore.quickDay(
+      state.profile.mealLog, key, kcal, prot, t ? t.kcal : null, t ? t.protein : null);
+    state.profile.mealLog = log;
+    state.day = EMPTY_DAY();
+    state.quickKcal = '';
+    state.quickP = '';
+
+    const patch = { mealLog: log, day: state.day };
+    window.App.stampRating(Object.assign({}, state.profile, patch), patch);
+    try {
+      await window.Store.saveProfile(patch);
+      toast('День записано приблизно: ' + log[key].kcal + ' ккал' +
+        (prot ? '' : '. Без білка — білкова частина рейтингу за цей день не рахується'), 'ok');
+    } catch (e) {
+      toast(e.queued ? e.message : 'Не збереглося: ' + e.message, e.queued ? 'ok' : 'err');
+    }
+    renderDay();
+  }
+
   function renderDay() {
     const host = $('#day');
     if (!host) return;
@@ -1090,7 +1228,7 @@
     const t = target();
     const got = dayTotals();
 
-    const meals = state.day.meals.map(function (m, mi) {
+    const meals = state.quick ? '' : state.day.meals.map(function (m, mi) {
       const mt = mealTotals(m);
       return '' +
         '<div class="card mt-2">' +
@@ -1134,7 +1272,9 @@
             /* «Закрити день» — головна дія дня: підсумок із датою і ціллю
                лягає в історію (mealLog), день очищається під наступний.
                «Очистити» лишилась для помилково набраного дня — БЕЗ запису. */
-            '<button class="btn btn--primary btn--sm" type="button" id="d-close">Закрити день</button>' +
+            (state.quick
+              ? ''
+              : '<button class="btn btn--primary btn--sm" type="button" id="d-close">Закрити день</button>') +
             /* «Скопіювати день» (F1): однакові дні набивались руками
                щоразу, бо копіювався тільки рецепт, а день — ні. */
             '<button class="btn btn--ghost btn--sm" type="button" id="d-copy" ' +
@@ -1144,6 +1284,7 @@
           '</div>' +
         '</div>' +
 
+        modeSeg() +
         copyPanel() +
 
         (staleKey
@@ -1153,9 +1294,9 @@
               'Натисніть «Закрити день», щоб записати його в історію й почати сьогоднішній.</div>' +
             '</div>'
           : '') +
-        macroDonut(got, t) +
+        (state.quick ? quickForm() : macroDonut(got, t)) +
 
-        (t
+        (state.quick ? '' : t
           ? '<div class="vol-list mt-2">' + (volSeq = 0, '') +
               progressRow('Калорії',   got.kcal,  t.kcal,    'ккал') +
               progressRow('Білок',     got.p,     t.protein, 'г') +
@@ -1180,16 +1321,18 @@
            найчастіша операція вимагала найдовшої дороги. Пошук шукає і
            продукти, і рецепти; вибір відкриває ту саму модалку — рішення
            про масу і прийом лишаються в одному місці. */
-        '<div class="field" style="margin:16px 0 0">' +
-          '<label class="field__label" for="d-quick">Додати в день</label>' +
-          '<input class="input" id="d-quick" type="search" autocomplete="off" ' +
-                 'placeholder="курка, вівсянка, рецепт…">' +
-          '<div id="d-quick-list" class="quick-list" hidden></div>' +
-        '</div>' +
+        (state.quick
+          ? ''
+          : '<div class="field" style="margin:16px 0 0">' +
+              '<label class="field__label" for="d-quick">Додати в день</label>' +
+              '<input class="input" id="d-quick" type="search" autocomplete="off" ' +
+                     'placeholder="курка, вівсянка, рецепт…">' +
+              '<div id="d-quick-list" class="quick-list" hidden></div>' +
+            '</div>' +
 
-        '<p class="small muted" style="margin:14px 0 0">' +
-          'Кількість і назви прийомів — на сторінці <a href="nutrition.html">Харчування</a>.' +
-        '</p>' +
+            '<p class="small muted" style="margin:14px 0 0">' +
+              'Кількість і назви прийомів — на сторінці <a href="nutrition.html">Харчування</a>.' +
+            '</p>') +
       '</div>' +
       meals;
 
@@ -1589,6 +1732,7 @@
     } catch (_) { state.profile = {}; }
 
     state.folds = loadFolds();
+    state.quick = loadQuick();
 
     // Довідник продуктів за замовчуванням згорнутий. Їх майже сотня, і
     // розгорнутим він займає більшу частину сторінки: до рецептів і дня
@@ -1893,6 +2037,7 @@
         closeCurrentDay();
         return;
       }
+      if (e.target.closest('#q-save')) { saveQuickDay(); return; }
       if (e.target.closest('#d-copy')) {
         state.copyOpen = !state.copyOpen;
         renderDay();
@@ -1920,7 +2065,35 @@
       }
     });
 
+    /* Перемикач «докладно / швидко». change, а не click: радіокнопку
+       перемикають і клавіатурою, і клік по label теж дає change. */
+    dHost.addEventListener('change', function (e) {
+      const r = e.target.closest('input[name="d-mode"]');
+      if (!r) return;
+      state.quick = r.value === 'quick';
+      saveQuick(state.quick);
+      /* Перехід у швидкий режим підставляє суму вже набраного дня: інакше
+         розібрані позиції зникли б, а людина побачила б порожнє поле і не
+         зрозуміла, що втратила. */
+      if (state.quick && !state.quickKcal) {
+        const got = dayTotals();
+        if (got.kcal >= 1) {
+          state.quickKcal = String(Math.round(got.kcal));
+          if (got.p >= 1) state.quickP = String(Math.round(got.p));
+        }
+      }
+      renderDay();
+      const f = $('#q-kcal');
+      if (f) f.focus();
+    });
+
     dHost.addEventListener('input', function (e) {
+      const q = e.target.closest('#q-kcal, #q-p');
+      if (q) {
+        if (q.id === 'q-kcal') state.quickKcal = q.value;
+        else state.quickP = q.value;
+        return;
+      }
       const el = e.target.closest('[data-df="amount"]');
       if (el) {
         const it = state.day.meals[Number(el.dataset.di)].items[Number(el.dataset.dj)];

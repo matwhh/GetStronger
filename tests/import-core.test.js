@@ -237,3 +237,24 @@ describe('копія дня: заморожені позиції', () => {
     assert.ok(r.rejected.includes('day'));
   });
 });
+
+describe('швидкий запис дня', () => {
+  test('прапорець partial переживає імпорт', () => {
+    const r = V({ mealLog: { '2026-09-10': {
+      kcal: 2100, p: 0, f: 0, c: 0, fiber: 0, target: 2200, partial: true } } });
+    assert.equal(r.patch.mealLog['2026-09-10'].partial, true,
+      'без прапорця приблизний день після відновлення стає «виміряним»');
+  });
+
+  test('звичайний день прапорця не отримує', () => {
+    const r = V({ mealLog: { '2026-09-10': {
+      kcal: 2100, p: 150, f: 70, c: 200, fiber: 25, target: 2200 } } });
+    assert.equal(r.patch.mealLog['2026-09-10'].partial, undefined);
+  });
+
+  test('partial не з булевого типу не проходить як true', () => {
+    const r = V({ mealLog: { '2026-09-10': {
+      kcal: 2100, p: 0, f: 0, c: 0, fiber: 0, partial: 'так' } } });
+    assert.equal(r.patch.mealLog['2026-09-10'].partial, undefined);
+  });
+});

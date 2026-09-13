@@ -377,3 +377,77 @@ describe('mealLog: знімок позицій', () => {
     }
   });
 });
+
+/*
+ * Швидкий запис дня (F2).
+ *
+ * Порожній день для аналітики означає «не їв», що неправда: без цього
+ * режиму кожен ресторан занижував би середнє спожите, а отже завищував
+ * розрахункові витрати. Головне, що тут під охороною, — різниця між
+ * «нуль» і «невідомо».
+ */
+describe('mealLog: швидкий запис', () => {
+  it('пише ккал, білок і прапорець, жир з вуглеводами лишає нулями', () => {
+    const log = H.quickDay({}, '2026-09-10', 2150, 140, 2200, 150);
+    const e = log['2026-09-10'];
+    assert.equal(e.kcal, 2150);
+    assert.equal(e.p, 140);
+    assert.equal(e.f, 0);
+    assert.equal(e.c, 0);
+    assert.equal(e.partial, true);
+    assert.equal(e.target, 2200);
+    assert.equal(e.pTarget, 150);
+  });
+
+  it('білок необовʼязковий: без нього запис усе одно є', () => {
+    const log = H.quickDay({}, '2026-09-10', 2150, null, 2200, 150);
+    assert.equal(log['2026-09-10'].kcal, 2150);
+    assert.equal(log['2026-09-10'].p, 0);
+    assert.equal(log['2026-09-10'].partial, true);
+  });
+
+  it('нуль або сміття замість калорій не створює дня', () => {
+    for (const bad of [0, -100, NaN, null, undefined, 'багато']) {
+      const log = H.quickDay({}, '2026-09-10', bad, 100, 2200, 150);
+      assert.equal(log['2026-09-10'], undefined, String(bad));
+    }
+  });
+
+  it('швидкий поверх розібраного дня не лишає по собі ні БЖВ, ні знімка', () => {
+    const full = H.closeDay({}, '2026-09-10',
+      { kcal: 2000, p: 150, f: 70, c: 200, fiber: 30 }, 2200, 150,
+      [{ name: 'Обід', items: [{ kind: 'snap', name: 'X', unit: 'g', qty: 10, per: { kcal: 1 } }] }]);
+    assert.equal(full['2026-09-10'].f, 70);
+    assert.ok(full['2026-09-10'].meals);
+
+    const quick = H.quickDay(full, '2026-09-10', 1800, null, 2200, 150);
+    const e = quick['2026-09-10'];
+    assert.equal(e.kcal, 1800);
+    assert.equal(e.f, 0, 'жир із розібраного дня лишився — запис бреше точністю');
+    assert.equal(e.meals, undefined, 'знімок позицій лишився під приблизним записом');
+    assert.equal(e.partial, true);
+  });
+
+  it('перехід приблизний → повний знімає прапорець, а не дублює день', () => {
+    let log = H.quickDay({}, '2026-09-10', 1800, null, 2200, 150);
+    log = H.closeDay(log, '2026-09-10',
+      { kcal: 2000, p: 150, f: 70, c: 200, fiber: 30 }, 2200, 150);
+    assert.equal(Object.keys(log).length, 1, 'зʼявився другий запис за той самий день');
+    assert.equal(log['2026-09-10'].partial, undefined);
+    assert.equal(log['2026-09-10'].f, 70);
+  });
+
+  it('quickDay не мутує вхідний журнал', () => {
+    const before = H.quickDay({}, '2026-09-10', 1800, null, 2200, 150);
+    const frozen = JSON.stringify(before);
+    H.quickDay(before, '2026-09-11', 1900, 120, 2200, 150);
+    assert.equal(JSON.stringify(before), frozen);
+  });
+
+  it('countsProtein: «невідомо» — це не «нуль»', () => {
+    assert.equal(H.countsProtein({ kcal: 2000, p: 0 }), true, 'повний день з нулем білка — виміряний нуль');
+    assert.equal(H.countsProtein({ kcal: 2000, p: 0, partial: true }), false);
+    assert.equal(H.countsProtein({ kcal: 2000, p: 140, partial: true }), true);
+    assert.equal(H.countsProtein(null), false);
+  });
+});

@@ -312,6 +312,17 @@
   /**
    * Статистика закритих днів за період. inTarget — день у межах ±5% від
    * ЦІЛІ СВОГО дня; дні без цілі в цю частку не входять.
+   *
+   * Швидкі записи (partial, див. HistoryCore.quickDay) рахуються в
+   * СЕРЕДНЄ СПОЖИТЕ разом з усіма: інакше кожен ресторан занижував би
+   * середнє, і витрати виходили б завищеними — тобто аналітика брехала б
+   * саме там, де людина була найчеснішою.
+   *
+   * А от у СЕРЕДНІЙ БІЛОК швидкий день без білка не входить. Там нуль
+   * означає «невідомо», а не «не їв білка»: порахувати його нулем — це
+   * тихо занизити білкову частку за кожен день, коли точність була
+   * неможлива. Скільки таких днів — видно в partialDays, щоб «замало
+   * даних» не виглядало як «мало білка».
    */
   function foodStats(mealLog, periodDays, now) {
     if (!mealLog || typeof mealLog !== 'object') return null;
@@ -330,11 +341,18 @@
       return e.kcal >= e.target * 0.95 && e.kcal <= e.target * 1.05;
     }).length;
 
+    const proteinDays = days.filter(function (e) { return window.HistoryCore.countsProtein(e); });
+    const partialDays = days.filter(function (e) { return e.partial === true; }).length;
+
     return {
       count: days.length,
       days: days,
       avgKcal: Math.round(sum('kcal') / days.length),
-      avgP: Math.round(sum('p') / days.length),
+      avgP: proteinDays.length
+        ? Math.round(proteinDays.reduce(function (t, e) { return t + (Number(e.p) || 0); }, 0) / proteinDays.length)
+        : null,
+      proteinDays: proteinDays.length,
+      partialDays: partialDays,
       avgTarget: withTarget.length
         ? Math.round(withTarget.reduce(function (s, e) { return s + e.target; }, 0) / withTarget.length)
         : null,

@@ -183,7 +183,7 @@
         kpi(stats.consistency === null ? '—' : stats.consistency + '%', 'активних днів',
             stats.daysTotal ? stats.daysActive + ' із ' + stats.daysTotal : '') +
         kpi(stats.avgElo === null ? '—' : stats.avgElo, 'середнє ELO за сезон',
-            stats.delta === null ? '' : 'останній сезон: ' + signed(stats.delta) + ' до попереднього') +
+            stats.delta === null ? '' : 'останній: ' + signed(stats.delta) + ' до попереднього') +
       '</div>');
   }
 
@@ -213,7 +213,9 @@
       '<div class="vol-list">' + rows.map(function (r) {
         return '<div class="vol">' +
           '<span class="vol__name">' + esc(lbl(r.season)) +
-            (r.current ? ' <span class="vol__target">зараз</span>' : '') + '</span>' +
+            /* Крапка-роздільник обовʼязкова: без неї «Осінь 2026 зараз»
+               читається як назва сезону, а не як позначка. */
+            (r.current ? ' <span class="vol__target">· зараз</span>' : '') + '</span>' +
           '<span class="vol__bar"><i style="width:' + r.pct + '%"></i></span>' +
           '<span class="vol__num mono">' + r.elo + '</span>' +
           '<span class="small muted">' +

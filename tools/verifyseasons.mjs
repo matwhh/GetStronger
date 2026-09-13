@@ -479,7 +479,24 @@ const FAKE = { state: STATE, events: EVENTS, history: HISTORY, awards: AWARDS };
     String(await s.p.evaluate(() => document.documentElement.scrollWidth + ' > ' + window.innerWidth)));
   ok('65. смуги сезонів на телефоні лишаються видимими',
     await s.p.locator('#szs-ladder .vol__bar').count() === HISTORY.length + 1);
-  ok('66. без JS-помилок', errs.length === 0 && s.errs.length === 0,
+
+  /*
+   * Нагорода в розборі сезону мусить лишатись КАРТКОЮ, а не банером.
+   * Сітка .awd-grid просить 150px на колонку плюс проміжок — усередині
+   * акордеона на телефоні їй бракувало шести пікселів, і вона падала до
+   * однієї колонки: картка ставала на всю ширину екрана. Ламається це
+   * мовчки й лише на вузькому екрані, тобто там, куди з десктопа не
+   * дивляться.
+   */
+  const card = await s.p.evaluate(() => {
+    const a = document.querySelector('#szs-list .acc.is-open .awd');
+    if (!a) return null;
+    const r = a.getBoundingClientRect();
+    return { w: Math.round(r.width), h: Math.round(r.height), vw: window.innerWidth };
+  });
+  ok('66. нагорода сезону на телефоні не розтягується на весь екран',
+    card && card.w < card.vw * 0.6, JSON.stringify(card));
+  ok('67. без JS-помилок', errs.length === 0 && s.errs.length === 0,
     errs.concat(s.errs).join(' | '));
   await ctx.close();
 }
@@ -491,13 +508,13 @@ const FAKE = { state: STATE, events: EVENTS, history: HISTORY, awards: AWARDS };
   const ctx = await context({ state: STATE, events: [], history: HISTORY, awards: AWARDS, recentFails: true });
   const { p, errs } = await open(ctx, 'rating.html', '#sz-events');
   const txt = await p.locator('#sz-events').innerText();
-  ok('67. невдале завантаження стрічки не називається «порожньо»',
+  ok('68. невдале завантаження стрічки не називається «порожньо»',
     !/Ще порожньо/.test(txt), txt.replace(/\n/g, ' ').slice(0, 140));
-  ok('68. і пояснює, що нарахування не загубились', /не губляться/.test(txt),
+  ok('69. і пояснює, що нарахування не загубились', /не губляться/.test(txt),
     txt.replace(/\n/g, ' ').slice(0, 160));
-  ok('69. решта панелі при цьому працює — ELO на місці',
+  ok('70. решта панелі при цьому працює — ELO на місці',
     /412/.test(await p.locator('#sz-header').innerText()));
-  ok('70. без JS-помилок', errs.length === 0, errs.join(' | '));
+  ok('71. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 

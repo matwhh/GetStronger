@@ -417,6 +417,128 @@
     return out;
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Тижнева ціль (F3)                                                   */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЧОМУ ВОНА ПОТРІБНА. Денний стрік карає за пропуск: один забутий
+   * понеділок обнуляє серію з тридцяти днів. Але у звички «тричі на
+   * тиждень» пропущений понеділок — це не помилка взагалі, це один із
+   * чотирьох вільних днів. Тобто показник карав за те, що правилами
+   * дозволено, і саме тому люди кидали трекер після першого пропуску.
+   *
+   * Тиждень — з понеділка, місцевим днем, через DateCore.mondayOf. Жодної
+   * власної арифметики дат тут немає навмисно: чотири різні mondayOf у
+   * чотирьох файлах — це вже було, і саме воно давало різні тижні на
+   * різних екранах у ніч переходу на літній час.
+   *
+   * Що вважається виконаним днем. Якщо в трекера є ДЕННА ціль — день,
+   * який її досягає. Якщо денної цілі немає (звички, добавки, шкали без
+   * цілі), то будь-який записаний день: тижнева ціль без денної означає
+   * «скільки днів на тиждень я це взагалі робив», і це чесна відповідь на
+   * питання, яке людина ставила, коли писала «3 з 7».
+   */
+  const WEEK_GOAL_MIN = 1, WEEK_GOAL_MAX = 7;
+
+  /**
+   * Тижнева ціль трекера: скільки днів на тиждень.
+   * @param {number|null} n 1–7; усе поза межами або сміття — знімає ціль
+   */
+  function setWeekGoal(trackers, id, n) {
+    const src = isPlain(trackers) ? trackers : {};
+    if (!src[id]) return src;
+    const raw = Math.round(Number(n));
+    /* Понад 7 — обрізаємо, а не відкидаємо: людина, яка написала «10 днів
+       на тиждень», хотіла «щодня», і сказати їй «неправильне значення»
+       означало б сперечатись замість зрозуміти. */
+    const ok = Number.isFinite(raw) && raw >= WEEK_GOAL_MIN;
+    const out = Object.assign({}, src);
+    out[id] = Object.assign({}, out[id],
+      { weekGoal: ok ? Math.min(raw, WEEK_GOAL_MAX) : null });
+    return out;
+  }
+
+  /** Тижнева ціль трекера або null */
+  function weekGoalOf(tracker) {
+    const n = Math.round(Number(tracker && tracker.weekGoal));
+    if (!Number.isFinite(n) || n < WEEK_GOAL_MIN) return null;
+    return Math.min(n, WEEK_GOAL_MAX);
+  }
+
+  /** Ключ понеділка того тижня, у який потрапляє дата */
+  function weekStartKey(now) {
+    return todayKey(window.DateCore.mondayOf(now instanceof Date ? now : new Date()));
+  }
+
+  /**
+   * Чи день виконано з погляду тижневої цілі.
+   * @param {object} tracker трекер із реєстру
+   * @param {*} raw запис журналу за день (може бути обʼєктом зі value)
+   */
+  function dayDone(tracker, raw) {
+    if (raw === null || raw === undefined) return false;
+    const def = defFor(tracker);
+    if (!def) return false;
+    if (def.kind === 'boolean' || def.kind === 'dose') return taken(raw);
+    if (def.kind === 'pair' || def.kind === 'card') return false;
+
+    const v = entryValue(raw);
+    if (v === null) return false;
+    const goal = Number(tracker.goal);
+    /* Без денної цілі порівнювати ні з чим: записаний день = зроблений */
+    if (!Number.isFinite(goal) || goal <= 0) return true;
+    return v >= goal;
+  }
+
+  /**
+   * Тиждень трекера з тижневою ціллю: {done, goal, start, left}.
+   * null — у трекера тижневої цілі немає, і тоді діє старе поводження.
+   */
+  function weekStats(tracker, log, now) {
+    const goal = weekGoalOf(tracker);
+    if (!goal) return null;
+    const start = weekStartKey(now);
+    const day = (isPlain(log) && isPlain(log[tracker.id])) ? log[tracker.id] : {};
+    let done = 0;
+    for (let i = 0; i < 7; i++) {
+      const k = window.DateCore.shiftKey(start, i);
+      if (dayDone(tracker, day[k])) done++;
+    }
+    return { done: done, goal: goal, start: start, left: Math.max(0, goal - done) };
+  }
+
+  /**
+   * Скільки тижнів ПОСПІЛЬ ціль закрита, рахуючи назад.
+   *
+   * Поточний тиждень не програний, поки не скінчився: якщо ціль у ньому
+   * ще не закрита, рахунок починається з минулого. Те саме правило, що в
+   * денному стріку, — інакше в понеділок уранці серія обнулялася б щоразу.
+   */
+  function weekStreak(tracker, log, now) {
+    const goal = weekGoalOf(tracker);
+    if (!goal) return 0;
+    const day = (isPlain(log) && isPlain(log[tracker.id])) ? log[tracker.id] : {};
+    const doneIn = function (startKey) {
+      let n = 0;
+      for (let i = 0; i < 7; i++) {
+        if (dayDone(tracker, day[window.DateCore.shiftKey(startKey, i)])) n++;
+      }
+      return n;
+    };
+
+    let cursor = weekStartKey(now);
+    if (doneIn(cursor) < goal) cursor = window.DateCore.shiftKey(cursor, -7);
+    let weeks = 0;
+    while (doneIn(cursor) >= goal) {
+      weeks++;
+      cursor = window.DateCore.shiftKey(cursor, -7);
+      /* Стеля на випадок журналу, зібраного імпортом: без неї цикл
+         крутився б по порожніх тижнях лише доки не скінчиться терпіння. */
+      if (weeks > 520) break;
+    }
+    return weeks;
+  }
+
   /*
    * Джерело даних (режим трекера): 'manual' | 'apple_health'. Зараз
    * web-середовище Get Stronger не має доступу до Apple Health, і жодного разу
@@ -843,6 +965,14 @@
     taken: taken,
     gramsOf: gramsOf,
     setGoal: setGoal,
+    WEEK_GOAL_MIN: WEEK_GOAL_MIN,
+    WEEK_GOAL_MAX: WEEK_GOAL_MAX,
+    setWeekGoal: setWeekGoal,
+    weekGoalOf: weekGoalOf,
+    weekStartKey: weekStartKey,
+    dayDone: dayDone,
+    weekStats: weekStats,
+    weekStreak: weekStreak,
     setSource: setSource,
     ingest: ingest,
     entryValue: entryValue,

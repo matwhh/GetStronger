@@ -79,6 +79,18 @@
     const TC = window.TrackerCore;
     if (!TC) return '';
 
+    /*
+     * Тижнева ціль (F3) заміняє підпис ЦІЛКОМ, а не додається до нього.
+     * Два різні «стріки» в одному кубику — денний і тижневий — це не
+     * більше інформації, а питання «то який із них справжній».
+     */
+    const ws = TC.weekStats(t, log, now);
+    if (ws) {
+      const wk = TC.weekStreak(t, log, now);
+      return ws.done + '/' + ws.goal + ' цього тижня' +
+        (wk > 0 ? ' · ' + wk + ' ' + plural(wk, 'тиждень', 'тижні', 'тижнів') + ' поспіль' : '');
+    }
+
     if (def.kind === 'boolean' || def.kind === 'dose') {
       const s = TC.boolSummary(log, t.id, 7, t.createdAt, now);
       if (s.streak > 0) return 'серія ' + s.streak + ' ' + plural(s.streak, 'день', 'дні', 'днів');
@@ -101,7 +113,7 @@
     return 'тиждень: ' + num(s.avg) + (def.unit ? ' ' + def.unit : '');
   }
 
-  /* Українська множина потрібна рівно в одному місці — серії днів. */
+  /* Українська множина: серії днів і серії тижнів (F3). */
   function plural(n, one, few, many) {
     const a = Math.abs(n) % 100;
     const b = a % 10;

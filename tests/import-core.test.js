@@ -258,3 +258,25 @@ describe('швидкий запис дня', () => {
     assert.equal(r.patch.mealLog['2026-09-10'].partial, undefined);
   });
 });
+
+describe('тижнева ціль трекера', () => {
+  const tr = (extra) => ({ trackers: { h1: Object.assign(
+    { id: 'h1', type: 'habit', name: 'Розтяжка', enabled: true }, extra) } });
+
+  test('weekGoal переживає імпорт', () => {
+    assert.equal(V(tr({ weekGoal: 3 })).patch.trackers.h1.weekGoal, 3,
+      'без цього трекер після відновлення повертається до денного стріку');
+  });
+
+  test('weekGoal поза межами не проходить як ціль', () => {
+    for (const bad of [0, -1, 8, 99, 'три', null]) {
+      assert.equal(V(tr({ weekGoal: bad })).patch.trackers.h1.weekGoal, null, String(bad));
+    }
+  });
+
+  test('трекер без weekGoal дістає null, а не зникає', () => {
+    const t = V(tr({})).patch.trackers.h1;
+    assert.equal(t.weekGoal, null);
+    assert.equal(t.name, 'Розтяжка');
+  });
+});

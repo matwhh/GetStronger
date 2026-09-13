@@ -585,3 +585,184 @@ describe('tracker-core: заміри як картка-розділ', () => {
     assert.equal(next.sleep.goal, 480);
   });
 });
+
+/*
+ * Тижнева ціль x/7 (F3).
+ *
+ * Проблема, яку це лікує: денний стрік карав за пропуск, дозволений
+ * правилами самої звички. «Тричі на тиждень» із пропущеним понеділком —
+ * це не зірвана серія, а один із чотирьох вільних днів; обнулення
+ * показника тут читалось як «ти провалився», і після першого ж пропуску
+ * трекер кидали.
+ *
+ * Дати передаються аргументом, тиждень — з понеділка місцевим днем через
+ * DateCore. Власної арифметики дат тут немає навмисно: чотири різні
+ * mondayOf у чотирьох файлах уже були, і саме вони давали різні тижні на
+ * різних екранах у ніч переходу на літній час.
+ */
+describe('тижнева ціль: реєстр', () => {
+  const base = () => ({ h1: { id: 'h1', type: 'habit', name: 'Розтяжка', enabled: true } });
+
+  it('ціль 1–7 записується як є', () => {
+    for (const n of [1, 3, 7]) {
+      assert.equal(T.weekGoalOf(T.setWeekGoal(base(), 'h1', n).h1), n);
+    }
+  });
+
+  it('понад 7 обрізається до 7, а не відкидається', () => {
+    /* Перевіряємо і ЗАПИСАНЕ поле, і читання. Без першого рядка тест
+       проходив би навіть тоді, коли setWeekGoal кладе в профіль 100:
+       weekGoalOf обрізає при читанні, і різниця стала б видимою лише
+       після експорту профілю — тобто ніколи. */
+    assert.equal(T.setWeekGoal(base(), 'h1', 10).h1.weekGoal, 7);
+    assert.equal(T.setWeekGoal(base(), 'h1', 100).h1.weekGoal, 7);
+    assert.equal(T.weekGoalOf(T.setWeekGoal(base(), 'h1', 10).h1), 7);
+  });
+
+  it('нуль, відʼємне і сміття знімають ціль', () => {
+    for (const bad of [0, -3, NaN, null, undefined, 'три', '']) {
+      assert.equal(T.weekGoalOf(T.setWeekGoal(base(), 'h1', bad).h1), null, String(bad));
+    }
+  });
+
+  it('відсутнє поле = старе поводження, а не нуль', () => {
+    assert.equal(T.weekGoalOf(base().h1), null);
+    assert.equal(T.weekStats(base().h1, {}, NOW), null);
+    assert.equal(T.weekStreak(base().h1, {}, NOW), 0);
+  });
+
+  it('setWeekGoal не мутує реєстр і не чіпає невідомий id', () => {
+    const src = base();
+    const out = T.setWeekGoal(src, 'h1', 3);
+    assert.equal(src.h1.weekGoal, undefined);
+    assert.equal(T.setWeekGoal(src, 'немає', 3), src);
+    assert.equal(out.h1.name, 'Розтяжка');
+  });
+});
+
+describe('тижнева ціль: лічильник тижня', () => {
+  /* 17 серпня 2026 — понеділок. Тиждень: 17…23 серпня. */
+  const habit = { id: 'h1', type: 'habit', name: 'Розтяжка', enabled: true, weekGoal: 3 };
+  const WED = new Date(2026, 7, 19);
+
+  it('тиждень починається з понеділка місцевим днем', () => {
+    assert.equal(T.weekStartKey(NOW), '2026-08-17');
+    assert.equal(T.weekStartKey(new Date(2026, 7, 23)), '2026-08-17', 'неділя належить тому ж тижню');
+    assert.equal(T.weekStartKey(new Date(2026, 7, 24)), '2026-08-24');
+  });
+
+  it('рахує лише дні цього тижня', () => {
+    const log = { h1: {
+      '2026-08-16': true,   // неділя ПОПЕРЕДНЬОГО тижня — не рахується
+      '2026-08-17': true,
+      '2026-08-19': true,
+      '2026-08-24': true    // наступний тиждень — не рахується
+    } };
+    const w = T.weekStats(habit, log, WED);
+    assert.equal(w.start, '2026-08-17');
+    assert.equal(w.done, 2);
+    assert.equal(w.goal, 3);
+    assert.equal(w.left, 1);
+  });
+
+  it('тиждень без жодного запису — нуль, не null', () => {
+    const w = T.weekStats(habit, {}, WED);
+    assert.equal(w.done, 0);
+    assert.equal(w.left, 3);
+  });
+
+  it('перевиконання не дає відʼємного залишку', () => {
+    const log = { h1: { '2026-08-17': true, '2026-08-18': true, '2026-08-19': true, '2026-08-20': true } };
+    const w = T.weekStats(habit, log, WED);
+    assert.equal(w.done, 4);
+    assert.equal(w.left, 0);
+  });
+
+  it('пропуск одного дня НЕ обнуляє нічого', () => {
+    const log = { h1: { '2026-08-17': true, '2026-08-19': true, '2026-08-21': true } };
+    const w = T.weekStats(habit, log, new Date(2026, 7, 22));
+    assert.equal(w.done, 3, 'ціль закрита з пропусками — це і був сенс');
+    assert.equal(T.weekStreak(habit, log, new Date(2026, 7, 22)), 1);
+  });
+});
+
+describe('тижнева ціль: що вважається виконаним днем', () => {
+  it('звичка: позначка дня', () => {
+    const h = { id: 'h1', type: 'habit', weekGoal: 2 };
+    assert.equal(T.dayDone(h, true), true);
+    assert.equal(T.dayDone(h, false), false);
+    assert.equal(T.dayDone(h, null), false);
+    assert.equal(T.dayDone(h, undefined), false);
+  });
+
+  it('числовий трекер із денною ціллю: тільки день, що її досягає', () => {
+    const w = { id: 'water', type: 'water', goal: 2.5, weekGoal: 5 };
+    assert.equal(T.dayDone(w, 2.5), true);
+    assert.equal(T.dayDone(w, 3), true);
+    assert.equal(T.dayDone(w, 2.4), false);
+    assert.equal(T.dayDone(w, 0), false);
+  });
+
+  it('числовий трекер БЕЗ денної цілі: будь-який записаний день', () => {
+    /* Тижнева ціль без денної означає «скільки днів на тиждень я це
+       взагалі робив». Порівнювати там ні з чим, а рахувати нулем усе —
+       це сказати людині, що вона не робила того, що робила. */
+    const w = { id: 'water', type: 'water', goal: null, weekGoal: 5 };
+    assert.equal(T.dayDone(w, 0.5), true);
+    assert.equal(T.dayDone(w, null), false);
+  });
+
+  it('значення у формі {value, source} читається так само', () => {
+    const st = { id: 'steps', type: 'steps', goal: 8000, weekGoal: 4 };
+    assert.equal(T.dayDone(st, { value: 9000, source: 'manual' }), true);
+    assert.equal(T.dayDone(st, { value: 100, source: 'manual' }), false);
+  });
+
+  it('pair і card не дають виконаних днів', () => {
+    assert.equal(T.dayDone({ id: 'painFatigue', type: 'painFatigue', weekGoal: 3 }, { pain: 2, fatigue: 3 }), false);
+    assert.equal(T.dayDone({ id: 'measure', type: 'measure', weekGoal: 3 }, true), false);
+  });
+});
+
+describe('тижнева ціль: серія тижнів', () => {
+  const habit = { id: 'h1', type: 'habit', weekGoal: 2 };
+  const mark = (...keys) => ({ h1: keys.reduce((a, k) => (a[k] = true, a), {}) });
+
+  it('три закриті тижні поспіль = 3', () => {
+    const log = mark(
+      '2026-08-03', '2026-08-05',     // тиждень 3–9
+      '2026-08-10', '2026-08-12',     // тиждень 10–16
+      '2026-08-17', '2026-08-18'      // тиждень 17–23 (поточний)
+    );
+    assert.equal(T.weekStreak(habit, log, new Date(2026, 7, 19)), 3);
+  });
+
+  it('незакритий поточний тиждень не обнуляє серію', () => {
+    /* Понеділок уранці ще нічого не позначено — минулі тижні від цього
+       не зникають, інакше показник обнулявся б щотижня о 00:01. */
+    const log = mark('2026-08-10', '2026-08-12');
+    assert.equal(T.weekStreak(habit, log, new Date(2026, 7, 17)), 1);
+  });
+
+  it('пропущений тиждень серію обриває', () => {
+    const log = mark('2026-08-03', '2026-08-05', '2026-08-17', '2026-08-18');
+    assert.equal(T.weekStreak(habit, log, new Date(2026, 7, 19)), 1);
+  });
+
+  it('порожній журнал — нуль тижнів', () => {
+    assert.equal(T.weekStreak(habit, {}, NOW), 0);
+    assert.equal(T.weekStreak(habit, null, NOW), 0);
+  });
+
+  it('перехід на літній час не зсуває межі тижня', () => {
+    /* В Україні літній час знімається останньої неділі жовтня: 25 жовтня
+       2026 — неділя, тобто ОСТАННІЙ день тижня 19–25 жовтня. Якби тиждень
+       рахувався мілісекундами, ця доба з 25 годин зсунула б межу. */
+    assert.equal(T.weekStartKey(new Date(2026, 9, 25)), '2026-10-19');
+    assert.equal(T.weekStartKey(new Date(2026, 9, 26)), '2026-10-26');
+    const log = mark('2026-10-19', '2026-10-25');
+    const w = T.weekStats(habit, log, new Date(2026, 9, 25));
+    assert.equal(w.done, 2, 'неділя переходу випала з тижня');
+    assert.equal(T.weekStreak(habit, log, new Date(2026, 9, 25)), 1);
+  });
+});

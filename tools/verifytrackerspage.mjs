@@ -248,6 +248,97 @@ const tap = async (l) => { await l.evaluate(e => e.scrollIntoView({ block: 'cent
   await ctx.close();
 }
 
+/* ---- 6. Тижнева ціль звички x/7 (F3) ---- */
+/*
+ * Головне, що тут стережеться: у звички з тижневою ціллю денний стрік не
+ * показується НІДЕ. Два різні «поспіль» на одному екрані — не більше
+ * інформації, а питання «то який із них справжній», і саме через це
+ * показник переставав щось означати.
+ */
+{
+  const { ctx, p, errs } = await open('trackers.html');
+
+  await p.evaluate(async () => {
+    const T = window.TrackerCore;
+    const added = T.addCustom(T.ensureBuiltins({}), 'habit', 'Розтяжка');
+    const id = added.id;
+    let tr = T.setEnabled(added.trackers, id, true);
+    tr = T.setPinned(tr, id, true);
+    /* Три позначки з пропусками цього тижня: рівно той випадок, який
+       денний стрік рахував як «серія 1», а людина — як «зробив тричі». */
+    const start = T.weekStartKey(new Date());
+    const D = window.DateCore;
+    const log = { [id]: {
+      [start]: true,
+      [D.shiftKey(start, 2)]: true,
+      [D.shiftKey(start, 4)]: true
+    } };
+    try { await window.Store.saveProfile({ trackers: tr, trackerLog: log }); }
+    catch (e) { if (!e.queued) throw e; }
+  });
+
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  const row = () => p.locator('.tr-row', { hasText: 'Розтяжка' }).first();
+  ok('6. у звички є поле «днів на тиждень»', await row().locator('[data-week-set]').count() === 1);
+
+  await row().locator('[data-week-set]').fill('3');
+  await row().locator('[data-week-set]').press('Tab');
+  await p.waitForTimeout(900);
+
+  const saved = await p.evaluate(async () => {
+    const pr = await window.Store.getProfile();
+    const id = Object.keys(pr.trackers).find(k => pr.trackers[k].name === 'Розтяжка');
+    return pr.trackers[id].weekGoal;
+  });
+  ok('6. ціль 3/тиж зберігається в профілі', saved === 3, 'weekGoal=' + saved);
+
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  const meta = await row().locator('.tr-row__meta').innerText();
+  ok('6. у налаштуваннях видно тижневий лічильник', /3 з 3 цього тижня/.test(meta), meta);
+  /* ТІЛЬКИ тижневий: ні «за 30 днів», ні «N днів поспіль» поруч бути не
+     має — це були б два різні відповіді на одне питання. */
+  ok('6. 30-денного підсумку поруч немає', !/за 30 днів/.test(meta), meta);
+  /* Пробіл на початку обовʼязковий: «тиждень» містить у собі «день», і
+     без нього ця перевірка падала саме на правильному тексті. */
+  ok('6. денного стріку поруч немає', !/ (день|дні|днів) поспіль/.test(meta), meta);
+
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1400);
+  const tileTxt = await p.locator('#today .twt', { hasText: 'Розтяжка' }).first().innerText();
+  ok('6. на «Сьогодні» кубик показує 3/3 цього тижня', /3\/3 цього тижня/.test(tileTxt), tileTxt);
+  ok('6. на кубику немає «серія N днів»', !/серія \d+ (день|дні|днів)/.test(tileTxt), tileTxt);
+
+  /* Понад 7 — не помилка, а «щодня»: обрізається */
+  await p.goto('file://' + ROOT + '/trackers.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  await row().locator('[data-week-set]').fill('10');
+  await row().locator('[data-week-set]').press('Tab');
+  await p.waitForTimeout(900);
+  const capped = await p.evaluate(async () => {
+    const pr = await window.Store.getProfile();
+    const id = Object.keys(pr.trackers).find(k => pr.trackers[k].name === 'Розтяжка');
+    return pr.trackers[id].weekGoal;
+  });
+  ok('6. «10 днів на тиждень» стає 7, а не помилкою', capped === 7, 'weekGoal=' + capped);
+
+  /* Порожнє поле знімає ціль і повертає денний стрік */
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForTimeout(1300);
+  await row().locator('[data-week-set]').fill('');
+  await row().locator('[data-week-set]').press('Tab');
+  await p.waitForTimeout(900);
+  const cleared = await p.evaluate(async () => {
+    const pr = await window.Store.getProfile();
+    const id = Object.keys(pr.trackers).find(k => pr.trackers[k].name === 'Розтяжка');
+    return pr.trackers[id].weekGoal;
+  });
+  ok('6. порожнє поле знімає тижневу ціль', cleared === null, 'weekGoal=' + cleared);
+  ok('6. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter(r => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок сторінки трекерів пройшло.');

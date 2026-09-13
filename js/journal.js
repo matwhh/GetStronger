@@ -1910,6 +1910,16 @@
 
     /* dose (добавка в грамах) для підсумку — та сама позначка «прийнято/ні»:
        середні грами тут нічого не кажуть, важлива регулярність. */
+    /* Тижнева ціль (F3): у такого трекера денний стрік не показується
+       ніде, включно з журналом — інакше на трьох екранах стояло б три
+       різні «поспіль» для однієї звички. */
+    const ws = TC.weekStats(t, state.trackerLog);
+    if (ws) {
+      const wk = TC.weekStreak(t, state.trackerLog);
+      return { name: t.name, val: ws.done + '/' + ws.goal,
+               trend: 'цього тижня' + (wk > 0 ? ' · ' + wk + ' тиж. поспіль' : '') };
+    }
+
     if (def.kind === 'boolean' || def.kind === 'dose') {
       const st = TC.boolSummary(state.trackerLog, t.id, 30, t.createdAt);
       return { name: t.name, val: st.pct + '%', trend: st.done + ' із ' + st.total + ' днів' + (st.streak ? ' · ' + st.streak + ' поспіль зараз' : '') };

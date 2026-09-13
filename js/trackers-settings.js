@@ -83,6 +83,15 @@
     // обидві форми прозоро; інші види kind і далі пишуться голими значеннями.
     const today = (def.kind === 'duration' || def.kind === 'value') ? T.entryValue(todayRaw) : todayRaw;
 
+    /* Тижнева ціль (F3) заміняє денний стрік, а не додається до нього:
+       два різні «поспіль» на одному екрані читаються як помилка. */
+    const ws = T.weekStats(t, state.log);
+    if (ws) {
+      const wk = T.weekStreak(t, state.log);
+      return ws.done + ' з ' + ws.goal + ' цього тижня' +
+        (wk > 0 ? ' · ' + wk + ' ' + plural(wk, 'тиждень', 'тижні', 'тижнів') + ' поспіль' : '');
+    }
+
     if (def.kind === 'boolean') {
       const st = T.boolSummary(state.log, t.id, 30, t.createdAt);
       const streakTxt = st.streak > 0 ? st.streak + ' ' + plural(st.streak, 'день', 'дні', 'днів') + ' поспіль' : 'ще без позначок';
@@ -367,8 +376,39 @@
    */
   function customRow(t, kind) {
     const st = T.boolSummary(state.log, t.id, 30, t.createdAt);
-    const streakTxt = kind === 'habit' && st.streak > 0
-      ? ' · ' + st.streak + ' ' + plural(st.streak, 'день', 'дні', 'днів') + ' поспіль'
+    const ws = T.weekStats(t, state.log);
+    /*
+     * З тижневою ціллю (F3) денний стрік НЕ показується взагалі. Пропуск
+     * одного дня у звички «тричі на тиждень» — не помилка, а один із
+     * вільних днів; денний стрік казав би протилежне тому, що людина сама
+     * собі призначила.
+     */
+    const wk = ws ? T.weekStreak(t, state.log) : 0;
+    /*
+     * З тижневою ціллю показник ОДИН: x із y цього тижня. «0 із 1 за 30
+     * днів» поруч із «3 з 3 цього тижня» — це два різні відповіді на одне
+     * питання, і перший із них ще й виглядає як провал.
+     */
+    const metaTxt = ws
+      ? ws.done + ' з ' + ws.goal + ' цього тижня' +
+        (wk > 0 ? ' · ' + wk + ' ' + plural(wk, 'тиждень', 'тижні', 'тижнів') + ' поспіль' : '')
+      : st.done + ' із ' + st.total + ' за 30 днів' +
+        (kind === 'habit' && st.streak > 0
+          ? ' · ' + st.streak + ' ' + plural(st.streak, 'день', 'дні', 'днів') + ' поспіль'
+          : '');
+    /* Поле тижневої цілі — лише у звичок: саме вони бувають «тричі на
+       тиждень». У добавок на цьому місці доза, і другий ввід у той самий
+       рядок не вліз би; ядро тижневу ціль підтримує для будь-якого
+       трекера, тож якщо вона знадобиться добавкам — це правка розмітки,
+       а не логіки. */
+    const weekField = kind === 'habit'
+      ? '<span class="qi-dose">' +
+          '<input class="input input--sm num mono" type="text" inputmode="numeric" ' +
+            'data-week-set="' + esc(t.id) + '" placeholder="—" ' +
+            'value="' + esc(ws ? String(ws.goal) : '') + '" ' +
+            'aria-label="Скільки днів на тиждень: ' + esc(t.name) + '">' +
+          '<span class="qi-dose__u">/тиж</span>' +
+        '</span>'
       : '';
     const doseField = kind === 'supplement'
       ? '<span class="qi-dose">' +
@@ -394,9 +434,10 @@
         '</label>' +
         '<div class="tr-row__btn" style="cursor:default">' +
           '<span class="tr-row__name">' + esc(t.name) + '</span>' +
-          '<span class="tr-row__meta small muted">' + st.done + ' із ' + st.total + ' за 30 днів' + esc(streakTxt) + '</span>' +
+          '<span class="tr-row__meta small muted">' + esc(metaTxt) + '</span>' +
         '</div>' +
         doseField +
+        weekField +
         pinBtn(t) +
         del +
       '</div>' +
@@ -442,7 +483,9 @@
 
   function renderHabits() {
     customGroup('#tr-habits', 'habit', 'Звички',
-      'Своя звичка, щоденне виконання, серія днів поспіль.',
+      'Своя звичка. Поле «/тиж» задає тижневу ціль: скільки днів на тиждень ' +
+      'достатньо. З нею пропущений день нічого не обнуляє, а замість серії днів ' +
+      'показується x із y цього тижня.',
       '+ Додати звичку', 'Наприклад, лягати до 23:00');
   }
 
@@ -530,6 +573,26 @@
             : T.logValue(state.trackers, state.log, id, mins, todayKey()));
           renderBuiltins();
         }, 0);
+        return;
+      }
+
+      /*
+       * Тижнева ціль (F3). Порожнє поле — це «немає тижневої цілі», і
+       * трекер повертається до денного стріку; 0 і сміття так само
+       * знімають ціль, а більше за 7 обрізається до 7, бо «10 днів на
+       * тиждень» означало «щодня», а не помилку.
+       */
+      const wg = e.target.closest('[data-week-set]');
+      if (wg) {
+        const raw = String(wg.value || '').trim();
+        const n = raw === '' ? null : Number(raw.replace(',', '.'));
+        if (raw !== '' && (!Number.isFinite(n) || n < 1)) {
+          window.App.toast('Днів на тиждень: від 1 до ' + T.WEEK_GOAL_MAX, 'err');
+          setTimeout(renderHabits, 0);
+          return;
+        }
+        saveTrackers(T.setWeekGoal(state.trackers, wg.dataset.weekSet, n));
+        setTimeout(renderHabits, 0);
         return;
       }
 

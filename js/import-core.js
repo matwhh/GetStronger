@@ -681,6 +681,10 @@
          Беремо лише скаляри верхнього рівня, не більше 20 ключів. */
       settings: cleanSettings(t.settings),
               goal: t.goal === null ? null : finite(t.goal, 0, 100000),
+              /* Тижнева ціль x/7 (F3). Без неї трекер після відновлення
+                 повертається до денного стріку — тобто до показника, який
+                 карає за пропуск, дозволений правилами самої звички. */
+              weekGoal: finite(t.weekGoal, 1, 7) === null ? null : Math.round(finite(t.weekGoal, 1, 7)),
               source: (t.source === 'manual' || t.source === 'apple_health') ? t.source : null,
               order: finite(t.order, 0, 100000) || 0,
               createdAt: DATE_KEY.test(t.createdAt) ? t.createdAt : null

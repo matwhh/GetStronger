@@ -132,7 +132,7 @@ elo-core · elo-api · elo-hooks
 | `onboarding-core.js` | 176 | крок онбордингу з полів профілю | `OnboardingCore`: `stepFor`, `pageFor`, `isAllowed`, `LIMITS` | `AgeCore` |
 | `bmi-core.js` | 168 | BMI, категорія, попередження | `BmiCore`: `bmi`, `category`, `shouldWarn`, `showWarnModal` | `App.lockScroll` ⚠️ |
 | `donut-core.js` | 163 | SVG-кільце складу з анімацією | `Donut`: `html`, `animate` | — |
-| `statwindow-core.js` | 160 | вікно, за яке рахується статистика (НЕ сезон рейтингу) | `StatWindow`: `current`, `at`, `contains`, `clipSeries` | `DateCore` |
+| `statwindow-core.js` | 158 | вікно, за яке рахується статистика (НЕ сезон рейтингу) | `StatWindow`: `current`, `at`, `contains`, `clipSeries` | `DateCore` |
 | `reps-core.js` | 151 | діапазон повторень зі стажу й групи | `RepsCore`: `repRangeFor`, `tierFor`, `applyPlan`, `RANGES` | `MUSCLES` |
 | `date-core.js` | 149 | ⭐ **єдине джерело правди про дати** | `DateCore`: `keyOf`, `todayKey`, `dateOf`, `mondayOf`, `addDays`, `shiftKey`, `daysBetween`, `lastKeys` | — |
 | `auth-msg-core.js` | 148 | людські тексти помилок входу й реєстрації | `AuthMsg`: `emailProblem`, `loginPassProblem`, `signInProblem` | — |
@@ -312,8 +312,8 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 
 | Рівень | Чим | Скільки | Коли |
 |---|---|---|---|
-| Юніт | `node --test`, без залежностей | **51 файл, 1098 тестів** | `npm test`, ~6 с |
-| Гігієна | `tools/ci-hygiene.mjs` | 16 перевірок по ~300 файлах | `node tools/ci-hygiene.mjs`, ~1 с |
+| Юніт | `node --test`, без залежностей | **52 файли, 1107 тестів** | `npm test`, ~6 с |
+| Гігієна | `tools/ci-hygiene.mjs` | 17 перевірок по ~320 файлах | `node tools/ci-hygiene.mjs`, ~1 с |
 | Браузер | Playwright на справжньому Chromium | **55 файлів `verify*.mjs`** | `bash tools/ci-browser.sh core` |
 
 Ще 5 файлів `verify*.mjs` — не браузерні: `verify-sql-suites.mjs`,
@@ -353,6 +353,7 @@ CSP), дрейф барʼєрів між `db/*.sql` і бойовою схемо
 | 14 | лише `js/date-core.js` має власне тіло `keyOf`/`dateOf`/`mondayOf`/… | `mondayOf` жив у 4 файлах із 4 різними реалізаціями |
 | 15 | сторінка, що вантажить модуль із датами, вантажить і `date-core` | інакше делегат падає на `undefined` |
 | 16 | у CSS немає правил під класи, яких ніде немає | мертві правила лишались після кожного переписаного екрана |
+| 17 | назви місяців і днів тижня — лише в `js/date-core.js` | список місяців жив чотирма копіями; такі словники не падають, вони розходяться написанням |
 
 Інші скрипти в `tools/`: `adult.mjs` (садить пройдений профіль),
 `pw.mjs` (шляхи до Chromium), `ci-offline.sh` (вішає Supabase і Sentry

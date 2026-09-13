@@ -1487,7 +1487,6 @@ begin
 end;
 $function$
 ;
-grant execute on function public.elo_week_ready(uid uuid, p_week_start date, cfg jsonb) to authenticated;
 grant execute on function public.elo_week_ready(uid uuid, p_week_start date, cfg jsonb) to service_role;
 
 CREATE OR REPLACE FUNCTION public.elo_week_room(uid uuid, p_day date, cfg jsonb)

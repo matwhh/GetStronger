@@ -91,6 +91,7 @@
 20260912230526  deny_public_execute                    → deny-public-execute.sql ← SEC
 20260912230827  season_end_plpgsql                     → season-end-plpgsql.sql
 20260912231110  season_helpers_execute_authenticated   → season-helpers-grant.sql
+20260913173713  elo_week_ready_revoke_authenticated    → elo-week-ready-revoke.sql ← SEC
 ```
 
 **Про `elo-pace.sql`.** Це не точкова правка, а зміна БАЛАНСУ: вартість дії
@@ -134,6 +135,26 @@ git: `git show <коміт перед перебалансом>:db/live-schema.s
   які гранта немає, і не є definer. Виклик падав із «permission denied for
   function season_bounds» три дні; побачили тести, а не люди, бо клієнт
   `season_of` не кличе.
+
+**`elo_week_ready_revoke_authenticated` — витік факту про чужий акаунт
+(аудит 13.09.2026).** `public.elo_week_ready(uid, p_week_start, cfg)` —
+SECURITY DEFINER, приймає uid ПАРАМЕТРОМ (а не бере `auth.uid()`), і в
+бойовій базі мала `grant execute … to authenticated`. Відповідь — рядок
+про ЧУЖИЙ акаунт: `season_closed` (людина закрила сезон),
+`before_first_event` (подій у сезоні немає), `null` (є). Тобто будь-хто,
+хто ввійшов і знає чужий UUID, дізнавався, чи грає та людина в сезоні.
+
+Гранта не було в жодному файлі `db/`: `elo-week-eval-fix.sql`, яка цю
+функцію створила, робить `revoke all … from public` і дає execute лише
+`service_role`. Право лишилось у базі від типового PUBLIC і закріпилось
+іменним. Тобто продакшн розійшовся зі своїм джерелом, і побачити це можна
+було тільки запитом до бази — що й сталось аж через тиждень.
+
+Серверні виклики не постраждали: `elo_catch_up_weeks` і
+`elo_eval_week_for` самі SECURITY DEFINER, тобто ходять від власника;
+клієнт цю функцію не кличе взагалі. Сторожем стала нова перевірка в
+`tools/verify-schema-perms.mjs` — саме там, а не в гігієні: розходження
+було між файлом і БАЗОЮ, і файл про нього не знав.
 
 **`db/elo-pace-recount.sql` — одноразовий добір, не міграція.** Сезон
 AUTUMN-2026 уже йшов, тож набране за плоскою шкалою перераховано під новий

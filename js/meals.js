@@ -1213,8 +1213,11 @@
     window.App.stampRating(Object.assign({}, state.profile, patch), patch);
     try {
       await window.Store.saveProfile(patch);
+      /* Текст мусить збігатися з тим, що робить сервер. Було «білкова
+         частина не рахується» — а вона рахувалась, і то як провалена. */
       toast('День записано приблизно: ' + log[key].kcal + ' ккал' +
-        (prot ? '' : '. Без білка — білкова частина рейтингу за цей день не рахується'), 'ok');
+        (prot ? '' : '. Без білка день міряється самими калоріями') +
+        '. Приблизний день не буває чистим', 'ok');
     } catch (e) {
       toast(e.queued ? e.message : 'Не збереглося: ' + e.message, e.queued ? 'ok' : 'err');
     }

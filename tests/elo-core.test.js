@@ -498,3 +498,53 @@ describe('ELO: темп за рівнем', () => {
     assert.equal(E.weekPenalty(0, 4, 0, CFG), 4 * CFG.missedWorkoutPenalty);
   });
 });
+
+/* =========================================================================
+   ПРИБЛИЗНИЙ ДЕНЬ ХАРЧУВАННЯ
+
+   Швидкий запис (HistoryCore.quickDay) — це одне число, вписане рукою.
+   Він мусить бути ВИГІДНІШИМ за незаписаний день, інакше сенсу в ньому
+   немає, і ДЕШЕВШИМ за розібраний по грамах, інакше розбирати нема сенсу.
+
+   Стеля нижча за cleanThreshold — це і є межа: приблизний день ніколи не
+   буває чистим. Не окреме правило «не давати бонус», а наслідок одного
+   числа: чистий день вимагає якості ≥ 0.9 в кожній категорії, стеля 0.85
+   туди не дотягує за побудовою. Перелік заборон розходиться з правилом,
+   одне число — ні.
+   ========================================================================= */
+describe('ELO: приблизний день харчування', () => {
+  const perfect = { kcal: 2600, target: 2600, protein: 180, proteinTarget: 180 };
+
+  it('розібраний день бездоганний — стелі немає', () => {
+    assert.equal(E.actionDelta('meal', perfect, CFG).mult, 1);
+  });
+
+  it('приблизний день зрізається стелею', () => {
+    const m = E.actionDelta('meal', Object.assign({ partial: true }, perfect), CFG).mult;
+    assert.equal(m, CFG.partialNutritionCap);
+    assert.ok(m < CFG.cleanThreshold, 'приблизний день дотягується до чистого');
+  });
+
+  it('невідомий білок: калорії беруть усю вагу, але стеля лишається', () => {
+    /* pTarget = 0 — це «невідомо», а не «ціль нуль»: див. history-core. */
+    const m = E.actionDelta('meal',
+      { kcal: 2600, target: 2600, protein: 0, proteinTarget: 0, partial: true }, CFG).mult;
+    assert.equal(m, CFG.partialNutritionCap);
+  });
+
+  it('поганий приблизний день стеля не чіпає — вона зрізає лише верх', () => {
+    const bad = { kcal: 2600 * 1.3, target: 2600, protein: 0, proteinTarget: 0, partial: true };
+    const withCap = E.actionDelta('meal', bad, CFG).mult;
+    const noCap = E.actionDelta('meal',
+      Object.assign({}, bad, { partial: false }), CFG).mult;
+    assert.equal(withCap, noCap);
+    assert.ok(withCap < CFG.partialNutritionCap);
+  });
+
+  it('приблизний день дорожчий за незаписаний і дешевший за розібраний', () => {
+    const full = E.actionDelta('meal', perfect, CFG).delta;
+    const quick = E.actionDelta('meal', Object.assign({ partial: true }, perfect), CFG).delta;
+    assert.ok(quick > 0, 'приблизний день нічого не дає — тоді нащо він');
+    assert.ok(quick < full, 'приблизний день коштує як розібраний');
+  });
+});

@@ -319,7 +319,21 @@
       qP = ladder(cfg.tolerance.protein, clamp((Number(payload.protein) || 0) / pTarget, 0, 1));
     }
     const mult = qK * kSh + qP * pSh;
-    return { quality: mult, mult: mult, delta: Math.round(day * mult) };
+    /*
+     * Приблизний запис (HistoryCore.quickDay) — одне число, вписане
+     * рукою. Він мусить бути вигіднішим за незаписаний день, інакше в
+     * ньому немає сенсу, і дешевшим за розібраний по грамах, інакше
+     * немає сенсу розбирати.
+     *
+     * Стеля нижча за cleanThreshold, тому приблизний день НІКОЛИ не
+     * буває чистим — це наслідок одного числа, а не окремої заборони.
+     * Перелік заборон розходиться з правилом; одне число — ні.
+     *
+     * Зрізає лише верх: поганий приблизний день і без стелі нижчий за
+     * неї, тож карати його вдруге нема за що.
+     */
+    const capped = payload.partial ? Math.min(mult, cfg.partialNutritionCap) : mult;
+    return { quality: capped, mult: capped, delta: Math.round(day * capped) };
   }
 
   function sleepDelta(payload, cfg, ctx) {

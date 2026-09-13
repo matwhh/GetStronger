@@ -29,6 +29,7 @@
   "cleanDayBonus": 3,
   "cleanWeekBonus": 9,
   "cleanThreshold": 0.9,
+  "partialNutritionCap": 0.85,
   "nutritionSplit": {
     "kcal": 0.55,
     "protein": 0.45

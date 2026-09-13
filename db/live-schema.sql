@@ -496,6 +496,11 @@ begin
         least(1, greatest(0, coalesce((payload->>'protein')::numeric, 0) / ptarget)));
     end if;
     m := qk * ksh + qp * psh;
+    -- Стеля приблизного дня. coalesce на 1 — щоб конфіг без ключа поводився
+    -- рівно як до цієї міграції, а не обнуляв категорію.
+    if coalesce((payload->>'partial')::boolean, false) then
+      m := least(m, coalesce((cfg->>'partialNutritionCap')::numeric, 1));
+    end if;
     q := m; d := daily * m;
   elsif kind = 'sleep' then
     daily := weekly * (cfg#>>'{weights,sleep}')::numeric / 7;
@@ -940,7 +945,12 @@ begin
       'kcal',          greatest(0, public.elo_num(rec->'kcal', 0)),
       'target',        public.elo_num(rec->'target', 0),
       'protein',       greatest(0, public.elo_num(rec->'p', 0)),
-      'proteinTarget', greatest(0, public.elo_num(rec->'pTarget', 0)));
+      -- pTarget пишеться з етапу «authoritative ELO». Його немає у старих
+      -- записах І в приблизних днях без білка — тоді калорії беруть усю
+      -- вагу категорії (див. elo_action_delta).
+      'proteinTarget', greatest(0, public.elo_num(rec->'pTarget', 0)),
+      -- Приблизний запис: одне число рукою замість розбору по грамах.
+      'partial',       coalesce((rec->>'partial')::boolean, false));
 
   elsif kind = 'sleep' then
     v := public.elo_tracker_value(d, 'sleep', p_day);

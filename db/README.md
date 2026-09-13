@@ -93,6 +93,7 @@
 20260912231110  season_helpers_execute_authenticated   → season-helpers-grant.sql
 20260913173713  elo_week_ready_revoke_authenticated    → elo-week-ready-revoke.sql ← SEC
 20260913175326  lint_followups_comments_and_fk_index   → lint-followups.sql
+20260913223623  elo_partial_day_cap                    → elo-partial-cap.sql     ← правила
 ```
 
 **Про `elo-pace.sql`.** Це не точкова правка, а зміна БАЛАНСУ: вартість дії

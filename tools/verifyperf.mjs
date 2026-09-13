@@ -23,9 +23,21 @@ const LIMIT = {
 };
 import { chromium } from 'playwright';
 import { adultContext } from './adult.mjs';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { CHROME, ROOT } from './pw.mjs';
 const PAGES=readdirSync(ROOT).filter(f=>f.endsWith('.html')).sort();
+
+/* СТОРІНКИ-ПЕРЕНАПРАВЛЕННЯ МІРЯЮТЬСЯ, АЛЕ НЕ СУДЯТЬСЯ.
+   today.html і trackers-settings.html — це <meta http-equiv="refresh"> на
+   інші сторінки (старі закладки, ярлик «На екран Home»). Браузер вантажить
+   спершу їх, потім ціль, і слухач 'response' складає ОБИДВА документи в
+   одне число. Тобто today.html «важить» index.html плюс себе — і саме він
+   першим упирається в стелю, хоч людина цих байтів не платить: вона платить
+   за ціль, яку вже зважено окремим рядком.
+   Саме це й сталось 13.09: today.html 1606 КБ при стелі 1500, тоді як
+   index.html — 1246. Ознака береться з розмітки, а не зі списку імен:
+   зʼявиться ще одне перенаправлення — воно теж не зіпсує суд. */
+const isRedirect=(f)=>/http-equiv=["']?refresh/i.test(readFileSync(ROOT+'/'+f,'utf8'));
 const b=await chromium.launch({executablePath:CHROME});
 const rows=[];
 for(const f of PAGES){
@@ -43,14 +55,17 @@ for(const f of PAGES){
     return {dcl:Math.round(nav.domContentLoadedEventEnd||0), nodes:document.querySelectorAll('*').length,
             scripts:document.querySelectorAll('script[src]').length};
   });
-  rows.push({page:f, kb:Math.round(bytes/1024), reqs, loadMs, dcl:m.dcl, nodes:m.nodes, scripts:m.scripts});
+  rows.push({page:f, kb:Math.round(bytes/1024), reqs, loadMs, dcl:m.dcl, nodes:m.nodes, scripts:m.scripts,
+             redirect:isRedirect(f)});
   await ctx.close();
 }
 await b.close();
 rows.sort((a,b)=>b.kb-a.kb);
 console.log('сторінка'.padEnd(22), 'КБ'.padStart(6), 'запитів'.padStart(8), 'load мс'.padStart(8), 'DCL мс'.padStart(7), 'вузлів'.padStart(7), 'скриптів'.padStart(9));
-for(const r of rows) console.log(r.page.padEnd(22), String(r.kb).padStart(6), String(r.reqs).padStart(8), String(r.loadMs).padStart(8), String(r.dcl).padStart(7), String(r.nodes).padStart(7), String(r.scripts).padStart(9));
-const worst=rows[0], slowest=rows.slice().sort((a,b)=>b.loadMs-a.loadMs)[0], most=rows.slice().sort((a,b)=>b.nodes-a.nodes)[0];
+for(const r of rows) console.log((r.redirect?'→ ':'  ')+r.page.padEnd(20), String(r.kb).padStart(6), String(r.reqs).padStart(8), String(r.loadMs).padStart(8), String(r.dcl).padStart(7), String(r.nodes).padStart(7), String(r.scripts).padStart(9));
+const judged=rows.filter(r=>!r.redirect);
+if(judged.length!==rows.length) console.log('\n→ — перенаправлення: їхнє число містить і сторінку-ціль, тож у стелі не судяться');
+const worst=judged[0], slowest=judged.slice().sort((a,b)=>b.loadMs-a.loadMs)[0], most=judged.slice().sort((a,b)=>b.nodes-a.nodes)[0];
 console.log('\nнайважча:', worst.page, worst.kb+' КБ | найповільніша:', slowest.page, slowest.loadMs+' мс | найбільше вузлів:', most.page, most.nodes);
 
 const bad=[];

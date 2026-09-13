@@ -122,13 +122,31 @@ for (const [want, key, why] of [
   });
   ok('підказка не обрізана карткою', fits);
 
-  /* Крайня клітинка: підказка мусить зсунутись, а не вилізти. */
+  /* Крайня клітинка: підказка мусить зсунутись, а не вилізти.
+   *
+   * СПЕРШУ ДОКРУТИТИ, АЖ ПОТІМ НАВОДИТИ. Сітка теплокарти прокручується
+   * по горизонталі, і hover() сам докручує до потрібної клітинки — а на
+   * прокрутку навішано hide(): клітинка зʼїжджає з-під підказки, тож
+   * підказку ховають. Виходило так: підказка показалась і тут же зникла,
+   * прямокутник став нульовим, і перевірка червоніла не на «вилізла», а
+   * на «її вже немає». У CI це падало стабільно, локально — ні, бо там
+   * сітка встигала докрутитись до сьогодні ще на завантаженні.
+   *
+   * Тому: докрутити, дати прокрутці стихнути, і лише тоді наводити. І
+   * окремо переконатись, що підказка ВЗАГАЛІ є, — інакше наступна
+   * перевірка знову міряла б нулі й називала це виходом за картку. */
   const last = p.locator('.heatmap [data-hm]').last();
+  await last.scrollIntoViewIfNeeded();
+  await p.waitForTimeout(260);
   await last.hover();
-  await p.waitForTimeout(220);
+  await p.waitForTimeout(260);
+  ok('у крайньої клітинки підказка взагалі показалась',
+     !(await p.locator('.heatmap__tip').isHidden()));
   ok('у крайньої клітинки підказка теж у межах картки',
      await p.evaluate(() => {
-       const t = document.querySelector('.heatmap__tip').getBoundingClientRect();
+       const el = document.querySelector('.heatmap__tip');
+       if (!el || el.hidden) return false;
+       const t = el.getBoundingClientRect();
        const c = document.querySelector('#jr-train .card').getBoundingClientRect();
        return t.left >= c.left - 1 && t.right <= c.right + 1;
      }));

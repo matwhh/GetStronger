@@ -28,6 +28,19 @@ import { CHROME } from './pw.mjs';
 
 const ROOT = process.cwd();
 const CFG = JSON.parse(readFileSync(ROOT + '/db/elo-config.json', 'utf8'));
+
+/* Числа шкали БЕРУТЬСЯ З КОНФІГУ, а не пишуться тут.
+   Зашиті 200/2000/2500 пережили перебаланс (elo_pace_level_curve) і
+   зробили сім перевірок червоними на ПРАВИЛЬНІЙ поведінці: сторінка
+   малювала 24/240 і «ще 216», а перевірка вимагала 24/200 і «ще 176».
+   Перевірка, яка знає відповідь напамʼять, стереже минулий баланс, а не
+   сьогоднішній екран. Тепер вона рахує те саме, що й EloCore.levelFor. */
+const LVL   = CFG.levelSize;        /* розмір рівня */
+const START = 24;                   /* ELO для першого рівня у фікстурі */
+const PCT   = Math.round(START / LVL * 100);
+const TOP   = CFG.eliteFloor - 100; /* всередині ОСТАННЬОГО рівня, не в ELITE */
+const ELITE = CFG.eliteFloor + 200; /* впевнено в зоні ELITE */
+const LVL2  = LVL + 20;             /* другий рівень, трохи вище межі */
 const R = [];
 const ok = (n, c, x) => { R.push([n, c]); console.log((c ? 'OK   ' : 'FAIL ') + n + (x ? ' :: ' + x : '')); };
 
@@ -95,14 +108,14 @@ async function page(elo, events) {
 
 /* ---- 1. Перший рівень: два кінці, заливка, числа ---- */
 {
-  /* 24 ELO — рівень 1 (розмір рівня 200), пройдено 12%. Дві події цього
-     тижня дають +7, одна минулого — не рахується. */
+  /* START ELO — рівень 1 (розмір рівня LVL), пройдено PCT %. Дві події
+     цього тижня дають +7, одна минулого — не рахується. */
   const events = [
     { day: key(0), delta: 4, reason: 'тренування' },
     { day: key(sinceMonday), delta: 3, reason: 'сон' },
     { day: key(sinceMonday + 1), delta: 9, reason: 'минулий тиждень' }
   ];
-  const { p, ctx, errs } = await page(24, events);
+  const { p, ctx, errs } = await page(START, events);
 
   ok('1. шкала намальована', await p.locator('#sz-header .lvlbar').count() === 1);
   ok('2. у неї два кінці', await p.locator('#sz-header .lvlbar .lvlbar__end').count() === 2);
@@ -115,19 +128,21 @@ async function page(elo, events) {
   /* Заливка приїжджає змінною --to, а не width: вона росте анімацією. */
   const to = await p.locator('#sz-header .lvlbar__fill')
     .evaluate((e) => e.style.getPropertyValue('--to').trim());
-  ok('4. заливка = відсоток рівня, а не саме ELO', to === '12%', to);
+  ok('4. заливка = відсоток рівня, а не саме ELO', to === PCT + '%', to + ' проти ' + PCT + '%');
 
   /* А після анімації ширина справді така. */
   const w = await p.locator('#sz-header .lvlbar__fill').evaluate((e) => {
     const track = e.parentElement.getBoundingClientRect().width;
     return Math.round(e.getBoundingClientRect().width / track * 100);
   });
-  ok('5. і смуга справді заповнена на стільки ж', Math.abs(w - 12) <= 2, String(w));
+  ok('5. і смуга справді заповнена на стільки ж', Math.abs(w - PCT) <= 2, w + ' проти ' + PCT);
 
   const cap = await p.locator('#sz-header .lvlbar + .row').innerText();
-  ok('6. видно, скільки ELO зараз і скільки всього', /24\s*\/\s*200 ELO/.test(cap), cap.replace(/\n/g, ' '));
+  ok('6. видно, скільки ELO зараз і скільки всього',
+     new RegExp(START + '\\s*/\\s*' + LVL + ' ELO').test(cap), cap.replace(/\n/g, ' '));
   ok('7. видно, скільки лишилось до наступного рівня',
-     /ще\s*176\s*до Level 2/.test(cap.replace(/\n/g, ' ')), cap.replace(/\n/g, ' '));
+     new RegExp('ще\\s*' + (LVL - START) + '\\s*до Level 2').test(cap.replace(/\n/g, ' ')),
+     cap.replace(/\n/g, ' '));
 
   /* ГОЛОВНА ЗМІНА: метрика тижнева, а не денна. «Сьогодні» майже завжди
      нуль або трійка, і дивитись на неї означало робити висновок про
@@ -143,18 +158,20 @@ async function page(elo, events) {
 
 /* ---- 2. Десятий рівень: праворуч стеля, а не Level 11 ---- */
 {
-  /* 1900 ELO — десятий рівень, до ELITE (2000) лишилось 100. */
-  const { p, ctx, errs } = await page(1900, []);
+  /* TOP ELO — останній рівень драбини, до ELITE лишилось 100. Саме
+     «останній», а не «десятий»: кількість рівнів теж у конфігу. */
+  const { p, ctx, errs } = await page(TOP, []);
 
   const nums = await p.locator('#sz-header .lvlbar .lvl-ico__n')
     .evaluateAll((els) => els.map((e) => e.textContent.trim()));
-  ok('11. жетон рівно один — одинадцятого рівня не існує',
-     nums.join(',') === '10', nums.join(','));
+  ok('11. жетон рівно один — рівня за останнім не існує',
+     nums.join(',') === String(CFG.levelCount), nums.join(',') + ' проти ' + CFG.levelCount);
   ok('12. праворуч позначка стелі', await p.locator('#sz-header .lvlbar__end--top').count() === 1);
 
   const cap = await p.locator('#sz-header .lvlbar + .row').innerText().then((t) => t.replace(/\n/g, ' '));
-  /* Регресія: доти тут писалось «До Level 11». */
-  ok('13. і жодного Level 11 у підписі', !/Level 11/.test(cap), cap);
+  /* Регресія: доти тут писалось «До Level 11» — рівня, якого немає. */
+  ok('13. і жодного неіснуючого рівня в підписі',
+     !new RegExp('Level ' + (CFG.levelCount + 1)).test(cap), cap);
   ok('14. підпис веде до ELITE', /до ELITE/.test(cap), cap);
 
   ok('15. без тижневого числа сторінка не ламається',
@@ -165,10 +182,11 @@ async function page(elo, events) {
 
 /* ---- 3. ELITE: шкала веде до стелі сезону ---- */
 {
-  const { p, ctx, errs } = await page(2200, []);
+  const { p, ctx, errs } = await page(ELITE, []);
   const cap = await p.locator('#sz-header .lvlbar + .row').innerText().then((t) => t.replace(/\n/g, ' '));
   ok('17. на ELITE шкала міряє до стелі сезону',
-     /2200\s*\/\s*2500 ELO/.test(cap) && /до стелі сезону/.test(cap), cap);
+     new RegExp(ELITE + '\\s*/\\s*' + CFG.seasonMax + ' ELO').test(cap)
+     && /до стелі сезону/.test(cap), cap);
   ok('18. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
@@ -177,11 +195,11 @@ async function page(elo, events) {
 {
   /* Перший захід на рівні 1 лише запамʼятовує рівень: показувати свято
      людині, яка просто відкрила сторінку, — брехня. */
-  const one = await page(24, []);
+  const one = await page(START, []);
   ok('19. перший захід — без анімації підвищення',
      await one.p.locator('#sz-header .lvlbar.is-levelup').count() === 0);
   /* Той самий контекст, те саме сховище — але рівень виріс до другого. */
-  await one.p.evaluate(() => localStorage.setItem('__fakeElo', '260'));
+  await one.p.evaluate((v) => localStorage.setItem('__fakeElo', String(v)), LVL2);
   await one.p.reload({ waitUntil: 'load' });
   await one.p.waitForSelector('#sz-header .lvlbar', { timeout: 8000 }).catch(() => {});
   await one.p.waitForTimeout(1400);
@@ -204,7 +222,7 @@ async function page(elo, events) {
      теж немає — нам нема з чим порівнювати. Це та сама перевірка з
      іншого боку: анімація зʼявляється лише на РОСТІ, а не на факті
      «рівень другий». */
-  const two = await page(260, []);
+  const two = await page(LVL2, []);
   ok('20. чисте сховище на другому рівні — теж без анімації',
      await two.p.locator('#sz-header .lvlbar.is-levelup').count() === 0);
   const seen = await two.p.evaluate(() => localStorage.getItem('ib.elo.lvlseen'));

@@ -137,7 +137,7 @@ Get Stronger — особистий інструмент для тренуван
 
 ```bash
 node --check js/файл.js                     # синтаксис, миттєво
-npm test                                    # 1087 юніт-тестів, ~6 с
+npm test                                    # 1098 юніт-тестів, ~6 с
 TZ=Europe/Kyiv npm test                     # той самий набір в іншому поясі
 node tools/ci-hygiene.mjs                   # гігієна репозиторію, ~1 с
 node tools/verify<назва>.mjs                # одна браузерна перевірка, 10–60 с

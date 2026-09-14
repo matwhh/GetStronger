@@ -428,6 +428,66 @@
     }).filter(Boolean).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
   }
 
+  /**
+   * СКІЛЬКИ ПІДХОДІВ ЗА ОСТАННІ N ТРЕНУВАНЬ.
+   *
+   * Єдине ВИМІРЯНЕ число про обʼєм. Поруч у знімку сесії лежать reps і
+   * vol, але обидва похідні від середини запланованого діапазону
+   * повторень — тобто оцінки. Підходи закриває сам користувач, тож це
+   * факт, а не модель.
+   *
+   * ВІКНО В ТРЕНУВАННЯХ, А НЕ В ДНЯХ. Тиждень із трьох сесій і тиждень
+   * із пʼяти дадуть різні суми навіть за однакової роботи в кожній —
+   * календарне вікно міряло б частоту, а не обʼєм. Індексація сесіями
+   * порівнює подібне з подібним.
+   *
+   * Поруч віддається ПОПЕРЕДНЄ таке саме вікно: без нього «42 підходи»
+   * — це число без відповіді на єдине питання, яке з ним ставлять
+   * («більше чи менше, ніж було»). Коли попереднього вікна ще немає,
+   * повертається null, а не нуль: відсутність історії — не падіння.
+   *
+   * Сесії без sets (записи до появи знімка) відкидаються цілком, а не
+   * рахуються як нуль підходів: нуль тут означав би «прийшов і нічого
+   * не зробив», чого ці записи не стверджують.
+   *
+   * @param {object} sessionLog журнал сесій
+   * @param {number} [lastSessions] розмір вікна, тренувань
+   * @returns {{count:number,total:number,perSession:number,
+   *            prev:?object, deltaPct:?number}|null}
+   */
+  function setsStats(sessionLog, lastSessions, now) {
+    const n = Math.max(1, Math.round(Number(lastSessions) || 7));
+    const today = keyOf(now instanceof Date ? now : new Date());
+    const all = sessionEntries(sessionLog, null, today)
+      .filter(function (e) { return Number(e.sets) > 0; });
+    if (!all.length) return null;
+
+    /* Вікно і те, що було перед ним: sessionEntries віддає за зростанням
+       дати, тож останні — у кінці. */
+    const win = all.slice(-n);
+    const before = all.slice(Math.max(0, all.length - 2 * n), all.length - win.length);
+
+    const sum = function (list) {
+      return list.reduce(function (a, e) { return a + Number(e.sets); }, 0);
+    };
+    const pack = function (list) {
+      if (!list.length) return null;
+      const total = sum(list);
+      return { count: list.length, total: total,
+               perSession: Math.round(total / list.length * 10) / 10 };
+    };
+
+    const cur = pack(win);
+    const prev = pack(before);
+    return {
+      count: cur.count, total: cur.total, perSession: cur.perSession,
+      prev: prev,
+      deltaPct: (prev && prev.perSession > 0)
+        ? Math.round((cur.perSession - prev.perSession) / prev.perSession * 100)
+        : null
+    };
+  }
+
   window.ProgressCore = {
     bodyStats: bodyStats,
     forecast: forecast,
@@ -439,6 +499,7 @@
     trainingStats: trainingStats,
     foodStats: foodStats,
     sessionEntries: sessionEntries,
+    setsStats: setsStats,
     sessionMinutes: sessionMinutes,
     timeStats: timeStats,
     prList: prList

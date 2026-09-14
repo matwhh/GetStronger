@@ -536,6 +536,27 @@
       trend: ts.count + ' ' + window.App.plural(ts.count, 'сесія', 'сесії', 'сесій') + ' за 30 днів'
     });
 
+    /*
+     * Підходи за останні тренування — ЄДИНЕ ВИМІРЯНЕ число про обʼєм
+     * (D8). Тоннаж поруч у знімку сесії похідний від середини
+     * запланованого діапазону повторень, тобто оцінка; підходи закриває
+     * сама людина. Вікно рахується в тренуваннях, а не в днях: інакше
+     * число міряло б частоту, а не обʼєм.
+     */
+    const ss = PC.setsStats(state.sessionLog, 7);
+    if (ss) {
+      const cmp = ss.deltaPct === null
+        ? 'перше таке вікно'
+        : (ss.deltaPct > 0 ? '+' : '') + ss.deltaPct + '% до попередніх ' +
+          ss.prev.count + ' ' + window.App.plural(ss.prev.count, 'тренування', 'тренувань', 'тренувань');
+      tiles.push({
+        val: String(ss.total),
+        lbl: 'підходів за ' + ss.count + ' ' +
+             window.App.plural(ss.count, 'тренування', 'тренування', 'тренувань'),
+        trend: fmtNum.n(ss.perSession, 1) + ' за тренування · ' + cmp
+      });
+    }
+
     // Нові особисті рекорди за 30 днів
     const prsNew = PC.prList(state.weightLog, 30).filter(function (x) { return x.isNew; }).length;
     if (prsNew) tiles.push({

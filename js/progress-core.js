@@ -429,61 +429,73 @@
   }
 
   /**
-   * СКІЛЬКИ ПІДХОДІВ ЗА ОСТАННІ N ТРЕНУВАНЬ.
+   * СКІЛЬКИ ПІДХОДІВ ЗА ОСТАННІЙ ПОВНИЙ ТИЖДЕНЬ.
    *
    * Єдине ВИМІРЯНЕ число про обʼєм. Поруч у знімку сесії лежать reps і
    * vol, але обидва похідні від середини запланованого діапазону
-   * повторень — тобто оцінки. Підходи закриває сам користувач, тож це
-   * факт, а не модель.
+   * повторень — тобто оцінки. Підходи закриває сам користувач.
    *
-   * ВІКНО В ТРЕНУВАННЯХ, А НЕ В ДНЯХ. Тиждень із трьох сесій і тиждень
-   * із пʼяти дадуть різні суми навіть за однакової роботи в кожній —
-   * календарне вікно міряло б частоту, а не обʼєм. Індексація сесіями
-   * порівнює подібне з подібним.
+   * ВІКНО — ТИЖДЕНЬ, І ЦЕ НЕ ДРІБНИЦЯ. Спершу тут стояло «останні сім
+   * тренувань». Воно здавалось точнішим (порівнює сесію з сесією), але
+   * заводило ДРУГУ одиницю обʼєму: весь проєкт міряє його на тиждень —
+   * weeklySets у планах, «Підходів на тиждень по групах мʼязів», стеля на
+   * групу. Два різні вікна на одне поняття не порівняти очима, а саме
+   * заради порівняння число й показують.
    *
-   * Поруч віддається ПОПЕРЕДНЄ таке саме вікно: без нього «42 підходи»
-   * — це число без відповіді на єдине питання, яке з ним ставлять
-   * («більше чи менше, ніж було»). Коли попереднього вікна ще немає,
-   * повертається null, а не нуль: відсутність історії — не падіння.
+   * Береться ОСТАННІЙ ПОВНИЙ тиждень (Пн–Нд), а не поточний: поточний ще
+   * триває, і посеред нього будь-яке число читається як падіння.
    *
-   * Сесії без sets (записи до появи знімка) відкидаються цілком, а не
-   * рахуються як нуль підходів: нуль тут означав би «прийшов і нічого
-   * не зробив», чого ці записи не стверджують.
+   * База — середнє N попередніх повних тижнів. Чотири за замовчуванням:
+   * те саме вікно, яким правило β з плану визначає «обʼєм виріс на
+   * третину». Тиждень без тренувань входить у середнє НУЛЕМ, а не
+   * пропускається: пропустити його означало б винагородити простій.
    *
    * @param {object} sessionLog журнал сесій
-   * @param {number} [lastSessions] розмір вікна, тренувань
-   * @returns {{count:number,total:number,perSession:number,
-   *            prev:?object, deltaPct:?number}|null}
+   * @param {number} [baseWeeks] скільки попередніх тижнів у базі
+   * @returns {{total:number, sessions:number, from:string, to:string,
+   *            prev:?{avg:number, weeks:number}, deltaPct:?number}|null}
    */
-  function setsStats(sessionLog, lastSessions, now) {
-    const n = Math.max(1, Math.round(Number(lastSessions) || 7));
-    const today = keyOf(now instanceof Date ? now : new Date());
-    const all = sessionEntries(sessionLog, null, today)
-      .filter(function (e) { return Number(e.sets) > 0; });
-    if (!all.length) return null;
+  function setsStats(sessionLog, baseWeeks, now) {
+    const back = Math.max(1, Math.round(Number(baseWeeks) || 4));
+    const D = window.DateCore;
+    const today = now instanceof Date ? now : new Date();
 
-    /* Вікно і те, що було перед ним: sessionEntries віддає за зростанням
-       дати, тож останні — у кінці. */
-    const win = all.slice(-n);
-    const before = all.slice(Math.max(0, all.length - 2 * n), all.length - win.length);
+    /* Понеділок ОСТАННЬОГО ПОВНОГО тижня — попередній відносно поточного. */
+    const lastMon = D.shiftKey(D.keyOf(D.mondayOf(today)), -7);
 
-    const sum = function (list) {
-      return list.reduce(function (a, e) { return a + Number(e.sets); }, 0);
-    };
-    const pack = function (list) {
-      if (!list.length) return null;
-      const total = sum(list);
-      return { count: list.length, total: total,
-               perSession: Math.round(total / list.length * 10) / 10 };
+    /** Підходи й сесії за тиждень, що починається в monKey. */
+    const weekOf = function (monKey) {
+      let total = 0, sessions = 0;
+      for (let i = 0; i < 7; i++) {
+        const s = (sessionLog || {})[D.shiftKey(monKey, i)];
+        const n = Number(s && s.sets);
+        if (n > 0) { total += n; sessions += 1; }
+      }
+      return { total: total, sessions: sessions };
     };
 
-    const cur = pack(win);
-    const prev = pack(before);
+    const cur = weekOf(lastMon);
+    if (!cur.sessions) return null;
+
+    /* База. Тижні беруться підряд, порожні — нулями. Якщо перед останнім
+       повним тижнем немає ЖОДНОГО запису, бази ще немає: середнє з самих
+       нулів показало б «зростання на сотні відсотків» на порожньому місці. */
+    let sum = 0, any = false;
+    for (let k = 1; k <= back; k++) {
+      const wk = weekOf(D.shiftKey(lastMon, -7 * k));
+      sum += wk.total;
+      if (wk.sessions) any = true;
+    }
+    const prev = any ? { avg: Math.round(sum / back * 10) / 10, weeks: back } : null;
+
     return {
-      count: cur.count, total: cur.total, perSession: cur.perSession,
+      total: cur.total,
+      sessions: cur.sessions,
+      from: lastMon,
+      to: D.shiftKey(lastMon, 6),
       prev: prev,
-      deltaPct: (prev && prev.perSession > 0)
-        ? Math.round((cur.perSession - prev.perSession) / prev.perSession * 100)
+      deltaPct: (prev && prev.avg > 0)
+        ? Math.round((cur.total - prev.avg) / prev.avg * 100)
         : null
     };
   }

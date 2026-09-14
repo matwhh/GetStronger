@@ -239,11 +239,19 @@
   /* Малювання                                                           */
   /* ------------------------------------------------------------------ */
 
-  function blockHtml(b) {
+  /*
+   * i — порядковий номер блока в розділі. Потрібен лише заголовкам: з
+   * нього робиться якір, на який показує зміст. Передається тільки на
+   * верхньому рівні; вкладені блоки з dyn мапляться без індексу й якорів
+   * не дістають, інакше два заголовки отримали б однаковий id.
+   */
+  function blockHtml(b, i, pre) {
     if (!b || typeof b !== 'object') return '';
     switch (b.t) {
       case 'h':
-        return '<h3 class="help__h">' + esc(b.text) + '</h3>';
+        return '<h3 class="help__h"' +
+          (typeof i === 'number' ? ' id="' + pre + i + '"' : '') + '>' +
+          esc(b.text) + '</h3>';
       case 'p':
         return '<p class="small">' + esc(b.text) + '</p>';
       case 'list': {
@@ -279,16 +287,62 @@
         if (!fn) return '';
         let out = [];
         try { out = fn() || []; } catch (_) { out = []; }
-        return out.map(blockHtml).join('');
+        return out.map(function (x) { return blockHtml(x); }).join('');
       }
       default:
         return '';
     }
   }
 
-  function sectionHtml(sec) {
+  /*
+   * ЗМІСТ БУДУЄТЬСЯ З САМИХ ЗАГОЛОВКІВ, а не пишеться руками.
+   *
+   * Другий список розділів розійшовся б із першим на першій же правці
+   * тексту — це те саме правило, що в усьому проєкті про дві копії
+   * одного переліку. Тут копії немає: зміст — це проєкція blocks.
+   *
+   * Показується лише там, де в ньому є сенс: коротким розділам по
+   * сторінках він лише додав би екран прокрутки перед відповіддю.
+   * Вигляд узято в результатів пошуку (.help__hit) — та сама роль
+   * «рядок, який кудись веде», і жодного нового CSS.
+   */
+  const TOC_MIN = 5;
+
+  /*
+   * Префікс якорів свій на КОЖЕН рендер розділу. У панелі одночасно живуть
+   * два тексти — відкритий розділ і хвіст «Про Get Stronger», — і наскрізна
+   * нумерація блоків дала б їм однакові id: getElementById повертав би
+   * чужий заголовок, а зміст вів би не туди. Це вже сталось і ловиться
+   * перевіркою нижче.
+   */
+  let secSeq = 0;
+
+  function tocHtml(sec, pre) {
+    const hs = [];
+    (sec.blocks || []).forEach(function (b, i) {
+      if (b && b.t === 'h' && b.text) hs.push({ i: i, text: b.text });
+    });
+    if (hs.length < TOC_MIN) return '';
+    return '<nav class="help__hits" style="margin:0 0 18px" aria-label="Зміст">' +
+      hs.map(function (h) {
+        return '<button class="help__hit" type="button" data-help-jump="' + pre + h.i + '">' +
+          '<span class="help__hit-where">' + esc(h.text) + '</span>' +
+        '</button>';
+      }).join('') +
+    '</nav>';
+  }
+
+  /**
+   * @param {object} sec розділ
+   * @param {boolean} [withToc] будувати зміст. Тільки для інструкції:
+   *   коротким розділам по сторінках він додав би екран прокрутки перед
+   *   відповіддю, а хвосту «Про Get Stronger» — просто зайвий список.
+   */
+  function sectionHtml(sec, withToc) {
+    const pre = 'help-s' + (++secSeq) + '-b-';
     return '<p class="help__lead">' + esc(sec.lead) + '</p>' +
-           (sec.blocks || []).map(blockHtml).join('');
+           (withToc ? tocHtml(sec, pre) : '') +
+           (sec.blocks || []).map(function (b, i) { return blockHtml(b, i, pre); }).join('');
   }
 
   /* ------------------------------------------------------------------ */
@@ -496,7 +550,7 @@
             : '') +
         '</div>' +
         '<div class="help__body">' +
-          sectionHtml(sec) +
+          sectionHtml(sec, start === 'guide') +
           /* «Про Get Stronger» — згорнутий хвіст, а не окремий екран: він
              потрібен рідко, але шукати його в іншому місці ще гірше. */
           '<details class="help__about">' +
@@ -521,7 +575,7 @@
                    : C.sections[page];
       if (!target) return;
       titleEl.textContent = target.title;
-      body.innerHTML = sectionHtml(target);
+      body.innerHTML = sectionHtml(target, page === 'guide');
       /* Хвіст «Про Get Stronger» лишається тільки на своїй сторінці, а не
          дублюється під інструкцією й під результатами пошуку. */
       if (about && page !== 'about' && page !== 'guide') body.appendChild(about);
@@ -537,6 +591,19 @@
         showSection('guide');
         return;
       }
+      const jump = e.target.closest('[data-help-jump]');
+      if (jump) {
+        e.preventDefault();
+        const el = body.querySelector('#' + jump.dataset.helpJump);
+        if (el) {
+          /* Плавність вимикається там, де людина попросила менше руху. */
+          const calm = window.matchMedia &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          el.scrollIntoView({ block: 'start', behavior: calm ? 'auto' : 'smooth' });
+        }
+        return;
+      }
+
       const go = e.target.closest('[data-help-go]');
       if (go) {
         e.preventDefault();

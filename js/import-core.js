@@ -31,7 +31,7 @@
    * це випадково подвійним кліком не можна.
    */
   const ALLOWED_KEYS = ['birthDate','sex','age','height','weight','goalWeight','bodyfat','daysPerWeek',
-    'programId','goal','customPlans','weights','activePlan','trainingAge',
+    'programId','goal','customPlans','customExercises','warmups','weights','activePlan','trainingAge',
     'activity','meals','recipes','day','hrRest','hrMax','records',
     'displayName','pet','scheme',
     'bodyLog','workLog','theme','periodization','deload',
@@ -463,6 +463,33 @@
         }
 
         case 'weights':  { const m = cleanNumMap(v, 0, 500);  return m ? accept(k, m) : reject(k); }
+        /* Розминка — ціле 0…5 на вправу; стеля та сама, що в
+           js/workout-core.js, і перевіряється тут ще раз, бо файл могли
+           правити руками. */
+        case 'warmups':  { const m = cleanNumMap(v, 0, 5);    return m ? accept(k, m) : reject(k); }
+
+        /*
+         * Свої вправи. Форму знає одне місце — js/user-exercises-core.js,
+         * і саме воно тут і працює: другий набір правил розійшовся б із
+         * тим, за яким вправи створюються на сторінці.
+         */
+        case 'customExercises': {
+          if (!Array.isArray(v) || v.length > 200) return reject(k);
+          const UE = window.UserExercises;
+          if (!UE || !Array.isArray(window.MUSCLES)) return reject(k);
+          const ids = window.MUSCLES.map(function (m) { return m.id; });
+          const out = [];
+          const seen = Object.create(null);
+          for (let i = 0; i < v.length; i++) {
+            const one = UE.normOne(v[i], ids);
+            if (!one) continue;
+            const key = one.name.toLowerCase();
+            if (seen[key]) continue;
+            seen[key] = true;
+            out.push(one);
+          }
+          return accept(k, out);
+        }
         case 'records':  { const m = cleanNumMap(v, 0, 500);  return m ? accept(k, m) : reject(k); }
         case 'bodyLog':  { const m = cleanLog(v, 20, 400);    return m ? accept(k, m) : reject(k); }
         case 'workLog':  { const m = cleanLog(v, 0, 1);       return m ? accept(k, m) : reject(k); }

@@ -108,6 +108,31 @@
     return Math.min(n, maxRepsFor(ex));
   }
 
+  /*
+   * СТЕЛЯ RIR — 5, і взята вона не зі стелі.
+   *
+   * js/periodization-core.js, оцінюючи разовий максимум, однаково
+   * обрізає RIR до 5: далі підхід перестає бути силовим і формула
+   * Еплі на ньому не працює. Прийняти тут 9 означало б показати число,
+   * яке нижче по дорозі мовчки стане пʼятіркою.
+   *
+   * Нуль — це відповідь, а не порожнеча: «до відмови». Тому порожнє
+   * поле дає null («не задано»), а не нуль.
+   */
+  const RIR_MAX = 5;
+
+  /** Запас до відмови: ціле 0…5, або null для порожнього й сміття. */
+  function normRir(value) {
+    if (value == null) return null;
+    /* Обрізаємо ДО перевірки на порожнечу: Number('   ') — це 0, тобто
+       поле з пробілами мовчки означало б «до відмови». */
+    const txt = String(value).trim();
+    if (txt === '') return null;
+    const n = Math.round(Number(txt));
+    if (!Number.isFinite(n)) return null;
+    return Math.min(Math.max(n, 0), RIR_MAX);
+  }
+
   /**
    * План із перерахованими reps. Повертає НОВІ обʼєкти днів і вправ:
    * resolvePlan віддає посилання прямо в PROGRAMS/customPlans, і запис у
@@ -141,6 +166,8 @@
   window.RepsCore = {
     RANGES: RANGES,
     MAX: MAX,
+    RIR_MAX: RIR_MAX,
+    normRir: normRir,
     tierFor: tierFor,
     sizeOf: sizeOf,
     repRangeFor: repRangeFor,

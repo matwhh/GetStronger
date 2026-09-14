@@ -161,6 +161,11 @@
 <!-- Реєстр схем тренувань: потрібен, щоб зміна статі одразу
      відчепила план чужої статі (detachPlanIfForeign у account.js). -->
 <script defer src="js/programs-data.js"></script>
+<!-- Довідник груп мʼязів і ядро своїх вправ: імпорт перевіряє
+     customExercises тими самими правилами, якими сторінка плану їх
+     створює. Без цих двох файлів поле просто відкидалось би. -->
+<script defer src="js/exercises.js"></script>
+<script defer src="js/user-exercises-core.js"></script>
 <script defer src="js/import-core.js"></script>
 <script defer src="js/account.js"></script>
 </body>

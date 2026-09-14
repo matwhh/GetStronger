@@ -1289,6 +1289,22 @@ a.card > .btn {
 .tdy-ex.is-done .tdy-ex__name { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .tdy-ex__rest { flex: 0 0 auto; }
 
+/* Свої вправи в редакторі плану.
+   Список, а не таблиця: у рядка всього три речі — назва, групи й кошик,
+   і таблична сітка на телефоні розсипалась би на картки заради них. */
+.own-ex { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.own-ex__row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--line);
+}
+.own-ex__row:last-child { border-bottom: 0; }
+.own-ex__txt { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.own-ex__name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Групи віддають місце назві першими: назву людина писала сама, а групу
+   обирала зі списку й памʼятає. */
+.own-ex__ms { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.own-ex__row .icon-btn { margin-left: auto; flex: 0 0 auto; }
+
 /* Три числа вправи — одним списком.
    Робоча вага, розминка й ваги підходів стояли кожне у своїй формі:
    рядок унизу, два рядки тексту під схемою і кнопка збоку від кружечків.

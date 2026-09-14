@@ -2047,6 +2047,97 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Вікно з формою                                                      */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ВІКНО З ФОРМОЮ — одне на весь сайт.
+   *
+   * confirmBox відповідає на «ви точно?», а це — на «впишіть значення»:
+   * робоча вага й повторення на тренуванні, кількість розминкових
+   * підходів, своя вправа в редакторі плану. Розмітка та сама .modal, що
+   * носять і питання, і попередження про ІМТ, і довідка: нового вигляду
+   * на сторінці не зʼявляється.
+   *
+   * ЗБЕРЕЖЕННЯ — ОКРЕМОЮ КНОПКОЮ, а не на виході з поля. Саме мовчазний
+   * запис на blur свого часу зробив із робочої ваги пастку: одна сторінка
+   * робила «сьогодні я взяв 50» і «віднині моя робоча вага 50» одним
+   * жестом (див. коментар у js/workout.js).
+   *
+   * onSave повертає true, якщо вікно можна закривати. Хибне значення
+   * лишає вікно відкритим — набране число нікуди не зникає, і людина
+   * бачить тост із причиною поруч зі своїм вводом.
+   *
+   * @param {{title:string, sub?:string, body:string,
+   *          onOpen?:function(HTMLElement), onSave:function(HTMLElement):boolean}} o
+   */
+  function sheet(o) {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal';
+    wrap.innerHTML =
+      '<div class="modal__backdrop"></div>' +
+      '<div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="app-sh-t">' +
+        '<h3 id="app-sh-t" style="margin:0">' + esc(o.title) + '</h3>' +
+        (o.sub ? '<p class="small muted mt-1">' + esc(o.sub) + '</p>' : '') +
+        '<div class="mt-2">' + o.body + '</div>' +
+        '<div class="modal__actions mt-3">' +
+          '<button class="btn btn--ghost" type="button" data-sh="no">Скасувати</button>' +
+          '<button class="btn btn--primary" type="button" data-sh="yes">Зберегти</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+
+    const box = wrap.querySelector('.modal__box');
+    const prevFocus = document.activeElement;
+    let closed = false;
+
+    try { lockScroll(true); } catch (_) {}
+
+    function close() {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('keydown', onKey, true);
+      wrap.remove();
+      try { lockScroll(false); } catch (_) {}
+      try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (_) {}
+    }
+
+    function focusable() {
+      return Array.prototype.slice.call(box.querySelectorAll('input, button'))
+        .filter(function (el) { return !el.disabled; });
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') {
+        e.preventDefault(); save(); return;
+      }
+      if (e.key !== 'Tab') return;
+      /* Фокус не виходить за межі вікна: список замкнений у кільце. */
+      const list = focusable();
+      if (!list.length) return;
+      e.preventDefault();
+      const cur = list.indexOf(document.activeElement);
+      const next = e.shiftKey
+        ? (cur <= 0 ? list.length - 1 : cur - 1)
+        : (cur === -1 || cur === list.length - 1 ? 0 : cur + 1);
+      try { list[next].focus(); } catch (_) {}
+    }
+
+    function save() { if (o.onSave(box) !== false) close(); }
+
+    box.querySelector('[data-sh="no"]').addEventListener('click', close);
+    box.querySelector('[data-sh="yes"]').addEventListener('click', save);
+    wrap.querySelector('.modal__backdrop').addEventListener('click', close);
+    document.addEventListener('keydown', onKey, true);
+    if (typeof o.onOpen === 'function') o.onOpen(box);
+
+    /* Фокус — у перше поле: вікно відкрили, щоб щось набрати. */
+    const first = box.querySelector('input');
+    try { (first || box.querySelector('[data-sh="no"]')).focus(); } catch (_) {}
+  }
+
+
+  /* ------------------------------------------------------------------ */
   /* Питання «ви точно?» — вікном сайту, а не системним confirm()        */
   /* ------------------------------------------------------------------ */
   /*
@@ -2137,6 +2228,7 @@
     plural: plural,
     fmt: fmt,
     fmtNum: numFmt,
+    sheet: sheet,
     stampRating: stampRating,
     flashDone: flashDone,
     busy: busy,

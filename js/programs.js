@@ -1181,6 +1181,28 @@
       'data-act="reps" data-day="' + dayIdx + '" data-i="' + i + '" aria-label="Повторення">';
   }
 
+  /**
+   * Поле запасу до відмови.
+   *
+   * Було просто число з даних програми — незмінне. Але RIR — це не
+   * властивість вправи, а домовленість людини з собою: наскільки близько
+   * до відмови вона сьогодні працює. У даних він стоїть як орієнтир
+   * автора програми, і саме тому порожнє поле означає «без RIR», а не
+   * «поверни авторський»: прибрати запас із вправи — така сама
+   * осмислена дія, як поставити його.
+   *
+   * Стеля 5 — з js/reps-core.js, та сама, до якої однаково обрізає
+   * періодизація, коли рахує разовий максимум.
+   */
+  function rirInput(ex, dayIdx, i) {
+    const RC = window.RepsCore;
+    const own = RC ? RC.normRir(ex.rir) : null;
+    return '<input class="input input--sm input--reps num mono" type="number" min="0" max="' +
+      (RC ? RC.RIR_MAX : 5) + '" step="1" ' +
+      'value="' + (own === null ? '' : own) + '" placeholder="—" ' +
+      'data-act="rir" data-day="' + dayIdx + '" data-i="' + i + '" aria-label="RIR, запас до відмови">';
+  }
+
   function exerciseRow(ex, i, dayIdx, total) {
     const ms = musclesOfExercise(ex);
     const filled = Boolean(ex.name && ex.name.trim());
@@ -1246,7 +1268,7 @@
         '</td>' +
         '<td data-l="Повтори">' + repsInput(ex, dayIdx, i) + '</td>' +
         '<td data-l="Вага, кг">' + weightInput(ex, dayIdx, i) + '</td>' +
-        '<td class="num mono" data-l="RIR">' + esc(ex.rir) + '</td>' +
+        '<td data-l="RIR">' + rirInput(ex, dayIdx, i) + '</td>' +
         '<td class="tbl__acts">' +
           '<div class="row-actions">' +
             '<button class="icon-btn" type="button" data-act="up" data-day="' + dayIdx + '" data-i="' + i + '"' +
@@ -1288,7 +1310,7 @@
       /* «Повт.» у правці ширша за перегляд: там просто число, а тут поле
          з лічильником і підказкою на пʼять знаків («10–12»). На 70px
          підказка обрізалась до «10–1» — тобто показувала неправду. */
-      ? '<th style="width:90px">Підх.</th><th style="width:104px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:60px">RIR</th><th style="width:120px">Дії</th>'
+      ? '<th style="width:90px">Підх.</th><th style="width:104px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:84px">RIR</th><th style="width:120px">Дії</th>'
       : '<th style="width:70px">Підх.</th><th style="width:70px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:60px">RIR</th><th style="width:90px">Відпоч.</th>';
 
     // 5 колонок у head + «#» і «Вправа»
@@ -1302,6 +1324,10 @@
               return '<option value="' + esc(m.id) + '">' + esc(m.name) + '</option>';
             }).join('') +
           '</select>' +
+          /* Своя вправа — поруч із вибором групи, а не в окремому розділі:
+             її створюють саме тоді, коли в списку не знайшлось потрібного. */
+          '<button class="btn btn--ghost btn--sm" type="button" data-own-new="' + dayIdx + '">' +
+            '+ своя вправа</button>' +
         '</div>'
       : '';
 
@@ -1555,6 +1581,168 @@
    *        беремо ті, що відкриті зараз: перемальовка не має міняти вигляд
    *        сторінки, якщо про це не просили явно.
    */
+  /* ------------------------------------------------------------------ */
+  /* Свої вправи                                                         */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ДОКЛЕЮЄМО ПРЯМО В window.EXERCISES, а не тримаємо поруч.
+   *
+   * exercisesForMuscles, primaryMuscle і liftKind замкнені на той самий
+   * масив усередині js/exercises.js — другого списку вони не побачать.
+   * Тому свої вправи саме дописуються в нього, а перед дописуванням
+   * старі свої прибираються: інакше видалена вправа лишалася б у
+   * випадайці до перезавантаження сторінки.
+   *
+   * Позначка user:true — єдине, чим своя відрізняється від бібліотечної,
+   * і потрібна вона рівно для цього прибирання.
+   */
+  function muscleIds() {
+    return MUSCLES.map(function (m) { return m.id; });
+  }
+
+  function syncUserExercises() {
+    const UE = window.UserExercises;
+    const lib = window.EXERCISES;
+    if (!UE || !Array.isArray(lib)) return [];
+    for (let i = lib.length - 1; i >= 0; i--) {
+      if (lib[i] && lib[i].user) lib.splice(i, 1);
+    }
+    const own = UE.list(state.profile, muscleIds());
+    UE.applyTo(lib, own).slice(lib.length).forEach(function (e) { lib.push(e); });
+    return own;
+  }
+
+  /** Список своїх вправ під розкладом — лише в режимі правки. */
+  function ownExercisesBlock() {
+    const UE = window.UserExercises;
+    if (!state.editing || !UE) return '';
+    const own = UE.list(state.profile, muscleIds());
+    if (!own.length) return '';
+    return '' +
+      '<div class="mt-3">' +
+        '<h3 style="margin:0 0 4px">Мої вправи</h3>' +
+        '<p class="small muted" style="margin:0 0 8px">Стоять у заміні поруч із бібліотечними. ' +
+          'Прибрати звідси — прибрати з бібліотеки: там, де вправа вже стоїть у плані, ' +
+          'вона лишається разом зі своєю вагою.</p>' +
+        '<ul class="own-ex">' +
+          own.map(function (e) {
+            return '<li class="own-ex__row">' +
+              /* Назва й групи — стовпчиком: поруч на телефоні обрізались
+                 обидві, і рядок не казав ні що це за вправа, ні на що. */
+              '<span class="own-ex__txt">' +
+                '<span class="own-ex__name">' + esc(e.name) + '</span>' +
+                '<span class="small muted own-ex__ms">' + esc(muscleNames(e.muscles)) +
+                  (e.lift === 'compound' ? ' · багатосуглобова' : '') + '</span>' +
+              '</span>' +
+              '<button class="icon-btn icon-btn--danger" type="button" data-own-del="' + esc(e.name) + '" ' +
+                'aria-label="Прибрати вправу ' + esc(e.name) + ' з бібліотеки">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>' +
+              '</button>' +
+            '</li>';
+          }).join('') +
+        '</ul>' +
+      '</div>';
+  }
+
+  /*
+   * ВІКНО СТВОРЕННЯ.
+   *
+   * Питаємо рівно два: назву й ГОЛОВНУ групу. Додаткові групи в
+   * бібліотеці існують (румунська тяга згадує сідниці), але потрібні
+   * вони лише для того, щоб вправа знаходилась у заміні й з їхнього
+   * боку — на обʼєм вони не впливають. Складати заради цього список
+   * галочок означало б поставити перед людиною вибір, наслідків якого
+   * вона не побачить.
+   *
+   * Тип (багатосуглобова чи ні) питаємо, бо в нього є видимий наслідок:
+   * стеля відсотків у періодизації. За замовчуванням — ізоляція, як і в
+   * бібліотеці: помилка в цей бік дає нижчу стелю, а в інший — 92% від
+   * разового максимуму в махах гантелями.
+   */
+  function openOwnExerciseSheet(dayIdx) {
+    const UE = window.UserExercises;
+    const sheet = window.App.sheet;
+    if (!UE || !sheet) return;
+
+    sheet({
+      title: 'Своя вправа',
+      sub: 'Далі вона нічим не відрізняється від бібліотечної: стоїть у заміні, ' +
+           'а її підходи йдуть у тижневий обʼєм головній групі.',
+      body:
+        '<div class="field">' +
+          '<label class="field__label" for="own-name">Назва</label>' +
+          '<input class="input" id="own-name" type="text" autocomplete="off" ' +
+            'maxlength="' + UE.NAME_MAX + '" placeholder="Жим у хаммері">' +
+        '</div>' +
+        '<div class="field mt-2">' +
+          '<label class="field__label" for="own-muscle">Головна група мʼязів</label>' +
+          '<select class="select" id="own-muscle">' +
+            MUSCLES.map(function (m) {
+              return '<option value="' + esc(m.id) + '">' + esc(m.name) + '</option>';
+            }).join('') +
+          '</select>' +
+        '</div>' +
+        /* .check, а не голий input: рідний квадратик у рамці з підписом —
+           той самий орган керування, що в акаунті й на вітальній. */
+        '<label class="check mt-2">' +
+          '<input type="checkbox" id="own-compound">' +
+          '<span>Багатосуглобова — присідання, жими, тяги</span>' +
+        '</label>' +
+        '<p class="field__hint mt-1">Саме цій групі підуть підходи в таблиці ' +
+          'тижневого обʼєму.</p>',
+      onSave: function (box) {
+        const ids = muscleIds();
+        const raw = {
+          name: box.querySelector('#own-name').value,
+          muscles: [box.querySelector('#own-muscle').value],
+          lift: box.querySelector('#own-compound').checked ? 'compound' : 'isolation'
+        };
+        /* Зайнятими вважаємо лише БІБЛІОТЕЧНІ назви: свої UE.add звірить
+           сам, а якби сюди потрапили ще й вони, дублікат ловився б двічі. */
+        const taken = (window.EXERCISES || [])
+          .filter(function (e) { return !e.user; })
+          .map(function (e) { return e.name; });
+        const res = UE.add(UE.list(state.profile, ids), raw, taken, ids);
+        if (!res.ok) {
+          toast(res.why === 'dup'
+            ? 'Вправа з такою назвою вже є — у бібліотеці або серед ваших'
+            : res.why === 'muscles'
+              ? 'Оберіть групу мʼязів'
+              : 'Назва — від 1 до ' + UE.NAME_MAX + ' знаків', 'err');
+          return false;
+        }
+
+        state.profile.customExercises = res.list;
+        syncUserExercises();
+        saveOwn({ customExercises: res.list }).catch(function (e) {
+          if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err');
+        });
+
+        /* Ставимо одразу в той день, з якого відкрили: людина створила
+           вправу в конкретному місці плану, а не «в бібліотеку взагалі». */
+        const name = res.list[res.list.length - 1].name;
+        if (Number.isFinite(dayIdx)) onEdit('add-named', dayIdx, 0, name);
+        else renderPlan();
+        toast('Вправу «' + name + '» додано', 'ok');
+        return true;
+      }
+    });
+  }
+
+  /** Прибрати свою вправу з бібліотеки (у плані вона лишається). */
+  function removeOwnExercise(name) {
+    const UE = window.UserExercises;
+    if (!UE) return;
+    const left = UE.remove(UE.list(state.profile, muscleIds()), name);
+    state.profile.customExercises = left;
+    syncUserExercises();
+    saveOwn({ customExercises: left }).catch(function (e) {
+      if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err');
+    });
+    renderPlan();
+    toast('«' + name + '» більше немає в бібліотеці', 'ok');
+  }
+
   function renderPlan(wantOpen) {
     const host = $('#plan');
     if (!host) return;
@@ -1674,6 +1862,8 @@
             return out.join('');
           })() +
         '</div>' +
+
+        ownExercisesBlock() +
 
         '<hr class="divider">' +
         '<h3>Після кожного тренування</h3>' +
@@ -1887,6 +2077,14 @@
       }
       return true;
     }
+    if (act === 'rir') {
+      /* Порожнє поле прибирає RIR зовсім — у схемі тоді немає «· RIR n».
+         Нуль тут значущий: це «до відмови», а не «не задано». */
+      const RC = window.RepsCore;
+      const own = RC ? RC.normRir(value) : null;
+      if (own === null) delete list[i].rir; else list[i].rir = String(own);
+      return true;
+    }
     if (act === 'swap' && value) {
       const found = (window.EXERCISES || []).find(function (e) { return e.name === value; });
       if (!found) return false;
@@ -1926,6 +2124,42 @@
         toast('Підходи зменшено до ' + max + ': ' +
               muscleNames([primaryMuscle(found)]) + ' упирається в тижневу межу', 'err');
       }
+      return true;
+    }
+    /*
+     * ДОДАТИ КОНКРЕТНУ ВПРАВУ ЗА НАЗВОЮ.
+     *
+     * Потрібне рівно одному місцю — щойно створеній своїй вправі: людина
+     * зробила її в цьому дні й очікує побачити її саме тут, а не шукати
+     * в заміні. Перевірки ті самі, що в add-muscle (стеля групи,
+     * дублікат у плані), бо своя вправа нічим не привілейована.
+     */
+    if (act === 'add-named' && value) {
+      const found = (window.EXERCISES || []).find(function (e) { return e.name === value; });
+      if (!found) return false;
+
+      const dup = state.plan.some(function (d) {
+        return (d.exercises || []).some(function (e) { return e.name === found.name; });
+      });
+      if (dup) {
+        toast('Ця вправа вже є в плані — додайте їй підходів замість другого рядка', 'err');
+        return false;
+      }
+
+      const main = primaryMuscle(found);
+      const room = main ? roomInMuscle(main) : 3;
+      if (room < 1) {
+        const muscle = MUSCLES.find(function (m) { return m.id === main; });
+        toast((muscle ? muscle.name : 'Група') + ' уже на межі ' +
+              (muscle ? muscle.cap : '') + ' підходів на тиждень', 'err');
+        return false;
+      }
+
+      list.push({
+        pattern: '', name: found.name, muscles: (found.muscles || []).slice(),
+        lift: found.lift,
+        sets: Math.min(3, room), reps: '8–12', rir: '2', rest: '90 с', note: ''
+      });
       return true;
     }
     if (act === 'add-muscle' && value) {
@@ -2277,6 +2511,10 @@
     try {
       profile = await window.Store.getProfile() || {};
       state.profile = profile;
+      /* Свої вправи доклеюємо ДО першої перемальовки: інакше випадайка
+         заміни вперше малюється без них і мовчки «не знає» вправу, яка
+         вже стоїть у плані. */
+      syncUserExercises();
       if (profile.customPlans && typeof profile.customPlans === 'object') {
         state.custom = profile.customPlans;
       }
@@ -2355,6 +2593,7 @@
       if (profile.customPlans && typeof profile.customPlans === 'object') {
         state.custom = profile.customPlans;
       }
+      syncUserExercises();
       state.deload = (profile.deload && typeof profile.deload === 'object' && profile.deload.before)
         ? profile.deload : null;
 
@@ -2562,6 +2801,12 @@
         refresh();
         return;
       }
+      const own = e.target.closest('[data-own-new]');
+      if (own) { openOwnExerciseSheet(Number(own.dataset.ownNew)); return; }
+
+      const del = e.target.closest('[data-own-del]');
+      if (del) { removeOwnExercise(del.dataset.ownDel); return; }
+
       const btn = e.target.closest('button[data-act]');
       if (btn && !btn.disabled) {
         onEdit(btn.dataset.act, Number(btn.dataset.day), Number(btn.dataset.i));

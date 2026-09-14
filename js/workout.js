@@ -786,88 +786,6 @@
     return (kg.length > 3 ? kg.slice(0, 3).join(' · ') + ' …' : kg.join(' · ')) + ' кг';
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Вікно правки                                                        */
-  /* ------------------------------------------------------------------ */
-  /*
-   * ОДНЕ ВІКНО НА ОБИДВА «ЗМІНИТИ».
-   *
-   * Розмітка — та сама .modal, що носять питання «ви точно?» і вікно
-   * завершення тренування: нового вигляду на сторінці не зʼявляється.
-   * Збереження — окремою кнопкою, а не на blur поля: саме мовчазний
-   * запис на виході з поля свого часу й зробив із робочої ваги пастку
-   * (див. коментар нижче в рядку вправи).
-   *
-   * onSave повертає true, якщо вікно можна закривати. Хибне значення
-   * лишає вікно відкритим — набране число нікуди не зникає, і людина
-   * бачить тост із причиною поруч зі своїм вводом.
-   */
-  function openSheet(o) {
-    const wrap = document.createElement('div');
-    wrap.className = 'modal';
-    wrap.innerHTML =
-      '<div class="modal__backdrop"></div>' +
-      '<div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="wk-sh-t">' +
-        '<h3 id="wk-sh-t" style="margin:0">' + esc(o.title) + '</h3>' +
-        (o.sub ? '<p class="small muted mt-1">' + esc(o.sub) + '</p>' : '') +
-        '<div class="mt-2">' + o.body + '</div>' +
-        '<div class="modal__actions mt-3">' +
-          '<button class="btn btn--ghost" type="button" data-sh="no">Скасувати</button>' +
-          '<button class="btn btn--primary" type="button" data-sh="yes">Зберегти</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(wrap);
-
-    const box = wrap.querySelector('.modal__box');
-    const prevFocus = document.activeElement;
-    let closed = false;
-
-    try { window.App.lockScroll(true); } catch (_) {}
-
-    function close() {
-      if (closed) return;
-      closed = true;
-      document.removeEventListener('keydown', onKey, true);
-      wrap.remove();
-      try { window.App.lockScroll(false); } catch (_) {}
-      try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (_) {}
-    }
-
-    function focusable() {
-      return Array.prototype.slice.call(box.querySelectorAll('input, button'))
-        .filter(function (el) { return !el.disabled; });
-    }
-
-    function onKey(e) {
-      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-      if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') {
-        e.preventDefault(); save(); return;
-      }
-      if (e.key !== 'Tab') return;
-      /* Фокус не виходить за межі вікна: список замкнений у кільце. */
-      const list = focusable();
-      if (!list.length) return;
-      e.preventDefault();
-      const cur = list.indexOf(document.activeElement);
-      const next = e.shiftKey
-        ? (cur <= 0 ? list.length - 1 : cur - 1)
-        : (cur === -1 || cur === list.length - 1 ? 0 : cur + 1);
-      try { list[next].focus(); } catch (_) {}
-    }
-
-    function save() { if (o.onSave(box) !== false) close(); }
-
-    box.querySelector('[data-sh="no"]').addEventListener('click', close);
-    box.querySelector('[data-sh="yes"]').addEventListener('click', save);
-    wrap.querySelector('.modal__backdrop').addEventListener('click', close);
-    document.addEventListener('keydown', onKey, true);
-    if (typeof o.onOpen === 'function') o.onOpen(box);
-
-    /* Фокус — у перше поле: вікно відкрили, щоб щось набрати. */
-    const first = box.querySelector('input');
-    try { (first || box.querySelector('[data-sh="no"]')).focus(); } catch (_) {}
-  }
-
   /*
    * РОБОЧА ВАГА Й ПОВТОРЕННЯ — ОДНИМ ВІКНОМ.
    *
@@ -895,8 +813,9 @@
     const hint = RC && state.profile
       ? RC.repRangeFor(state.profile.trainingAge, ex)
       : String(ex.reps || '');
+    const rir = RC ? RC.normRir(ex.rir) : null;
 
-    openSheet({
+    window.App.sheet({
       title: ex.name,
       sub: 'Це план, а не сьогоднішній підхід: нова вага стає робочою з цієї миті ' +
            'й лягає в історію ваг. Разовий підхід легше чи важче правиться нижче, ' +
@@ -915,9 +834,15 @@
               'step="1" autocomplete="off" placeholder="' + esc(hint) + '" value="' +
               (own === null ? '' : own) + '">' +
           '</div>' +
+          '<div class="field" style="flex:1 1 140px">' +
+            '<label class="field__label" for="wk-sh-rir">RIR</label>' +
+            '<input class="input num mono" id="wk-sh-rir" type="number" min="0" max="' +
+              (RC ? RC.RIR_MAX : 5) + '" step="1" autocomplete="off" placeholder="—" value="' +
+              (rir === null ? '' : rir) + '">' +
+          '</div>' +
         '</div>' +
         '<p class="field__hint mt-1">Порожнє поле повторень — діапазон за вашим стажем (' +
-          esc(hint) + ').</p>',
+          esc(hint) + '). RIR — скільки повторень лишається в запасі; 0 — до відмови.</p>',
       onSave: function (box) {
         /* Кома — той самий знак, що й у полі ваги підходу (js/workout.js
            нижче): 47,5 і 47.5 мають означати одне й те саме, бо на
@@ -937,7 +862,9 @@
           toast(WL.message(ex.name), 'err');
           return false;
         }
-        saveWorkWeight(ex, kg, RC ? RC.normUserReps(rRaw, ex) : null);
+        saveWorkWeight(ex, kg,
+          RC ? RC.normUserReps(rRaw, ex) : null,
+          RC ? RC.normRir(box.querySelector('#wk-sh-rir').value) : null);
         return true;
       }
     });
@@ -950,7 +877,7 @@
    * сховища, бо це різні за природою речі (див. js/reps-core.js). Тому
    * і патч один, і запис один — щоб половина правки не доїхала.
    */
-  function saveWorkWeight(ex, kg, ownReps) {
+  function saveWorkWeight(ex, kg, ownReps, rir) {
     const patch = {};
 
     const weights = Object.assign({}, state.profile.weights || {});
@@ -967,10 +894,28 @@
     }
 
     const RC = window.RepsCore;
+    let planChanged = false;
+
     const had = RC ? RC.normUserReps(ex.userReps, ex) : null;
     if (RC && had !== ownReps) {
       if (ownReps === null) { delete ex.userReps; ex.reps = RC.repRangeFor(state.profile.trainingAge, ex); }
       else { ex.userReps = ownReps; ex.reps = String(ownReps); }
+      planChanged = true;
+    }
+
+    /*
+     * RIR живе в самому плані, а не окремою книгою: на відміну від ваги,
+     * він задається СХЕМОЮ вправи в цьому дні. Порожнє поле прибирає
+     * число зовсім — у схемі тоді просто немає «· RIR n», і періодизація
+     * рахує запас нулем, як і для будь-якої вправи без RIR.
+     */
+    const hadRir = RC ? RC.normRir(ex.rir) : null;
+    if (RC && hadRir !== rir) {
+      if (rir === null) delete ex.rir; else ex.rir = String(rir);
+      planChanged = true;
+    }
+
+    if (planChanged) {
       patch.customPlans = planWithEdits();
       state.profile.customPlans = patch.customPlans;
     }
@@ -1021,7 +966,7 @@
       return l.map(function (x) { return fmtNum.kg(x.kg) + ' кг'; }).join(' · ');
     }
 
-    openSheet({
+    window.App.sheet({
       title: 'Розминка: ' + ex.name,
       sub: 'Сходинки до робочої ваги — те, що в програмі називали підводними ' +
            'підходами. У робочі підходи й тижневий обʼєм вони не входять.',

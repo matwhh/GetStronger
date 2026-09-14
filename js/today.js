@@ -854,11 +854,41 @@
       });
   }
 
+  /*
+   * ВХІД В ІНСТРУКЦІЮ ДЛЯ ТОГО, ХТО ЩОЙНО ПРИЙШОВ.
+   *
+   * Доти інструкція відкривалась однією кнопкою ВСЕРЕДИНІ панелі
+   * довідки — тобто той, кому вона потрібна найбільше, мав знайти
+   * спершу довідку, а в ній ще одну кнопку. Тепер рядок стоїть на
+   * «Сьогодні», поки жодного тренування не завершено.
+   *
+   * Зникає САМ, щойно зʼявився перший завершений день: підказка, яку
+   * треба закривати руками, — це ще одна справа, яку ми додали людині.
+   * Тому ні хрестика, ні памʼяті про «більше не показувати» тут немає.
+   */
+  function firstStepsHtml() {
+    if (!window.Help) return '';
+    const log = (state.profile && state.profile.sessionLog) || {};
+    const done = Object.keys(log).some(function (k) { return log[k] && log[k].end; });
+    if (done) return '';
+    return '' +
+      '<section class="card mt-2">' +
+        '<h2 style="margin:0 0 6px">Перший тиждень</h2>' +
+        '<p class="small muted" style="margin:0 0 12px">' +
+          'Графіки поки порожні, а блок «час додати вагу» мовчить — це не ' +
+          'поломка: сайту ще немає з чого рахувати. Що робити зараз і чому ' +
+          'спочатку так — в інструкції, десять хвилин один раз.' +
+        '</p>' +
+        '<button class="btn btn--primary btn--sm" type="button" data-open-guide>' +
+          'Відкрити інструкцію</button>' +
+      '</section>';
+  }
+
   function render() {
     const host = $('#today');
     if (!host) return;
     host.innerHTML = headHtml() + weekHtml() + widgetHtml() + progressionHtml() +
-      habitsHtml() + trackersHtml();
+      habitsHtml() + trackersHtml() + firstStepsHtml();
     /* Нахил вішається на щойно створений віджет: initTilt позначає вже
        оброблені контейнери, тож повторний виклик безпечний. */
     if (window.App && window.App.initTilt) window.App.initTilt(host);
@@ -921,6 +951,14 @@
         decide(snooze.dataset.prgSnooze, { snoozeUntil: PC.snoozeUntil(state.todayKey) });
         return;
       }
+    });
+
+    /* Інструкція з «Перших кроків». Делегуванням, як і решта: блок
+       перемальовується разом з усім екраном. */
+    host.addEventListener('click', function (e) {
+      if (!(e.target.closest && e.target.closest('[data-open-guide]'))) return;
+      e.preventDefault();
+      if (window.Help && window.Help.open) window.Help.open('guide');
     });
 
     /* Вибір дня в смузі. Делегуванням: смуга перемальовується цілком. */

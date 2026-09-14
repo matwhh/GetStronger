@@ -386,15 +386,18 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   font-family: var(--font-display);
   font-weight: 400;              /* Archivo Black має лише одну, максимальну вагу */
   /*
-   * НАБІР — ЯК У СПОРТИВНОГО СЛОГАНА: ВЕЛИКІ ЛІТЕРИ, ВАЖКО, ЩІЛЬНО.
+   * НАЗВА ПИШЕТЬСЯ ТАК, ЯК ВОНА ПИШЕТЬСЯ: «Get Stronger».
    *
-   * Тут стояло 2.25rem із розрядкою 0.10em — під слово з п'яти літер.
-   * «GET STRONGER» — дванадцять; у тому ж наборі воно виходить під
-   * 270px і в шапку телефона не влазить узагалі. Тому кегль менший, а
-   * розрядка з широкої стала щільною: у важкому гротеску великими
-   * літерами саме щільність і дає ту саму «вибиту» щільну пляму, заради
-   * якої такі написи й роблять. Розріджені капітелі читаються як
-   * вивіска, а не як знак.
+   * Тут стояв text-transform: uppercase, і шапка показувала «GET
+   * STRONGER» — набір, якого немає більше ніде: ні в manifest, ні в
+   * <title>, ні в тексті сторінок, ні в тому, як назву вимовляє читалка.
+   * Одна назва мусить виглядати однаково всюди, інакше в голові вона
+   * двоїться. Прибрано і тут, і в картинці для соцмереж (tools/og.mjs).
+   *
+   * Кегль лишається меншим за початкові 2.25rem: дванадцять літер із
+   * пробілом у важкому гротеску все одно широкі, і в шапку телефона
+   * слово влазить саме в цьому діапазоні. Трекінг — ледь відʼємний: у
+   * Archivo Black великі й малі літери й так стоять щільно.
    *
    * Накреслення НЕ нове: це той самий Archivo Black, який уже стоїть у
    * --font-display. Тягнути заради шапки ще один шрифт означало б ще
@@ -405,7 +408,6 @@ p  { margin: 0 0 1em; color: var(--text-2); }
   letter-spacing: -0.005em;
   line-height: 1;
   color: var(--text);
-  text-transform: uppercase;
   white-space: nowrap;
   /* Ціль дотику: сам напис 31–36px заввишки, а WCAG 2.5.8 хоче ≥ 24px із
      запасом і сенсорні гайдлайни — ≥ 44px. Розширюємо зону кліку, не
@@ -1238,17 +1240,6 @@ a.card > .btn {
    підходу («перший 100, третій 80»). Згорнутий за замовчуванням: тап по
    кружечку вже записав вагу й повтори тієї миті, і лізти сюди треба
    лише тоді, коли підхід відрізнявся від плану. */
-.tdy-ex__log-tgl {
-  margin-left: auto;
-  min-height: 44px;                 /* палець у залі, а не курсор */
-  display: inline-flex; align-items: center;
-  border: 0; background: none; padding: 0 2px;
-  color: var(--muted); font-size: 0.8rem; text-decoration: underline;
-  text-underline-offset: 3px; cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.tdy-ex__log-tgl:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
-.tdy-ex__log-tgl:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; border-radius: 6px; }
 .tdy-ex__log {
   display: flex; flex-direction: column; gap: 8px;
   padding: 2px 0 12px;
@@ -1298,32 +1289,43 @@ a.card > .btn {
 .tdy-ex.is-done .tdy-ex__name { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .tdy-ex__rest { flex: 0 0 auto; }
 
-/* Робоча вага прямо в рядку.
-   Окремим рядком під назвою, а не в тому ж флексі: назва вправи буває
-   на три слова, і поле поруч із нею на телефоні стискалось до нечитабельного.
-   Відступ зліва вирівнює поле під текст назви, а не під галочку. */
-.tdy-ex__wt {
-  display: flex; align-items: center; gap: 8px;
-  padding: 0 0 12px;
+/* Три числа вправи — одним списком.
+   Робоча вага, розминка й ваги підходів стояли кожне у своїй формі:
+   рядок унизу, два рядки тексту під схемою і кнопка збоку від кружечків.
+   Шість різних виглядів на одну вправу, і жоден не підказував, де тут
+   можна щось змінити. Тепер форма одна: підпис — значення — дія. */
+.tdy-ex__meta { margin: 0; padding: 0 0 12px; display: flex; flex-direction: column; }
+.tdy-ex__meta-row { display: flex; align-items: center; gap: 10px; min-height: 28px; }
+.tdy-ex__meta-lbl { flex: 0 0 96px; font-size: 0.8rem; color: var(--muted); }
+/* Значення в один рядок: підпис і дія стоять на своїх місцях у всіх
+   трьох рядках, і довге значення не має права їх зсувати. */
+.tdy-ex__meta-val {
+  margin: 0; flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.92rem; color: var(--text);
 }
-.tdy-ex__wt-lbl { font-size: 0.8rem; color: var(--muted); }
-.tdy-ex__wt-unit { font-size: 0.85rem; color: var(--muted); }
-.tdy-ex__wt .input { width: 92px; }
-
-/* Робочу вагу тут тільки ВИДНО — правлять її в плані (див. коментар у
-   js/workout.js). Число лишається помітним, бо на нього дивляться перед
-   кожним підходом, а «змінити» навмисно тьмяне: це вихід зі сторінки
-   посеред тренування, і він не має конкурувати з кнопками підходів. */
-.tdy-ex__wt-val { font-size: 1rem; color: var(--text); }
-.tdy-ex__wt-edit {
-  margin-left: auto;
-  color: var(--muted);
+.tdy-ex__meta-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* «змінити» навмисно тьмяне: воно не має конкурувати з кружечками
+   підходів, заради яких сторінку й відкривають. Ціль дотику — 44 px,
+   зроблена відступами з відʼємними полями, щоб не роздувати рядок. */
+.tdy-ex__meta-act {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center;
+  border: 0; background: none;
+  padding: 12px 2px; margin: -12px 0 -12px auto;
+  color: var(--muted); font-size: 0.8rem; text-decoration: underline;
   text-decoration-color: rgba(var(--tint-rgb), 0.3);
-  /* Ціль дотику 44px без зсуву розкладки: поле поруч було саме таким. */
-  padding: 12px 0; margin-top: -12px; margin-bottom: -12px;
+  text-underline-offset: 3px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.tdy-ex__wt-edit:hover { color: var(--text); }
-.tdy-ex.is-done .tdy-ex__wt { opacity: 0.55; }
+.tdy-ex__meta-act:hover { color: var(--text); }
+.tdy-ex__meta-act:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
+.tdy-ex__meta-act:focus-visible { outline: 2px solid var(--acc-ink); outline-offset: 2px; border-radius: 6px; }
+
+/* Робоча вага — головне число рядка, на нього дивляться перед підходом. */
+.tdy-ex__wt-val { font-size: 1rem; color: var(--text); }
+.tdy-ex__wt-unit { font-size: 0.85rem; color: var(--muted); }
+.tdy-ex.is-done .tdy-ex__meta { opacity: 0.55; }
 
 .card.is-selected { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc), var(--shadow-lg); }
 .card--hover:hover::before { opacity: 1; }

@@ -601,14 +601,19 @@ for (const w of [320, 390, 430]) {
   await ctx.close();
 }
 
-/* ---- 10. Робочу вагу з тренування не міняють, і вага підходу має стелю -- */
+/* ---- 10. Робочу вагу міняють ВІКНОМ, і вага підходу має стелю -------- */
 /*
- * Поле «Робоча вага» стояло просто на сторінці тренування й писало в
- * книгу ваг. Одна сторінка робила дві протилежні речі одним жестом:
- * «сьогодні я взяв 50» і «віднині моя робоча вага 50». Зменшив через
- * втому — план мовчки поїхав униз назавжди, історія ваг отримала подію,
- * якої не було, а прогресія побачила зміну ваги й обнулила лічильник
- * тренувань на ній.
+ * Поле «Робоча вага» колись стояло просто на сторінці тренування й писало
+ * в книгу ваг на виході з фокуса. Одна сторінка робила дві протилежні
+ * речі одним жестом: «сьогодні я взяв 50» і «віднині моя робоча вага 50».
+ * Зменшив через втому — план мовчки поїхав униз назавжди, історія ваг
+ * отримала подію, якої не було, а прогресія побачила зміну ваги й
+ * обнулила лічильник тренувань на ній. Поле прибрали, і «змінити» вело
+ * на сторінку плану — тобто виганяло зі сторінки посеред тренування.
+ *
+ * Тепер правка лишилась тут, але перестала бути випадковою: окреме
+ * вікно, окрема кнопка «Зберегти». Стережемо саме це — що МОВЧАЗНОГО
+ * запису немає (поля в рядку немає), а свідомий є і доїжджає в книгу ваг.
  *
  * Друге: стеля вводу була спільна, 0–500 на будь-що. Для присідання це
  * майже чесно, для махів гантелями — ні: 300 кг у бічній дельті
@@ -619,11 +624,76 @@ for (const w of [320, 390, 430]) {
   await p.goto('file://' + ROOT + '/workout.html', { waitUntil: 'load' });
   await p.waitForTimeout(1400);
 
-  ok('10. поля робочої ваги на тренуванні немає',
+  ok('10. поля робочої ваги в рядку вправи немає',
      await p.locator('[data-wt]').count() === 0);
   ok('10. але саме число видно', await p.locator('.tdy-ex__wt-val').count() > 0);
-  ok('10. і є вихід туди, де її міняють',
-     await p.locator('.tdy-ex__wt-edit[href="plan.html"]').count() > 0);
+  ok('10. і є кнопка, що відкриває вікно правки',
+     await p.locator('.tdy-ex__wt-edit[data-wt-edit]').count() > 0);
+
+  /* Вікно: Escape — це «нічого не сталось». */
+  await tap(p.locator('[data-wt-edit]').first());
+  await p.waitForTimeout(400);
+  ok('10. вікно відкрилось із полем ваги й полем повторень',
+     await p.locator('.modal #wk-sh-w').count() === 1 &&
+     await p.locator('.modal #wk-sh-r').count() === 1);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(300);
+  ok('10. Escape закриває вікно', await p.locator('.modal').count() === 0);
+
+  const exName = await p.locator('#workout .tdy-ex__name').first().innerText();
+  const wasKg = await p.evaluate(async (n) => {
+    const pr = await window.Store.getProfile();
+    return Number((pr.weights || {})[n]) || null;
+  }, exName);
+
+  await tap(p.locator('[data-wt-edit]').first());
+  await p.waitForTimeout(400);
+  await p.locator('.modal #wk-sh-w').fill('47,5');
+  await p.locator('.modal #wk-sh-r').fill('7');
+  await tap(p.locator('.modal [data-sh="yes"]'));
+  await p.waitForTimeout(900);
+
+  ok('10. після збереження вікно закрилось', await p.locator('.modal').count() === 0);
+  const saved = await p.evaluate(async (n) => {
+    const pr = await window.Store.getProfile();
+    const log = (pr.weightLog || {})[n] || [];
+    return { kg: Number((pr.weights || {})[n]), last: log.length ? Number(log[log.length - 1].kg) : null };
+  }, exName);
+  ok('10. нова робоча вага в книзі ваг', saved.kg === 47.5, String(saved.kg) + ' (було ' + wasKg + ')');
+  ok('10. і подія в історії ваг саме ця', saved.last === 47.5, String(saved.last));
+  ok('10. число видно в рядку одразу',
+     (await p.locator('#workout .tdy-ex__wt-val').first().innerText()).replace('.', ',') === '47,5',
+     await p.locator('#workout .tdy-ex__wt-val').first().innerText());
+  ok('10. власне число повторень доїхало в схему',
+     /×\s*7(\s|$|\s*·)/.test(await p.locator('#workout .tdy-ex__scheme').first().innerText()),
+     await p.locator('#workout .tdy-ex__scheme').first().innerText());
+
+  /* ---- Розминка: одне число замість двох текстових рядків ---- */
+  const block = await p.locator('#workout .tdy-ex').first().innerText();
+  ok('10. рядка «Підводні» в блоці вправи немає', !/Підводн/i.test(block), block.replace(/\n+/g, ' | ').slice(0, 90));
+  ok('10. драбини відсотками в блоці теж немає', !/40\/60\/80/.test(block));
+  ok('10. натомість один короткий рядок розминки',
+     /Розминка/.test(block) && await p.locator('[data-wu-val]').count() > 0);
+
+  await tap(p.locator('[data-wu-edit]').first());
+  await p.waitForTimeout(400);
+  ok('10. вікно розминки — це одне поле кількості',
+     await p.locator('.modal #wk-sh-n').count() === 1);
+  await p.locator('.modal #wk-sh-n').fill('1');
+  await p.waitForTimeout(250);
+  ok('10. і воно одразу показує, що дасть',
+     /кг/.test(await p.locator('.modal [data-wu-prev]').innerText()),
+     await p.locator('.modal [data-wu-prev]').innerText());
+  await tap(p.locator('.modal [data-sh="yes"]'));
+  await p.waitForTimeout(900);
+  ok('10. вибір збережено в профілі',
+     await p.evaluate(async (n) => {
+       const pr = await window.Store.getProfile();
+       return Number((pr.warmups || {})[n]);
+     }, exName) === 1);
+  ok('10. і рядок каже «1 підхід»',
+     /^1 підхід$/.test(await p.locator('[data-wu-val]').first().innerText()),
+     await p.locator('[data-wu-val]').first().innerText());
 
   /* Вага ПІДХОДУ лишається редагованою — це факт одного дня. */
   const first = p.locator('#workout .tdy-ex').first();

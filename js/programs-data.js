@@ -47,7 +47,7 @@
 
 /** Спільні примітки, щоб не дублювати текст у кожній програмі */
 const COMMON_NOTES = [
-  'Підводні підходи в першій базовій вправі (2–3) не рахуються як робочі й не входять у тижневий обʼєм.',
+  'Розминкові підходи (сходинки до робочої ваги, раніше «підводні») не рахуються як робочі й не входять у тижневий обʼєм. Скільки їх — ставите самі на екрані тренування.',
   'RIR (Reps In Reserve) — скільки повторень ви могли б зробити понад виконані. RIR 2 = зупинились за 2 повторення до відмови.',
   'Відмова не обовʼязкова: приріст маси при роботі до відмови проти роботи близько до відмови відрізняється мінімально (ES 0,19, PMID 36334240), а втома і ризик травми — суттєво.',
   'Повторення задані за розміром групи: великі мʼязи (груди, спина, квадрицепс, біцепс стегна, сідниці) — 6–8 за підхід, малі — 8–10.',
@@ -143,9 +143,9 @@ window.COOLDOWN = COOLDOWN;
 const UL_UPPER = {
   title: 'Upper', focus: 'Верх тіла',
   exercises: [
-    { pattern: 'Горизонтальний жим', name: 'Жим у тренажері',                 muscles: ['chest'],      sets: 2, reps: '6–8',  weight: null,   rir: '2', rest: '2–3 хв', note: 'Підводні: 1–2 підходи × 6' },
+    { pattern: 'Горизонтальний жим', name: 'Жим у тренажері',                 muscles: ['chest'],      sets: 2, reps: '6–8',  weight: null,   rir: '2', rest: '2–3 хв' },
     { pattern: 'Вертикальна тяга',   name: 'Підтягування з вагою',            muscles: ['back'],       sets: 2, reps: '6–8',  weight: null,   rir: '2', rest: '2–3 хв', note: 'З додатковою вагою на поясі' },
-    { pattern: 'Горизонтальний жим', name: 'Жим штанги під нахилом у Сміті',  muscles: ['chest'],      sets: 3, reps: '6–8',  weight: null,   rir: '2', rest: '2–3 хв', note: 'Підводні: 1–2 підходи × 6' },
+    { pattern: 'Горизонтальний жим', name: 'Жим штанги під нахилом у Сміті',  muscles: ['chest'],      sets: 3, reps: '6–8',  weight: null,   rir: '2', rest: '2–3 хв' },
     { pattern: 'Вертикальна тяга',   name: 'Тяга верхнього блоку вузьким паралельним хватом', muscles: ['back'], sets: 2, reps: '6–8', weight: null, rir: '2', rest: '2 хв', note: '' },
     { pattern: 'Вертикальний жим',   name: 'Жим на плечі у Сміті',            muscles: ['frontDelts'], sets: 3, reps: '8–10',  weight: null,   rir: '2', rest: '2–3 хв', note: '' },
     { pattern: 'Горизонтальна тяга', name: 'Тяга з упором',                   muscles: ['back'],       sets: 2, reps: '6–8',  weight: null, rir: '2', rest: '2 хв',   note: '' },
@@ -171,8 +171,8 @@ const UL_UPPER = {
 const UL_LOWER = {
   title: 'Lower', focus: 'Низ тіла',
   exercises: [
-    { pattern: 'Присідальний рух',      name: 'Присідання зі штангою',               muscles: ['quads'],                   sets: 3, reps: '6–8', weight: null, rir: '2', rest: '3 хв',   note: 'Підводні: 1–2 підходи × 6' },
-    { pattern: 'Тазостегновий шарнір',  name: 'Румунська тяга',                      muscles: ['hamstrings', 'glutes'],    sets: 3, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв', note: 'Підводні: 1–2 підходи × 6' },
+    { pattern: 'Присідальний рух',      name: 'Присідання зі штангою',               muscles: ['quads'],                   sets: 3, reps: '6–8', weight: null, rir: '2', rest: '3 хв' },
+    { pattern: 'Тазостегновий шарнір',  name: 'Румунська тяга',                      muscles: ['hamstrings', 'glutes'],    sets: 3, reps: '6–8', weight: null, rir: '2', rest: '2–3 хв' },
     { pattern: 'Односторонній рух ніг', name: 'Випади у Сміті на сідниці',           muscles: ['glutes'],                  sets: 3, reps: '6–8', weight: null, rir: '2', rest: '2 хв',   note: '' },
     { pattern: 'Розгинання гомілки',    name: 'Розгинання ніг',                      muscles: ['quads'],                   sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с',   note: '' },
     { pattern: 'Згинання гомілки',      name: 'Згинання ніг сидячи',                        muscles: ['hamstrings'],              sets: 3, reps: '6–8', weight: null, rir: '1', rest: '90 с',   note: '' },

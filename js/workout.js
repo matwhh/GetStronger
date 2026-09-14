@@ -632,6 +632,7 @@
       if (!box || !tgl || tgl.disabled) { openLogs.delete(i); return; }
       box.hidden = false;
       tgl.setAttribute('aria-expanded', 'true');
+      tgl.textContent = 'сховати';
     });
   }
 
@@ -657,9 +658,17 @@
       if (!list.length) {
         box.hidden = true;
         tgl.setAttribute('aria-expanded', 'false');
+        tgl.textContent = 'показати';
         openLogs.delete(i);
       }
     }
+    syncLogSum(rowEl, i);
+  }
+
+  /** Коротке значення рядка «Ваги підходів» — точково, без перемальовки. */
+  function syncLogSum(rowEl, i) {
+    const sum = rowEl.querySelector('[data-log-sum]');
+    if (sum) sum.textContent = logSummary(i);
   }
 
   /** Правка ваги/повторів одного підходу з поля */
@@ -696,6 +705,8 @@
     state.done[i] = WC.editSet(state.done[i], k, patch, ps, fbW, fbR);
     saveDayState();
     refreshProgress();
+    const row = el.closest && el.closest('.tdy-ex');
+    if (row) syncLogSum(row, i);
 
     /* Показуємо назад те, що реально записалось: поза межами значення
        не приймається і підхід повертається до робочої ваги — мовчазне
@@ -711,6 +722,377 @@
       el.value = shown.r == null ? '' : String(shown.r);
       if (raw !== '' && WC.normReps(raw) === null) toast('Повтори: 1–200', 'err');
     }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Розминка                                                            */
+  /* ------------------------------------------------------------------ */
+  /*
+   * «ПІДВОДНІ» Й «РОЗМИНКА» БУЛИ ОДНИМ І ТИМ САМИМ.
+   *
+   * Під схемою вправи стояли два рядки: авторський текст програми
+   * «Підводні: 1–2 підходи × 6» і порахована драбина «40/60/80 %: 20 ·
+   * 30 · 40 кг». Обидва описують те саме — сходинки до робочої ваги, —
+   * але жили нарізно: текст не знав про вагу, драбина не знала про
+   * текст, і на будь-якій правці вони розійшлися б у числах. До того ж
+   * удвох вони займали більше місця, ніж сама вправа, а читають їх один
+   * раз за тренування.
+   *
+   * Тепер поняття одне — розминкові підходи, — і в рядку вправи від
+   * нього лишається одне коротке число. Самі ваги живуть у вікні, як і
+   * робоча вага: обидва «змінити» виглядають і поводяться однаково.
+   */
+  function warmupLadder(name) {
+    if (!window.OneRM || !WC.warmupSets) return [];
+    return WC.warmupSets(planWeight(name), window.OneRM.PLATE_STEP,
+      WC.warmupCountFor(state.profile, name));
+  }
+
+  /** Коротке значення рядка «Розминка»: рахуємо СХОДИНКИ, а не вибір. */
+  function warmupLabel(name) {
+    if (!WC.warmupCountFor(state.profile, name)) return 'без розминки';
+    const l = warmupLadder(name);
+    /*
+     * Нуль сходинок при ненульовому виборі — не помилка вибору, а
+     * наслідок ваги: без робочої ваги рахувати нема від чого, а на дуже
+     * малій сусідні відсотки після округлення схлопуються в одне число.
+     * Показати тут «3 підходи», яких у вікні не буде, означало б збрехати
+     * рівно в тому місці, заради якого цей рядок і стоїть.
+     */
+    if (!l.length) return '—';
+    return l.length + ' ' + window.App.plural(l.length, 'підхід', 'підходи', 'підходів');
+  }
+
+  /** Драбина словами: «20 · 30 · 40 кг» або порожньо. */
+  function ladderText(name) {
+    const l = warmupLadder(name);
+    return l.length ? l.map(function (x) { return fmtNum.kg(x.kg); }).join(' · ') + ' кг' : '';
+  }
+
+  /** Коротке значення рядка «Ваги підходів»: що реально записано. */
+  function logSummary(i) {
+    const ex = state.plan[state.dayIdx].exercises[i];
+    const ps = WC.plannedSets(ex);
+    const ds = WC.doneSetsFor(state.done[i], ps);
+    if (!ds) return '—';
+    const kg = [];
+    perfSets(i).slice(0, ds).forEach(function (p) {
+      const v = Number.isFinite(p.w) ? fmtNum.kg(p.w) : null;
+      if (v !== null && kg.indexOf(v) === -1) kg.push(v);
+    });
+    if (!kg.length) return ds + ' ' + window.App.plural(ds, 'підхід', 'підходи', 'підходів');
+    /* Три числа — стеля рядка: далі він переносився б і рядок «Розминка»
+       під ним переставав бути на своєму місці. Решту видно у списку. */
+    return (kg.length > 3 ? kg.slice(0, 3).join(' · ') + ' …' : kg.join(' · ')) + ' кг';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Вікно правки                                                        */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ОДНЕ ВІКНО НА ОБИДВА «ЗМІНИТИ».
+   *
+   * Розмітка — та сама .modal, що носять питання «ви точно?» і вікно
+   * завершення тренування: нового вигляду на сторінці не зʼявляється.
+   * Збереження — окремою кнопкою, а не на blur поля: саме мовчазний
+   * запис на виході з поля свого часу й зробив із робочої ваги пастку
+   * (див. коментар нижче в рядку вправи).
+   *
+   * onSave повертає true, якщо вікно можна закривати. Хибне значення
+   * лишає вікно відкритим — набране число нікуди не зникає, і людина
+   * бачить тост із причиною поруч зі своїм вводом.
+   */
+  function openSheet(o) {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal';
+    wrap.innerHTML =
+      '<div class="modal__backdrop"></div>' +
+      '<div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="wk-sh-t">' +
+        '<h3 id="wk-sh-t" style="margin:0">' + esc(o.title) + '</h3>' +
+        (o.sub ? '<p class="small muted mt-1">' + esc(o.sub) + '</p>' : '') +
+        '<div class="mt-2">' + o.body + '</div>' +
+        '<div class="modal__actions mt-3">' +
+          '<button class="btn btn--ghost" type="button" data-sh="no">Скасувати</button>' +
+          '<button class="btn btn--primary" type="button" data-sh="yes">Зберегти</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+
+    const box = wrap.querySelector('.modal__box');
+    const prevFocus = document.activeElement;
+    let closed = false;
+
+    try { window.App.lockScroll(true); } catch (_) {}
+
+    function close() {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('keydown', onKey, true);
+      wrap.remove();
+      try { window.App.lockScroll(false); } catch (_) {}
+      try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (_) {}
+    }
+
+    function focusable() {
+      return Array.prototype.slice.call(box.querySelectorAll('input, button'))
+        .filter(function (el) { return !el.disabled; });
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') {
+        e.preventDefault(); save(); return;
+      }
+      if (e.key !== 'Tab') return;
+      /* Фокус не виходить за межі вікна: список замкнений у кільце. */
+      const list = focusable();
+      if (!list.length) return;
+      e.preventDefault();
+      const cur = list.indexOf(document.activeElement);
+      const next = e.shiftKey
+        ? (cur <= 0 ? list.length - 1 : cur - 1)
+        : (cur === -1 || cur === list.length - 1 ? 0 : cur + 1);
+      try { list[next].focus(); } catch (_) {}
+    }
+
+    function save() { if (o.onSave(box) !== false) close(); }
+
+    box.querySelector('[data-sh="no"]').addEventListener('click', close);
+    box.querySelector('[data-sh="yes"]').addEventListener('click', save);
+    wrap.querySelector('.modal__backdrop').addEventListener('click', close);
+    document.addEventListener('keydown', onKey, true);
+    if (typeof o.onOpen === 'function') o.onOpen(box);
+
+    /* Фокус — у перше поле: вікно відкрили, щоб щось набрати. */
+    const first = box.querySelector('input');
+    try { (first || box.querySelector('[data-sh="no"]')).focus(); } catch (_) {}
+  }
+
+  /*
+   * РОБОЧА ВАГА Й ПОВТОРЕННЯ — ОДНИМ ВІКНОМ.
+   *
+   * Колись поле робочої ваги стояло просто в рядку вправи й писало в
+   * книгу ваг на виході з фокуса. Одна сторінка робила дві протилежні
+   * речі одним жестом: «сьогодні я взяв 50» і «віднині моя робоча вага
+   * 50». Зменшив через втому — план мовчки поїхав униз назавжди,
+   * історія ваг отримала подію, якої не було, а прогресія побачила зміну
+   * ваги й обнулила лічильник тренувань на ній. Тому поле прибрали, а
+   * «змінити» вело на сторінку плану — тобто виганяло зі сторінки
+   * посеред тренування.
+   *
+   * Вікно знімає обидві біди разом: правка лишилась тут, але перестала
+   * бути випадковою. Її роблять окремим рішенням і окремою кнопкою, під
+   * підписом, який прямо каже, що міняється план, а не сьогоднішній
+   * підхід. Вага ОДНОГО підходу як була, так і лишається в «Вагах
+   * підходів» — це різні речі, і плутати їх не можна.
+   */
+  function openWeightSheet(i) {
+    const ex = state.plan[state.dayIdx].exercises[i];
+    const RC = window.RepsCore;
+    const cur = planWeight(ex.name);
+    const own = RC ? RC.normUserReps(ex.userReps, ex) : null;
+    const max = RC ? RC.maxRepsFor(ex) : 15;
+    const hint = RC && state.profile
+      ? RC.repRangeFor(state.profile.trainingAge, ex)
+      : String(ex.reps || '');
+
+    openSheet({
+      title: ex.name,
+      sub: 'Це план, а не сьогоднішній підхід: нова вага стає робочою з цієї миті ' +
+           'й лягає в історію ваг. Разовий підхід легше чи важче правиться нижче, ' +
+           'у «Вагах підходів».',
+      body:
+        '<div class="row" style="gap:12px;flex-wrap:wrap">' +
+          '<div class="field" style="flex:1 1 140px">' +
+            '<label class="field__label" for="wk-sh-w">Робоча вага, кг</label>' +
+            '<input class="input num mono" id="wk-sh-w" type="text" inputmode="decimal" ' +
+              'autocomplete="off" placeholder="—" value="' +
+              esc(cur === null ? '' : fmtNum.kg(cur)) + '">' +
+          '</div>' +
+          '<div class="field" style="flex:1 1 140px">' +
+            '<label class="field__label" for="wk-sh-r">Повторення</label>' +
+            '<input class="input num mono" id="wk-sh-r" type="number" min="1" max="' + max + '" ' +
+              'step="1" autocomplete="off" placeholder="' + esc(hint) + '" value="' +
+              (own === null ? '' : own) + '">' +
+          '</div>' +
+        '</div>' +
+        '<p class="field__hint mt-1">Порожнє поле повторень — діапазон за вашим стажем (' +
+          esc(hint) + ').</p>',
+      onSave: function (box) {
+        /* Кома — той самий знак, що й у полі ваги підходу (js/workout.js
+           нижче): 47,5 і 47.5 мають означати одне й те саме, бо на
+           телефоні клавіатура дає те, що дає. */
+        const wRaw = String(box.querySelector('#wk-sh-w').value || '').replace(',', '.').trim();
+        const rRaw = String(box.querySelector('#wk-sh-r').value || '').trim();
+
+        /* Стеля своя для кожної вправи — та сама перевірка, що й у ваги
+           підходу: 300 кг у бічній дельті не мають доїхати до графіків. */
+        const WL = window.WeightLimits;
+        const kg = wRaw === '' ? null : WC.normWeight(wRaw);
+        if (wRaw !== '' && kg === null) {
+          toast(WL ? WL.message(ex.name) : 'Вага: 0–500 кг', 'err');
+          return false;
+        }
+        if (WL && kg !== null && !WL.check(ex.name, wRaw).ok) {
+          toast(WL.message(ex.name), 'err');
+          return false;
+        }
+        saveWorkWeight(ex, kg, RC ? RC.normUserReps(rRaw, ex) : null);
+        return true;
+      }
+    });
+  }
+
+  /**
+   * Запис робочої ваги й власного числа повторень.
+   *
+   * Вага живе в книзі ваг, повторення — у збереженому плані: два різні
+   * сховища, бо це різні за природою речі (див. js/reps-core.js). Тому
+   * і патч один, і запис один — щоб половина правки не доїхала.
+   */
+  function saveWorkWeight(ex, kg, ownReps) {
+    const patch = {};
+
+    const weights = Object.assign({}, state.profile.weights || {});
+    const before = Number(weights[ex.name]);
+    if (kg === null) delete weights[ex.name]; else weights[ex.name] = kg;
+    if (Number(before) !== Number(kg)) {
+      state.profile.weights = weights;
+      patch.weights = weights;
+      if (kg !== null && window.HistoryCore) {
+        const log = window.HistoryCore.appendWeight(state.profile.weightLog, ex.name, kg);
+        state.profile.weightLog = log;
+        patch.weightLog = log;
+      }
+    }
+
+    const RC = window.RepsCore;
+    const had = RC ? RC.normUserReps(ex.userReps, ex) : null;
+    if (RC && had !== ownReps) {
+      if (ownReps === null) { delete ex.userReps; ex.reps = RC.repRangeFor(state.profile.trainingAge, ex); }
+      else { ex.userReps = ownReps; ex.reps = String(ownReps); }
+      patch.customPlans = planWithEdits();
+      state.profile.customPlans = patch.customPlans;
+    }
+
+    if (!Object.keys(patch).length) return;
+    window.App.stampRating(Object.assign({}, state.profile, patch), patch);
+    saveOwn(patch).catch(function (e) {
+      toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');
+    });
+    render();
+  }
+
+  /**
+   * Поточний план як збережена правка користувача.
+   *
+   * Той самий формат, що пише «Мій план тренувань» (js/programs.js):
+   * ключ «програма:днів», ваги всередину не кладемо — єдине джерело
+   * правди для них книга ваг. Інші ключі не чіпаємо: у профілі можуть
+   * лежати правки до інших програм і до іншої кількості днів.
+   */
+  function planWithEdits() {
+    const a = (state.profile && state.profile.activePlan) || {};
+    const key = WC.planKey(a.programId || '', String(Number(a.days) || 0));
+    const all = Object.assign({}, state.profile.customPlans || {});
+    all[key] = state.plan.map(function (day) {
+      return Object.assign({}, day, {
+        exercises: (day.exercises || []).map(function (e) {
+          const copy = Object.assign({}, e);
+          delete copy.weight;
+          return copy;
+        })
+      });
+    });
+    return all;
+  }
+
+  /** Вікно розминки: одне число й одразу видно, що воно дасть. */
+  function openWarmupSheet(i) {
+    const ex = state.plan[state.dayIdx].exercises[i];
+    const n = WC.warmupCountFor(state.profile, ex.name);
+
+    function preview(v) {
+      const l = window.OneRM
+        ? WC.warmupSets(planWeight(ex.name), window.OneRM.PLATE_STEP, v)
+        : [];
+      if (planWeight(ex.name) === null) return 'Робочої ваги ще немає — рахувати нема від чого.';
+      if (!l.length) return 'Без розминкових підходів.';
+      return l.map(function (x) { return fmtNum.kg(x.kg) + ' кг'; }).join(' · ');
+    }
+
+    openSheet({
+      title: 'Розминка: ' + ex.name,
+      sub: 'Сходинки до робочої ваги — те, що в програмі називали підводними ' +
+           'підходами. У робочі підходи й тижневий обʼєм вони не входять.',
+      body:
+        '<div class="field" style="max-width:180px">' +
+          '<label class="field__label" for="wk-sh-n">Скільки підходів</label>' +
+          '<input class="input num mono" id="wk-sh-n" type="number" min="0" max="' +
+            WC.WARMUP_MAX + '" step="1" autocomplete="off" value="' + n + '">' +
+        '</div>' +
+        '<p class="field__hint mt-1" data-wu-prev>' + esc(preview(n)) + '</p>' +
+        '<p class="small muted mt-2" style="margin-bottom:0">0 — без розминки: ' +
+          'ізоляцію в кінці тренування розминають вправи, зроблені перед нею.</p>',
+      onOpen: function (box) {
+        const inp = box.querySelector('#wk-sh-n');
+        const out = box.querySelector('[data-wu-prev]');
+        /*
+         * Оновлюємо ТЕКСТ, а не перемальовуємо блок: перемальовка під час
+         * події input зносить поле разом із кареткою, і браузер лишається
+         * без вузла, у якому щойно набирали (див. ту саму граблю в
+         * js/nutrition.js).
+         */
+        inp.addEventListener('input', function () {
+          const v = WC.normWarmupCount(inp.value);
+          out.textContent = preview(v === null ? n : v);
+        });
+      },
+      onSave: function (box) {
+        const v = WC.normWarmupCount(box.querySelector('#wk-sh-n').value);
+        /* Порожнє поле — «нічого не міняв», а не «нуль»: нуль набирають. */
+        if (v === null || v === n) return true;
+        const book = Object.assign({}, state.profile.warmups || {});
+        book[ex.name] = v;
+        state.profile.warmups = book;
+        saveOwn({ warmups: book }).catch(function (e) {
+          toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');
+        });
+        render();
+        return true;
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Рядок вправи                                                        */
+  /* ------------------------------------------------------------------ */
+  /*
+   * ТРИ ОДНАКОВІ РЯДКИ ЗАМІСТЬ ЧОТИРЬОХ РІЗНИХ.
+   *
+   * Під назвою вправи стояли: авторська примітка, рядок підводних, рядок
+   * розминки, кружечки підходів із кнопкою журналу збоку і внизу окремо
+   * зроблена робоча вага. Шість різних форм на одну вправу — і жодна не
+   * підказувала, де тут можна щось змінити.
+   *
+   * Тепер усе, що правиться, стоїть однаково: підпис — значення — дія.
+   * Робоча вага, розминка й ваги підходів виглядають як один список, бо
+   * вони й є одним списком: три числа цієї вправи. Кружечки лишились
+   * вище — вони не значення, а сама дія тренування.
+   */
+  /*
+   * Кнопка стоїть УСЕРЕДИНІ <dd>, а не поруч із ним: у <dl> всередині
+   * обгортки-<div> за специфікацією можуть лежати тільки <dt> і <dd>, і
+   * кнопка третім сусідом робила б розмітку невалідною. Візуально нічого
+   * не міняється — вирівнює її margin-left: auto.
+   */
+  function metaRow(label, valHtml, actHtml) {
+    return '<div class="tdy-ex__meta-row">' +
+      '<dt class="tdy-ex__meta-lbl">' + esc(label) + '</dt>' +
+      '<dd class="tdy-ex__meta-val">' +
+        '<span class="tdy-ex__meta-txt">' + valHtml + '</span>' + actHtml +
+      '</dd>' +
+    '</div>';
   }
 
   function exerciseRow(ex, i) {
@@ -739,21 +1121,6 @@
               (ex.rir ? ' · RIR ' + esc(ex.rir) : '') +
             '</span>' +
             (ex.note ? '<span class="tdy-ex__note">' + esc(ex.note) + '</span>' : '') +
-            /*
-             * Розминка (E7). Крок — базовий 2,5 для всіх вправ, а не 5
-             * для ніг: класифікація «нога / не нога» живе в today.js і
-             * programs.js, і третя її копія тут розійшлася б із ними.
-             * Для розминки дрібніший крок ніколи не буває помилкою —
-             * 2,5 збирається на будь-якій штанзі.
-             */
-            (function () {
-              const w = (window.OneRM && WC.warmupSets)
-                ? WC.warmupSets(planWeight(ex.name), window.OneRM.PLATE_STEP) : [];
-              if (!w.length) return '';
-              return '<span class="tdy-ex__note">Розминка (' +
-                WC.WARMUP_PCT.join('/') + ' %): ' +
-                w.map(function (x) { return fmtNum.kg(x.kg); }).join(' · ') + ' кг</span>';
-            })() +
           '</div>' +
           '<button class="tdy-ex__rest btn btn--ghost btn--sm" type="button" ' +
                   'data-rest-sec="' + sec + '" data-rest-name="' + esc(ex.name) + '">' +
@@ -763,32 +1130,31 @@
         '<div class="tdy-ex__sets" role="group" aria-label="Підходи: ' + esc(ex.name) + '">' +
           pips +
           '<span class="tdy-ex__sets-num mono" data-sets-num="' + i + '">' + ds + '/' + ps + '</span>' +
-          '<button class="tdy-ex__log-tgl" type="button" data-log-tgl="' + i + '" ' +
-            'aria-expanded="false" aria-controls="wk-log-' + i + '"' +
-            (ds ? '' : ' disabled') + '>Ваги підходів</button>' +
         '</div>' +
+
+        '<dl class="tdy-ex__meta">' +
+          metaRow('Робоча вага',
+            '<b class="tdy-ex__wt-val num mono">' + (w == null ? '—' : esc(fmtNum.kg(w))) + '</b>' +
+            (w == null ? '' : '<span class="tdy-ex__wt-unit"> кг</span>'),
+            '<button class="tdy-ex__meta-act tdy-ex__wt-edit" type="button" data-wt-edit="' + i + '"' +
+              (off ? ' disabled' : '') +
+              ' aria-label="Змінити робочу вагу: ' + esc(ex.name) + '">змінити</button>') +
+
+          metaRow('Розминка',
+            '<span class="mono" data-wu-val="' + i + '">' + esc(warmupLabel(ex.name)) + '</span>',
+            '<button class="tdy-ex__meta-act" type="button" data-wu-edit="' + i + '"' +
+              (off ? ' disabled' : '') +
+              ' aria-label="Змінити розминку: ' + esc(ex.name) + '">змінити</button>') +
+
+          metaRow('Ваги підходів',
+            '<span class="mono" data-log-sum="' + i + '">' + esc(logSummary(i)) + '</span>',
+            '<button class="tdy-ex__meta-act" type="button" data-log-tgl="' + i + '" ' +
+              'aria-expanded="false" aria-controls="wk-log-' + i + '"' +
+              (ds ? '' : ' disabled') + '>показати</button>') +
+        '</dl>' +
+
         '<div class="tdy-ex__log" id="wk-log-' + i + '" data-set-log="' + i + '" hidden>' +
           setLogHtml(i, ex, ps) +
-        '</div>' +
-        /*
-         * РОБОЧУ ВАГУ ТУТ НЕ МІНЯЮТЬ — ЇЇ ТІЛЬКИ ВИДНО.
-         *
-         * Раніше поруч стояло поле вводу, і воно писало просто в книгу
-         * ваг. Через це одна сторінка робила дві протилежні речі одним
-         * жестом: «сьогодні я взяв 50» і «віднині моя робоча вага 50».
-         * Зменшив вагу через втому — і план мовчки поїхав униз назавжди;
-         * історія ваг отримала подію, якої не було; прогресія побачила
-         * зміну ваги й обнулила лічильник тренувань на ній.
-         *
-         * Тепер поділ чіткий: вага КОНКРЕТНОГО ПІДХОДУ правиться в
-         * «Вагах підходів» вище і лишається фактом одного дня, а робоча
-         * вага живе в плані, де її й змінюють свідомо.
-         */
-        '<div class="tdy-ex__wt">' +
-          '<span class="tdy-ex__wt-lbl">Робоча вага</span>' +
-          '<b class="tdy-ex__wt-val num mono">' + (w == null ? '—' : esc(fmtNum.kg(w))) + '</b>' +
-          '<span class="tdy-ex__wt-unit">кг</span>' +
-          '<a class="tdy-ex__wt-edit small" href="plan.html">змінити</a>' +
         '</div>' +
       '</li>';
   }
@@ -1128,11 +1494,21 @@
         if (box) {
           box.hidden = !box.hidden;
           tgl.setAttribute('aria-expanded', String(!box.hidden));
+          tgl.textContent = box.hidden ? 'показати' : 'сховати';
           const idx = Number(box.dataset.setLog);
           if (box.hidden) openLogs.delete(idx); else openLogs.add(idx);
         }
         return;
       }
+
+      /* Обидва «змінити» — однакові кнопки, що відкривають вікно. Під час
+         завершеного дня вони вимкнені: план правлять до або після, а не
+         в записі, який уже поїхав в історію. */
+      const wtBtn = e.target.closest('[data-wt-edit]');
+      if (wtBtn && !wtBtn.disabled) { openWeightSheet(Number(wtBtn.dataset.wtEdit)); return; }
+
+      const wuBtn = e.target.closest('[data-wu-edit]');
+      if (wuBtn && !wuBtn.disabled) { openWarmupSheet(Number(wuBtn.dataset.wuEdit)); return; }
 
       if (e.target.closest('#wk-finish')) { finishWorkout(); return; }
 

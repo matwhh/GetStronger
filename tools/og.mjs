@@ -55,7 +55,7 @@ svg { display:block; margin-bottom:40px; margin-top:24px; }
 /* Відʼємне праве поле компенсує трекінг після останньої літери — інакше
    слово стоїть на пів-пробіла правіше за оптичний центр. */
 .word { font-family:"Archivo Black",sans-serif; font-size:96px; line-height:1;
-  letter-spacing:-0.005em; text-transform:uppercase; color:#ffffff; white-space:nowrap; }
+  letter-spacing:-0.005em; color:#ffffff; white-space:nowrap; }
 </style></head><body>
 ${MARK}
 <div class="word">Get Stronger</div>

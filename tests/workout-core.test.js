@@ -388,3 +388,56 @@ describe('розминка відсотками', () => {
     assert.equal(WC.warmupSets(2, 2.5).length, 0);
   });
 });
+
+/*
+ * СКІЛЬКИ РОЗМИНКОВИХ ПІДХОДІВ — ЧИСЛО ЛЮДИНИ.
+ *
+ * «Підводні» з опису програми і драбина 40/60/80 % описували те саме —
+ * сходинки до робочої ваги — двома незалежними текстами, які на першій
+ * же правці розійшлися б. Лишилось одне поняття і одне число: скільки
+ * сходинок. Відсотки на кожну кількість — таблиця, а не формула: рівні
+ * проміжки дали б на двох підходах 40 і 80 %, тобто стрибок удвічі там,
+ * де сходинок найменше.
+ */
+describe('кількість розминкових підходів', () => {
+  it('драбина залежить від кількості, а не розтягується рівномірно', () => {
+    assert.equal(WC.warmupSets(100, 2.5, 1).map((s) => s.pct).join(','), '60');
+    assert.equal(WC.warmupSets(100, 2.5, 2).map((s) => s.pct).join(','), '50,75');
+    assert.equal(WC.warmupSets(100, 2.5, 3).map((s) => s.pct).join(','), '40,60,80');
+    assert.equal(WC.warmupSets(100, 2.5, 4).map((s) => s.pct).join(','), '40,55,70,85');
+    assert.equal(WC.warmupSets(100, 2.5, 5).map((s) => s.pct).join(','), '35,50,65,80,90');
+  });
+
+  it('нуль означає «без розминки», а не «за замовчуванням»', () => {
+    assert.equal(WC.warmupSets(100, 2.5, 0).length, 0);
+  });
+
+  it('без кількості лишається три сходинки — як було до правки', () => {
+    assert.equal(WC.warmupSets(100, 2.5).map((s) => s.pct).join(','), '40,60,80');
+  });
+
+  it('число поза межами підтягується, сміття дає типове', () => {
+    assert.equal(WC.normWarmupCount(9), 5);
+    assert.equal(WC.normWarmupCount(-2), 0);
+    assert.equal(WC.normWarmupCount('3'), 3);
+    assert.equal(WC.normWarmupCount(2.4), 2);
+    for (const bad of [null, undefined, '', 'три', NaN]) {
+      assert.equal(WC.normWarmupCount(bad), null, String(bad));
+    }
+  });
+
+  it('кількість береться з профілю по назві вправи', () => {
+    const p = { warmups: { 'Присідання зі штангою': 5, 'Жим лежачи': 0, 'Тяга': 'сміття' } };
+    assert.equal(WC.warmupCountFor(p, 'Присідання зі штангою'), 5);
+    assert.equal(WC.warmupCountFor(p, 'Жим лежачи'), 0, 'нуль — це вибір, а не відсутність');
+    assert.equal(WC.warmupCountFor(p, 'Тяга'), 3, 'сміття — типове');
+    assert.equal(WC.warmupCountFor(p, 'Чого немає'), 3);
+    assert.equal(WC.warmupCountFor(null, 'Будь-що'), 3);
+  });
+
+  it('вибрана кількість доїжджає до драбини', () => {
+    const p = { warmups: { 'Жим': 2 } };
+    const kg = WC.warmupSets(100, 2.5, WC.warmupCountFor(p, 'Жим')).map((s) => s.kg);
+    assert.equal(kg.join(','), '50,75');
+  });
+});

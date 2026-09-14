@@ -470,6 +470,57 @@
    */
   var WARMUP_PCT = [40, 60, 80];
 
+  /*
+   * ДРАБИНА — ТАБЛИЦЯ, А НЕ ФОРМУЛА.
+   *
+   * Розтягнути ті самі 40–80 % на будь-яку кількість сходинок можна
+   * одним рядком арифметики, але на двох підходах це дало б 40 і 80 %:
+   * стрибок удвічі саме там, де сходинок найменше й кожна має бути
+   * пологішою. Тому кожній кількості — свій ряд, підібраний під те, як
+   * входять у робочу вагу, а не під рівність проміжків.
+   *
+   * П'ять — стеля: далі розминка починає забирати сили в самої вправи.
+   * Нуль — теж відповідь: ізоляцію в кінці тренування розминають уже
+   * зробленими перед нею вправами.
+   */
+  var WARMUP_LADDER = {
+    0: [],
+    1: [60],
+    2: [50, 75],
+    3: WARMUP_PCT,
+    4: [40, 55, 70, 85],
+    5: [35, 50, 65, 80, 90]
+  };
+
+  var WARMUP_DEFAULT = 3;
+  var WARMUP_MAX = 5;
+
+  /**
+   * Скільки розминкових підходів поставила людина: ціле 0…5 або null.
+   *
+   * null — саме «числа немає» (порожньо, сміття), і тільки воно вмикає
+   * типове значення. Нуль означає вибір «без розминки» і типовим НЕ
+   * підміняється: інакше поле виглядало б зламаним — поставив 0, а
+   * повернулось 3.
+   *
+   * Завелике не відкидається, а підтягується до стелі — так само, як
+   * власне число повторень (js/reps-core.js): мовчазне «нічого не
+   * сталось» гірше за видиму поправку.
+   */
+  function normWarmupCount(value) {
+    if (value == null || value === '') return null;
+    var n = Math.floor(Number(String(value).trim()));
+    if (!Number.isFinite(n)) return null;
+    return Math.min(Math.max(n, 0), WARMUP_MAX);
+  }
+
+  /** Кількість розминкових підходів вправи: вибір людини або типові 3. */
+  function warmupCountFor(profile, name) {
+    var book = profile && profile.warmups;
+    var own = book && typeof book === 'object' ? normWarmupCount(book[name]) : null;
+    return own === null ? WARMUP_DEFAULT : own;
+  }
+
   /**
    * Розминкові підходи під робочу вагу.
    *
@@ -489,9 +540,10 @@
    *
    * @param {number} workKg робоча вага вправи, кг
    * @param {number} step   крок млинців (2,5 або 5)
+   * @param {number} [count] скільки сходинок; без нього — типові три
    * @returns {Array<{pct:number, kg:number}>}
    */
-  function warmupSets(workKg, step) {
+  function warmupSets(workKg, step, count) {
     var kg = Number(workKg);
     if (!Number.isFinite(kg) || kg <= 0) return [];
     var plates = (window.OneRM && typeof window.OneRM.toPlates === 'function')
@@ -499,8 +551,14 @@
     /* Без округлення розминки не буває: 37,4 кг у залі не зібрати. */
     if (!plates) return [];
 
+    /* undefined — «кількість не питали», тобто типові три. Явний нуль
+       проходить через normWarmupCount і чесно дає порожню розминку. */
+    var n = count === undefined ? WARMUP_DEFAULT : normWarmupCount(count);
+    if (n === null) n = WARMUP_DEFAULT;
+    var pcts = WARMUP_LADDER[n] || [];
+
     var out = [], seen = Object.create(null);
-    WARMUP_PCT.forEach(function (pct) {
+    pcts.forEach(function (pct) {
       var w = plates(kg * pct / 100, step);
       /*
        * Нуль означає «легше за найменший млинець» — це вже не вага.
@@ -542,6 +600,11 @@
     completedToday: completedToday,
     completedThisWeek: completedThisWeek,
     WARMUP_PCT: WARMUP_PCT,
+    WARMUP_LADDER: WARMUP_LADDER,
+    WARMUP_DEFAULT: WARMUP_DEFAULT,
+    WARMUP_MAX: WARMUP_MAX,
+    normWarmupCount: normWarmupCount,
+    warmupCountFor: warmupCountFor,
     warmupSets: warmupSets
   };
 })();

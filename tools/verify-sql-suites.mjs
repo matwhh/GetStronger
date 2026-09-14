@@ -65,7 +65,8 @@ const SUITES = [
   { file: 'db/elo-tests.sql',            tag: 'ELO-ТЕСТИ' },
   { file: 'db/elo-integrity-tests.sql',  tag: 'ELO-INTEGRITY' },
   { file: 'db/multiuser-tests.sql',      tag: 'MULTIUSER' },
-  { file: 'db/sim-week.sql',             tag: 'SIM' }
+  { file: 'db/sim-week.sql',             tag: 'SIM' },
+  { file: 'db/close-season-tests.sql',    tag: 'ЗАКРИТТЯ СЕЗОНУ' }
 ];
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-sql-'));

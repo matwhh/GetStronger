@@ -305,7 +305,6 @@ Vercel збирає сам (збірки немає — статика)
 
 | Що | Де | Термін |
 |---|---|---|
-| `elo_close_season` перевести на сервер із `p_user` + cron | DB-008 | до 2026-12-03 (кінець сезону) |
 | Sentry: увімкнути «Prevent Storing of IP Addresses» | OPS-005 | панель Sentry |
 | Рішення: чи слати помилки SW у Sentry | PWA-011 | — |
 | Vercel: Production Branch зробити `release` | OPS-004 | панель Vercel |

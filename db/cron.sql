@@ -37,3 +37,9 @@ grant usage on schema cron to postgres;
 grant all privileges on all tables in schema cron to postgres;
 
 select cron.schedule('forge-elo-week', '10 0 * * *', $$select public.elo_cron_eval_week()$$);
+
+-- DB-008. Закриття сезону. 03:40 UTC — після нічної оцінки тижня (00:10) і
+-- після чистки покинутих реєстрацій (03:20), щоб підсумок бачив уже
+-- дорахований останній тиждень. Функція сама нічого не робить, поки сезон
+-- не завершився й не минуло вікно дописування.
+select cron.schedule('forge-close-season', '40 3 * * *', $$select public.elo_cron_log_close_seasons()$$);

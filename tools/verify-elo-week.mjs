@@ -112,8 +112,42 @@ try {
 
   const today = val('select current_date');
   const monday = (n) => val(`select (date_trunc('week', current_date)::date - ${n} * 7)::text`);
-  const lastWeek = monday(1), twoWeeksAgo = monday(2), threeWeeksAgo = monday(3);
-  console.log('  · сьогодні ' + today + ', минулий тиждень із ' + lastWeek);
+  const lastWeek = monday(1);
+
+  /*
+   * ТИЖДЕНЬ ДЛЯ ФІКСТУР ОБИРАЄТЬСЯ, А НЕ ВІДЛІЧУЄТЬСЯ.
+   *
+   * Тут стояло просто «два тижні тому» — і 14.09.2026 весь набір
+   * почервонів на порожньому місці: тиждень 31.08–06.09 лежить на межі
+   * сезонів. Події сіються за season_of(ДНЯ), а придатність тижня
+   * рахується за season_of(НЕДІЛІ) — ELO-005 навмисно віддає тиждень
+   * сезону його неділі. Для тижня-межі це різні сезони, перша подія
+   * людини не потрапляє в той сезон, за яким тиждень оцінюють, і
+   * week_ready чесно каже before_first_event. Падало пʼять перевірок
+   * поспіль, хоча жодного коду ніхто не міняв — червоніло від дати.
+   *
+   * Тому беремо найсвіжіший тиждень, який (а) уже минув разом із вікном
+   * подання і (б) не перетинає межу сезону. Набір перестає залежати від
+   * того, якого числа його запустили. Сам випадок тижня-межі нікуди не
+   * дівається — він перевіряється окремо, нижче й навмисно.
+   */
+  const pickWeek = () => {
+    for (let n = 2; n <= 16; n++) {
+      const m = monday(n);
+      /* case ... end, а не boolean::text: psql друкує булеве поле як
+         't'/'f', але ЗВЕДЕНЕ до тексту — як 'true'/'false', і порівняння
+         з 't' не спрацьовувало ніколи. Саме через це перша спроба цього
+         виправлення мовчки повертала той самий тиждень-межу. */
+      const same = val(`select case when season_of('${m}'::date) = season_of('${m}'::date + 6)
+                                    then 1 else 0 end`);
+      if (same === '1') return m;
+    }
+    return monday(2);
+  };
+  const twoWeeksAgo = pickWeek();
+  const threeWeeksAgo = val(`select ('${twoWeeksAgo}'::date - 7)::text`);
+  console.log('  · сьогодні ' + today + ', минулий тиждень із ' + lastWeek +
+              ', робочий тиждень фікстур ' + twoWeeksAgo);
 
   const ev = (u, day, cat, type, key, qual) =>
     run(`insert into elo_events (user_id, season, day, category, event_type, action_key, quality, delta, elo_after, reason)
@@ -237,6 +271,50 @@ try {
     const n = val(`select count(*) from elo_events where user_id = '${A}'
                    and event_type = 'week' and day = '${sunday}'::date`);
     if (n !== '1') throw new Error('week-рядка за ' + sunday + ' немає');
+  });
+
+  /*
+   * ТИЖДЕНЬ, ЩО ЛЕЖИТЬ НА МЕЖІ СЕЗОНІВ.
+   *
+   * Правило записане тут навмисно, а не лишене «як вийде»: саме через
+   * нього набір червонів 14.09.2026, і саме його доведеться змінити, якщо
+   * колись вирішать інакше.
+   *
+   * Тиждень належить сезону своєї НЕДІЛІ (ELO-005), а «перша подія
+   * людини» шукається В ЦЬОМУ Ж сезоні (ELO-002). Отже тиждень, у якому
+   * людина тренувалась лише в дні попереднього сезону, для нового сезону
+   * ще не почався — і не оцінюється. Тижневий бонус і штраф за такий
+   * тиждень не нараховуються; самі дії за ті дні своє ELO вже дали в
+   * попередньому сезоні.
+   */
+  check('тиждень на межі сезонів належить сезону своєї неділі', () => {
+    let wk = null;
+    for (let n = 2; n <= 16; n++) {
+      const m = monday(n);
+      const same = val(`select case when season_of('${m}'::date) = season_of('${m}'::date + 6)
+                                    then 1 else 0 end`);
+      if (same === '0') { wk = m; break; }
+    }
+    if (!wk) { console.log('    (тижня-межі серед останніх 16 немає — випадок не відтворюється)'); return; }
+
+    const F = '00000000-0000-4000-8000-00000000000f';
+    run(`insert into auth.users (id, email) values ('${F}', '${F}@t');
+         insert into account_status (user_id, status, username) values ('${F}', 'approved', 'userf')`);
+
+    /* Тренування в понеділок — це ще попередній сезон. */
+    ev(F, wk, 'training', 'workout', 'wf:' + wk, 1);
+    const r1 = val(`select public.elo_week_ready('${F}', '${wk}'::date,
+                     (select data from elo_config where id = 1))`);
+    if (r1 !== 'before_first_event') {
+      throw new Error('очікувалось before_first_event, отримано ' + (r1 || 'ГОТОВИЙ'));
+    }
+
+    /* Неділя того ж тижня — уже новий сезон, і тиждень стає придатним. */
+    const sun = val(`select ('${wk}'::date + 6)::text`);
+    ev(F, sun, 'training', 'workout', 'wf:' + sun, 1);
+    const r2 = val(`select coalesce(public.elo_week_ready('${F}', '${wk}'::date,
+                     (select data from elo_config where id = 1)), 'ГОТОВИЙ')`);
+    if (r2 !== 'ГОТОВИЙ') throw new Error('тиждень-межа визнано непридатним: ' + r2);
   });
 
   /* --------------------------------- ELO-006: тиждень вступу — неповний */

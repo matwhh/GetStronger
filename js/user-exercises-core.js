@@ -44,8 +44,17 @@
     return s;
   }
 
-  /** Ключ порівняння назв: регістр і пробіли не роблять вправу іншою. */
-  function keyOf(name) {
+  /*
+   * Ключ порівняння НАЗВ.
+   *
+   * Не keyOf — це імʼя в проєкті зайняте датами (js/date-core.js), і
+   * гігієна стежить, щоб воно не почало означати дві різні речі.
+   *
+   * Регістр і зайві пробіли вправи не міняють: у книзі ваг, у стелі ваги
+   * й в історії ключем стоїть сама назва, тож «Жим лежачи» і «жим
+   * ЛЕЖАЧИ» ділили б одне число, хоч у списку виглядали б як дві вправи.
+   */
+  function nameKey(name) {
     var s = normName(name);
     return s === null ? null : s.toLowerCase();
   }
@@ -111,9 +120,9 @@
     if (name === null) return { ok: false, why: 'name' };
     if (normMuscles(raw && raw.muscles, known) === null) return { ok: false, why: 'muscles' };
 
-    var key = keyOf(name);
-    var busy = (Array.isArray(taken) ? taken : []).some(function (n) { return keyOf(n) === key; }) ||
-               src.some(function (e) { return keyOf(e && e.name) === key; });
+    var key = nameKey(name);
+    var busy = (Array.isArray(taken) ? taken : []).some(function (n) { return nameKey(n) === key; }) ||
+               src.some(function (e) { return nameKey(e && e.name) === key; });
     if (busy) return { ok: false, why: 'dup' };
 
     var one = normOne(raw, known);
@@ -123,9 +132,9 @@
 
   /** Прибрати свою вправу за назвою. Повертає НОВИЙ список. */
   function remove(current, name) {
-    var key = keyOf(name);
+    var key = nameKey(name);
     return (Array.isArray(current) ? current : [])
-      .filter(function (e) { return keyOf(e && e.name) !== key; });
+      .filter(function (e) { return nameKey(e && e.name) !== key; });
   }
 
   /**
@@ -138,11 +147,11 @@
     var lib = Array.isArray(library) ? library : [];
     var busy = Object.create(null);
     lib.forEach(function (e) {
-      var k = keyOf(e && e.name);
+      var k = nameKey(e && e.name);
       if (k !== null) busy[k] = true;
     });
     var extra = (Array.isArray(own) ? own : []).filter(function (e) {
-      var k = keyOf(e && e.name);
+      var k = nameKey(e && e.name);
       if (k === null || busy[k]) return false;
       busy[k] = true;
       return true;

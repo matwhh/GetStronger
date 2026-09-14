@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
 /* exercises.js дає liftKind/primaryMuscle/MUSCLES для restSecFor */
-const ctx = loadModules(['js/date-core.js', 'js/exercises.js', 'js/workout-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/exercises.js', 'js/onerm-core.js', 'js/workout-core.js']);
 const WC = ctx.WorkoutCore;
 
 /* Синтетичний день: складна велика (3 хв), ізоляція (2 хв), кругова («—»).
@@ -339,5 +339,52 @@ describe('resolvePlan: власне число повторень доїжджа
       { name: 'Жим лежачи', muscles: ['chest'], sets: 3, reps: '3–5' }
     ]), PROGRAMS);
     assert.equal(r.plan[0].exercises[0].reps, '8–10');
+  });
+});
+
+/*
+ * РОЗМИНКА ВІДСОТКАМИ (E7)
+ *
+ * Доти розминка в системі не існувала зовсім: у плані вона згадана
+ * словом, але жодного числа під нею немає, і людина в залі рахує
+ * відсотки в голові або не рахує взагалі.
+ *
+ * Числа тут НЕ вигадані щоразу заново: відсотки беруться з одного
+ * переліку WARMUP_PCT, а округлення — з OneRM.toPlates, того самого,
+ * яким користується калькулятор. Друга копія округлення розійшлася б із
+ * першою на першій же правці кроку.
+ *
+ * Головне, що стережеться, — розминка не бреше точністю: вага, якої не
+ * зібрати млинцями, і повтори, яких ніхто не міряв, тут не зʼявляються.
+ */
+describe('розминка відсотками', () => {
+  it('три сходинки від робочої ваги, округлені до кроку', () => {
+    const w = WC.warmupSets(100, 2.5);
+    assert.equal(w.map((s) => s.kg).join(','), '40,60,80');
+    assert.equal(w.map((s) => s.pct).join(','), '40,60,80');
+  });
+
+  it('округлення саме до кроку, а не до цілих кілограмів', () => {
+    /* 40% від 62,5 — це 25; 60% — 37,5; 80% — 50. Крок 2,5 їх бере. */
+    assert.equal(WC.warmupSets(62.5, 2.5).map((s) => s.kg).join(','), '25,37.5,50');
+    /* Крок 5 (ноги) зсуває ті самі числа на сітку по 5. */
+    assert.equal(WC.warmupSets(62.5, 5).map((s) => s.kg).join(','), '25,40,50');
+  });
+
+  it('однакові після округлення сходинки не дублюються', () => {
+    /* На малій вазі 40/60/80 % сходяться в одне-два числа, і показувати
+       «10 кг, 10 кг, 10 кг» означало б удавати три підходи там, де один. */
+    const kg = WC.warmupSets(12, 5).map((s) => s.kg);
+    assert.equal(kg.join(','), [...new Set(kg)].join(','));
+  });
+
+  it('нуль і сміття не дають розминки', () => {
+    for (const bad of [0, -50, null, undefined, NaN, 'важко']) {
+      assert.equal(WC.warmupSets(bad, 2.5).length, 0, String(bad));
+    }
+  });
+
+  it('вага, менша за крок, розминки не потребує', () => {
+    assert.equal(WC.warmupSets(2, 2.5).length, 0);
   });
 });

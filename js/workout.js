@@ -739,6 +739,21 @@
               (ex.rir ? ' · RIR ' + esc(ex.rir) : '') +
             '</span>' +
             (ex.note ? '<span class="tdy-ex__note">' + esc(ex.note) + '</span>' : '') +
+            /*
+             * Розминка (E7). Крок — базовий 2,5 для всіх вправ, а не 5
+             * для ніг: класифікація «нога / не нога» живе в today.js і
+             * programs.js, і третя її копія тут розійшлася б із ними.
+             * Для розминки дрібніший крок ніколи не буває помилкою —
+             * 2,5 збирається на будь-якій штанзі.
+             */
+            (function () {
+              const w = (window.OneRM && WC.warmupSets)
+                ? WC.warmupSets(planWeight(ex.name), window.OneRM.PLATE_STEP) : [];
+              if (!w.length) return '';
+              return '<span class="tdy-ex__note">Розминка (' +
+                WC.WARMUP_PCT.join('/') + ' %): ' +
+                w.map(function (x) { return fmtNum.kg(x.kg); }).join(' · ') + ' кг</span>';
+            })() +
           '</div>' +
           '<button class="tdy-ex__rest btn btn--ghost btn--sm" type="button" ' +
                   'data-rest-sec="' + sec + '" data-rest-name="' + esc(ex.name) + '">' +

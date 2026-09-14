@@ -13,9 +13,14 @@
  *
  * ЧОТИРИ УМОВИ, І ВСІ МУСЯТЬ ЗБІГТИСЬ:
  *
- *   1. ТИЖДЕНЬ ЗАКРИТИЙ. Усі заплановані дні тижня завершені кнопкою.
- *      Не «хоч щось зроблено» — саме всі: підняти вагу після тижня, де
- *      два дні з трьох пропущено, означає закріпити недоробку.
+ *   1. ВПРАВУ ЗРОБЛЕНО СТІЛЬКИ РАЗІВ, СКІЛЬКИ ЇЇ ПЛАНУЄ ТИЖДЕНЬ.
+ *      Думка та сама, що була: підняти вагу після тижня, де половина
+ *      підходів не зроблена, означає закріпити недоробку. Але доти ця
+ *      умова стояла на рівні ВСЬОГО тижня — «усі заплановані дні
+ *      завершені», — і тому пропущений день ніг глушив жим, зроблений
+ *      двічі й на межі. Вправа, яку зробили як належить, нічого не
+ *      винна дню, якого не було; пропуск карається рейтингом
+ *      (missedWorkoutPenalty), а не чужою вагою (E6).
  *   2. ВПРАВА НА ВЕРХНІЙ МЕЖІ в УСІХ своїх робочих підходах того тижня.
  *      Один підхід із дев'ятьма повтореннями з діапазону 8–10 — ще не
  *      привід: правило вимагає верхню межу скрізь.
@@ -237,7 +242,23 @@
 
     var days = Number(profile.daysPerWeek) ||
                (profile.activePlan && Number(profile.activePlan.days)) || plan.length;
-    if (!weekComplete(profile.sessionLog, prevMon, days)) return [];
+    /*
+     * Тиждень БІЛЬШЕ НЕ ВОРОТА (E6). Доти тут стояв ранній вихід: один
+     * пропущений день — і порожній список для всіх вправ одразу. Тепер
+     * повнота тижня лише супроводжує пропозицію (поле weekClosed), щоб
+     * екран міг це сказати, а рішення ухвалюється по кожній вправі.
+     */
+    var weekClosed = weekComplete(profile.sessionLog, prevMon, days);
+
+    /* Скільки разів тиждень планує кожну вправу. Рахується з плану, а не
+       з факту: саме з цим числом порівнюється зроблене. */
+    var plannedTimes = Object.create(null);
+    plan.forEach(function (day) {
+      var list = (day && Array.isArray(day.exercises)) ? day.exercises : [];
+      list.forEach(function (ex) {
+        if (ex && ex.name) plannedTimes[ex.name] = (plannedTimes[ex.name] || 0) + 1;
+      });
+    });
 
     var weights = profile.weights || {};
     var sl = profile.sessionLog || {};
@@ -267,7 +288,8 @@
           appeared++;
           if (!hitTop(e, top)) allTop = false;
         });
-        if (!appeared || !allTop) return;
+        /* Стільки ж разів, скільки планує тиждень, і щоразу на межі. */
+        if (appeared < (plannedTimes[name] || 1) || !allTop) return;
 
         var age = weightAge(profile, name, today);
         if (!age || age.sessions < MIN_SESSIONS) return;
@@ -279,7 +301,8 @@
         out.push({
           name: name, kg: kg, step: step, next: kg + step,
           top: top, reps: String(ex.reps || ''),
-          days: age.days, sessions: age.sessions, week: prevMon
+          days: age.days, sessions: age.sessions, week: prevMon,
+          weekClosed: weekClosed
         });
       });
     });

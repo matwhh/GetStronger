@@ -468,7 +468,7 @@
    * підготувати, а не втомити, і кожен зайвий підхід у ній — це підхід,
    * знятий із робочих.
    */
-  var WARMUP_PCT = [40, 60, 80];
+  var WARMUP_PCT = [45, 65, 85];
 
   /*
    * ДРАБИНА — ТАБЛИЦЯ, А НЕ ФОРМУЛА.
@@ -486,11 +486,42 @@
   var WARMUP_LADDER = {
     0: [],
     1: [60],
-    2: [50, 75],
+    2: [50, 70],
     3: WARMUP_PCT,
     4: [40, 55, 70, 85],
     5: [35, 50, 65, 80, 90]
   };
+
+  /*
+   * ВІДСОТКИ Й ПОВТОРИ — З ОПУБЛІКОВАНОГО ПРОТОКОЛУ.
+   *
+   * Перша версія цієї таблиці була складена «на око», і на трьох
+   * сходинках давала 40/60/80. Тепер 1 → 60; 2 → 50/70; 3 → 45/65/85 —
+   * як у Warm Up Protocol Джеффа Ніппарда, на чий канал сайт і посилає
+   * по техніку виконання. Своє число проти чужого опублікованого —
+   * програє за визначенням.
+   *
+   * Повторів тут раніше не було СВІДОМО: вигадане число поруч із
+   * порахованою вагою видавало б здогад за розрахунок. Тепер джерело те
+   * саме, що й для відсотків: чим важча сходинка, тим менше повторень —
+   * розминка має підготувати, а не втомити.
+   *
+   * Чотири й пʼять сходинок протокол не описує: там продовжено ту саму
+   * логіку спадання. Тому це таблиця, а не формула — домальоване видно
+   * окремо від узятого з джерела.
+   */
+  var WARMUP_REPS = {
+    0: [],
+    1: ['6–10'],
+    2: ['6–10', '4–6'],
+    3: ['6–10', '4–6', '3–4'],
+    4: ['8–10', '6–8', '4–6', '3–4'],
+    5: ['8–10', '6–8', '4–6', '3–4', '2–3']
+  };
+
+  /* Стеля свого числа повторень у розминці: вище — це вже не розминка,
+     а робочий підхід у високому діапазоні. */
+  var WARMUP_REPS_MAX = 30;
 
   var WARMUP_DEFAULT = 3;
   var WARMUP_MAX = 5;
@@ -533,6 +564,42 @@
     return known || ex;
   }
 
+  /** Своє число повторень однієї сходинки: ціле 1…30, або null. */
+  function normWarmupReps(value) {
+    if (value == null || value === '') return null;
+    var txt = String(value).trim();
+    if (txt === '') return null;
+    var n = Math.round(Number(txt));
+    if (!Number.isFinite(n) || n < 1) return null;
+    return Math.min(n, WARMUP_REPS_MAX);
+  }
+
+  /**
+   * Запис книги розминки, приведений до однієї форми: {n, reps} або null.
+   *
+   * У книзі лежить або САМЕ ЧИСЛО (так писала перша версія), або обʼєкт
+   * із повторами. Стара форма читається як є й не мігрується: вибір
+   * «дві сходинки», зроблений учора, мусить пережити сьогоднішню правку.
+   *
+   * null означає «вибору немає» — і тільки він вмикає типове значення.
+   */
+  function normWarmup(value) {
+    if (value == null || value === '') return null;
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      var n = normWarmupCount(value.n);
+      if (n === null) return null;
+      var src = Array.isArray(value.reps) ? value.reps : [];
+      var reps = [];
+      for (var i = 0; i < n; i++) reps.push(normWarmupReps(src[i]));
+      return { n: n, reps: reps };
+    }
+    var plain = normWarmupCount(value);
+    if (plain === null) return null;
+    var empty = [];
+    for (var k = 0; k < plain; k++) empty.push(null);
+    return { n: plain, reps: empty };
+  }
+
   /*
    * ТИПОВА КІЛЬКІСТЬ ЗАЛЕЖИТЬ ВІД ТИПУ ВПРАВИ.
    *
@@ -551,8 +618,8 @@
   function warmupCountFor(profile, ex) {
     var one = (ex && typeof ex === 'object') ? ex : { name: String(ex == null ? '' : ex) };
     var book = profile && profile.warmups;
-    var own = book && typeof book === 'object' ? normWarmupCount(book[one.name]) : null;
-    if (own !== null) return own;
+    var own = book && typeof book === 'object' ? normWarmup(book[one.name]) : null;
+    if (own !== null) return own.n;
 
     /* liftKind сам дивиться спершу в поле lift, потім у бібліотеку за
        назвою, і лише тоді здається — старі збережені плани поля не
@@ -577,6 +644,21 @@
     return WARMUP_DEFAULT;
   }
 
+  /** Повтори кожної сходинки: своє число або діапазон із протоколу. */
+  function warmupRepsFor(profile, ex) {
+    var one = (ex && typeof ex === 'object') ? ex : { name: String(ex == null ? '' : ex) };
+    var n = warmupCountFor(profile, one);
+    var book = profile && profile.warmups;
+    var own = (book && typeof book === 'object') ? normWarmup(book[one.name]) : null;
+    var base = WARMUP_REPS[n] || [];
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var mine = (own && own.n === n) ? own.reps[i] : null;
+      out.push(mine === null || mine === undefined ? (base[i] || '') : String(mine));
+    }
+    return out;
+  }
+
   /**
    * Розминкові підходи під робочу вагу.
    *
@@ -597,9 +679,10 @@
    * @param {number} workKg робоча вага вправи, кг
    * @param {number} step   крок млинців (2,5 або 5)
    * @param {number} [count] скільки сходинок; без нього — типові три
-   * @returns {Array<{pct:number, kg:number}>}
+   * @param {Array<number|null>} [reps] свої повтори посходинково
+   * @returns {Array<{pct:number, kg:number, reps:string}>}
    */
-  function warmupSets(workKg, step, count) {
+  function warmupSets(workKg, step, count, reps) {
     var kg = Number(workKg);
     if (!Number.isFinite(kg) || kg <= 0) return [];
     var plates = (window.OneRM && typeof window.OneRM.toPlates === 'function')
@@ -613,8 +696,11 @@
     if (n === null) n = WARMUP_DEFAULT;
     var pcts = WARMUP_LADDER[n] || [];
 
+    var base = WARMUP_REPS[n] || [];
+    var own = Array.isArray(reps) ? reps : [];
+
     var out = [], seen = Object.create(null);
-    pcts.forEach(function (pct) {
+    pcts.forEach(function (pct, idx) {
       var w = plates(kg * pct / 100, step);
       /*
        * Нуль означає «легше за найменший млинець» — це вже не вага.
@@ -626,7 +712,11 @@
        */
       if (!(w > 0) || w >= kg || seen[w]) return;
       seen[w] = true;
-      out.push({ pct: pct, kg: w });
+      /* Повтори беруться за ІНДЕКСОМ сходинки, а не за місцем у
+         результаті: коли сусідні відсотки схлопнулись, той, що лишився,
+         мусить нести свої повтори, а не чужі, що просто були першими. */
+      var mine = normWarmupReps(own[idx]);
+      out.push({ pct: pct, kg: w, reps: mine === null ? (base[idx] || '') : String(mine) });
     });
     return out;
   }
@@ -657,6 +747,11 @@
     completedThisWeek: completedThisWeek,
     WARMUP_PCT: WARMUP_PCT,
     WARMUP_LADDER: WARMUP_LADDER,
+    WARMUP_REPS: WARMUP_REPS,
+    WARMUP_REPS_MAX: WARMUP_REPS_MAX,
+    normWarmup: normWarmup,
+    normWarmupReps: normWarmupReps,
+    warmupRepsFor: warmupRepsFor,
     WARMUP_DEFAULT: WARMUP_DEFAULT,
     WARMUP_MAX: WARMUP_MAX,
     normWarmupCount: normWarmupCount,

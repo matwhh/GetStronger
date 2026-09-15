@@ -671,7 +671,7 @@ for (const w of [320, 390, 430]) {
   /* ---- Розминка: одне число замість двох текстових рядків ---- */
   const block = await p.locator('#workout .tdy-ex').first().innerText();
   ok('10. рядка «Підводні» в блоці вправи немає', !/Підводн/i.test(block), block.replace(/\n+/g, ' | ').slice(0, 90));
-  ok('10. драбини відсотками в блоці теж немає', !/40\/60\/80/.test(block));
+  ok('10. драбини відсотками в блоці теж немає', !/40\/60\/80|45\/65\/85/.test(block));
   ok('10. натомість один короткий рядок розминки',
      /Розминка/.test(block) && await p.locator('[data-wu-val]').count() > 0);
 
@@ -698,12 +698,56 @@ for (const w of [320, 390, 430]) {
        const pr = await window.Store.getProfile();
        return Number((pr.warmups || {})[n]);
      }, exName) === 1);
-  ok('10. і рядок каже «1 підхід»',
-     /^1 підхід$/.test(await p.locator('[data-wu-val]').first().innerText()),
+  /*
+   * РЯДОК КАЖЕ ВСЕ: номер, вагу й повтори. Раніше тут стояло «1 підхід»,
+   * і щоб дізнатись, з якої ваги починати, доводилось відкривати вікно —
+   * у залі, з телефоном в одній руці.
+   */
+  ok('10. рядок показує саму драбину, а не кількість',
+     /^1×\d+([.,]\d+)?×\d/.test(await p.locator('[data-wu-val]').first().innerText()),
      await p.locator('[data-wu-val]').first().innerText());
 
-  /* Нуль прибирає рядок зовсім — це й просили: порожнього рядка немає. */
+  /* Окреме вікно розминки: кількість + повтори кожної сходинки. */
+  await tap(p.locator('[data-wu-edit]').first());
+  await p.waitForTimeout(400);
+  ok('10. у розминки своє вікно', await p.locator('.modal #wk-sh-n').count() === 1 &&
+     await p.locator('.modal #wk-wu-r0').count() === 1);
+  ok('10. і в ньому видно вагу сходинки',
+     /кг/.test(await p.locator('.modal [data-wu-kg="0"]').innerText()),
+     await p.locator('.modal [data-wu-kg="0"]').innerText());
+  await p.locator('.modal #wk-sh-n').fill('2');
+  await p.waitForTimeout(250);
+  ok('10. друга сходинка зʼявилась одразу',
+     await p.locator('.modal [data-wu-row="1"]').isVisible());
+  await p.locator('.modal #wk-wu-r1').fill('4');
+  await tap(p.locator('.modal [data-sh="yes"]'));
+  await p.waitForTimeout(900);
+
+  ok('10. свої повтори доїхали в рядок',
+     /2×\d+([.,]\d+)?×4$/.test(await p.locator('[data-wu-val]').first().innerText()),
+     await p.locator('[data-wu-val]').first().innerText());
+  ok('10. і лежать у профілі під своєю сходинкою',
+     await p.evaluate(async (n) => {
+       const pr = await window.Store.getProfile();
+       const w = (pr.warmups || {})[n];
+       return w && w.n === 2 && w.reps[1] === 4;
+     }, exName));
+
+  /* Вікно ваги міняє ТІЛЬКИ кількість — і не має стерти ці повтори. */
   await tap(p.locator('[data-wt-edit]').first());
+  await p.waitForTimeout(400);
+  await p.locator('.modal #wk-sh-n').fill('3');
+  await tap(p.locator('.modal [data-sh="yes"]'));
+  await p.waitForTimeout(900);
+  ok('10. правка кількості у вікні ваги не стирає повтори',
+     await p.evaluate(async (n) => {
+       const pr = await window.Store.getProfile();
+       const w = (pr.warmups || {})[n];
+       return w && w.n === 3 && w.reps[1] === 4;
+     }, exName));
+
+  /* Нуль прибирає рядок зовсім — це й просили: порожнього рядка немає. */
+  await tap(p.locator('[data-wu-edit]').first());
   await p.waitForTimeout(400);
   await p.locator('.modal #wk-sh-n').fill('0');
   await tap(p.locator('.modal [data-sh="yes"]'));
@@ -711,8 +755,15 @@ for (const w of [320, 390, 430]) {
   const firstRow = await p.locator('#workout .tdy-ex').first().innerText();
   ok('10. без розминки рядка «Розминка» немає взагалі',
      !/Розминка/.test(firstRow), firstRow.replace(/\n+/g, ' | ').slice(0, 80));
-  ok('10. а вікно вправи все одно відкривається',
+  /* А сама розминка при цьому не стає недосяжною: кількість лишається у
+     вікні ваги, яке є в кожної вправи. */
+  ok('10. але ввімкнути її є звідки — поле лишилось у вікні ваги',
      await p.locator('[data-wt-edit]').first().count() === 1);
+  await tap(p.locator('[data-wt-edit]').first());
+  await p.waitForTimeout(400);
+  ok('10. і це саме поле кількості', await p.locator('.modal #wk-sh-n').count() === 1);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(300);
 
   /*
    * ІЗОЛЯЦІЯ РОЗМИНКИ НЕ ПРОСИТЬ.

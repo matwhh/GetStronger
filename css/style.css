@@ -1321,6 +1321,25 @@ a.card > .btn {
   font-size: 0.92rem; color: var(--text);
 }
 .tdy-ex__meta-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Розминка — єдиний рядок, якому дозволено перенестись: у ньому стоїть
+   уся драбина («1×45×6–10 · 2×65×4–6»), і обрізати її трьома крапками
+   означало б повернути те, заради чого вона тут і зʼявилась — потребу
+   відкривати вікно, щоб дізнатись вагу. */
+.tdy-ex__meta-row--wrap { align-items: flex-start; padding: 4px 0; }
+.tdy-ex__meta-row--wrap .tdy-ex__meta-lbl { padding-top: 2px; }
+.tdy-ex__meta-row--wrap .tdy-ex__meta-txt { white-space: normal; overflow: visible; line-height: 1.45; }
+
+/* Рядок сходинки у вікні розминки: номер, порахована вага, поле повторів. */
+.wu-list { display: flex; flex-direction: column; gap: 6px; }
+.wu-row { display: flex; align-items: center; gap: 8px; }
+.wu-row[hidden] { display: none; }
+.wu-row__n { flex: 0 0 auto; width: 16px; font-size: 0.8rem; color: var(--muted); }
+.wu-row__kg { flex: 0 0 auto; min-width: 72px; font-size: 0.92rem; color: var(--text); }
+.wu-row__x { font-size: 0.8rem; color: var(--muted); }
+/* .modal__box .input ставить 100 % ширини — тут поле навмисно вузьке,
+   бо в ньому одне-два числа. Тому селектор тієї ж ваги, але нижче. */
+.modal__box .wu-row .input { width: 88px; }
+
 /* «змінити» навмисно тьмяне: воно не має конкурувати з кружечками
    підходів, заради яких сторінку й відкривають. Ціль дотику — 44 px,
    зроблена відступами з відʼємними полями, щоб не роздувати рядок. */

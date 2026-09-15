@@ -747,7 +747,27 @@
   function warmupLadder(ex) {
     if (!window.OneRM || !WC.warmupSets) return [];
     return WC.warmupSets(planWeight(ex.name), window.OneRM.PLATE_STEP,
-      WC.warmupCountFor(state.profile, ex));
+      WC.warmupCountFor(state.profile, ex), warmupOwnReps(ex.name));
+  }
+
+  /** Свої повтори сходинок із книги, як вони записані (числа або null). */
+  function warmupOwnReps(name) {
+    const own = WC.normWarmup((state.profile.warmups || {})[name]);
+    return own ? own.reps : [];
+  }
+
+  /**
+   * Рядок розминки — ЦІЛКОМ, а не натяк на нього.
+   *
+   * Було «3 підходи»: щоб дізнатись, з якої ваги починати, доводилось
+   * відкривати вікно — у залі, з телефоном в одній руці. Тепер у рядку
+   * стоїть усе, що треба зробити: номер, вага і скільки разів. Відсотка
+   * тут немає навмисно — у залі на штангу вішають кілограми.
+   */
+  function warmupLine(ex) {
+    return warmupLadder(ex).map(function (x, i) {
+      return (i + 1) + '×' + fmtNum.kg(x.kg) + '×' + x.reps;
+    }).join(' · ');
   }
 
   /** Підказка у вікні: що дадуть N сходинок при цій робочій вазі. */
@@ -757,21 +777,6 @@
     const l = window.OneRM ? WC.warmupSets(kg, window.OneRM.PLATE_STEP, n) : [];
     if (!l.length) return 'Без розминкових підходів.';
     return l.map(function (x) { return fmtNum.kg(x.kg) + ' кг'; }).join(' · ');
-  }
-
-  /** Коротке значення рядка «Розминка»: рахуємо СХОДИНКИ, а не вибір. */
-  function warmupLabel(ex) {
-    if (!WC.warmupCountFor(state.profile, ex)) return 'без розминки';
-    const l = warmupLadder(ex);
-    /*
-     * Нуль сходинок при ненульовому виборі — не помилка вибору, а
-     * наслідок ваги: без робочої ваги рахувати нема від чого, а на дуже
-     * малій сусідні відсотки після округлення схлопуються в одне число.
-     * Показати тут «3 підходи», яких у вікні не буде, означало б збрехати
-     * рівно в тому місці, заради якого цей рядок і стоїть.
-     */
-    if (!l.length) return '—';
-    return l.length + ' ' + window.App.plural(l.length, 'підхід', 'підходи', 'підходів');
   }
 
   /** Коротке значення рядка «Ваги підходів»: що реально записано. */
@@ -967,10 +972,7 @@
      * стояла. Тому не в customPlans.
      */
     if (warm !== undefined && warm !== WC.warmupCountFor(state.profile, ex)) {
-      const book = Object.assign({}, state.profile.warmups || {});
-      book[ex.name] = warm;
-      state.profile.warmups = book;
-      patch.warmups = book;
+      patch.warmups = writeWarmup(ex.name, warm, null);
     }
 
     if (!Object.keys(patch).length) return;
@@ -979,6 +981,32 @@
       toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');
     });
     render();
+  }
+
+  /**
+   * Запис у книгу розминки.
+   *
+   * Одне місце на обидва вікна: у вікні ваги міняють ЛИШЕ кількість, і
+   * воно не має права стерти повтори, набрані у вікні розминки. Тому
+   * масив повторів не переписується цілком, а підрізається чи
+   * доповнюється під нову кількість.
+   *
+   * Коли своїх повторів немає жодних, у книгу лягає САМЕ ЧИСЛО — та
+   * форма, яку писала перша версія і яку читає стара збірка сайту, ще
+   * відкрита в іншій вкладці.
+   */
+  function writeWarmup(name, n, repsOverride) {
+    const book = Object.assign({}, state.profile.warmups || {});
+    const own = WC.normWarmup(book[name]);
+    const prev = own ? own.reps : [];
+    const reps = [];
+    for (let k = 0; k < n; k++) {
+      const v = repsOverride ? repsOverride[k] : prev[k];
+      reps.push(WC.normWarmupReps(v));
+    }
+    book[name] = reps.some(function (r) { return r !== null; }) ? { n: n, reps: reps } : n;
+    state.profile.warmups = book;
+    return book;
   }
 
   /**
@@ -1005,6 +1033,104 @@
     return all;
   }
 
+  /*
+   * ВІКНО РОЗМИНКИ.
+   *
+   * Кількість сходинок є і у вікні ваги — там її зручно поставити
+   * заразом із самою вагою. Але повтори там були б п'ятим і шостим
+   * полем у вікні, яке відкривають, щоб змінити одне число. Тому все,
+   * що стосується самої розминки, живе окремо: кількість, а під нею —
+   * рядок на кожну сходинку, де видно вагу й можна вписати точні
+   * повтори замість діапазону з протоколу.
+   *
+   * Поля всіх п'яти сходинок малюються одразу й ховаються атрибутом
+   * hidden: перемальовувати список під час набору означало б забрати
+   * фокус із поля, у якому зараз друкують.
+   */
+  function openWarmupSheet(i) {
+    const ex = state.plan[state.dayIdx].exercises[i];
+    const n0 = WC.warmupCountFor(state.profile, ex);
+    const own0 = warmupOwnReps(ex.name);
+    const step = window.OneRM ? window.OneRM.PLATE_STEP : 2.5;
+    const kg = planWeight(ex.name);
+
+    let rows = '';
+    for (let k = 0; k < WC.WARMUP_MAX; k++) {
+      rows += '<div class="wu-row" data-wu-row="' + k + '"' + (k < n0 ? '' : ' hidden') + '>' +
+        '<span class="wu-row__n mono">' + (k + 1) + '</span>' +
+        '<span class="wu-row__kg mono" data-wu-kg="' + k + '">—</span>' +
+        '<span class="wu-row__x">×</span>' +
+        '<input class="input input--sm num mono" id="wk-wu-r' + k + '" type="number" ' +
+          'min="1" max="' + WC.WARMUP_REPS_MAX + '" step="1" autocomplete="off" ' +
+          'value="' + (own0[k] == null ? '' : own0[k]) + '" ' +
+          'aria-label="Повтори розминкового підходу ' + (k + 1) + '">' +
+      '</div>';
+    }
+
+    window.App.sheet({
+      title: 'Розминка: ' + ex.name,
+      sub: 'Сходинки до робочої ваги. Вага рахується сама, повтори можна ' +
+           'замінити своїм числом — порожнє поле лишає діапазон із протоколу.',
+      body:
+        '<div class="field" style="max-width:190px">' +
+          '<label class="field__label" for="wk-sh-n">Скільки підходів</label>' +
+          '<input class="input num mono" id="wk-sh-n" type="number" min="0" max="' +
+            WC.WARMUP_MAX + '" step="1" autocomplete="off" value="' + n0 + '">' +
+        '</div>' +
+        '<div class="wu-list mt-2">' + rows + '</div>' +
+        '<p class="field__hint mt-1" data-wu-prev></p>' +
+        '<p class="small muted mt-2" style="margin-bottom:0">0 — без розминки: ' +
+          'тоді рядка про неї в тренуванні немає взагалі.</p>',
+      onOpen: function (box) {
+        const nInp = box.querySelector('#wk-sh-n');
+        const out = box.querySelector('[data-wu-prev]');
+
+        const sync = function () {
+          const v = WC.normWarmupCount(nInp.value);
+          const n = v === null ? n0 : v;
+          const reps = [];
+          for (let k = 0; k < WC.WARMUP_MAX; k++) {
+            reps.push(box.querySelector('#wk-wu-r' + k).value);
+          }
+          const l = WC.warmupSets(kg, step, n, reps);
+          /* Ваги проставляємо в самі рядки — щоб було видно, що саме
+             ставити на штангу, ще до збереження. */
+          for (let k = 0; k < WC.WARMUP_MAX; k++) {
+            const row = box.querySelector('[data-wu-row="' + k + '"]');
+            row.hidden = k >= n;
+            const cell = box.querySelector('[data-wu-kg="' + k + '"]');
+            cell.textContent = l[k] ? fmtNum.kg(l[k].kg) + ' кг' : '—';
+            box.querySelector('#wk-wu-r' + k).placeholder =
+              (WC.WARMUP_REPS[n] || [])[k] || '—';
+          }
+          out.textContent = kg === null
+            ? 'Робочої ваги ще немає — рахувати нема від чого.'
+            : (l.length ? '' : 'Без розминкових підходів.');
+        };
+
+        nInp.addEventListener('input', sync);
+        box.querySelectorAll('.wu-row input').forEach(function (el) {
+          el.addEventListener('input', sync);
+        });
+        sync();
+      },
+      onSave: function (box) {
+        const v = WC.normWarmupCount(box.querySelector('#wk-sh-n').value);
+        const n = v === null ? n0 : v;
+        const reps = [];
+        for (let k = 0; k < WC.WARMUP_MAX; k++) {
+          reps.push(box.querySelector('#wk-wu-r' + k).value);
+        }
+        const book = writeWarmup(ex.name, n, reps);
+        saveOwn({ warmups: book }).catch(function (e) {
+          toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');
+        });
+        render();
+        return true;
+      }
+    });
+  }
+
   /* ------------------------------------------------------------------ */
   /* Рядок вправи                                                        */
   /* ------------------------------------------------------------------ */
@@ -1027,8 +1153,8 @@
    * кнопка третім сусідом робила б розмітку невалідною. Візуально нічого
    * не міняється — вирівнює її margin-left: auto.
    */
-  function metaRow(label, valHtml, actHtml) {
-    return '<div class="tdy-ex__meta-row">' +
+  function metaRow(label, valHtml, actHtml, extraCls) {
+    return '<div class="tdy-ex__meta-row' + (extraCls || '') + '">' +
       '<dt class="tdy-ex__meta-lbl">' + esc(label) + '</dt>' +
       '<dd class="tdy-ex__meta-val">' +
         '<span class="tdy-ex__meta-txt">' + valHtml + '</span>' + actHtml +
@@ -1094,10 +1220,11 @@
            */
           (warmupLadder(ex).length
             ? metaRow('Розминка',
-                '<span class="mono" data-wu-val="' + i + '">' + esc(warmupLabel(ex)) + '</span>',
-                '<button class="tdy-ex__meta-act" type="button" data-wt-edit="' + i + '"' +
+                '<span class="mono" data-wu-val="' + i + '">' + esc(warmupLine(ex)) + '</span>',
+                '<button class="tdy-ex__meta-act" type="button" data-wu-edit="' + i + '"' +
                   (off ? ' disabled' : '') +
-                  ' aria-label="Змінити розминку: ' + esc(ex.name) + '">змінити</button>')
+                  ' aria-label="Змінити розминку: ' + esc(ex.name) + '">змінити</button>',
+                ' tdy-ex__meta-row--wrap')
             : '') +
 
           metaRow('Ваги підходів',
@@ -1460,6 +1587,9 @@
          в записі, який уже поїхав в історію. */
       const wtBtn = e.target.closest('[data-wt-edit]');
       if (wtBtn && !wtBtn.disabled) { openWeightSheet(Number(wtBtn.dataset.wtEdit)); return; }
+
+      const wuBtn = e.target.closest('[data-wu-edit]');
+      if (wuBtn && !wuBtn.disabled) { openWarmupSheet(Number(wuBtn.dataset.wuEdit)); return; }
 
 
 

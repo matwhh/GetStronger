@@ -268,6 +268,10 @@
     custom: {},       // збережені правки планів
     weights: {},      // робочі ваги за назвою вправи, спільні для всього сайту
     weightLog: {},    // історія цих ваг (append-only; js/history-core.js)
+    /* Скільки розминкових підходів у вправи — теж книга по назві, як і
+       ваги: вправа одна, отже й сходинки до неї одні. Порожньо означає
+       «як вирішує сайт» (js/workout-core.js), а не нуль. */
+    warmups: {},
     /* Останнє скидання ваг: { percent, at, before }.
        before — повний знімок книги ваг ДО скидання. Саме знімок, а не
        відсоток: зворотне множення після округлення до 2,5 кг не повертає
@@ -437,7 +441,8 @@
     const patch = {
       customPlans: state.custom,
       weights: state.weights,
-      weightLog: state.weightLog
+      weightLog: state.weightLog,
+      warmups: state.warmups
     };
     window.App.stampRating(Object.assign({}, state.profile || {}, patch), patch);
     try {
@@ -1203,6 +1208,37 @@
       'data-act="rir" data-day="' + dayIdx + '" data-i="' + i + '" aria-label="RIR, запас до відмови">';
   }
 
+  /**
+   * Поле «скільки розминкових підходів».
+   *
+   * Розминка — не властивість плану, а книга по назві вправи (як і
+   * робоча вага): вправа одна, отже й сходинки до неї одні, у якому б
+   * дні вона не стояла. Тому поле пише в profile.warmups, а не в
+   * customPlans.
+   *
+   * Порожнє поле означає «як вирішує сайт»: три сходинки для великої
+   * групи в багатосуглобовому русі, жодної для решти (js/workout-core.js).
+   * Нуль — це вибір «без розминки», і він не те саме, що порожньо.
+   */
+  /** Скільки сходинок у вправи зараз — числом, для режиму перегляду. */
+  function warmupCount(ex) {
+    const WC = window.WorkoutCore;
+    if (!WC) return '—';
+    const n = WC.warmupCountFor({ warmups: state.warmups || {} }, ex);
+    return n ? String(n) : '—';
+  }
+
+  function warmupInput(ex, dayIdx, i) {
+    const WC = window.WorkoutCore;
+    const own = WC ? WC.normWarmupCount((state.warmups || {})[ex.name]) : null;
+    const auto = WC ? WC.warmupCountFor({}, ex) : 0;
+    const max = WC ? WC.WARMUP_MAX : 5;
+    return '<input class="input input--sm input--reps num mono" type="number" min="0" max="' + max + '" step="1" ' +
+      'value="' + (own === null ? '' : own) + '" placeholder="' + auto + '" ' +
+      'data-act="warmup" data-day="' + dayIdx + '" data-i="' + i + '" ' +
+      'aria-label="Розминкові підходи">';
+  }
+
   function exerciseRow(ex, i, dayIdx, total) {
     const ms = musclesOfExercise(ex);
     const filled = Boolean(ex.name && ex.name.trim());
@@ -1229,6 +1265,7 @@
           '<td class="num mono" data-l="Повтори">' + esc(ex.reps) + '</td>' +
           '<td data-l="Вага, кг">' + weightInput(ex, dayIdx, i) + '</td>' +
           '<td class="num mono" data-l="RIR">' + esc(ex.rir) + '</td>' +
+          '<td class="num mono" data-l="Розминка">' + warmupCount(ex) + '</td>' +
           '<td data-l="Відпочинок">' +
             (restFor(ex) === '—'
               ? '<span class="num mono muted">—</span>'
@@ -1269,6 +1306,7 @@
         '<td data-l="Повтори">' + repsInput(ex, dayIdx, i) + '</td>' +
         '<td data-l="Вага, кг">' + weightInput(ex, dayIdx, i) + '</td>' +
         '<td data-l="RIR">' + rirInput(ex, dayIdx, i) + '</td>' +
+        '<td data-l="Розминка">' + warmupInput(ex, dayIdx, i) + '</td>' +
         '<td class="tbl__acts">' +
           '<div class="row-actions">' +
             '<button class="icon-btn" type="button" data-act="up" data-day="' + dayIdx + '" data-i="' + i + '"' +
@@ -1310,11 +1348,11 @@
       /* «Повт.» у правці ширша за перегляд: там просто число, а тут поле
          з лічильником і підказкою на пʼять знаків («10–12»). На 70px
          підказка обрізалась до «10–1» — тобто показувала неправду. */
-      ? '<th style="width:90px">Підх.</th><th style="width:104px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:84px">RIR</th><th style="width:120px">Дії</th>'
-      : '<th style="width:70px">Підх.</th><th style="width:70px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:60px">RIR</th><th style="width:90px">Відпоч.</th>';
+      ? '<th style="width:90px">Підх.</th><th style="width:104px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:84px">RIR</th><th style="width:84px">Розм.</th><th style="width:120px">Дії</th>'
+      : '<th style="width:70px">Підх.</th><th style="width:70px">Повт.</th><th style="width:90px">Вага, кг</th><th style="width:60px">RIR</th><th style="width:70px">Розм.</th><th style="width:90px">Відпоч.</th>';
 
-    // 5 колонок у head + «#» і «Вправа»
-    const cols = 7;
+    // 6 колонок у head + «#» і «Вправа»
+    const cols = 8;
 
     const addRow = state.editing
       ? '<div class="row mt-1">' +
@@ -2085,6 +2123,17 @@
       if (own === null) delete list[i].rir; else list[i].rir = String(own);
       return true;
     }
+    if (act === 'warmup') {
+      /* Книга по назві вправи, а не поле плану: та сама вправа в іншому
+         дні мусить мати ту саму розминку. Порожньо — «як вирішує сайт»,
+         тому ключ прибирається зовсім, а не пишеться нулем. */
+      const WC = window.WorkoutCore;
+      const n = WC ? WC.normWarmupCount(value) : null;
+      if (!state.warmups || typeof state.warmups !== 'object') state.warmups = {};
+      if (n === null) delete state.warmups[list[i].name];
+      else state.warmups[list[i].name] = n;
+      return true;
+    }
     if (act === 'swap' && value) {
       const found = (window.EXERCISES || []).find(function (e) { return e.name === value; });
       if (!found) return false;
@@ -2527,6 +2576,9 @@
       if (profile.weightLog && typeof profile.weightLog === 'object') {
         state.weightLog = Object.assign({}, profile.weightLog);
       }
+      if (profile.warmups && typeof profile.warmups === 'object') {
+        state.warmups = Object.assign({}, profile.warmups);
+      }
 
       // Разова міграція: до цієї версії вага лежала всередині плану.
       // Забираємо її звідти в книгу, щоб старі збережені плани не втратили
@@ -2589,6 +2641,9 @@
       }
       if (profile.weightLog && typeof profile.weightLog === 'object') {
         state.weightLog = Object.assign({}, profile.weightLog);
+      }
+      if (profile.warmups && typeof profile.warmups === 'object') {
+        state.warmups = Object.assign({}, profile.warmups);
       }
       if (profile.customPlans && typeof profile.customPlans === 'object') {
         state.custom = profile.customPlans;

@@ -675,9 +675,16 @@ for (const w of [320, 390, 430]) {
   ok('10. натомість один короткий рядок розминки',
      /Розминка/.test(block) && await p.locator('[data-wu-val]').count() > 0);
 
-  await tap(p.locator('[data-wu-edit]').first());
+  /*
+   * РОЗМИНКА ПРАВИТЬСЯ В ТОМУ Ж ВІКНІ, ЩО Й ВАГА.
+   *
+   * Окрема кнопка біля рядка розминки зникала разом із самим рядком —
+   * тобто саме тоді, коли розминку треба ВВІМКНУТИ. Тепер поле стоїть у
+   * вікні вправи, а воно є завжди.
+   */
+  await tap(p.locator('[data-wt-edit]').first());
   await p.waitForTimeout(400);
-  ok('10. вікно розминки — це одне поле кількості',
+  ok('10. у вікні вправи є поле розминки',
      await p.locator('.modal #wk-sh-n').count() === 1);
   await p.locator('.modal #wk-sh-n').fill('1');
   await p.waitForTimeout(250);
@@ -695,6 +702,18 @@ for (const w of [320, 390, 430]) {
      /^1 підхід$/.test(await p.locator('[data-wu-val]').first().innerText()),
      await p.locator('[data-wu-val]').first().innerText());
 
+  /* Нуль прибирає рядок зовсім — це й просили: порожнього рядка немає. */
+  await tap(p.locator('[data-wt-edit]').first());
+  await p.waitForTimeout(400);
+  await p.locator('.modal #wk-sh-n').fill('0');
+  await tap(p.locator('.modal [data-sh="yes"]'));
+  await p.waitForTimeout(900);
+  const firstRow = await p.locator('#workout .tdy-ex').first().innerText();
+  ok('10. без розминки рядка «Розминка» немає взагалі',
+     !/Розминка/.test(firstRow), firstRow.replace(/\n+/g, ' | ').slice(0, 80));
+  ok('10. а вікно вправи все одно відкривається',
+     await p.locator('[data-wt-edit]').first().count() === 1);
+
   /*
    * ІЗОЛЯЦІЯ РОЗМИНКИ НЕ ПРОСИТЬ.
    *
@@ -708,20 +727,18 @@ for (const w of [320, 390, 430]) {
     name: li.querySelector('.tdy-ex__name').textContent.trim(),
     warm: (li.querySelector('[data-wu-val]') || {}).textContent
   })));
+  /* «Розминка є» тепер означає ВЕЛИКА група + багатосуглобовий рух:
+     трицепс у жимі вузьким хватом — теж compound, але вага там мала. */
   const kinds = await p.evaluate((names) => names.map((n) => {
     const e = (window.EXERCISES || []).find((x) => x.name === n);
-    return e && e.lift === 'compound' ? 'compound' : 'isolation';
+    if (!e || e.lift !== 'compound') return 'isolation';
+    return window.RepsCore.sizeOf(e) === 'large' ? 'compound' : 'isolation';
   }), wuRows.map((r) => r.name));
 
-  const isoWarmed = wuRows.filter((r, i) => kinds[i] === 'isolation' && r.warm !== 'без розминки');
-  ok('10. в ізоляції розминки немає жодної',
+  const isoWarmed = wuRows.filter((r, i) => kinds[i] === 'isolation' && r.warm != null);
+  ok('10. в ізоляції рядка розминки немає жодного',
      isoWarmed.length === 0,
      isoWarmed.map((r) => r.name + ': ' + r.warm).slice(0, 3).join(' | '));
-
-  const compNone = wuRows.filter((r, i) => kinds[i] === 'compound' && r.warm === 'без розминки');
-  ok('10. а в багатосуглобових вона лишилась',
-     wuRows.some((r, i) => kinds[i] === 'compound') && compNone.length === 0,
-     compNone.map((r) => r.name).join(' | '));
 
   /* Вага ПІДХОДУ лишається редагованою — це факт одного дня. */
   const first = p.locator('#workout .tdy-ex').first();

@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
 /* exercises.js дає liftKind/primaryMuscle/MUSCLES для restSecFor */
-const ctx = loadModules(['js/date-core.js', 'js/exercises.js', 'js/onerm-core.js', 'js/workout-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/exercises.js', 'js/reps-core.js',
+                         'js/onerm-core.js', 'js/workout-core.js']);
 const WC = ctx.WorkoutCore;
 
 /* Синтетичний день: складна велика (3 хв), ізоляція (2 хв), кругова («—»).
@@ -427,12 +428,13 @@ describe('кількість розминкових підходів', () => {
   });
 
   it('кількість береться з профілю по назві вправи', () => {
-    const base = { lift: 'compound' };
+    /* Велика група + багатосуглобовість: саме там типові три сходинки. */
+    const base = { lift: 'compound', muscles: ['back'] };
     const p = { warmups: { 'Присідання зі штангою': 5, 'Жим лежачи': 0, 'Тяга': 'сміття' } };
     assert.equal(WC.warmupCountFor(p, { name: 'Присідання зі штангою', lift: 'compound' }), 5);
     assert.equal(WC.warmupCountFor(p, { name: 'Жим лежачи', lift: 'compound' }), 0,
       'нуль — це вибір, а не відсутність');
-    assert.equal(WC.warmupCountFor(p, { name: 'Тяга', lift: 'compound' }), 3, 'сміття — типове');
+    assert.equal(WC.warmupCountFor(p, Object.assign({ name: 'Тяга' }, base)), 3, 'сміття — типове');
     assert.equal(WC.warmupCountFor(p, Object.assign({ name: 'Чого немає' }, base)), 3);
     assert.equal(WC.warmupCountFor(null, Object.assign({ name: 'Будь-що' }, base)), 3);
   });
@@ -452,6 +454,29 @@ describe('кількість розминкових підходів', () => {
   it('багатосуглобовій типові три сходинки, ізоляції — жодної', () => {
     assert.equal(WC.warmupCountFor(null, { name: 'Присідання зі штангою', lift: 'compound' }), 3);
     assert.equal(WC.warmupCountFor(null, { name: 'Біцепс у кросовері', lift: 'isolation' }), 0);
+  });
+
+  /*
+   * МАЛА ГРУПА НЕ РОЗМИНАЄТЬСЯ, НАВІТЬ ЯКЩО РУХ БАГАТОСУГЛОБОВИЙ.
+   *
+   * Самої ознаки compound замало: жим вузьким хватом чи французький жим
+   * — це трицепс, тобто мала група й невелика вага. Сходинки 40/60/80 %
+   * там означають три зайві рядки й три зайві підходи.
+   *
+   * Розмір групи не класифікується тут заново: беремо RepsCore.sizeOf,
+   * той самий, яким уже рахується діапазон повторень, а він, своєю
+   * чергою, дивиться в MUSCLES (js/exercises.js).
+   */
+  it('мала група розминки не отримує навіть у багатосуглобовій вправі', () => {
+    const tri = { name: 'Жим лежачи вузьким хватом', muscles: ['triceps'], lift: 'compound' };
+    assert.equal(WC.warmupCountFor(null, tri), 0);
+  });
+
+  it('велика група плюс багатосуглобовість — ось коли розминка є', () => {
+    const legs = { name: 'Присідання', muscles: ['quads'], lift: 'compound' };
+    assert.equal(WC.warmupCountFor(null, legs), 3);
+    const fly = { name: 'Розведення', muscles: ['chest'], lift: 'isolation' };
+    assert.equal(WC.warmupCountFor(null, fly), 0, 'ізоляція на велику групу — теж без розминки');
   });
 
   it('тип береться з бібліотеки, коли в плані його немає', () => {

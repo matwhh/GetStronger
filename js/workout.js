@@ -750,6 +750,15 @@
       WC.warmupCountFor(state.profile, ex));
   }
 
+  /** Підказка у вікні: що дадуть N сходинок при цій робочій вазі. */
+  function ladderHint(ex, n, kgOverride) {
+    const kg = kgOverride === undefined ? planWeight(ex.name) : kgOverride;
+    if (kg === null) return 'Робочої ваги ще немає — рахувати нема від чого.';
+    const l = window.OneRM ? WC.warmupSets(kg, window.OneRM.PLATE_STEP, n) : [];
+    if (!l.length) return 'Без розминкових підходів.';
+    return l.map(function (x) { return fmtNum.kg(x.kg) + ' кг'; }).join(' · ');
+  }
+
   /** Коротке значення рядка «Розминка»: рахуємо СХОДИНКИ, а не вибір. */
   function warmupLabel(ex) {
     if (!WC.warmupCountFor(state.profile, ex)) return 'без розминки';
@@ -810,6 +819,7 @@
       ? RC.repRangeFor(state.profile.trainingAge, ex)
       : String(ex.reps || '');
     const rir = RC ? RC.normRir(ex.rir) : null;
+    const warm = WC.warmupCountFor(state.profile, ex);
 
     window.App.sheet({
       title: ex.name,
@@ -838,7 +848,38 @@
           '</div>' +
         '</div>' +
         '<p class="field__hint mt-1">Порожнє поле повторень — діапазон за вашим стажем (' +
-          esc(hint) + '). RIR — скільки повторень лишається в запасі; 0 — до відмови.</p>',
+          esc(hint) + '). RIR — скільки повторень лишається в запасі; 0 — до відмови.</p>' +
+        /*
+         * РОЗМИНКА ТУТ, А НЕ ОКРЕМИМ ВІКНОМ.
+         *
+         * Окрема кнопка «змінити» біля рядка розминки існувала лише
+         * заради одного числа — і зникала разом із рядком, коли розминки
+         * немає, тобто саме тоді, коли її треба ввімкнути. Тепер поле
+         * стоїть поруч із вагою: вікно вправи є завжди.
+         */
+        '<div class="field mt-2" style="max-width:190px">' +
+          '<label class="field__label" for="wk-sh-n">Розминкових підходів</label>' +
+          '<input class="input num mono" id="wk-sh-n" type="number" min="0" max="' +
+            WC.WARMUP_MAX + '" step="1" autocomplete="off" value="' + warm + '">' +
+        '</div>' +
+        '<p class="field__hint mt-1" data-wu-prev>' + esc(ladderHint(ex, warm)) + '</p>',
+      onOpen: function (box) {
+        /*
+         * Підказка живе на ДВОХ полях: кількість сходинок і робоча вага,
+         * від якої вони рахуються. Міняємо тільки текст, не перемальовуючи
+         * блок: перемальовка під час input зносить поле разом із кареткою.
+         */
+        const nInp = box.querySelector('#wk-sh-n');
+        const wInp = box.querySelector('#wk-sh-w');
+        const out = box.querySelector('[data-wu-prev]');
+        const sync = function () {
+          const v = WC.normWarmupCount(nInp.value);
+          out.textContent = ladderHint(ex, v === null ? warm : v,
+            WC.normWeight(String(wInp.value || '').replace(',', '.')));
+        };
+        nInp.addEventListener('input', sync);
+        wInp.addEventListener('input', sync);
+      },
       onSave: function (box) {
         /* Кома — той самий знак, що й у полі ваги підходу (js/workout.js
            нижче): 47,5 і 47.5 мають означати одне й те саме, бо на
@@ -858,9 +899,13 @@
           toast(WL.message(ex.name), 'err');
           return false;
         }
+        /* Порожнє поле розминки — «нічого не міняв», а не нуль: нуль
+           набирають, і він означає «без розминки». */
+        const wu = WC.normWarmupCount(box.querySelector('#wk-sh-n').value);
         saveWorkWeight(ex, kg,
           RC ? RC.normUserReps(rRaw, ex) : null,
-          RC ? RC.normRir(box.querySelector('#wk-sh-rir').value) : null);
+          RC ? RC.normRir(box.querySelector('#wk-sh-rir').value) : null,
+          wu === null ? warm : wu);
         return true;
       }
     });
@@ -873,7 +918,7 @@
    * сховища, бо це різні за природою речі (див. js/reps-core.js). Тому
    * і патч один, і запис один — щоб половина правки не доїхала.
    */
-  function saveWorkWeight(ex, kg, ownReps, rir) {
+  function saveWorkWeight(ex, kg, ownReps, rir, warm) {
     const patch = {};
 
     const weights = Object.assign({}, state.profile.weights || {});
@@ -916,6 +961,18 @@
       state.profile.customPlans = patch.customPlans;
     }
 
+    /*
+     * Розминка живе КНИГОЮ по назві вправи, як і робоча вага: вправа
+     * одна — отже й розминка в неї одна, у якому б дні плану вона не
+     * стояла. Тому не в customPlans.
+     */
+    if (warm !== undefined && warm !== WC.warmupCountFor(state.profile, ex)) {
+      const book = Object.assign({}, state.profile.warmups || {});
+      book[ex.name] = warm;
+      state.profile.warmups = book;
+      patch.warmups = book;
+    }
+
     if (!Object.keys(patch).length) return;
     window.App.stampRating(Object.assign({}, state.profile, patch), patch);
     saveOwn(patch).catch(function (e) {
@@ -946,63 +1003,6 @@
       });
     });
     return all;
-  }
-
-  /** Вікно розминки: одне число й одразу видно, що воно дасть. */
-  function openWarmupSheet(i) {
-    const ex = state.plan[state.dayIdx].exercises[i];
-    const n = WC.warmupCountFor(state.profile, ex);
-
-    function preview(v) {
-      const l = window.OneRM
-        ? WC.warmupSets(planWeight(ex.name), window.OneRM.PLATE_STEP, v)
-        : [];
-      if (planWeight(ex.name) === null) return 'Робочої ваги ще немає — рахувати нема від чого.';
-      if (!l.length) return 'Без розминкових підходів.';
-      return l.map(function (x) { return fmtNum.kg(x.kg) + ' кг'; }).join(' · ');
-    }
-
-    window.App.sheet({
-      title: 'Розминка: ' + ex.name,
-      sub: 'Сходинки до робочої ваги — те, що в програмі називали підводними ' +
-           'підходами. У робочі підходи й тижневий обʼєм вони не входять.',
-      body:
-        '<div class="field" style="max-width:180px">' +
-          '<label class="field__label" for="wk-sh-n">Скільки підходів</label>' +
-          '<input class="input num mono" id="wk-sh-n" type="number" min="0" max="' +
-            WC.WARMUP_MAX + '" step="1" autocomplete="off" value="' + n + '">' +
-        '</div>' +
-        '<p class="field__hint mt-1" data-wu-prev>' + esc(preview(n)) + '</p>' +
-        '<p class="small muted mt-2" style="margin-bottom:0">0 — без розминки: ' +
-          'ізоляцію в кінці тренування розминають вправи, зроблені перед нею.</p>',
-      onOpen: function (box) {
-        const inp = box.querySelector('#wk-sh-n');
-        const out = box.querySelector('[data-wu-prev]');
-        /*
-         * Оновлюємо ТЕКСТ, а не перемальовуємо блок: перемальовка під час
-         * події input зносить поле разом із кареткою, і браузер лишається
-         * без вузла, у якому щойно набирали (див. ту саму граблю в
-         * js/nutrition.js).
-         */
-        inp.addEventListener('input', function () {
-          const v = WC.normWarmupCount(inp.value);
-          out.textContent = preview(v === null ? n : v);
-        });
-      },
-      onSave: function (box) {
-        const v = WC.normWarmupCount(box.querySelector('#wk-sh-n').value);
-        /* Порожнє поле — «нічого не міняв», а не «нуль»: нуль набирають. */
-        if (v === null || v === n) return true;
-        const book = Object.assign({}, state.profile.warmups || {});
-        book[ex.name] = v;
-        state.profile.warmups = book;
-        saveOwn({ warmups: book }).catch(function (e) {
-          toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');
-        });
-        render();
-        return true;
-      }
-    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -1081,11 +1081,24 @@
               (off ? ' disabled' : '') +
               ' aria-label="Змінити робочу вагу: ' + esc(ex.name) + '">змінити</button>') +
 
-          metaRow('Розминка',
-            '<span class="mono" data-wu-val="' + i + '">' + esc(warmupLabel(ex)) + '</span>',
-            '<button class="tdy-ex__meta-act" type="button" data-wu-edit="' + i + '"' +
-              (off ? ' disabled' : '') +
-              ' aria-label="Змінити розминку: ' + esc(ex.name) + '">змінити</button>') +
+          /*
+           * РЯДКА РОЗМИНКИ НЕМАЄ, КОЛИ НЕМАЄ РОЗМИНКИ.
+           *
+           * «Розминка · без розминки · змінити» — це три слова про те,
+           * чого на екрані не відбувається, і в ізоляції такий рядок
+           * стояв у кожній вправі. Порожнє значення краще не показувати
+           * зовсім, ніж показувати порожнім.
+           *
+           * Саме число при цьому не стає недосяжним: розминка правиться
+           * у вікні робочої ваги, а воно є в кожної вправи.
+           */
+          (warmupLadder(ex).length
+            ? metaRow('Розминка',
+                '<span class="mono" data-wu-val="' + i + '">' + esc(warmupLabel(ex)) + '</span>',
+                '<button class="tdy-ex__meta-act" type="button" data-wt-edit="' + i + '"' +
+                  (off ? ' disabled' : '') +
+                  ' aria-label="Змінити розминку: ' + esc(ex.name) + '">змінити</button>')
+            : '') +
 
           metaRow('Ваги підходів',
             '<span class="mono" data-log-sum="' + i + '">' + esc(logSummary(i)) + '</span>',
@@ -1448,8 +1461,7 @@
       const wtBtn = e.target.closest('[data-wt-edit]');
       if (wtBtn && !wtBtn.disabled) { openWeightSheet(Number(wtBtn.dataset.wtEdit)); return; }
 
-      const wuBtn = e.target.closest('[data-wu-edit]');
-      if (wuBtn && !wuBtn.disabled) { openWarmupSheet(Number(wuBtn.dataset.wuEdit)); return; }
+
 
       if (e.target.closest('#wk-finish')) { finishWorkout(); return; }
 

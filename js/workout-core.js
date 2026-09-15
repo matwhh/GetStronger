@@ -515,6 +515,25 @@
   }
 
   /*
+   * Вправа з групами мʼязів.
+   *
+   * Старі збережені плани (і саме поле «назва» у фікстурах) можуть не
+   * носити muscles — тоді розмір групи не визначити, і вправа мовчки
+   * вважалася б малою. Тому те саме, що робить liftKind: не знаємо з
+   * самого обʼєкта — питаємо бібліотеку за назвою.
+   */
+  function withMuscles(ex) {
+    if (Array.isArray(ex.muscles) && ex.muscles.length) return ex;
+    var lib = window.EXERCISES;
+    if (!Array.isArray(lib)) return ex;
+    var known = null;
+    for (var i = 0; i < lib.length; i++) {
+      if (lib[i] && lib[i].name === ex.name) { known = lib[i]; break; }
+    }
+    return known || ex;
+  }
+
+  /*
    * ТИПОВА КІЛЬКІСТЬ ЗАЛЕЖИТЬ ВІД ТИПУ ВПРАВИ.
    *
    * Сходинки до робочої ваги мають сенс там, де вага велика й техніка
@@ -541,7 +560,21 @@
     var kind = (typeof window.liftKind === 'function')
       ? window.liftKind(one)
       : (one.lift === 'compound' ? 'compound' : 'isolation');
-    return kind === 'compound' ? WARMUP_DEFAULT : 0;
+    if (kind !== 'compound') return 0;
+
+    /*
+     * Самої багатосуглобовості замало: жим вузьким хватом чи французький
+     * жим — це трицепс, тобто мала група й невелика вага, і сходинки
+     * 40/60/80 % там означають три зайві підходи. Розминка лишається
+     * там, де вага справді велика: велика група плюс складний рух.
+     *
+     * Розмір групи беремо з RepsCore.sizeOf — тим самим, яким рахується
+     * діапазон повторень; він дивиться в MUSCLES. Своя копія цієї
+     * класифікації розійшлася б із нею на першій правці.
+     */
+    var RC = window.RepsCore;
+    if (RC && typeof RC.sizeOf === 'function' && RC.sizeOf(withMuscles(one)) !== 'large') return 0;
+    return WARMUP_DEFAULT;
   }
 
   /**

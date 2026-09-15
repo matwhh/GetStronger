@@ -369,6 +369,10 @@
     evaluateWeeks: evaluateWeeks,
     closeSeasonIfDue: closeSeasonIfDue,
     activateGrace: function () { return window.Store.rpc('elo_activate_grace', {}); },
+    /* Перерахунок сезону після зміни набору категорій. Аргументів немає
+       навмисно: сервер сам знає і нинішній набір, і те, чим перевіряти
+       старі дельти (db/elo-recount-category.sql). */
+    recountCategories: function () { return window.Store.rpc('elo_recount_categories', {}); },
     leaderboard: function (n) { return window.Store.rpc('elo_leaderboard', { p_limit: n || 50 }); },
     setName: function (name) { return window.Store.rpc('elo_set_name', { p_name: name }); },
     history: function () {

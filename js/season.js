@@ -284,6 +284,72 @@
     }, 600);
   });
 
+  /* ---------------- Категорії рейтингу ---------------- */
+  /*
+   * ВИМКНУТИ КАТЕГОРІЮ — НЕ ВІДМОВИТИСЬ ВІД ОЧОК.
+   *
+   * Тижнева стеля рейтингу спільна: вона не залежить від того, скільки
+   * категорій людина веде. Ваги лише ділять цю стелю — і доти 30 % її
+   * були закріплені за їжею, тобто недосяжні для того, хто щоденник не
+   * веде. Це читалось як штраф за чесність: «не ведеш їжу — сезон нижче,
+   * хоч як тренуйся».
+   *
+   * Вимикач прибирає вагу категорії й віддає її решті. Сума лишається
+   * тією самою, стеля теж — міняється тільки те, куди можна дотягтись.
+   * Тому й вигоди перемикати посеред сезону немає: більше за тижневу
+   * стелю все одно не взяти.
+   *
+   * Рахує це СЕРВЕР (elo_cfg_for): elo_state віддає вже персональний
+   * конфіг, тож числа на екрані й у базі не можуть розійтись.
+   */
+  const SKIPPABLE = [
+    { id: 'nutrition', name: 'Харчування', note: 'щоденник їжі: калорії й білок' }
+  ];
+
+  function renderCats(st) {
+    const host = $('#sz-cats');
+    if (!host) return;
+    const w = (st.config && st.config.weights) || {};
+    host.innerHTML = card(
+      '<h3 class="card__title" style="margin-bottom:4px">Що рахувати в рейтингу</h3>' +
+      '<p class="small muted" style="margin:0 0 10px">Вимкнена категорія віддає свою частку ' +
+        'решті: тижнева стеля рейтингу лишається тією самою, і сезон можна пройти ' +
+        'на той самий результат без неї.</p>' +
+      SKIPPABLE.map(function (c) {
+        const on = Object.prototype.hasOwnProperty.call(w, c.id);
+        return '<label class="check" style="width:100%;box-sizing:border-box">' +
+          '<input type="checkbox" data-cat="' + esc(c.id) + '"' + (on ? ' checked' : '') + '>' +
+          '<span>' + esc(c.name) + ' <span class="muted">— ' + esc(c.note) + '</span></span>' +
+        '</label>';
+      }).join('') +
+      '<p class="small muted" style="margin:10px 0 0">Уже нараховані очки лишаються як є — ' +
+        'міняється лише те, за що нараховувати далі.</p>');
+  }
+
+  /* Делегування на документі: картка перемальовується цілком, а слухач
+     живе поза нею — той самий прийом, що з ніком вище. */
+  document.addEventListener('change', async function (e) {
+    const box = e.target && e.target.closest && e.target.closest('[data-cat]');
+    if (!box) return;
+    const id = box.dataset.cat;
+    try {
+      const p = await window.Store.getProfile();
+      const was = Array.isArray(p && p.eloSkip) ? p.eloSkip : [];
+      const next = box.checked
+        ? was.filter(function (x) { return x !== id; })
+        : (was.indexOf(id) === -1 ? was.concat([id]) : was);
+      await window.Store.saveProfile({ eloSkip: next });
+      /* Конфіг рахує сервер, тож після запису питаємо його наново —
+         інакше картка показувала б вибір, якого база ще не знає. */
+      await refresh();
+      window.App.toast(box.checked ? 'Харчування рахується в рейтингу'
+                                   : 'Харчування більше не впливає на рейтинг', 'ok');
+    } catch (err) {
+      box.checked = !box.checked;
+      window.App.toast('Не збереглося: ' + (err && err.message), 'err');
+    }
+  });
+
   function renderGrace(st) {
     const cfgMax = st.config.graceWeeksPerSeason;
     const left = cfgMax - (st.graceUsed || 0);
@@ -797,6 +863,7 @@
        його не чіпає, інакше свято зʼїдалось би ще до показу. */
     renderHeader(st, levelJump(st.season, EC.levelFor(st.elo, st.config).level));
     renderGrace(st);
+    renderCats(st);
     renderEvents();
     renderBoard(st);
     renderHistory();
@@ -822,7 +889,7 @@
 
     renderReport();
     const cachedSt = Api.cached();
-    if (cachedSt && cachedSt.config) { renderHeader(cachedSt); renderGrace(cachedSt); }
+    if (cachedSt && cachedSt.config) { renderHeader(cachedSt); renderGrace(cachedSt); renderCats(cachedSt); }
     refresh().catch(function () {
       if (!cachedSt) {
         $('#sz-header').innerHTML = card(

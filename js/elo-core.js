@@ -251,6 +251,47 @@
     return (Number.isFinite(v) && v > 0) ? v : 1;
   }
 
+  /*
+   * КОНФІГ ПІД ЛЮДИНУ: ВИМКНЕНІ КАТЕГОРІЇ.
+   *
+   * Тижнева стеля в грі спільна — weeklyBudget × темп, незалежно від
+   * категорій (elo_week_room на сервері). Ваги лише ділять цю стелю. Тому
+   * людина, яка не веде щоденник їжі, не «заробляла менше за ті самі
+   * дії» — вона мала НЕДОСЯЖНИЙ кусок власної стелі: 30 %, закріплені за
+   * категорією, якої в неї немає.
+   *
+   * Вимкнення категорії — не знижка й не штраф, а перерозподіл: вага
+   * зникає, решта нормується назад до одиниці, спільна стеля лишається
+   * тією самою. Через це ж і немає вигоди вмикати-вимикати категорію
+   * посеред сезону: більше за тижневу стелю все одно не взяти.
+   *
+   * Повертає НОВИЙ обʼєкт: cfg приходить із сервера один на весь екран, і
+   * правка на місці зачепила б усе, що його вже прочитало.
+   */
+  function cfgFor(cfg, skip) {
+    const src = (cfg && cfg.weights) || null;
+    if (!src) return cfg;
+    const drop = Array.isArray(skip) ? skip : [];
+    const keys = Object.keys(src).filter(function (k) { return drop.indexOf(k) === -1; });
+    /* Вимкнути все — це ділення на нуль і бюджет NaN. Такого вибору немає
+       в інтерфейсі, але конфіг приходить і з профілю, який могли правити
+       руками в експорті. */
+    if (!keys.length || keys.length === Object.keys(src).length) return cfg;
+
+    let sum = 0;
+    keys.forEach(function (k) { sum += Number(src[k]) || 0; });
+    if (!(sum > 0)) return cfg;
+
+    const weights = {};
+    keys.forEach(function (k) { weights[k] = (Number(src[k]) || 0) / sum; });
+    return Object.assign({}, cfg, { weights: weights });
+  }
+
+  /** Категорії, які зараз у грі, — за вагами конфігу. */
+  function categories(cfg) {
+    return Object.keys((cfg && cfg.weights) || {});
+  }
+
   /** Тижневий бюджет категорії в ELO (без бонусної частки). */
   function weeklyBudget(cat, cfg, elo) {
     return cfg.weeklyBudget * pace(elo, cfg) * cfg.categoryShare * cfg.weights[cat];
@@ -385,7 +426,13 @@
    * не менше 4 (тренувальний день) чи 3 (день відпочинку — без training).
    */
   function cleanDay(dayMults, isTrainingDay, cfg) {
-    const need = ['nutrition', 'sleep', 'recovery', 'activity'].concat(isTrainingDay ? ['training'] : []);
+    /* Список категорій береться з КОНФІГУ, а не пишеться тут удруге:
+       інакше вимкнена категорія робила б чистий день недосяжним
+       назавжди — він вимагав би їжі, якої людина свідомо не веде. */
+    const need = categories(cfg).filter(function (c) {
+      return c !== 'training' || isTrainingDay;
+    });
+    if (!need.length) return false;
     return need.every(function (c) { return (dayMults[c] || 0) >= cfg.cleanThreshold; });
   }
 
@@ -399,7 +446,10 @@
 
   /** Чистий тиждень: план закритий повністю, без штрафів. */
   function cleanWeek(workoutsDone, plannedDays, mealDaysClosed, cfg) {
-    return workoutsDone >= plannedDays && mealDaysClosed >= 7 ? cfg.cleanWeekBonus : 0;
+    /* Сім закритих днів їжі питаємо лише тоді, коли їжа взагалі в грі. */
+    const needMeals = categories(cfg).indexOf('nutrition') !== -1;
+    const meals = !needMeals || (Number(mealDaysClosed) || 0) >= 7;
+    return workoutsDone >= plannedDays && meals ? cfg.cleanWeekBonus : 0;
   }
 
   /**
@@ -472,6 +522,8 @@
     dailyBudget: dailyBudget,
     ladder: ladder,
     actionDelta: actionDelta,
+    cfgFor: cfgFor,
+    categories: categories,
     cleanDay: cleanDay,
     weekPenalty: weekPenalty,
     cleanWeek: cleanWeek,

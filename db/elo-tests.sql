@@ -191,12 +191,28 @@ begin
   reset role;
   select coalesce(sum(delta),0) as s into st from public.elo_events
     where user_id = ua and category='training' and day between wk and wk + 6;
-  -- У понеділок «учора/позавчора» — інший ISO-тиждень, у сумі лише сьогоднішнє.
-  c := st.s = case when date_trunc('week', current_date - 1)::date = wk then per * 2 + w1 else per end;
+  /*
+   * КОЖЕН ІЗ ТРЬОХ ДНІВ ПИТАЄМО ОКРЕМО.
+   *
+   * Тут стояло «якщо вчора той самий тиждень — то per×2 + w1». У вівторок
+   * це неправда: учора (понеділок) у тижні, а позавчора (неділя) — ні, і
+   * очікування включало дельту, якої в сумі немає. Набір червонів раз на
+   * тиждень від самої лише дати, як і фікстури оцінки тижня до правки
+   * (tools/verify-elo-week.mjs).
+   *
+   * Тепер кожен день додається до очікування ЛИШЕ якщо він справді
+   * потрапляє у вікно [wk, wk+6] — і жоден день тижня набір не зачіпає.
+   */
+  c := st.s = per
+       + case when date_trunc('week', current_date - 1)::date = wk then per else 0 end
+       + case when date_trunc('week', current_date - 2)::date = wk then w1  else 0 end;
   alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end
             || 'тижневий бюджет тренувань = ' || tb || ' незалежно від плану (факт ' || st.s
-            || ' при ' || (2 + (w1 > 0)::int) || ' тренуваннях у вікні)' || E'\n';
+            || ' при ' || (1
+                 + (date_trunc('week', current_date - 1)::date = wk)::int
+                 + (date_trunc('week', current_date - 2)::date = wk and w1 > 0)::int)
+            || ' тренуваннях у вікні)' || E'\n';
 
   raise exception E'ELO-ТЕСТИ: % з % пройдено\n%', okn, alln, out;
 end $$;

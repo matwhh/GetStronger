@@ -743,6 +743,7 @@ begin
     return jsonb_build_object('ok', false, 'error', why);
   end if;
 
+  cfg := public.elo_cfg_for(uid, cfg);
   szn := season_of(p_week_start + 6);
 
   planned := public.elo_planned_for(uid, p_week_start);
@@ -774,7 +775,11 @@ begin
   expected := round(planned * (1 - grace_days / 7.0) * avail / 7.0);
   missed := greatest(0, expected - done);
   pen := missed * (cfg->>'missedWorkoutPenalty')::int;
-  if done >= planned and meals >= 7 then
+  -- Сім закритих днів їжі питаємо лише тоді, коли їжа взагалі в грі:
+  -- інакше чистий тиждень був би недосяжним для того, хто свідомо
+  -- вимкнув категорію.
+  if done >= planned
+     and (not (cfg->'weights' ? 'nutrition') or meals >= 7) then
     bon := least((cfg->>'cleanWeekBonus')::int, public.elo_week_room(uid, p_week_start, cfg));
   end if;
   d := pen + bon;
@@ -1135,6 +1140,7 @@ begin
   end if;
 
   select data into cfg from elo_config where id = 1;
+  cfg := public.elo_cfg_for(uid, cfg);
   select * into st from season_state where user_id = uid and season = szn;
   select count(*) into total from season_state where season = szn;
 
@@ -1194,6 +1200,10 @@ begin
   end if;
   if p_day is null then raise exception 'BAD_DAY'; end if;
   select data into cfg from elo_config where id = 1;
+  -- Персональний конфіг: вимкнені категорії прибрані, ваги решти
+  -- перенормовані. Далі все рахується як завжди — жодна формула про
+  -- вимикач не знає (js/elo-core.js, cfgFor).
+  cfg := public.elo_cfg_for(uid, cfg);
   szn := season_of(p_day);
   if p_day > current_date + 1
      or p_day < current_date - (cfg->>'submitWindowDays')::int
@@ -1348,16 +1358,25 @@ CREATE OR REPLACE FUNCTION public.elo_try_clean_day(uid uuid, szn text, p_day da
 AS $function$
 declare
   got int; bonus int; room int; day_sum int; st season_state;
+  -- Категорії дня беремо з КОНФІГУ, а не списком у коді: людина могла
+  -- вимкнути категорію в рейтингу, і тоді чистий день не має її вимагати.
+  cats text[];
+  need int;
 begin
+  cfg := public.elo_cfg_for(uid, cfg);
+  select array_agg(k) into cats
+    from jsonb_object_keys(cfg->'weights') k where k <> 'training';
+  need := coalesce(array_length(cats, 1), 0);
+  if need = 0 then return; end if;
   if exists (select 1 from elo_events where user_id = uid and event_type = 'cleanday' and day = p_day) then
     return;
   end if;
   select count(distinct category) into got
   from elo_events
   where user_id = uid and season = szn and day = p_day
-    and category in ('nutrition','sleep','recovery','activity')
+    and category = any (cats)
     and quality >= (cfg->>'cleanThreshold')::numeric;
-  if got < 4 then return; end if;
+  if got < need then return; end if;
   if not grace and exists (
        select 1 from elo_events
        where user_id = uid and season = szn and day = p_day
@@ -1972,6 +1991,54 @@ grant UPDATE (user_id) on public.profiles to authenticated;
 -- заплановані завдання (для довідки, не виконується цим файлом)
 -- cron: forge-elo-week  «10 0 * * *»  select public.elo_cron_log_eval_week()
 -- cron: forge-purge-abandoned-signups  «20 3 * * *»  select public.cron_purge_abandoned_signups()
+
+CREATE OR REPLACE FUNCTION public.elo_cfg_for(uid uuid, cfg jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  raw jsonb;
+  skip text[];
+  keys text[];
+  total numeric := 0;
+  w jsonb := '{}'::jsonb;
+  k text;
+begin
+  if cfg is null or cfg->'weights' is null then return cfg; end if;
+
+  -- jsonb_typeof, а не просто coalesce: jsonb_array_elements_text кидає
+  -- «cannot extract elements from a scalar» на будь-чому, крім масиву, —
+  -- і один зіпсований профіль («eloSkip»: 123 з відредагованого руками
+  -- експорту) ламав би цій людині elo_submit ЦІЛКОМ. Знайдено тестом.
+  select coalesce((select p.data->'eloSkip' from profiles p where p.user_id = uid), '[]'::jsonb)
+    into raw;
+  if jsonb_typeof(raw) is distinct from 'array' then return cfg; end if;
+
+  select array_agg(x) into skip from jsonb_array_elements_text(raw) x;
+  if skip is null or array_length(skip, 1) is null then return cfg; end if;
+
+  select array_agg(x) into keys
+    from jsonb_object_keys(cfg->'weights') x where not (x = any (skip));
+  if keys is null or array_length(keys, 1) is null then return cfg; end if;
+  if array_length(keys, 1) = (select count(*) from jsonb_object_keys(cfg->'weights')) then
+    return cfg;
+  end if;
+
+  foreach k in array keys loop
+    total := total + coalesce((cfg#>>array['weights', k])::numeric, 0);
+  end loop;
+  if total <= 0 then return cfg; end if;
+
+  foreach k in array keys loop
+    w := w || jsonb_build_object(k,
+      round(coalesce((cfg#>>array['weights', k])::numeric, 0) / total, 6));
+  end loop;
+  return jsonb_set(cfg, '{weights}', w);
+end $function$
+;
+grant execute on function public.elo_cfg_for(uid uuid, cfg jsonb) to service_role;
 
 CREATE OR REPLACE FUNCTION public.elo_close_season_for(p_user uuid, p_season text)
  RETURNS jsonb

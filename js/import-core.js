@@ -32,6 +32,7 @@
    */
   const ALLOWED_KEYS = ['birthDate','sex','age','height','weight','goalWeight','bodyfat','daysPerWeek',
     'programId','goal','customPlans','customExercises','warmups','weights','activePlan','trainingAge',
+    'eloSkip',
     'activity','meals','recipes','day','hrRest','hrMax','records',
     'displayName','pet','scheme',
     'bodyLog','workLog','theme','periodization','deload',
@@ -474,6 +475,20 @@
            js/workout-core.js, і перевіряється тут ще раз, бо файл могли
            правити руками. */
         case 'warmups':  { const m = cleanNumMap(v, 0, 5);    return m ? accept(k, m) : reject(k); }
+
+        /* Вимкнені категорії рейтингу. Список короткий і закритий: чуже
+           слово тут не просто зайве — сервер нормує ваги за ним, і
+           вигадана назва мовчки нічого не вимкне, а ось «training»
+           з битого файла прибрав би людині половину рейтингу. */
+        case 'eloSkip': {
+          if (!Array.isArray(v)) return reject(k);
+          const KNOWN = ['nutrition', 'sleep', 'recovery', 'activity'];
+          const out = [];
+          for (let i = 0; i < v.length; i++) {
+            if (KNOWN.indexOf(v[i]) !== -1 && out.indexOf(v[i]) === -1) out.push(v[i]);
+          }
+          return accept(k, out);
+        }
 
         /*
          * Свої вправи. Форму знає одне місце — js/user-exercises-core.js,

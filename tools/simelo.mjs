@@ -39,6 +39,9 @@ const E = sb.window.EloCore;
    десятками недороблених станів. */
 const CFG = JSON.parse(fs.readFileSync(
   process.env.FORGE_ELO_CFG || new URL('../db/elo-config.json', import.meta.url), 'utf8'));
+/* Бойовий конфіг — умовчання для simulate(); окремим імʼям, бо один із
+   прогонів іде з конфігом БЕЗ харчування (див. блок «Без харчування»). */
+const BASE_CFG = CFG;
 
 /* Мінімальний детермінований PRNG (mulberry32) */
 function rng(seed) {
@@ -68,7 +71,15 @@ const PLANNED = 4;           // тренувань на тиждень
 const DAYS = 92;             // сезон
 const SLEEP_GOAL = 480, STEP_GOAL = 10000, KCAL = 2600, PROT = 170;
 
-function simulate(name, u, seed) {
+/**
+ * @param {{cfg?:object}} [opts] свій конфіг — наприклад, без харчування.
+ *   Коли в конфігу немає ваги nutrition, їжа не ведеться зовсім: ні подій,
+ *   ні штрафу за незакритий день. Саме так виглядає людина, яка вимкнула
+ *   категорію в рейтингу.
+ */
+function simulate(name, u, seed, opts) {
+  const CFG = (opts && opts.cfg) || BASE_CFG;
+  const eats = Boolean(CFG.weights.nutrition);
   const rand = rng(seed);
   let elo = 0;
   const series = [];
@@ -94,14 +105,16 @@ function simulate(name, u, seed) {
       deltas.push(r.delta); mults.training = r.mult;
       if (done / total >= 0.5) week.workouts++;
     }
-    if (shows(0.98)) {
-      const kcal = KCAL * (1 + (1 - exec) * (rand() < 0.5 ? -1 : 1) * (0.5 + rand() * 0.5));
-      const prot = PROT * Math.min(1.1, exec + rand() * 0.08);
-      const r = E.actionDelta('meal', { kcal, target: KCAL, protein: prot, proteinTarget: PROT }, CFG, { elo: elo });
-      deltas.push(r.delta); mults.nutrition = r.mult;
-      week.meals++;
-    } else {
-      deltas.push(CFG.openMealPenalty);
+    if (eats) {
+      if (shows(0.98)) {
+        const kcal = KCAL * (1 + (1 - exec) * (rand() < 0.5 ? -1 : 1) * (0.5 + rand() * 0.5));
+        const prot = PROT * Math.min(1.1, exec + rand() * 0.08);
+        const r = E.actionDelta('meal', { kcal, target: KCAL, protein: prot, proteinTarget: PROT }, CFG, { elo: elo });
+        deltas.push(r.delta); mults.nutrition = r.mult;
+        week.meals++;
+      } else {
+        deltas.push(CFG.openMealPenalty);
+      }
     }
     if (shows(0.97)) {
       const r = E.actionDelta('sleep', { minutes: SLEEP_GOAL * Math.min(1.05, exec + rand() * 0.1), goal: SLEEP_GOAL }, CFG, { elo: elo });
@@ -197,6 +210,31 @@ for (const [name, u] of Object.entries(USERS)) {
   console.log((ok ? 'OK   ' : 'FAIL ') + 'Flawless      ' + god.elo +
     ' ELO (бездоганний сезон → стеля)  L5 на день: ' + (god.day5 === null ? '—' : god.day5) +
     '  [ціль: 2900+ і L5 не пізніше 22-го]');
+}
+
+/*
+ * БЕЗ ХАРЧУВАННЯ — НЕ ГІРШЕ.
+ *
+ * Тижнева стеля спільна (weeklyBudget × темп), ваги лише ділять її між
+ * категоріями. Доти 30 % цієї стелі були закріплені за їжею: людина, яка
+ * її не веде, мала недосяжний кусок власного бюджету й не могла дійти
+ * туди, куди доходив той самий гравець зі щоденником.
+ *
+ * Тут той самий бездоганний профіль проживає сезон двічі: зі щоденником
+ * і без нього, з конфігом, де вага nutrition перерозподілена. Числа
+ * мусять зійтись — інакше вимикач у рейтингу був би прихованим штрафом.
+ */
+{
+  const noFood = E.cfgFor(CFG, ['nutrition']);
+  const u = { exec: 1, show: 1, jitter: 0, wave: 0 };
+  const withFood = simulate('Flawless', u, 42).elo;
+  const without = simulate('NoFood', u, 42, { cfg: noFood }).elo;
+  const gap = Math.abs(withFood - without);
+  const ok = without >= 2900 && gap <= 60;
+  total++; if (ok) pass++;
+  console.log((ok ? 'OK   ' : 'FAIL ') + 'Без харчування ' + without +
+    ' ELO проти ' + withFood + ' зі щоденником (різниця ' + gap +
+    ')  [ціль: 2900+ і різниця ≤ 60]');
 }
 
 console.log('\n' + pass + '/' + total + ' цілей балансу влучено.');

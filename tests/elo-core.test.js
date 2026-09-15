@@ -548,3 +548,81 @@ describe('ELO: приблизний день харчування', () => {
     assert.ok(quick < full, 'приблизний день коштує як розібраний');
   });
 });
+
+/*
+ * ХАРЧУВАННЯ МОЖНА НЕ ВЕСТИ — І НЕ ПРОГРАТИ ЧЕРЕЗ ЦЕ.
+ *
+ * Тижнева стеля в грі спільна: weeklyBudget × темп, незалежно від
+ * категорій (elo_week_room на сервері). Ваги лише ділять цю стелю між
+ * категоріями — і саме тому людина, яка не веде їжу, досі не могла
+ * дотягтись до 30 % власної стелі: вони були закріплені за категорією,
+ * якої в неї немає. Не «менше заробляла за ті самі дії», а мала
+ * недосяжний кусок бюджету.
+ *
+ * Тому вимкнення категорії — це не знижка й не штраф, а перерозподіл:
+ * ваги решти нормуються так, щоб сума лишилась тією самою одиницею.
+ */
+describe('Вимкнена категорія: бюджет перерозподіляється, а не зникає', () => {
+  const CFG = {
+    weeklyBudget: 200, categoryShare: 0.857, cleanThreshold: 0.9, cleanWeekBonus: 9,
+    weights: { training: 0.3, nutrition: 0.3, sleep: 0.2, recovery: 0.1, activity: 0.1 }
+  };
+
+  it('сума ваг лишається одиницею', () => {
+    const cut = E.cfgFor(CFG, ['nutrition']);
+    const sum = Object.keys(cut.weights)
+      .reduce((a, k) => a + cut.weights[k], 0);
+    assert.ok(Math.abs(sum - 1) < 1e-9, 'сума ' + sum);
+  });
+
+  it('вимкненої категорії в конфігу просто немає', () => {
+    assert.equal(E.cfgFor(CFG, ['nutrition']).weights.nutrition, undefined);
+  });
+
+  it('тижневий бюджет усіх категорій разом не змінився', () => {
+    const total = (cfg) => Object.keys(cfg.weights)
+      .reduce((a, k) => a + E.weeklyBudget(k, cfg, 0), 0);
+    assert.ok(Math.abs(total(CFG) - total(E.cfgFor(CFG, ['nutrition']))) < 1e-9);
+  });
+
+  it('решта категорій дорожчає рівно на вивільнену частку', () => {
+    const cut = E.cfgFor(CFG, ['nutrition']);
+    /* 0,3 / 0,7 — тренування забирає свою частку з решти 70 %. */
+    assert.ok(Math.abs(cut.weights.training - 0.3 / 0.7) < 1e-9, String(cut.weights.training));
+  });
+
+  it('вихідний конфіг не мутується', () => {
+    E.cfgFor(CFG, ['nutrition']);
+    assert.equal(CFG.weights.nutrition, 0.3);
+  });
+
+  it('порожній список чи сміття лишають конфіг як є', () => {
+    for (const bad of [null, undefined, [], 'ні', ['вигадана']]) {
+      assert.equal(E.cfgFor(CFG, bad).weights.nutrition, 0.3, String(bad));
+    }
+  });
+
+  it('вимкнути все не можна — лишиться хоч одна категорія', () => {
+    const cut = E.cfgFor(CFG, ['training', 'nutrition', 'sleep', 'recovery', 'activity']);
+    assert.ok(Object.keys(cut.weights).length > 0, 'інакше ділення на нуль і бюджет NaN');
+  });
+
+  /*
+   * Бонуси питають КАТЕГОРІЇ КОНФІГУ, а не свій список: інакше чистий
+   * день став би недосяжним назавжди — він вимагав би їжі, якої людина
+   * свідомо не веде.
+   */
+  it('чистий день не вимагає вимкненої категорії', () => {
+    const cut = E.cfgFor(CFG, ['nutrition']);
+    const mults = { sleep: 1, recovery: 1, activity: 1, training: 1 };
+    assert.equal(E.cleanDay(mults, true, cut), true);
+    assert.equal(E.cleanDay(mults, true, CFG), false, 'зі щоденником їжі — все ще вимагає');
+  });
+
+  it('чистий тиждень без харчування питає лише тренування', () => {
+    const cut = E.cfgFor(CFG, ['nutrition']);
+    assert.equal(E.cleanWeek(4, 4, 0, cut), CFG.cleanWeekBonus);
+    assert.equal(E.cleanWeek(3, 4, 7, cut), 0, 'план тренувань усе одно треба закрити');
+    assert.equal(E.cleanWeek(4, 4, 0, CFG), 0, 'зі щоденником — сім закритих днів обовʼязкові');
+  });
+});

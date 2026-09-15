@@ -514,11 +514,34 @@
     return Math.min(Math.max(n, 0), WARMUP_MAX);
   }
 
-  /** Кількість розминкових підходів вправи: вибір людини або типові 3. */
-  function warmupCountFor(profile, name) {
+  /*
+   * ТИПОВА КІЛЬКІСТЬ ЗАЛЕЖИТЬ ВІД ТИПУ ВПРАВИ.
+   *
+   * Сходинки до робочої ваги мають сенс там, де вага велика й техніка
+   * коштує дорого: присідання, жими, тяги. У біцепсі, трицепсі, ікрах,
+   * передпліччі чи шиї «розминковий підхід» — це той самий підхід, тільки
+   * легший; рядок про нього стояв у кожній такій вправі без діла.
+   *
+   * Класифікація НЕ вигадується тут заново: це той самий поділ
+   * compound/isolation із js/exercises.js, яким уже живуть час відпочинку
+   * й стеля відсотків у періодизації. Свою копію правила довелося б
+   * тримати в синхроні вручну — і вона розійшлася б на першій правці.
+   *
+   * @param {{name:string, lift?:string}|string} ex вправа (або сама назва)
+   */
+  function warmupCountFor(profile, ex) {
+    var one = (ex && typeof ex === 'object') ? ex : { name: String(ex == null ? '' : ex) };
     var book = profile && profile.warmups;
-    var own = book && typeof book === 'object' ? normWarmupCount(book[name]) : null;
-    return own === null ? WARMUP_DEFAULT : own;
+    var own = book && typeof book === 'object' ? normWarmupCount(book[one.name]) : null;
+    if (own !== null) return own;
+
+    /* liftKind сам дивиться спершу в поле lift, потім у бібліотеку за
+       назвою, і лише тоді здається — старі збережені плани поля не
+       носять, але назву мають. Без бібліотеки лишається саме поле. */
+    var kind = (typeof window.liftKind === 'function')
+      ? window.liftKind(one)
+      : (one.lift === 'compound' ? 'compound' : 'isolation');
+    return kind === 'compound' ? WARMUP_DEFAULT : 0;
   }
 
   /**

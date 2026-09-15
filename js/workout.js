@@ -742,16 +742,18 @@
    * нього лишається одне коротке число. Самі ваги живуть у вікні, як і
    * робоча вага: обидва «змінити» виглядають і поводяться однаково.
    */
-  function warmupLadder(name) {
+  /* Приймає ВПРАВУ, а не назву: типова кількість сходинок залежить від
+     того, багатосуглобова вона чи ізоляція (js/workout-core.js). */
+  function warmupLadder(ex) {
     if (!window.OneRM || !WC.warmupSets) return [];
-    return WC.warmupSets(planWeight(name), window.OneRM.PLATE_STEP,
-      WC.warmupCountFor(state.profile, name));
+    return WC.warmupSets(planWeight(ex.name), window.OneRM.PLATE_STEP,
+      WC.warmupCountFor(state.profile, ex));
   }
 
   /** Коротке значення рядка «Розминка»: рахуємо СХОДИНКИ, а не вибір. */
-  function warmupLabel(name) {
-    if (!WC.warmupCountFor(state.profile, name)) return 'без розминки';
-    const l = warmupLadder(name);
+  function warmupLabel(ex) {
+    if (!WC.warmupCountFor(state.profile, ex)) return 'без розминки';
+    const l = warmupLadder(ex);
     /*
      * Нуль сходинок при ненульовому виборі — не помилка вибору, а
      * наслідок ваги: без робочої ваги рахувати нема від чого, а на дуже
@@ -761,12 +763,6 @@
      */
     if (!l.length) return '—';
     return l.length + ' ' + window.App.plural(l.length, 'підхід', 'підходи', 'підходів');
-  }
-
-  /** Драбина словами: «20 · 30 · 40 кг» або порожньо. */
-  function ladderText(name) {
-    const l = warmupLadder(name);
-    return l.length ? l.map(function (x) { return fmtNum.kg(x.kg); }).join(' · ') + ' кг' : '';
   }
 
   /** Коротке значення рядка «Ваги підходів»: що реально записано. */
@@ -955,7 +951,7 @@
   /** Вікно розминки: одне число й одразу видно, що воно дасть. */
   function openWarmupSheet(i) {
     const ex = state.plan[state.dayIdx].exercises[i];
-    const n = WC.warmupCountFor(state.profile, ex.name);
+    const n = WC.warmupCountFor(state.profile, ex);
 
     function preview(v) {
       const l = window.OneRM
@@ -1086,7 +1082,7 @@
               ' aria-label="Змінити робочу вагу: ' + esc(ex.name) + '">змінити</button>') +
 
           metaRow('Розминка',
-            '<span class="mono" data-wu-val="' + i + '">' + esc(warmupLabel(ex.name)) + '</span>',
+            '<span class="mono" data-wu-val="' + i + '">' + esc(warmupLabel(ex)) + '</span>',
             '<button class="tdy-ex__meta-act" type="button" data-wu-edit="' + i + '"' +
               (off ? ' disabled' : '') +
               ' aria-label="Змінити розминку: ' + esc(ex.name) + '">змінити</button>') +

@@ -695,6 +695,34 @@ for (const w of [320, 390, 430]) {
      /^1 підхід$/.test(await p.locator('[data-wu-val]').first().innerText()),
      await p.locator('[data-wu-val]').first().innerText());
 
+  /*
+   * ІЗОЛЯЦІЯ РОЗМИНКИ НЕ ПРОСИТЬ.
+   *
+   * Сходинки 40/60/80 % мають сенс у присіданнях і жимах, а в біцепсі чи
+   * ікрах «розминковий підхід» — це той самий підхід, тільки легший.
+   * Рядок про нього стояв у кожній такій вправі без діла. Типова
+   * кількість тепер іде від типу вправи (compound/isolation), і саме це
+   * тут і стережеться — на живому плані, а не на вигаданій вправі.
+   */
+  const wuRows = await p.evaluate(() => Array.from(document.querySelectorAll('#workout .tdy-ex')).map((li) => ({
+    name: li.querySelector('.tdy-ex__name').textContent.trim(),
+    warm: (li.querySelector('[data-wu-val]') || {}).textContent
+  })));
+  const kinds = await p.evaluate((names) => names.map((n) => {
+    const e = (window.EXERCISES || []).find((x) => x.name === n);
+    return e && e.lift === 'compound' ? 'compound' : 'isolation';
+  }), wuRows.map((r) => r.name));
+
+  const isoWarmed = wuRows.filter((r, i) => kinds[i] === 'isolation' && r.warm !== 'без розминки');
+  ok('10. в ізоляції розминки немає жодної',
+     isoWarmed.length === 0,
+     isoWarmed.map((r) => r.name + ': ' + r.warm).slice(0, 3).join(' | '));
+
+  const compNone = wuRows.filter((r, i) => kinds[i] === 'compound' && r.warm === 'без розминки');
+  ok('10. а в багатосуглобових вона лишилась',
+     wuRows.some((r, i) => kinds[i] === 'compound') && compNone.length === 0,
+     compNone.map((r) => r.name).join(' | '));
+
   /* Вага ПІДХОДУ лишається редагованою — це факт одного дня. */
   const first = p.locator('#workout .tdy-ex').first();
   await tap(first.locator('[data-set-ex]').first());

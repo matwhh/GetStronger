@@ -427,17 +427,49 @@ describe('кількість розминкових підходів', () => {
   });
 
   it('кількість береться з профілю по назві вправи', () => {
+    const base = { lift: 'compound' };
     const p = { warmups: { 'Присідання зі штангою': 5, 'Жим лежачи': 0, 'Тяга': 'сміття' } };
-    assert.equal(WC.warmupCountFor(p, 'Присідання зі штангою'), 5);
-    assert.equal(WC.warmupCountFor(p, 'Жим лежачи'), 0, 'нуль — це вибір, а не відсутність');
-    assert.equal(WC.warmupCountFor(p, 'Тяга'), 3, 'сміття — типове');
-    assert.equal(WC.warmupCountFor(p, 'Чого немає'), 3);
-    assert.equal(WC.warmupCountFor(null, 'Будь-що'), 3);
+    assert.equal(WC.warmupCountFor(p, { name: 'Присідання зі штангою', lift: 'compound' }), 5);
+    assert.equal(WC.warmupCountFor(p, { name: 'Жим лежачи', lift: 'compound' }), 0,
+      'нуль — це вибір, а не відсутність');
+    assert.equal(WC.warmupCountFor(p, { name: 'Тяга', lift: 'compound' }), 3, 'сміття — типове');
+    assert.equal(WC.warmupCountFor(p, Object.assign({ name: 'Чого немає' }, base)), 3);
+    assert.equal(WC.warmupCountFor(null, Object.assign({ name: 'Будь-що' }, base)), 3);
+  });
+
+  /*
+   * ІЗОЛЯЦІЯ РОЗМИНКИ НЕ ПОТРЕБУЄ.
+   *
+   * Сходинки 40/60/80 % мають сенс там, де вага велика й техніка коштує
+   * дорого: присідання, жими, тяги. У біцепсі, трицепсі, ікрах, передпліччі
+   * чи шиї «розминковий підхід» — це той самий підхід, тільки легший, і
+   * рядок про нього стояв у кожній такій вправі без діла.
+   *
+   * Класифікацію не вигадуємо: це той самий поділ compound/isolation
+   * (js/exercises.js, window.liftKind), яким уже живуть час відпочинку й
+   * стеля відсотків у періодизації.
+   */
+  it('багатосуглобовій типові три сходинки, ізоляції — жодної', () => {
+    assert.equal(WC.warmupCountFor(null, { name: 'Присідання зі штангою', lift: 'compound' }), 3);
+    assert.equal(WC.warmupCountFor(null, { name: 'Біцепс у кросовері', lift: 'isolation' }), 0);
+  });
+
+  it('тип береться з бібліотеки, коли в плані його немає', () => {
+    /* Старі збережені плани поля lift не носять — але назва в них є. */
+    assert.equal(WC.warmupCountFor(null, { name: 'Присідання зі штангою' }), 3);
+    assert.equal(WC.warmupCountFor(null, { name: 'Біцепс у кросовері' }), 0);
+  });
+
+  it('свій вибір сильніший за тип вправи', () => {
+    const p = { warmups: { 'Біцепс у кросовері': 2, 'Присідання зі штангою': 0 } };
+    assert.equal(WC.warmupCountFor(p, { name: 'Біцепс у кросовері', lift: 'isolation' }), 2);
+    assert.equal(WC.warmupCountFor(p, { name: 'Присідання зі штангою', lift: 'compound' }), 0);
   });
 
   it('вибрана кількість доїжджає до драбини', () => {
     const p = { warmups: { 'Жим': 2 } };
-    const kg = WC.warmupSets(100, 2.5, WC.warmupCountFor(p, 'Жим')).map((s) => s.kg);
+    const kg = WC.warmupSets(100, 2.5, WC.warmupCountFor(p, { name: 'Жим', lift: 'compound' }))
+      .map((s) => s.kg);
     assert.equal(kg.join(','), '50,75');
   });
 });

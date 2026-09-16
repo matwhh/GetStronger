@@ -505,16 +505,21 @@
       ? { val: sign(lift.delta) + ' кг', lbl: 'сила · ' + lift.name, trend: lift.from + ' → ' + lift.to + ' за 8 тиж' }
       : { val: '—', lbl: 'сила', trend: 'без змін ваг' });
 
-    // Тренування: цього тижня X з Y (або всього)
+    /*
+     * Тренування: цього тижня X з Y.
+     *
+     * У підписі — НЕ виконання плану. Доти тут стояло «14 із 18 за 6 тиж»
+     * (дні), а нижче на тій самій сторінці картка «План тренувань»
+     * показувала свій відсоток за вибране вікно й у ПІДХОДАХ. Два різні
+     * числа під одним словом «план» на одному екрані — і жодне не
+     * пояснювало різниці. Відсоток тепер живе рівно в тій картці, де
+     * його можна перемкнути по періоду.
+     */
     const tr = PC.trainingStats(sn.workLog, sn.sessionLog, state.daysTarget);
-    /* adherence має вікно в тижнях — беремо його з повних журналів. */
-    const trFull = PC.trainingStats(state.workLog, state.sessionLog, state.daysTarget);
     tiles.push({
       val: state.daysTarget ? tr.thisWeek + ' з ' + state.daysTarget : String(tr.thisWeek),
       lbl: 'тренувань цього тижня',
-      trend: trFull.adherence
-        ? trFull.adherence.done + ' із ' + trFull.adherence.planned + ' за ' + trFull.adherence.weeks + ' тиж'
-        : tr.total + ' всього'
+      trend: tr.thisMonth + ' за 30 днів'
     });
 
     // Харчування: середнє проти цілі за 30 днів
@@ -566,10 +571,12 @@
       });
     }
 
-    // Нові особисті рекорди за 30 днів
-    const prsNew = PC.prList(state.weightLog, 30).filter(function (x) { return x.isNew; }).length;
+    // Нові особисті рекорди — той самий список, що в картці нижче
+    const prsNew = prRows().filter(function (x) { return x.isNew; }).length;
     if (prsNew) tiles.push({
-      val: '+' + prsNew, lbl: 'PR за 30 днів', trend: 'нові максимуми робочих ваг'
+      val: '+' + prsNew,
+      lbl: 'PR за ' + PR_RECENT_DAYS + ' днів',
+      trend: 'найважчі виконані підходи'
     });
 
     return tiles;
@@ -1164,21 +1171,6 @@
     });
   }
 
-  /** Рядок статистики регулярності під теплокартою */
-  function trainStatsLine() {
-    if (!window.ProgressCore) return '';
-    const st = window.ProgressCore.trainingStats(state.workLog, state.sessionLog, state.daysTarget);
-    if (!st.total) return '';
-    return '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
-      '<span class="small">Всього: <b class="mono">' + st.total + '</b></span>' +
-      '<span class="small">За 30 днів: <b class="mono">' + st.thisMonth + '</b></span>' +
-      (st.adherence
-        ? '<span class="small">План за ' + st.adherence.weeks + ' тиж: <b class="mono">' +
-            st.adherence.done + ' із ' + st.adherence.planned + '</b> (' + st.adherence.pct + '%)</span>'
-        : '') +
-    '</div>';
-  }
-
   function renderTrain() {
     const host = $('#jr-train');
     if (!host) return;
@@ -1203,12 +1195,13 @@
       });
     });
 
-    const monday = mondayOf(new Date());
-    let thisWeek = 0;
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday); d.setDate(monday.getDate() + i);
-      if (trained(keyOf(d))) thisWeek++;
-    }
+    /* «Цього тижня» тут і в плитці огляду — одне число з одного джерела.
+       Доти цей блок рахував його власним циклом по ПОВНИХ журналах, а
+       плитка брала з ProgressCore по сезонному зрізі: сезон, що починався
+       посеред тижня, розводив дві цифри на одному екрані. */
+    const thisWeek = window.ProgressCore
+      ? window.ProgressCore.trainingStats(sn.workLog, sn.sessionLog, state.daysTarget).thisWeek
+      : 0;
 
     // Ціль — кількість днів обраного плану. Хвалимось акцентом, лише
     // коли тиждень закритий повністю.
@@ -1226,7 +1219,6 @@
         '</div>' +
 
         '<div class="mt-2">' + heatmapHtml() + '</div>' +
-        trainStatsLine() +
         '<p class="small muted mt-1">Клікніть по дню, щоб поставити чи зняти позначку.' +
           (target ? '' : ' Оберіть план тренувань — і тут зʼявиться ціль на тиждень.') + '</p>' +
 
@@ -2026,8 +2018,6 @@
       '<div class="card">' +
         '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
           '<h2 style="margin:0">Харчування</h2>' +
-          (st && st.avgKcal !== null
-            ? '<span class="chip mono">≈' + st.avgKcal + ' ккал/день</span>' : '') +
         '</div>' +
         (st
           ? '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
@@ -2050,9 +2040,6 @@
                   (st.partialDays
                     ? ' <span class="muted">— по ' + st.proteinDays + ' із ' + st.count + ' днів</span>'
                     : '') + '</span>') +
-              (st.withTarget
-                ? '<span class="small">У межах ±5%: <b class="mono">' + st.inTarget + ' із ' + st.withTarget + '</b> днів</span>'
-                : '') +
             '</div>'
           : '') +
         '<div class="table-wrap mt-2">' +
@@ -2350,30 +2337,49 @@
    * вигадкою. Свіжий рекорд (до 14 днів) — з позначкою і датою.
    */
 
-  function renderPrs() {
-    const host = $('#jr-prs');
-    const PC = window.ProgressCore;
-    if (!host || !PC || !PC.prList) return;
+  /*
+   * Скільки днів рекорд вважається «новим». Число ОДНЕ на весь екран:
+   * доти плитка огляду рахувала свій список по книзі ваг за 30 днів, а
+   * картка нижче — по фактичних підходах за 14. «Новий PR» означало на
+   * одному екрані дві різні речі, і числа могли не збігтись.
+   */
+  const PR_RECENT_DAYS = 14;
 
-    /*
-     * Рекорд — це ПІДНЯТА вага, а не записана в план. Основа — знімки
-     * сесій (найважчий фактично виконаний підхід), і лише для вправ,
-     * яких у знімках ще немає, беремо максимум із книги ваг: історія
-     * книги довша за історію знімків, і обірвати її датою релізу було б
-     * гірше, ніж чесно підписати рядок «за журналом ваг».
-     */
+  /**
+   * Список рекордів. Будується тут і читається двома місцями — плиткою
+   * огляду й карткою нижче.
+   *
+   * Рекорд — це ПІДНЯТА вага, а не записана в план. Основа — знімки
+   * сесій (найважчий фактично виконаний підхід), і лише для вправ, яких
+   * у знімках ще немає, беремо максимум із книги ваг: історія книги
+   * довша за історію знімків, і обірвати її датою релізу було б гірше,
+   * ніж чесно підписати рядок «за журналом ваг».
+   */
+  function prRows() {
+    const PC = window.ProgressCore;
+    if (!PC || !PC.prList) return [];
     const EC = window.ExerciseCore;
-    const real = EC && EC.prFromSessions ? EC.prFromSessions(sn.sessionLog, 14, todayKey()) : [];
+    const real = EC && EC.prFromSessions
+      ? EC.prFromSessions(sn.sessionLog, PR_RECENT_DAYS, todayKey()) : [];
     const seen = Object.create(null);
     real.forEach(function (x) { seen[x.name] = 1; });
 
-    const book = PC.prList(sn.weightLog, 14).filter(function (x) { return !seen[x.name]; })
+    const book = PC.prList(sn.weightLog, PR_RECENT_DAYS)
+      .filter(function (x) { return !seen[x.name]; })
       .map(function (x) { x.book = true; return x; });
 
-    const list = real.concat(book).sort(function (a, b) {
+    return real.concat(book).sort(function (a, b) {
       if (a.kg !== b.kg) return b.kg - a.kg;
       return a.name < b.name ? -1 : 1;
     });
+  }
+
+  function renderPrs() {
+    const host = $('#jr-prs');
+    if (!host || !window.ProgressCore) return;
+
+    const list = prRows();
+    const book = list.filter(function (x) { return x.book; });
 
     if (!list.length) {
       host.innerHTML =
@@ -2405,7 +2411,7 @@
         '</div>' +
         '<div class="mt-2">' + rows + '</div>' +
         '<p class="small muted mb-0" style="margin-top:10px">Найважчий фактично виконаний підхід. ' +
-        '«Новий PR» — поставлений за останні два тижні.' +
+        '«Новий PR» — поставлений за останні ' + PR_RECENT_DAYS + ' днів.' +
         (hasBook ? ' Позначка «план» — вправи, яких ще немає у знімках тренувань: ' +
           'для них показано максимум із журналу робочих ваг.' : '') + '</p>' +
       '</div>';

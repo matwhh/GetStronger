@@ -153,7 +153,7 @@ bash tools/ci-browser.sh full               # core + решта, ~50 хв
 | сторінок `*.html` | 27 |
 | файлів у `js/` | 87 |
 | з них ядра `*-core.js` / `*-data.js` | 40 |
-| файлів `tests/*.test.js` | 60 |
+| файлів `tests/*.test.js` | 61 |
 | скриптів `tools/verify*.mjs` | 67 |
 | наборів у `ci-browser.sh core` | 14 |
 | наборів у `ci-browser.sh full` | 56 |

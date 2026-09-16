@@ -149,6 +149,60 @@ async function open(page, extra) {
   await ctx.close();
 }
 
+/* ---- 4. Симулятор «що якщо» ---- */
+{
+  const { ctx, p, errs } = await open('nutrition.html');
+  const card = p.locator('#nutri-sim');
+  ok('4. картка симулятора намалювалась', await card.locator('.card').count() === 1,
+    String(await card.locator('.card').count()));
+
+  const first = await card.locator('tbody tr').first().innerText();
+  ok('4. у таблиці є горизонти', /місяц/.test(first), first.replace(/\n+/g, ' | '));
+
+  /* Менше їжі — більше втрати ваги за той самий строк. Це найдешевша
+     перевірка того, що важіль справді керує моделлю, а не малює. */
+  /* Читаємо КОМІРКУ ваги останнього рядка, а не весь його текст: у
+     тексті першим числом стоїть кількість місяців, і порівняння
+     мовчки порівнювало б «12» з «12». */
+  const readLast = async () => {
+    const cells = card.locator('tbody tr').last().locator('td');
+    return (await cells.nth(1).innerText()).trim();
+  };
+  await card.locator('[data-sim-kcal]').first().click();     // −500 від підтримання
+  await p.waitForTimeout(400);
+  const low = await readLast();
+  await card.locator('[data-sim-kcal]').last().click();      // +500
+  await p.waitForTimeout(400);
+  const high = await readLast();
+  const kgOf = (t) => {
+    const m = t.replace(/−/g, '-').match(/-?\d+[.,]?\d*/);
+    return m ? Number(m[0].replace(',', '.')) : NaN;
+  };
+  ok('4. менше їжі — менша вага через рік', kgOf(low) < kgOf(high),
+    'на −500: ' + low.replace(/\n+/g, ' ') + ' | на +500: ' + high.replace(/\n+/g, ' '));
+
+  /* Зайві тренування мусять зсунути витрати сценарію вгору. */
+  const line = () => card.locator('p').filter({ hasText: 'Витрати за сценарієм' }).first().innerText();
+  const before = await line();
+  await card.locator('input[name="sim-ses"][value="2"]')
+    .evaluate(e => { e.checked = true; e.dispatchEvent(new Event('change', { bubbles: true })); });
+  await p.waitForTimeout(400);
+  const after = await line();
+  ok('4. «+2 тренування» піднімають витрати сценарію', before !== after,
+    before.replace(/\n+/g, ' ') + '  →  ' + after.replace(/\n+/g, ' '));
+  ok('4. і картка каже, скільки коштує тренування',
+    /ккал понад спокій/.test(await card.innerText()),
+    (await card.innerText()).replace(/\n+/g, ' | ').slice(0, 240));
+  /* Крапка в дробовому числі — чужа: на сайті всюди кома
+     (App.fmtNum). Найлегше пропустити саме тут, бо round() віддає
+     число, і воно друкується як є. */
+  const simTxt = await card.innerText();
+  ok('4. дробові числа з комою, а не з крапкою', !/\d+\.\d/.test(simTxt),
+    (simTxt.match(/\S*\d+\.\d\S*/g) || []).join(' '));
+  ok('4. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter(r => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок адаптивних витрат пройшло.');

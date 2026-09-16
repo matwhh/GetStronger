@@ -365,8 +365,30 @@
       }
     }
 
+    /*
+     * ДЕЛЬТА ВИТРАТ СЦЕНАРІЮ (tdeeBonus).
+     *
+     * Це НЕ переоснова обміну й не «тренувальний доданок» до звичайного
+     * рахунку — такий доданок був би подвійним (коефіцієнт активності вже
+     * включає тренування, а виміряні витрати включають їх за визначенням;
+     * див. docs/ENGINEERING.md, розділ 24). Тут інше: різниця витрат у
+     * сценарії «а якби я ходив у зал на два рази більше». Різниця —
+     * величина, якої в базовому рахунку немає, отже подвоювати нічого.
+     */
+    const bonus = bounded(p.tdeeBonus, [1, 2000]);
+    if (bonus !== null) tdee = tdee + bonus;
+
     const goal = GOALS[p.goal] || GOALS.maintain;
-    const raw = tdee * (1 + goal.pct);
+    /*
+     * СВОЄ ЧИСЛО КАЛОРІЙ (kcalOverride) — важіль симулятора.
+     *
+     * Мета з перемикача задає ВІДСОТОК від витрат; тут людина називає
+     * саме число. Далі все як звичайно: підлога калорійності, макроси,
+     * прогноз маси — жоден запобіжник не обходиться, інакше симулятор
+     * показував би те, чого в застосунку не буває.
+     */
+    const own = bounded(p.kcalOverride, [500, 12000]);
+    const raw = own !== null ? own : tdee * (1 + goal.pct);
 
     /*
      * ПІДЛОГА калорійності.
@@ -411,6 +433,11 @@
          змінилась» виглядає як збій. */
       formulaTdee: formulaTdee,
       measured: measured,
+      /* Позначка «це сценарій, а не ваша ціль»: екран мусить уміти
+         сказати це вголос, інакше симульоване число не відрізнити від
+         справжнього. */
+      simulated: own !== null,
+      tdeeBonus: bonus || 0,
       bmr: bmr,
       goalLabel: goal.label
     };
@@ -537,8 +564,35 @@
        * поступово за перші три місяці дефіциту, щоб не робити стрибка.
        */
       const inDeficit = step.kcal < step.tdee;
-      const adapt = inDeficit ? 1 - 0.10 * Math.min(1, (i + 1) / 3) : 1;
-      const dKcal = step.kcal - step.tdee * adapt;
+      /*
+       * Адаптація ПРОПОРЦІЙНА ГЛИБИНІ дефіциту, а не однакові 10 % на
+       * будь-який. Плоскі 10 % означали, що дефіцит у 290 ккал (це ~10 %
+       * витрат) з'їдається адаптацією повністю й вага стоїть НАЗАВЖДИ —
+       * тобто модель стверджувала, що худнути на помірному дефіциті
+       * неможливо в принципі. Десять відсотків — це верхня оцінка, і
+       * міряна вона на глибоких дефіцитах; на чверті витрат беремо її
+       * повністю, на дрібніших — пропорційну частку.
+       */
+      const depth = inDeficit
+        ? Math.min(1, (step.tdee - step.kcal) / (step.tdee * 0.25))
+        : 0;
+      const adapt = 1 - 0.10 * Math.min(1, (i + 1) / 3) * depth;
+      /*
+       * Адаптація ЗМЕНШУЄ дефіцит, але ніколи його не ПЕРЕВЕРТАЄ.
+       *
+       * Без цієї межі дрібний дефіцит ставав профіцитом: витрати 3042,
+       * їжа 2900 — дефіцит 142, а мінус 10 % витрат це вже 304, і
+       * модель показувала НАБІР ваги на дефіциті. Найпомітніше на
+       * сценаріях симулятора, де різниця між їжею й витратами мала
+       * навмисно: додаєш два тренування на тиждень — і прогноз росте.
+       *
+       * Фізіологічно адаптація виводить на плато, а не розвертає
+       * напрямок: тому адаптовані витрати не опускаються нижче за
+       * з'їдене.
+       */
+      let expend = step.tdee * adapt;
+      if (inDeficit && expend < step.kcal) expend = step.kcal;
+      const dKcal = step.kcal - expend;
 
       let next = w + dKcal * DAYS_PER_MONTH / KCAL_PER_KG_FAT;
       if (minWeight && next < minWeight) { next = minWeight; hitFloor = true; }
@@ -708,6 +762,77 @@
     return { reachable: false, months: null, reason: 'за цим режимом не встигає за ' + h + ' міс.' };
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Симулятор «що якщо»                                                 */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Два важелі, і жодного більше: скільки їсти й скільки разів на тиждень
+   * заходити в зал. Це рівно те, чим людина справді керує. Третій важіль
+   * («а якби обмін був швидшим») був би не симулятором, а втішанням.
+   *
+   * НОВОЇ МАТЕМАТИКИ ТУТ НЕМАЄ. Усе рахує massForecast — той самий, що
+   * малює звичайний прогноз, з тими самими запобіжниками: підлога
+   * калорійності, межа ІМТ, стеля приросту сухої маси, метаболічна
+   * адаптація. Симулятор лише підставляє в нього інші вхідні числа.
+   * Друга модель «для сценаріїв» розійшлася б із першою на першій правці,
+   * і на одному екрані стояли б два різні прогнози.
+   */
+
+  /** Горизонти сценарію. Три числа, бо четверте вже ніхто не читає. */
+  const SIM_MONTHS = [3, 6, 12];
+
+  /**
+   * @param {object} profile профіль (потрібні зріст, вага, вік)
+   * @param {object} opts
+   *   kcal          — скільки їсти; без нього береться поточна ціль
+   *   sessionsDelta — на скільки тренувань на тиждень більше (чи менше)
+   *   perSession    — скільки коштує одне тренування, ккал
+   *                   (CoachCore.trainingKcal.perSession)
+   *   goalWeight    — цільова вага для дати досягнення
+   * @returns {?{kcal:number, tdee:number, rows:Array, eta:object,
+   *             perDay:number, simulated:boolean}}
+   */
+  function simulate(profile, opts) {
+    const p = profile || {};
+    const o = opts || {};
+    const base = targetFor(p);
+    if (!base) return null;
+
+    /* Дельта витрат від зміни кількості тренувань, у розрахунку на добу.
+       Тиждень має сім днів — зайве тренування не коштує стільки ж
+       щодня. */
+    const delta = Number(o.sessionsDelta);
+    const per = Number(o.perSession);
+    const bonus = (Number.isFinite(delta) && delta > 0 && Number.isFinite(per) && per > 0)
+      ? Math.round(delta * per / 7)
+      : null;
+
+    const kcal = bounded(o.kcal, [500, 12000]);
+    const sim = Object.assign({}, p, {
+      kcalOverride: kcal === null ? base.kcal : kcal,
+      tdeeBonus: bonus
+    });
+
+    const t = targetFor(sim);
+    if (!t) return null;
+
+    const rows = SIM_MONTHS.map(function (m) {
+      return massForecast(sim, m);
+    }).filter(Boolean);
+    if (!rows.length) return null;
+
+    return {
+      kcal: t.kcal,
+      tdee: t.tdee,
+      perDay: Math.round(t.kcal - t.tdee),
+      bonus: bonus || 0,
+      simulated: t.simulated,
+      floored: t.floored,
+      rows: rows,
+      eta: etaToWeight(sim, o.goalWeight, ETA_HORIZON)
+    };
+  }
+
   window.NutritionCalc = {
     ACTIVITY: ACTIVITY,
     LIMITS: LIMITS,
@@ -728,6 +853,8 @@
     bmiInfo: bmiInfo,
     targetFor: targetFor,
     massForecast: massForecast,
+    simulate: simulate,
+    SIM_MONTHS: SIM_MONTHS,
     etaToWeight: etaToWeight,
     ETA_HORIZON: ETA_HORIZON,
     LEAN_CEILING: LEAN_CEILING

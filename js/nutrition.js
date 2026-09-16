@@ -211,7 +211,12 @@
    * підтримання береться не з полів, а з журналів їжі та зважувань,
    * тож вони їдуть у targetFor окремо від форми.
    */
-  let logs = { bodyLog: null, mealLog: null, tdeeMode: null };
+  let logs = { bodyLog: null, mealLog: null, sessionLog: null, tdeeMode: null };
+
+  /* Стан симулятора живе поруч із рештою сторінки, а не в розмітці:
+     перемальовка картки не має скидати сценарій, який людина щойно
+     набрала. */
+  const sim = { kcal: null, sessions: 0 };
 
   /* Профіль для ядра — з полів форми плюс журнали. Одна функція на всі
      виклики targetFor цієї сторінки: два способи зібрати той самий
@@ -706,6 +711,144 @@
       '</div>';
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Симулятор «що якщо»                                                 */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Два важелі — їжа й кількість тренувань, — бо рівно ними людина
+   * керує. Прогноз вище відповідає на питання «що буде за моєї мети»;
+   * тут питання інше й куди частіше: «а якби я їв на двісті менше» або
+   * «а якби ходив у зал чотири рази».
+   *
+   * НОВОЇ МАТЕМАТИКИ НЕМАЄ: рахує той самий massForecast із тими самими
+   * запобіжниками (NutritionCalc.simulate). Друга модель «для
+   * сценаріїв» розійшлася б із першою, і на одному екрані стояли б два
+   * різні прогнози.
+   */
+
+  /** Ціна одного тренування в калоріях — із ФАКТИЧНИХ сесій, якщо є. */
+  function sessionCost(input) {
+    const CC = window.CoachCore;
+    const kg = input && input.weight;
+    if (!CC || !Number.isFinite(kg)) return null;
+    const t = CC.trainingKcal(logs.sessionLog, kg, CC.WINDOW_DAYS);
+    if (t) return t.perSession;
+    /* Сесій ще немає — беремо годину помірної силової роботи за тією ж
+       формулою, що й ядро. Це оцінка, і підписана вона так само. */
+    return Math.round(CC.MET_LIFTING * 3.5 * kg / 200 * (CC.MET_LIFTING - 1) / CC.MET_LIFTING * 60);
+  }
+
+  const SIM_SESSIONS = [0, 1, 2, 3];
+
+  function renderSim(input) {
+    const host = $('#nutri-sim');
+    if (!host || !window.NutritionCalc.simulate) return;
+
+    const base = window.NutritionCalc.targetFor(profileOf(input));
+    if (!base) { host.innerHTML = ''; return; }
+
+    const maint = Math.round(base.tdee);
+    if (sim.kcal === null) sim.kcal = Math.round(base.kcal);
+    const per = sessionCost(input);
+
+    const r = window.NutritionCalc.simulate(profileOf(input), {
+      kcal: sim.kcal,
+      sessionsDelta: sim.sessions,
+      perSession: per,
+      goalWeight: goalWeight
+    });
+    if (!r) { host.innerHTML = ''; return; }
+
+    /* «−0» — це не число, а артефакт округлення: signed() бачить
+       від'ємні 0,04 і чесно ставить мінус, а десята їх з'їдає. У
+       коридорі похибки показуємо нуль без знака. */
+    const sign = function (v) {
+      return Math.abs(v) < 0.05 ? fmtNum.n(0, 1) : fmtNum.signed(v, 1);
+    };
+    const rows = r.rows.map(function (f) {
+      return '<tr>' +
+        '<td>' + f.months + ' ' + (f.months === 1 ? 'місяць' : (f.months < 5 ? 'місяці' : 'місяців')) + '</td>' +
+        /* fmtNum.kg, а не round(): round() віддає ЧИСЛО, і воно
+           друкується з крапкою — «75.9 кг» посеред сторінки, де всюди
+           кома. Правило форматування одне на весь Get Stronger. */
+        '<td class="num mono"><b>' + sign(f.totalKg) + '</b>' +
+          '<div class="small muted">' + fmtNum.kg(input.weight + f.totalKg) + ' кг</div></td>' +
+        '<td class="num mono">' + sign(f.lean) + '</td>' +
+        '<td class="num mono">' + sign(f.fat) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const eta = r.eta && r.eta.reachable
+      ? (r.eta.months === 0
+          ? 'Цільова вага вже досягнута.'
+          : 'До цільової ваги — близько ' + fmtNum.n(r.eta.months, 1) + ' міс.')
+      : (goalWeight === null
+          ? 'Цільову вагу не задано — строк рахувати нема до чого.'
+          : 'За цим сценарієм ціль не досягається: ' + esc(String((r.eta && r.eta.reason) || '')) + '.');
+
+    host.innerHTML =
+      '<div class="card mt-3">' +
+        '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px">' +
+          '<h2 style="margin:0">Що якщо</h2>' +
+          '<span class="chip chip--warn">модель, не обіцянка</span>' +
+        '</div>' +
+        '<p class="small muted mt-1">' +
+          'Два важелі, якими ви справді керуєте. Рахує той самий прогноз, ' +
+          'що й вище, — просто з іншими вхідними числами.' +
+        '</p>' +
+
+        '<div class="row mt-2" style="gap:12px;flex-wrap:wrap;align-items:flex-end">' +
+          '<div class="field" style="flex:0 0 150px">' +
+            '<label class="field__label" for="sim-kcal">Їсти, ккал/добу</label>' +
+            '<input class="input input--sm num mono" id="sim-kcal" type="text" ' +
+              'inputmode="numeric" autocomplete="off" value="' + sim.kcal + '">' +
+          '</div>' +
+          '<div class="row" style="gap:6px;flex-wrap:wrap">' +
+            [-500, -250, 0, 250, 500].map(function (d) {
+              return '<button class="btn btn--ghost btn--sm" type="button" data-sim-kcal="' +
+                (maint + d) + '">' + (d === 0 ? 'підтримання' : fmtNum.signed(d, 0)) + '</button>';
+            }).join('') +
+          '</div>' +
+        '</div>' +
+
+        '<div class="field mt-2">' +
+          '<label class="field__label">Тренувань на тиждень більше</label>' +
+          '<div class="seg">' +
+            SIM_SESSIONS.map(function (n) {
+              return '<label class="seg__item"><input type="radio" name="sim-ses" value="' + n + '"' +
+                (n === sim.sessions ? ' checked' : '') + '><span>' +
+                (n === 0 ? 'як зараз' : '+' + n) + '</span></label>';
+            }).join('') +
+          '</div>' +
+          '<span class="field__hint">' +
+            (per
+              ? 'Одне тренування — близько ' + per + ' ккал понад спокій' +
+                (r.bonus ? '; сценарій додає ' + r.bonus + ' ккал на добу' : '') + '.'
+              : 'Ціну тренування нема з чого порахувати.') +
+          '</span>' +
+        '</div>' +
+
+        '<p class="small mt-2 mb-0">Витрати за сценарієм — <b>' + fmtNum.kcal(Math.round(r.tdee)) +
+          '</b>, їжа — <b>' + fmtNum.kcal(r.kcal) + '</b>, різниця ' +
+          '<b>' + fmtNum.signed(r.perDay, 0) + '</b> ккал на добу.' +
+          (r.floored ? ' Число вперлося в підлогу калорійності — нижче модель не рахує.' : '') +
+        '</p>' +
+
+        '<div class="table-wrap mt-2">' +
+          '<table class="tbl"><thead><tr>' +
+            '<th>Через</th><th class="num">Вага</th><th class="num">Мʼязи</th><th class="num">Жир</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table>' +
+        '</div>' +
+
+        '<p class="small mt-2 mb-0">' + esc(eta) + '</p>' +
+        '<p class="small muted mb-0" style="margin-top:8px">' +
+          'Ліворуч — вага, це майже чиста арифметика. Праворуч — з чого вона ' +
+          'складається, і це вже модель: приріст сухої маси має стелю швидкості, ' +
+          'якої калоріями не обійти.' +
+        '</p>' +
+      '</div>';
+  }
+
   function renderForecast(input) {
     const host = $('#nutri-forecast');
     if (!host) return;
@@ -962,6 +1105,7 @@
       logs = {
         bodyLog: p.bodyLog || null,
         mealLog: p.mealLog || null,
+        sessionLog: p.sessionLog || null,
         tdeeMode: p.tdeeMode === 'measured' ? 'measured' : null
       };
     } catch (_) { /* профіль необовʼязковий */ }
@@ -971,8 +1115,31 @@
       render(i);
       renderTdee(i);
       renderForecast(i);
+      renderSim(i);
       window.App.initAccordions($('#nutri-forecast'));
     };
+
+    /* Важелі симулятора. Перемальовуємо ЛИШЕ його картку: повний update
+       зніс би поле, у якому зараз друкують число. */
+    const simHost = $('#nutri-sim');
+    if (simHost) {
+      simHost.addEventListener('click', function (e) {
+        const b = e.target.closest('[data-sim-kcal]');
+        if (!b) return;
+        sim.kcal = Number(b.dataset.simKcal);
+        renderSim(readInput());
+      });
+      simHost.addEventListener('change', function (e) {
+        const ses = e.target.closest('input[name="sim-ses"]');
+        if (ses) { sim.sessions = Number(ses.value) || 0; renderSim(readInput()); return; }
+        const k = e.target.closest('#sim-kcal');
+        if (k) {
+          const v = Math.round(Number(String(k.value).replace(',', '.')));
+          sim.kcal = Number.isFinite(v) && v > 0 ? v : sim.kcal;
+          renderSim(readInput());
+        }
+      });
+    }
 
     /* Перемикач режиму витрат. Зберігаємо й перемальовуємо все: ціль
        міняється зараз, а не «з наступного відкриття». */

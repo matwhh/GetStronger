@@ -17,6 +17,40 @@
 | **Історія змін** | `schema.sql`, `elo-*.sql`, `admin-elo*.sql`, `account-approval.sql`, `security-hardening*.sql`, `nick-length.sql`, `leaderboard-name.sql`, `cron.sql` | Те, чим базу доводили до нинішнього стану. Читати — так. Виконувати по продакшену — ні. |
 | **Інструменти** | `backup-export.sql`, `snapshot-before-plan.sql`, `restore-skeleton.sql`, `RESTORE.md`, `*-tests.sql`, `sim-week.sql` | Виконуються свідомо й окремо. Див. `RESTORE.md`. |
 
+## Перекриті файли: що не можна запускати
+
+Дванадцять файлів у цій теці містять тіла функцій, СТАРІШІ за базу. Кожен
+виглядає як «схема» — і саме такий прогін колись зняв із продакшену барʼєр
+`NOT_APPROVED` (INV-002). Тепер у кожного в шапці стоїть рядок
+`-- ПЕРЕКРИТО: <чим>`, і його звіряє `tools/ci-hygiene.mjs`:
+
+- **перевірка 8** вимагає, щоб файл, який перевизначає функцію з барʼєром у
+  базі (`NOT_APPROVED`, `USERNAME_TAKEN`, `SCREENING_TOO_LARGE`), мав цей
+  барʼєр — або був позначений як історія;
+- **перевірка 21** вимагає, щоб позначка казала, ЧИМ саме перекрито, і щоб
+  названий файл існував.
+
+| Файл | Чим перекрито | Чим небезпечний прогін |
+|---|---|---|
+| `elo-engine.sql` | багатьма пізнішими | 8 тіл з 11 старіші; знімає `NOT_APPROVED` |
+| `elo-integrity.sql` | `elo-week-eval-fix`, `elo-skip-category`, `elo-pace` | відкотить `season_bounds` до квартальної межі |
+| `elo-authoritative.sql` | `elo-partial-cap`, `elo-week-eval-fix`, `elo-skip-category` | 6 тіл з 9 старіші |
+| `admin-elo.sql` | `elo-partial-cap`, `elo-skip-category` | 3 тіла з 4 старіші |
+| `elo-proportional.sql` | `elo-partial-cap` | обидва тіла старіші |
+| `elo-catchup.sql` | `elo-week-eval-fix` | `elo_catch_up` старіша |
+| `elo-partial-first-week.sql` | `elo-skip-category` | `elo_eval_week_for` старіша |
+| `elo-state-local-day.sql` | `elo-skip-category` | ще й `drop function elo_state()` |
+| `elo-skip-category.sql` | `elo-recount-category`, `elo-skip-whitelist` | поверне дірку з `eloSkip` без білого списку |
+| `account-approval.sql` | `security-hardening-2.sql` | зніме `uid = auth.uid()` з `is_admin`/`is_approved` |
+| `nick-length.sql` | пізнішими міграціями | зніме перевірку унікальності ніка |
+| `leaderboard-name.sql` | пізнішими міграціями | те саме + довжина 24 замість 13 |
+
+Два останні варті окремої уваги: чинних тіл `elo_set_name` і
+`register_request` немає в жодному файлі `db/` — вони існують лише в
+`live-schema.sql` і в історії міграцій Supabase. Тобто це не «старіша
+версія», а «версія без перевірки»: прогін будь-якого з двох файлів звільнив
+би зайняті ніки й зняв обмеження розміру анкети.
+
 ## Як міняти базу
 
 Тільки міграцією: `apply_migration` з осмисленою назвою, і той самий текст —
@@ -31,7 +65,7 @@
 ## Порядок застосування на чистій базі
 
 Відповідає порядку міграцій у `supabase_migrations.schema_migrations`
-(стан на 2026-09-07, 38 міграцій). Файли покривають його не один-в-один:
+(стан на 2026-09-16, 66 міграцій). Файли покривають його не один-в-один:
 шість таблиць і частина функцій живуть ЛИШЕ в міграціях (INV-001), і саме
 тому для відтворення схеми береться `live-schema.sql`, а не список нижче.
 
@@ -96,6 +130,10 @@
 20260913223623  elo_partial_day_cap                    → elo-partial-cap.sql     ← правила
 20260913232553  elo_close_season_server_side           → elo-close-season-cron.sql ← DB-008
 20260913232703  elo_cron_close_seasons_align_with_repo → (вирівняно з файлом)
+20260915145326  elo_skip_category                      → elo-skip-category.sql
+20260915151208  elo_recount_categories                 → elo-recount-category.sql
+20260916181525  cron_wrappers_keep_work                → cron-keep-work.sql       ← крон
+20260916181540  elo_skip_whitelist                     → elo-skip-whitelist.sql   ← білий список
 ```
 
 **Про `elo-pace.sql`.** Це не точкова правка, а зміна БАЛАНСУ: вартість дії

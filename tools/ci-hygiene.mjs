@@ -178,27 +178,49 @@ if (existsSync('sw.js') && existsSync('index.html')) {
 // Джерело правди — db/live-schema.sql (знімок бойової схеми). Якщо функція
 // має барʼєр там, вона мусить мати його в кожному файлі db/, який її
 // перевизначає.
+//
+// Барʼєрів тепер три, і два додано 16.09.2026, коли аудит показав те саме
+// в іншому місці: у бойовому elo_set_name є перевірка унікальності ніка
+// (USERNAME_TAKEN проти account_status і season_state), а в nick-length.sql
+// і leaderboard-name.sql її немає ЗОВСІМ. Прогін будь-якого з них знімав би
+// її з продакшену — дослівно сценарій INV-002, тільки з ніком замість
+// підтвердження акаунта.
+//
+// ВИНЯТОК — файли з позначкою «ПЕРЕКРИТО» в шапці. Це історія, а не чинне
+// джерело: у них тіла свідомо старіші за базу, і вимагати від них барʼєр
+// означало б переписувати історію замість того, щоб її позначити. Що
+// позначка на місці й осмислена — стереже перевірка 21.
+const DB_GUARDS = ['NOT_APPROVED', 'USERNAME_TAKEN', 'SCREENING_TOO_LARGE'];
+const supersededSql = new Set();
 if (existsSync('db/live-schema.sql')) {
   const live = readFileSync('db/live-schema.sql', 'utf8');
   /* Межа тіла — початок НАСТУПНОЇ функції. Шукати роздільник $function$
      ненадійно: частина функцій у знімку однорядкові, і він стоїть у тому
      самому рядку, що й тіло. */
   const heads = [...live.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\(/g)];
-  const guarded = new Set();
+  const guarded = new Map();          // функція → які барʼєри має в базі
   heads.forEach((m, i) => {
     const end = i + 1 < heads.length ? heads[i + 1].index : live.length;
-    if (live.slice(m.index, end).includes('NOT_APPROVED')) guarded.add(m[1]);
+    const body = live.slice(m.index, end);
+    const has = DB_GUARDS.filter((g) => body.includes(g));
+    if (has.length) guarded.set(m[1], has);
   });
   for (const f of tracked.filter((x) => x.startsWith('db/') && x.endsWith('.sql') && x !== 'db/live-schema.sql')) {
     const src = readFileSync(f, 'utf8');
+    if (/^--\s*ПЕРЕКРИТО:/m.test(src.slice(0, 600))) { supersededSql.add(f); continue; }
     const defs = [...src.matchAll(/create or replace function public\.(\w+)\s*\(/gi)];
     defs.forEach((g, i) => {
-      if (!guarded.has(g[1])) return;
+      const need = guarded.get(g[1]);
+      if (!need) return;
       const end = i + 1 < defs.length ? defs[i + 1].index : src.length;
       const body = src.slice(g.index, end);
-      if (!body.includes('NOT_APPROVED')) {
-        fail(`${f}: public.${g[1]} без перевірки is_approved, хоча в базі вона є — ` +
-             'виконання цього файла зніме барʼєр із продакшену');
+      for (const barrier of need) {
+        if (!body.includes(barrier)) {
+          fail(`${f}: public.${g[1]} без перевірки ${barrier}, хоча в базі вона є — `
+             + 'виконання цього файла зніме барʼєр із продакшену. Якщо файл — '
+             + 'історія, а не чинне джерело, позначте його в шапці рядком '
+             + '«-- ПЕРЕКРИТО: <чим>».');
+        }
       }
     });
   }
@@ -695,6 +717,37 @@ for (const dep of CORE_DEPS) {
         fail(`AGENTS.md §2.2 — рядок «${what}» ніхто не рахує. Число, яке не `
            + 'звіряється, застаріє мовчки: або додайте лічильник у перевірку 20, '
            + 'або приберіть рядок.');
+      }
+    }
+  }
+}
+
+/* ---- 21. «ПЕРЕКРИТО» мусить казати, ЧИМ саме ------------------------- */
+//
+// Привід — аудит 16.09.2026. У db/ дванадцять файлів, тіла функцій у яких
+// старіші за базу: elo-engine.sql (8 із 11), elo-integrity.sql (7 із 8),
+// elo-authoritative.sql (6 із 9) і далі. Кожен виглядає як «схема» — і
+// саме такий прогін колись зняв із продакшену барʼєр NOT_APPROVED.
+//
+// Позначка в шапці рятує лише доти, доки вона осмислена. «ПЕРЕКРИТО:» без
+// назви — це «не запускай, бо не треба»: наступна людина відкриє файл,
+// не знайде чим саме, і піде дивитись у базу руками. Тому тут вимагається
+// текст після двокрапки, і щоб названий файл справді існував.
+{
+  for (const f of supersededSql) {
+    const src = readFileSync(f, 'utf8');
+    const m = /^--\s*ПЕРЕКРИТО:\s*(.+)$/m.exec(src.slice(0, 600));
+    const by = m ? m[1].replace(/\.\s*НЕ ЗАПУСКАТИ.*$/, '').trim() : '';
+    if (!by) {
+      fail(`${f} — позначка «ПЕРЕКРИТО:» без пояснення, чим саме. Напишіть `
+         + 'назву файла-наступника або «пізнішими міграціями (чинне тіло — '
+         + 'лише в live-schema.sql)».');
+      continue;
+    }
+    for (const name of by.match(/[a-z0-9-]+\.sql/g) || []) {
+      if (!tracked.includes('db/' + name)) {
+        fail(`${f} — у позначці «ПЕРЕКРИТО» названо db/${name}, якого в `
+           + 'репозиторії немає.');
       }
     }
   }

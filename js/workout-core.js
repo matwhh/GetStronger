@@ -697,8 +697,15 @@
    * число й поставити його поруч із порахованою вагою означало б видати
    * здогад за розрахунок.
    *
+   * ДРУГИЙ АРГУМЕНТ приймає і число, і ФУНКЦІЮ. Число — старий крок
+   * млинців. Функція — власне округлення того, хто кличе: сторінка
+   * тренування передає сюди профіль залу (js/gym-core.js), який знає,
+   * що саме можна зібрати з наявних млинців або поставити на
+   * гантельному ряду. Ядро при цьому лишається без залежності на
+   * GymCore: воно просто округлює тим, що дали.
+   *
    * @param {number} workKg робоча вага вправи, кг
-   * @param {number} step   крок млинців (2,5 або 5)
+   * @param {number|function} step крок млинців (2,5 або 5) або округлювач
    * @param {number} [count] скільки сходинок; без нього — типові три
    * @param {Array<number|null>} [reps] свої повтори посходинково
    * @returns {Array<{pct:number, kg:number, reps:string}>}
@@ -706,10 +713,14 @@
   function warmupSets(workKg, step, count, reps) {
     var kg = Number(workKg);
     if (!Number.isFinite(kg) || kg <= 0) return [];
-    var plates = (window.OneRM && typeof window.OneRM.toPlates === 'function')
-      ? window.OneRM.toPlates : null;
+    var snap = null;
+    if (typeof step === 'function') {
+      snap = function (v) { return step(v); };
+    } else if (window.OneRM && typeof window.OneRM.toPlates === 'function') {
+      snap = function (v) { return window.OneRM.toPlates(v, step); };
+    }
     /* Без округлення розминки не буває: 37,4 кг у залі не зібрати. */
-    if (!plates) return [];
+    if (!snap) return [];
 
     /* undefined — «кількість не питали», тобто типові три. Явний нуль
        проходить через normWarmupCount і чесно дає порожню розминку. */
@@ -722,7 +733,8 @@
 
     var out = [], seen = Object.create(null);
     pcts.forEach(function (pct, idx) {
-      var w = plates(kg * pct / 100, step);
+      var w = Number(snap(kg * pct / 100));
+      if (!Number.isFinite(w)) return;
       /*
        * Нуль означає «легше за найменший млинець» — це вже не вага.
        *

@@ -269,6 +269,7 @@ elo-core · elo-api · elo-hooks
 | `measureLog` | measure | `MeasureCore` (зокрема `homeSummary` на «Сьогодні») |
 | `trackers` · `trackerLog` | trackers, today | `TrackerCore` |
 | `mealsLog` | meals | `DayCore`, `AdherenceCore` |
+| `gym` | «Мій план» (`gym-view.js`) | `GymCore` — крок ваги, розминкові сходинки; `null` = стара поведінка |
 
 Усі вони ключовані **місцевим** днем — див. кінець розділу 3.
 

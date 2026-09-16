@@ -769,11 +769,43 @@
    * нього лишається одне коротке число. Самі ваги живуть у вікні, як і
    * робоча вага: обидва «змінити» виглядають і поводяться однаково.
    */
+  /*
+   * ОКРУГЛЕННЯ СХОДИНОК — ПІД КОНКРЕТНИЙ ЗАЛ.
+   *
+   * 30 % від 47,5 — це 14,25. Старе округлення давало 15 (крок 2,5), і
+   * на штанзі це справді 15. А на гантельному ряду з кроком 2 кг
+   * п'ятнадцяти не буває зовсім, і людина в залі щоразу мусила
+   * здогадуватись сама. Профіль залу (js/gym-core.js) знає, що саме
+   * можна зібрати; поки він порожній — усе рахується як і раніше.
+   */
+  function gymRounder(ex) {
+    const G = window.GymCore;
+    /* Число, а не функція: старий шлях лишається робочим і тоді, коли
+       gym-core на сторінку не підключили. */
+    const fallback = (window.OneRM && window.OneRM.PLATE_STEP) || 2.5;
+    if (!G) return fallback;
+    const gym = G.normGym(state.profile && state.profile.gym);
+    const kind = G.kindOf(ex && ex.name);
+    if (!G.knows(kind, gym)) return fallback;
+    return function (kg) { return G.achievable(kg, kind, gym); };
+  }
+
+  /** Крок ваги для цієї вправи у ВАШОМУ залі, або null — якщо не знаємо */
+  function gymStep(ex, kg) {
+    const G = window.GymCore;
+    if (!G || kg === null) return null;
+    const gym = G.normGym(state.profile && state.profile.gym);
+    const kind = G.kindOf(ex && ex.name);
+    if (!G.knows(kind, gym)) return null;
+    const up = G.nextUp(kg, kind, gym);
+    return up === null ? null : Math.round((up - kg) * 100) / 100;
+  }
+
   /* Приймає ВПРАВУ, а не назву: типова кількість сходинок залежить від
      того, багатосуглобова вона чи ізоляція (js/workout-core.js). */
   function warmupLadder(ex) {
     if (!window.OneRM || !WC.warmupSets) return [];
-    return WC.warmupSets(planWeight(ex.name), window.OneRM.PLATE_STEP,
+    return WC.warmupSets(planWeight(ex.name), gymRounder(ex),
       WC.warmupCountFor(state.profile, ex), warmupOwnReps(ex.name));
   }
 
@@ -801,7 +833,7 @@
   function ladderHint(ex, n, kgOverride) {
     const kg = kgOverride === undefined ? planWeight(ex.name) : kgOverride;
     if (kg === null) return 'Робочої ваги ще немає — рахувати нема від чого.';
-    const l = window.OneRM ? WC.warmupSets(kg, window.OneRM.PLATE_STEP, n) : [];
+    const l = window.OneRM ? WC.warmupSets(kg, gymRounder(ex), n) : [];
     if (!l.length) return 'Без розминкових підходів.';
     return l.map(function (x) { return fmtNum.kg(x.kg) + ' кг'; }).join(' · ');
   }
@@ -880,7 +912,16 @@
           '</div>' +
         '</div>' +
         '<p class="field__hint mt-1">Порожнє поле повторень — діапазон за вашим стажем (' +
-          esc(hint) + '). RIR — скільки повторень лишається в запасі; 0 — до відмови.</p>' +
+          esc(hint) + '). RIR — скільки повторень лишається в запасі; 0 — до відмови.' +
+          /* Крок показуємо ЛИШЕ тоді, коли профіль залу справді знає
+             снаряд. Написати «крок 2,5» за замовчуванням означало б
+             видати припущення за факт — саме те, від чого профіль залу
+             і рятує. */
+          (function () {
+            const st = gymStep(ex, cur);
+            return st === null ? ''
+              : ' Наступна вага у вашому залі — на ' + fmtNum.kg(st) + ' кг більша.';
+          })() + '</p>' +
         /*
          * РОЗМИНКА ТУТ, А НЕ ОКРЕМИМ ВІКНОМ.
          *
@@ -1078,7 +1119,7 @@
     const ex = state.plan[state.dayIdx].exercises[i];
     const n0 = WC.warmupCountFor(state.profile, ex);
     const own0 = warmupOwnReps(ex.name);
-    const step = window.OneRM ? window.OneRM.PLATE_STEP : 2.5;
+    const step = gymRounder(ex);
     const kg = planWeight(ex.name);
 
     let rows = '';

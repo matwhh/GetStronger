@@ -341,13 +341,25 @@
       return e.kcal >= e.target * 0.95 && e.kcal <= e.target * 1.05;
     }).length;
 
+    /* Нуль калорій — це «невідомо», а не «нічого не зʼїв». День міг
+       закритись без жодного запису (порожній день теж закривається), і
+       такі дні тягли середнє вниз: 2000 і 0 давали «1000 ккал/день»,
+       і людина бачила дефіцит, якого не було.
+
+       Те саме правило вже стояло поруч у двох місцях — countsProtein для
+       білка й TdeeCore.measure для спожитого (там kcal > 0 з самого
+       початку). Тут його не було. */
+    const kcalDays = days.filter(function (e) { return Number(e.kcal) > 0; });
     const proteinDays = days.filter(function (e) { return window.HistoryCore.countsProtein(e); });
     const partialDays = days.filter(function (e) { return e.partial === true; }).length;
 
     return {
       count: days.length,
       days: days,
-      avgKcal: Math.round(sum('kcal') / days.length),
+      avgKcal: kcalDays.length
+        ? Math.round(kcalDays.reduce(function (t, e) { return t + Number(e.kcal); }, 0) / kcalDays.length)
+        : null,
+      kcalDays: kcalDays.length,
       avgP: proteinDays.length
         ? Math.round(proteinDays.reduce(function (t, e) { return t + (Number(e.p) || 0); }, 0) / proteinDays.length)
         : null,

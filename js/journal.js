@@ -519,12 +519,16 @@
 
     // Харчування: середнє проти цілі за 30 днів
     const f = PC.foodStats(state.mealLog, 30);
-    tiles.push(f && f.avgTarget
+    /* avgKcal === null означає «є закриті дні, але в жодному немає
+       калорій» — це не нуль і не «даних немає зовсім». */
+    const fk = f && f.avgKcal !== null;
+    tiles.push(fk && f.avgTarget
       ? { val: f.avgKcal + ' / ' + f.avgTarget, lbl: 'ккал: середнє / ціль',
           trend: f.inTarget + ' із ' + f.withTarget + ' днів у межах ±5%' }
-      : f
-        ? { val: String(f.avgKcal), lbl: 'ккал у середньому', trend: f.count + ' закритих днів' }
-        : { val: '—', lbl: 'харчування', trend: 'ще без закритих днів' });
+      : fk
+        ? { val: String(f.avgKcal), lbl: 'ккал у середньому', trend: f.kcalDays + ' днів із записом' }
+        : { val: '—', lbl: 'харчування',
+            trend: f ? 'закриті дні без калорій' : 'ще без закритих днів' });
 
     // Дві плитки нижче зʼявляються лише З ДАНИМИ: порожня плитка з «—»
     // тут була б шумом, а не оглядом (плитки вище — базові чотири осі).
@@ -2022,13 +2026,20 @@
       '<div class="card">' +
         '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
           '<h2 style="margin:0">Харчування</h2>' +
-          (st ? '<span class="chip mono">≈' + st.avgKcal + ' ккал/день</span>' : '') +
+          (st && st.avgKcal !== null
+            ? '<span class="chip mono">≈' + st.avgKcal + ' ккал/день</span>' : '') +
         '</div>' +
         (st
           ? '<div class="row mt-1" style="gap:16px;flex-wrap:wrap">' +
-              (st.avgTarget
-                ? '<span class="small">Середнє / ціль: <b class="mono">' + st.avgKcal + ' / ' + st.avgTarget + '</b></span>'
-                : '<span class="small">Середнє: <b class="mono">' + st.avgKcal + ' ккал</b></span>') +
+              (st.avgKcal === null
+                ? '<span class="small">Калорії: <b>невідомі</b> ' +
+                  '<span class="muted">— у закритих днях немає жодного запису</span></span>'
+                : st.avgTarget
+                  ? '<span class="small">Середнє / ціль: <b class="mono">' + st.avgKcal + ' / ' + st.avgTarget + '</b></span>'
+                  : '<span class="small">Середнє: <b class="mono">' + st.avgKcal + ' ккал</b>' +
+                    (st.kcalDays !== st.count
+                      ? ' <span class="muted">— по ' + st.kcalDays + ' із ' + st.count + ' днів</span>'
+                      : '') + '</span>') +
               /* Білок рахується лише по днях, де він відомий (див.
                  ProgressCore.foodStats). Показати нуль замість «невідомо»
                  означало б, що приблизні дні — це дні без білка. */

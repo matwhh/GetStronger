@@ -203,6 +203,36 @@
       '</div>';
   }
 
+  /*
+   * ЖУРНАЛИ ПОТРІБНІ САМІЙ ЦІЛІ.
+   *
+   * Сторінка рахує від того, що в ПОЛЯХ, — і це правильно: людина
+   * крутить вагу й активність, щоб подивитись «а якби». Але виміряне
+   * підтримання береться не з полів, а з журналів їжі та зважувань,
+   * тож вони їдуть у targetFor окремо від форми.
+   */
+  let logs = { bodyLog: null, mealLog: null, tdeeMode: null };
+
+  /* Профіль для ядра — з полів форми плюс журнали. Одна функція на всі
+     виклики targetFor цієї сторінки: два способи зібрати той самий
+     обʼєкт розійшлись би, і сторінка показувала б числа з різних
+     профілів поруч. */
+  function profileOf(input, bodyfat) {
+    const i = input || {};
+    const L = window.NutritionCalc.LIMITS;
+    const bf = bodyfat === undefined
+      ? (Number.isFinite(i.bodyfat) && i.bodyfat >= L.bodyfat[0] && i.bodyfat <= L.bodyfat[1]
+          ? i.bodyfat : null)
+      : bodyfat;
+    return {
+      sex: i.sex === 'female' ? 'female' : 'male',
+      weight: i.weight, height: i.height, age: i.age,
+      bodyfat: bf,
+      activity: i.activity, goal: i.goalKey,
+      bodyLog: logs.bodyLog, mealLog: logs.mealLog, tdeeMode: logs.tdeeMode
+    };
+  }
+
   function render(input) {
     const out = $('#nutri-out');
     if (!out) return;
@@ -261,12 +291,7 @@
      * що в targetFor, але без підлоги калорійності, яку туди додано. Дві
      * копії однієї формули розходяться завжди; питання лише коли.
      */
-    const t = window.NutritionCalc.targetFor({
-      sex: sex === 'female' ? 'female' : 'male',
-      weight: weight, height: height, age: age,
-      bodyfat: hasBF ? bodyfat : null,
-      activity: activity, goal: goalKey
-    });
+    const t = window.NutritionCalc.targetFor(profileOf(input, hasBF ? bodyfat : null));
     if (!t) {
       out.innerHTML = '<div class="notice notice--acc">Не вдалося порахувати за цими даними.</div>';
       return;
@@ -595,6 +620,92 @@
     return 'До ' + round(goalWeight, 1) + ' кг — ' + etaLabel(e.months) + '.';
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Виміряні витрати                                                    */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Картка існує тільки тоді, коли є що показати: або вимірювання
+   * вийшло, або воно майже вийшло і людині варто знати, чого бракує.
+   * Порожня картка «увімкніть і ведіть журнали» на сторінці, де людина
+   * просто рахує норму, — це докір ні за що.
+   */
+  const TDEE_CONF = {
+    high: 'дані повні',
+    mid: 'даних достатньо',
+    low: 'даних обмаль'
+  };
+
+  function renderTdee(input) {
+    const host = $('#nutri-tdee');
+    if (!host || !window.TdeeCore) return;
+
+    const T = window.TdeeCore;
+    const m = T.measure(logs.bodyLog, logs.mealLog, 28)
+           || T.measure(logs.bodyLog, logs.mealLog, T.MIN_DAYS);
+    const on = logs.tdeeMode === 'measured';
+
+    if (!m) {
+      /* Нічого не виміряли. Кажемо про це лише тим, хто вже щось веде:
+         для решти це просто зайвий шум на сторінці калькулятора. */
+      const days = Object.keys(logs.mealLog || {}).length;
+      host.innerHTML = days
+        ? '<div class="card mt-3">' +
+            '<h2 style="margin-top:0">Виміряні витрати</h2>' +
+            '<p class="small muted mb-0">Щоб виміряти підтримання по факту, ' +
+              'потрібні два тижні: закриті дні харчування (щонайменше сім із десяти) ' +
+              'і зважування на початку й наприкінці. Поки їх немає, ціль рахується ' +
+              'за формулою — і це нормально, у перші тижні інакше й не буває.</p>' +
+          '</div>'
+        : '';
+      return;
+    }
+
+    /* Формульне число беремо з того ж ядра й тих самих полів — інакше
+       на екрані стояли б два числа з різних джерел, і різниця між ними
+       нічого б не означала. */
+    const ft = window.NutritionCalc.targetFor(profileOf(input));
+    const formula = ft ? Math.round(ft.formulaTdee) : 0;
+
+    host.innerHTML =
+      '<div class="card mt-3">' +
+        '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px">' +
+          '<h2 style="margin:0">Виміряні витрати</h2>' +
+          '<span class="small muted">' + m.days + ' днів · ' +
+            esc(TDEE_CONF[m.confidence] || '') + '</span>' +
+        '</div>' +
+        '<div class="kpis mt-2">' +
+          '<div class="kpi"><div class="kpi__val mono">' + fmtNum.kcal(m.kcal) + '</div>' +
+            '<p class="kpi__lbl">підтримання, ккал</p></div>' +
+          '<div class="kpi"><div class="kpi__val mono">' + fmtNum.kcal(m.lo) + '–' + fmtNum.kcal(m.hi) + '</div>' +
+            '<p class="kpi__lbl">смуга</p></div>' +
+          '<div class="kpi"><div class="kpi__val mono">' + fmtNum.kcal(m.intake) + '</div>' +
+            '<p class="kpi__lbl">їли в середньому</p></div>' +
+          /* fmtNum.signed, а не рядок із мінусом з клавіатури: знак у
+             проєкті — типографський «−», і два способи його писати
+             розійдуться на першій же правці. */
+          '<div class="kpi"><div class="kpi__val mono">' +
+            fmtNum.signed(m.deltaKg, 2) + '</div>' +
+            '<p class="kpi__lbl">зміна ваги, кг</p></div>' +
+        '</div>' +
+        (formula > 0
+          ? '<p class="small mt-2 mb-0">Формула на цих даних дає <b>' + fmtNum.kcal(formula) +
+            '</b> — різниця ' + fmtNum.signed(m.kcal - formula, 0) +
+            ' ккал. Формула описує середню людину; вимірювання — вас.</p>'
+          : '') +
+        '<label class="check mt-2" style="width:100%;box-sizing:border-box">' +
+          '<input type="checkbox" data-tdee-mode' + (on ? ' checked' : '') + '>' +
+          '<span>Рахувати ціль від виміряних витрат</span>' +
+        '</label>' +
+        '<p class="small muted mb-0" style="margin-top:10px">' +
+          'Підтримання = середнє спожите мінус зміна ваги, переведена в калорії ' +
+          '(1 кг ≈ 7700). Зміна береться між середніми за перший і останній тиждень, ' +
+          'а не між двома ранками: денна вага гуляє на кілограм від води й солі. ' +
+          'Смуга — це чесна похибка такого вимірювання, і на коротшому вікні вона ширша. ' +
+          'Вимкнете перемикач — ціль одразу повернеться до формули.' +
+        '</p>' +
+      '</div>';
+  }
+
   function renderForecast(input) {
     const host = $('#nutri-forecast');
     if (!host) return;
@@ -848,14 +959,44 @@
         if (!act.value) act.value = '1.55';
       }
       if (p.meals >= MEALS_MIN && p.meals <= MEALS_MAX) mealCount = p.meals;
+      logs = {
+        bodyLog: p.bodyLog || null,
+        mealLog: p.mealLog || null,
+        tdeeMode: p.tdeeMode === 'measured' ? 'measured' : null
+      };
     } catch (_) { /* профіль необовʼязковий */ }
 
     const update = () => {
       const i = readInput();
       render(i);
+      renderTdee(i);
       renderForecast(i);
       window.App.initAccordions($('#nutri-forecast'));
     };
+
+    /* Перемикач режиму витрат. Зберігаємо й перемальовуємо все: ціль
+       міняється зараз, а не «з наступного відкриття». */
+    const tdeeHost = $('#nutri-tdee');
+    if (tdeeHost) {
+      tdeeHost.addEventListener('change', async function (e) {
+        const box = e.target.closest('[data-tdee-mode]');
+        if (!box) return;
+        /* Вимкнено пишемо як null: «вимкнув» і «не чіпав» — одне й те
+           саме, а рядок 'formula' у профілі зробив би порожній браузер
+           «непорожнім» (js/store.js, isMeaningful). */
+        logs.tdeeMode = box.checked ? 'measured' : null;
+        try {
+          await window.Store.saveProfile({ tdeeMode: logs.tdeeMode });
+          window.App.toast(box.checked
+            ? 'Ціль рахується від виміряних витрат'
+            : 'Ціль рахується за формулою', 'ok');
+        } catch (err) {
+          window.App.toast(err.queued ? err.message : 'Не збереглося: ' + err.message,
+            err.queued ? 'ok' : 'err');
+        }
+        update();
+      });
+    }
 
     $$('#nutri-form input, #nutri-form select').forEach(el => {
       el.addEventListener('input', update);

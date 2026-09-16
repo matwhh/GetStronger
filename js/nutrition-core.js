@@ -304,6 +304,18 @@
     return (n >= range[0] && n <= range[1]) ? n : null;
   }
 
+  /* Вікно вимірювання: чотири тижні, бо один день застілля в ньому
+     важить учетверо менше, ніж у тижневому. Коротше (два тижні) —
+     запасний варіант, коли даних ще мало. */
+  const TDEE_WINDOW_DAYS = 28;
+
+  /* Стать РЯДКОМ для формули Міффліна. Назва саме sexOf, а не
+     isFemale*: перша версія поверталась 'male'/'female', і рядок пішов
+     у `isFemale ? 1200 : 1500` як умова — обидва рядки істинні, тож
+     чоловіки почали отримувати жіночу підлогу 1200. Зловив старий
+     регресійний тест підлоги, і саме для цього він і писався. */
+  function sexOf(p) { return (p && p.sex === 'female') ? 'female' : 'male'; }
+
   function targetFor(profile) {
     const p = profile || {};
     const weight = bounded(p.weight, LIMITS.weight);
@@ -313,10 +325,45 @@
 
     const bodyfat = bounded(p.bodyfat, LIMITS.bodyfat);
     const hasBF = bodyfat !== null;
-    const bmr = hasBF ? bmrKatch(weight, bodyfat) : bmrMifflin(p.sex === 'female' ? 'female' : 'male', weight, height, age);
+    const bmr = hasBF ? bmrKatch(weight, bodyfat) : bmrMifflin(sexOf(p), weight, height, age);
 
     const activity = bounded(p.activity, LIMITS.activity) || 1.55;
-    const tdee = bmr * activity;
+    const formulaTdee = bmr * activity;
+
+    /*
+     * ВИМІРЯНЕ ПІДТРИМАННЯ ЗАМІСТЬ ФОРМУЛИ.
+     *
+     * Формула описує СЕРЕДНЮ людину, якої в житті не буває: похибка на
+     * конкретній людині — сотні калорій. Якщо є щоденник їжі й регулярні
+     * зважування, підтримання можна не вгадувати, а виміряти
+     * (js/tdee-core.js). Перемикач у профілі, бо це рішення людини:
+     * вимірювання вимагає вести обидва журнали.
+     *
+     * Формула лишається запасним варіантом НАЗАВЖДИ — у перші два тижні
+     * іншого просто немає, і тоді ніщо не має зламатись чи почервоніти.
+     *
+     * МАСШТАБУВАННЯ ПО ВАЗІ. Виміряне число описує людину, яка важить
+     * refKg сьогодні. Прогноз маси кличе targetFor із ІНШОЮ вагою —
+     * саме щоб побачити, як зміняться витрати. Переносити сьогоднішнє
+     * підтримання на 70 кг без поправки означало б прогнозувати
+     * схуднення, якого не буде: витрати падають разом із масою.
+     * Вимірювання дає РІВЕНЬ, формула — форму залежності від ваги.
+     */
+    const TC = window.TdeeCore;
+    let measured = null;
+    let tdee = formulaTdee;
+    if (p.tdeeMode === 'measured' && TC && typeof TC.measure === 'function') {
+      const m = TC.measure(p.bodyLog, p.mealLog, TDEE_WINDOW_DAYS)
+             || TC.measure(p.bodyLog, p.mealLog, TC.MIN_DAYS);
+      if (m && m.refKg > 0) {
+        const refBmr = hasBF
+          ? bmrKatch(m.refKg, bodyfat)
+          : bmrMifflin(sexOf(p), m.refKg, height, age);
+        const scale = refBmr > 0 ? bmr / refBmr : 1;
+        tdee = m.kcal * scale;
+        measured = m;
+      }
+    }
 
     const goal = GOALS[p.goal] || GOALS.maintain;
     const raw = tdee * (1 + goal.pct);
@@ -359,6 +406,11 @@
       floorKcal: floorKcal,
       rawKcal: raw,
       tdee: tdee,
+      /* Формульне значення лишається поруч навмисно: екран має вміти
+         показати ОБИДВА числа й різницю між ними, інакше «ціль раптом
+         змінилась» виглядає як збій. */
+      formulaTdee: formulaTdee,
+      measured: measured,
       bmr: bmr,
       goalLabel: goal.label
     };

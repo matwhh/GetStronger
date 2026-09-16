@@ -312,6 +312,70 @@ const snapshot = (p) => p.evaluate(async () => {
   await ctx.close();
 }
 
+/* ---- 8. RIR належить підходу ---- */
+/*
+ * Правило, задля якого все й затівалось: q НЕ ВИГАДУЄТЬСЯ. План каже
+ * «RIR 2», людина могла піти до відмови — і підхід, у якому числа не
+ * ввели, лишається без нього. Інакше аналітика показувала б план, а не
+ * те, що сталось, і виглядало б це як справжні дані.
+ */
+{
+  const { ctx, p, errs } = await open();
+  const I = await pickRow(p, 3);
+  const row = p.locator('#workout .tdy-ex').nth(I);
+  await setWorkWeight(p, 60, I);
+  await tap(row.locator('[data-set-n]').nth(1));      // закрили 1 і 2
+  await p.waitForTimeout(150);
+  await tap(row.locator('[data-log-tgl]'));
+  const box = row.locator('[data-set-log]');
+
+  ok('8. поле RIR є в кожному рядку підходу',
+    await box.locator('[data-setq]').count() === 2,
+    String(await box.locator('[data-setq]').count()));
+  const empties = await box.locator('[data-setq]').evaluateAll(es => es.map(e => e.value));
+  ok('8. за замовчуванням порожнє — план не підставляється',
+    empties.every(v => v === ''), JSON.stringify(empties));
+
+  const q1 = box.locator('[data-setq]').nth(0);
+  await q1.fill('2');
+  await q1.evaluate(e => e.dispatchEvent(new Event('change', { bubbles: true })));
+  await p.waitForTimeout(200);
+  let st = await dayState(p);
+  ok('8. число лягло у свій підхід і не потекло в сусідній',
+    st.done[I][0].q === 2 && !('q' in st.done[I][1]), JSON.stringify(st.done[I]));
+
+  /* Нуль — це відповідь («до відмови»), а не порожнє поле. */
+  const q2 = box.locator('[data-setq]').nth(1);
+  await q2.fill('0');
+  await q2.evaluate(e => e.dispatchEvent(new Event('change', { bubbles: true })));
+  await p.waitForTimeout(200);
+  st = await dayState(p);
+  ok('8. нуль зберігається як нуль', st.done[I][1].q === 0, JSON.stringify(st.done[I][1]));
+
+  /* Поза стелею — обрізається до 5, і поле це ПОКАЗУЄ. */
+  await q1.fill('9');
+  await q1.evaluate(e => e.dispatchEvent(new Event('change', { bubbles: true })));
+  await p.waitForTimeout(200);
+  st = await dayState(p);
+  ok('8. понад стелю обрізається до 5', st.done[I][0].q === 5, JSON.stringify(st.done[I][0]));
+  ok('8. поле показує обрізане число', (await q1.inputValue()) === '5', await q1.inputValue());
+
+  /* Порожнє поле ПРИБИРАЄ число, а не підставляє план. */
+  await q1.fill('');
+  await q1.evaluate(e => e.dispatchEvent(new Event('change', { bubbles: true })));
+  await p.waitForTimeout(200);
+  st = await dayState(p);
+  ok('8. порожнє поле прибирає число', !('q' in st.done[I][0]), JSON.stringify(st.done[I][0]));
+
+  await p.waitForTimeout(1800);           // дебаунс запису сесії
+  const rec = await snapshot(p);
+  const s8 = rec && Array.isArray(rec.ex) && rec.ex[I] && rec.ex[I].s;
+  ok('8. знімок сесії несе RIR другого підходу і не вигадує першому',
+    Array.isArray(s8) && s8[1] && s8[1].q === 0 && !('q' in s8[0]), JSON.stringify(s8));
+  ok('8. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter(r => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок ваги підходів пройшло.');

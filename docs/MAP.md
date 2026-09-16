@@ -254,7 +254,7 @@ elo-core · elo-api · elo-hooks
 `PERSONAL_KEYS` у `store.js` — **один** перелік на весь файл. Три списки
 вже розходились (SYN-006).
 
-`SCHEMA_VERSION = 11` — версія ФОРМИ даних. Росте лише при зміні
+`SCHEMA_VERSION = 12` — версія ФОРМИ даних. Росте лише при зміні
 структури, не при додаванні поля. `migrate()` веде профіль по одному
 кроку; версія 5 зайнята назавжди (прибране «Обране»).
 
@@ -264,6 +264,7 @@ elo-core · elo-api · elo-hooks
 |---|---|---|
 | `weightLog` | account, welcome, journal | `HistoryCore`, `ProgressCore` |
 | `sessions` | workout | `ExerciseCore`, `ProgressCore`, ELO |
+| `sessionLog` | workout | `ProgressCore`, журнал; підходи лежать у `ex[].s[]` як `{w, r, q}` — вага, повтори, RIR |
 | `days` | workout, today | `WorkoutCore`, теплокарта, ELO |
 | `measureLog` | measure | `MeasureCore` (зокрема `homeSummary` на «Сьогодні») |
 | `trackers` · `trackerLog` | trackers, today | `TrackerCore` |

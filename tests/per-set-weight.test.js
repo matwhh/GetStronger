@@ -17,7 +17,11 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const ctx = loadModules(['js/date-core.js', 'js/workout-core.js']);
+/* reps-core тут не для повторень: workout-core делегує йому нормалізацію
+   RIR підходу, і без нього performedSets падає з «Cannot read properties
+   of undefined». На всіх чотирьох сторінках сайту він підключений перед
+   workout-core, і за цим стежить перевірка 15 гігієни. */
+const ctx = loadModules(['js/date-core.js', 'js/exercises.js', 'js/reps-core.js', 'js/workout-core.js']);
 const W = ctx.WorkoutCore;
 
 const ectx = loadModules(['js/date-core.js', 'js/onerm-core.js', 'js/exercise-core.js']);

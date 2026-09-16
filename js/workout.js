@@ -268,6 +268,10 @@
         const rec = {};
         if (w !== null) rec.w = w;
         if (r > 0) rec.r = r;
+        /* q пишеться лише тоді, коли його справді ввели: підставляти
+           RIR із плану означало б записати в історію намір замість
+           факту (див. performedSets у js/workout-core.js). */
+        if (Number.isFinite(p.q)) rec.q = p.q;
         s.push(rec);
         sumR += r;
         if (w !== null && w > 0) {
@@ -610,7 +614,16 @@
           'placeholder="—" value="' + esc(rec && rec.r != null ? String(rec.r) : '') + '" ' +
           'data-setr="' + i + '" data-setn="' + n + '" ' +
           'aria-label="Повтори підходу ' + n + ': ' + esc(ex.name) + '">' +
-        '<span class="tdy-set__u">повт.</span>' +
+        /* Було «повт.» — тепер третє поле, і трьох підписів у рядок на
+           телефоні не влазить. Запис «100 кг × 8 @ 2» читається без
+           підпису: так позначають підходи в будь-якому щоденнику, а
+           слово «повт.» лишилось у aria-label для читача з екрана. */
+        '<span class="tdy-set__x" aria-hidden="true">@</span>' +
+        '<input class="input input--sm num mono tdy-set__q" type="text" inputmode="numeric" ' +
+          'placeholder="—" value="' + esc(rec && rec.q != null ? String(rec.q) : '') + '" ' +
+          'data-setq="' + i + '" data-setn="' + n + '" ' +
+          'aria-label="Запас до відмови (RIR) підходу ' + n + ': ' + esc(ex.name) + '">' +
+        '<span class="tdy-set__u">RIR</span>' +
       '</div>';
   }
 
@@ -684,7 +697,8 @@
     const ps = WC.plannedSets(ex);
     const fbW = planWeight(ex.name);
     const fbR = repLow(ex.reps);
-    const raw = String(patch.w != null ? patch.w : patch.r);
+    const raw = String(patch.w != null ? patch.w
+                     : patch.r != null ? patch.r : patch.q);
 
     /*
      * СТЕЛЯ — СВОЯ ДЛЯ КОЖНОЇ ВПРАВИ.
@@ -724,9 +738,16 @@
         toast(window.WeightLimits ? window.WeightLimits.message(ex.name)
                                   : 'Вага підходу: 0–500 кг', 'err');
       }
-    } else {
+    } else if ('r' in patch) {
       el.value = shown.r == null ? '' : String(shown.r);
       if (raw !== '' && WC.normReps(raw) === null) toast('Повтори: 1–200', 'err');
+    } else {
+      /* RIR не відхиляється, а обрізається до стелі: 9 стає пʼятіркою
+         (чому саме 5 — у js/reps-core.js поруч із RIR_MAX). Поле
+         показує обрізане число саме тому, що мовчазне обрізання людина
+         помітила б лише в аналітиці через місяць. */
+      el.value = shown.q == null ? '' : String(shown.q);
+      if (raw !== '' && WC.normRir(raw) === null) toast('RIR: 0–5', 'err');
     }
   }
 
@@ -1538,6 +1559,12 @@
       if (sr) {
         editSetField(Number(sr.dataset.setr), Number(sr.dataset.setn) - 1,
           { r: String(sr.value || '').trim() }, sr);
+        return;
+      }
+      const sq = e.target.closest('[data-setq]');
+      if (sq) {
+        editSetField(Number(sq.dataset.setq), Number(sq.dataset.setn) - 1,
+          { q: String(sq.value || '').trim() }, sq);
         return;
       }
 

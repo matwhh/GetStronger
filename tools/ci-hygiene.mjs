@@ -432,20 +432,33 @@ for (const f of tracked) {
   }
 }
 
-/* ---- 15. Сторінка, що вживає дату, мусить вантажити date-core -------- */
+/* ---- 15. Сторінка мусить вантажити ядра, до яких ходять її модулі ---- */
 //
 // Модулі кличуть window.DateCore у момент ВИКЛИКУ, а не завантаження —
 // тобто забутий рядок у <head> не ламає сторінку одразу. Вона падає
 // пізніше й в іншому місці: «Cannot read properties of undefined».
-const DATE_USERS = tracked.filter((f) => /^js\/.+\.js$/.test(f) && f !== 'js/date-core.js')
-  .filter((f) => { try { return /window\.DateCore/.test(readFileSync(f, 'utf8')); } catch { return false; } })
-  .map((f) => f.replace(/^js\//, ''));
-for (const page of tracked.filter((f) => /^[^/]+\.html$/.test(f))) {
-  let html = '';
-  try { html = readFileSync(page, 'utf8'); } catch { continue; }
-  const uses = DATE_USERS.filter((m) => html.includes('js/' + m));
-  if (uses.length && !html.includes('js/date-core.js')) {
-    fail(`${page} — вантажить ${uses[0]}, який рахує дату, але не вантажить js/date-core.js`);
+//
+// Спершу правило знало лише про дату. Другим у списку став RepsCore:
+// js/workout-core.js делегує йому нормалізацію RIR підходу, і це
+// НЕОБОВʼЯЗКОВА залежність рівно до того дня, коли хтось додасть
+// сторінку з тренуванням і забуде рядок. Список не «на майбутнє» — у
+// нього дописують ядро тоді, коли до нього зʼявився делегат.
+const CORE_DEPS = [
+  { global: 'DateCore', file: 'js/date-core.js', what: 'рахує дату' },
+  { global: 'RepsCore', file: 'js/reps-core.js', what: 'ходить до RepsCore' }
+];
+for (const dep of CORE_DEPS) {
+  const re = new RegExp('window\\.' + dep.global);
+  const users = tracked.filter((f) => /^js\/.+\.js$/.test(f) && f !== dep.file)
+    .filter((f) => { try { return re.test(readFileSync(f, 'utf8')); } catch { return false; } })
+    .map((f) => f.replace(/^js\//, ''));
+  for (const page of tracked.filter((f) => /^[^/]+\.html$/.test(f))) {
+    let html = '';
+    try { html = readFileSync(page, 'utf8'); } catch { continue; }
+    const uses = users.filter((m) => html.includes('js/' + m));
+    if (uses.length && !html.includes(dep.file)) {
+      fail(`${page} — вантажить ${uses[0]}, який ${dep.what}, але не вантажить ${dep.file}`);
+    }
   }
 }
 

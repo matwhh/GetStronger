@@ -180,6 +180,12 @@
     return Math.round(n);
   }
 
+  /* Делегат: єдина реалізація — js/reps-core.js. Стеля RIR вирішується
+     там (RIR_MAX = 5, і причина описана поруч із нею), і другої копії
+     цього правила бути не може. reps-core підключений перед цим файлом
+     на всіх чотирьох сторінках, які беруть workout-core. */
+  function normRir(v) { return window.RepsCore.normRir(v); }
+
   /**
    * Виконані підходи вправи як масив {w, r}.
    * Легасі-форми (число, true) розгортаються у стільки ж підходів із
@@ -211,6 +217,14 @@
            лишається значення, підставлене в момент тапу. */
         if (w !== null) o.w = w; else if (w0 !== null) o.w = w0;
         if (r !== null) o.r = r; else if (r0 !== null) o.r = r0;
+        /* А ось RIR НЕ успадковується — ні з плану, ні з сусіда. Вага,
+           підставлена з книги, чесна: вона справді стоїть на штанзі.
+           Запас до відмови, підставлений із плану, був би вигадкою —
+           план каже «зупинись за два», а людина могла піти до нуля.
+           Тому підхід, де числа не ввели, лишається без нього, і
+           аналітика рахує тільки введені. */
+        const q = normRir(e.q);
+        if (q !== null) o.q = q;
         return o;
       });
     }
@@ -278,6 +292,13 @@
       if (r !== null) rec.r = r;
       else if (fb !== null) rec.r = fb;
       else delete rec.r;
+    }
+    /* RIR без підстановки: порожнє поле означає «числа немає», а не
+       «візьми з плану» (див. коментар у performedSets). Нуль сюди
+       доходить нулем — normRir віддає null лише на порожнє й сміття. */
+    if (patch && 'q' in patch) {
+      const q = normRir(patch.q);
+      if (q !== null) rec.q = q; else delete rec.q;
     }
     const out = cur.slice();
     out[k] = rec;
@@ -735,6 +756,7 @@
     doneSetsFor: doneSetsFor,
     normWeight: normWeight,
     normReps: normReps,
+    normRir: normRir,
     performedSets: performedSets,
     setDoneSets: setDoneSets,
     editSet: editSet,

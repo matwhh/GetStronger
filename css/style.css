@@ -1965,7 +1965,6 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
    четвертому сегменту місця в шкалі не лишалось узагалі. Колір знімає
    питання: відтінки рознесені по колу, і жоден не залежить від того,
    наскільки він світлий. */
-.macrobar__k   { background-color: var(--m-kcal); }
 .macrobar__p   { background-color: var(--m-protein); }
 .macrobar__f   { background-color: var(--m-fat); }
 .macrobar__c   { background-color: var(--m-carb); }
@@ -4458,8 +4457,6 @@ body {
   width: var(--ldr); height: var(--ldr);
   flex: 0 0 auto;
 }
-.loader--sm { --ldr: 30px; }
-.loader--lg { --ldr: 76px; }
 
 .loader__ring {
   --w: 3px;                       /* товщина кільця */
@@ -5076,7 +5073,6 @@ button.heatmap__cell::after {
 /* Наступний рівень приглушений, бо він ще не твій. Не сірий і не
    безбарвний — саме тьмяніший: жетон має лишитись упізнаваним, інакше
    правий кінець читається як заглушка. */
-.lvlbar__end--next,
 .lvlbar__end--top { opacity: 0.38; }
 /* Десятий рівень — далі жетонів немає, тільки стеля сезону. Позначка
    словом чесніша за ще одну кульку: одинадцятого рівня не існує. */

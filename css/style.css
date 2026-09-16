@@ -1456,8 +1456,8 @@ a.card > .btn {
  * ТАБЛЕТКА — ВИБІР ІЗ ДВОХ, А НЕ ЩЕ ОДНА КНОПКА.
  *
  * Нічого нового тут не вигадано: форма взята з .chip (радіус 999px),
- * поверхня — з того самого скляного рецепта, що в .card--glass, .kpi і
- * .tile (див. розділ «Скло» нижче, куди .pill дописано п'ятим), розміри
+ * поверхня — з того самого скляного рецепта, що в .card--glass і .kpi
+ * (див. розділ «Скло» нижче, куди .pill дописано четвертим), розміри
  * й переходи — з .btn. Це склейка наявного, а не новий елемент.
  *
  * ЧОМУ ВЗАГАЛІ СКЛО. У правилі сказано: скло позначає ПРЕДМЕТ, який
@@ -1699,45 +1699,16 @@ table.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
 /* Смужка виконання всередині головної картки — той самий візуальний
    словник, що .qi-bar у трекерах, лише без числа поруч. */
 
-/* Плитки стану. min() у minmax — щоб на вузькому екрані трек не був
-   ширший за сам контейнер (та сама пастка, що в .grid-*). */
-.tiles {
-  display: grid;
-  /* 14px, а не 10: плитки стоять поруч із картками, у яких внутрішній
-     відступ 26px, і вдвічі щільніший проміжок читався як склеєний блок. */
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
-}
 /*
- * Смужка з ДВОХ плиток. Загальна сітка (auto-fit від 150px) розкладала їх
- * на всю ширину вузькими колонками, і підписи на кшталт «−0,4 кг до
- * попереднього» ламались на два рядки. Тут колонки рівні й широкі: на
- * телефоні дві поруч, і кожна отримує половину екрана.
+ * Одиниця біля великого числа: «2348 ELO», де «ELO» дрібніше й тьмяніше.
+ *
+ * Це все, що лишилось від сімейства .tile — плиток-посилань, які колись
+ * стояли на головній. Розмітку прибрали ще в серпні (числа зараз малює
+ * .kpi, сітку — .kpis), а 80 рядків стилів разом із власним нахилом,
+ * бликом і приглушенням сусідів лишились і жили самі по собі до
+ * 16.09.2026. Знайдено аудитом: жоден html і жоден js не пише class="tile".
  */
-.tiles--wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.tiles--wide .tile { padding: 18px 20px; gap: 4px; }
-.tiles--wide .tile__val { font-size: 1.75rem; }
-.tiles--wide .tile__sub { font-size: 0.86rem; }
-
-.tile {
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 14px;
-  border: 1px solid var(--line); border-radius: var(--r);
-  background: var(--surface);
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color var(--t-fast), background var(--t-fast);
-}
-.tile:hover, .tile:focus-visible { border-color: var(--line-2); color: var(--text); }
-.tile:active { background: var(--surface-2); }
-.tile__label {
-  font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em;
-  text-transform: uppercase; color: var(--muted);
-}
-.tile__val { font-size: 1.5rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
 .tile__of { font-size: 0.95rem; font-weight: 500; color: var(--muted); }
-.tile__sub { font-size: 0.82rem; color: var(--text-2); }
-.tile--empty .tile__val { color: var(--muted); }
 
 /* Решта розділів — компактний перелік посилань, а не сітка карток.
    Повна навігація вже є в шапці й футері; тут лише швидкий доступ. */
@@ -4310,14 +4281,14 @@ body {
  * виглядає наклейкою, і жоден блик цього не рятує.
  *
  * ЩО СЮДИ ВХОДИТЬ. Картки вибору (.card--glass), плитки з числами
- * (.kpi), плитки-посилання (.tile). Звичайна .card лишається матовою
- * навмисно: якщо склом стане все, скло перестане щось означати —
+ * (.kpi), таблетки (.pill) і перемикач тижня (.twt). Звичайна .card
+ * лишається матовою навмисно: якщо склом стане все, скло перестане
+ * щось означати —
  * воно позначає ПРЕДМЕТ, який можна взяти, а не будь-яку рамку з
  * текстом.
  */
 .card.card--glass,
 .kpi,
-.tile,
 .twt,
 .pill {
   /* Блик — окремий шар (::after з inset: 0), тож поверхня мусить бути
@@ -4363,8 +4334,7 @@ body {
  * коротший. Плитки беруть три чверті.
  */
 .card.card--glass,
-.kpi,
-.tile {
+.kpi {
   transform:
     perspective(900px)
     rotateX(calc(var(--tilt-x, 0deg) * var(--tilt-k, 1)))
@@ -4373,23 +4343,19 @@ body {
   transition: transform 0.25s var(--e-out), opacity 0.25s var(--e-out),
               border-color var(--t-fast), background var(--t-fast);
 }
-.kpi,
-.tile { --tilt-k: 0.75; --spot-w: 150px; --spot-h: 120px; }
+.kpi { --tilt-k: 0.75; --spot-w: 150px; --spot-h: 120px; }
 .card.card--glass.is-hot,
-.kpi.is-hot,
-.tile.is-hot { will-change: transform; }
+.kpi.is-hot { will-change: transform; }
 /* Поки вказівник рухається по картці, переходу немає: інакше нахил
    відставав би від курсора на чверть секунди й читався як гальмування.
    Плавність потрібна на ВХІД і ВИХІД, а не на кожен рух. */
 .card.card--glass.is-tilting,
-.kpi.is-tilting,
-.tile.is-tilting { transition: opacity 0.25s var(--e-out), border-color var(--t-fast); }
+.kpi.is-tilting { transition: opacity 0.25s var(--e-out), border-color var(--t-fast); }
 
 /* Блик, що їде за курсором. Окремий шар, бо він не має нахилятись разом
    із карткою — інакше на краю він виїжджав би за її межі. */
 .card--glass::after,
-.kpi::after,
-.tile::after {
+.kpi::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -4403,15 +4369,12 @@ body {
   transition: opacity 0.25s var(--e-out);
 }
 .card--glass.is-hot::after,
-.kpi.is-hot::after,
-.tile.is-hot::after { opacity: 1; }
+.kpi.is-hot::after { opacity: 1; }
 .card--glass > *,
-.kpi > *,
-.tile > * { position: relative; z-index: 1; }
+.kpi > * { position: relative; z-index: 1; }
 
 .card.card--glass.is-hot,
-.kpi.is-hot,
-.tile.is-hot {
+.kpi.is-hot {
   border-color: rgba(var(--fx-rgb), 0.26);
   background: linear-gradient(158deg,
     rgba(var(--fx-rgb), 0.15) 0%,
@@ -4424,8 +4387,7 @@ body {
    батька), а не все скло сторінки: гасити половину екрана через наведення
    на одну плитку — не фокус, а миготіння. */
 .card.card--glass.is-cold,
-.kpi.is-cold,
-.tile.is-cold { opacity: 0.5; --tilt-s: 0.975; }
+.kpi.is-cold { opacity: 0.5; --tilt-s: 0.975; }
 
 /* Обрана картка в склі: та сама яскравіша межа, а грані лишаються ті
    самі, що й у решти скляних карток. Повторювати їх доводиться тому, що
@@ -4457,8 +4419,7 @@ body {
  * бюджет GPU, і на 4 картках різниця у вигляді непомітна.
  */
 @media not all and (hover: hover) and (pointer: fine) {
-  .kpi,
-  .tile { transform: none; }
+  .kpi { transform: none; }
   .card.card--glass {
     transform: none;
     backdrop-filter: blur(10px) saturate(1.05);
@@ -4467,14 +4428,11 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .card.card--glass,
-  .kpi,
-  .tile { transform: none; transition: opacity 0.2s linear, border-color 0.2s linear; }
+  .kpi { transform: none; transition: opacity 0.2s linear, border-color 0.2s linear; }
   .card.card--glass.is-cold,
-  .kpi.is-cold,
-  .tile.is-cold { --tilt-s: 1; }
+  .kpi.is-cold { --tilt-s: 1; }
   .card--glass::after,
-  .kpi::after,
-  .tile::after { display: none; }
+  .kpi::after { display: none; }
 }
 
 /* ---- Кільця очікування -------------------------------------------------
@@ -4724,7 +4682,6 @@ button.heatmap__cell::after {
    вже вживає :hover. */
 .acc__head:active { background: rgba(var(--acc-rgb), 0.14); }
 .quick-list__item:active { background: rgba(var(--acc-rgb), 0.18); }
-.tile:active { border-color: var(--acc-line); }
 
 @media (max-width: 720px) {
   /* Шапка нижча — отже й змінна нижча. Раніше min-height правився тут, а
@@ -4770,7 +4727,6 @@ button.heatmap__cell::after {
   table.tbl tbody tr:hover { background: transparent; }
   .acc__head:hover { background: transparent; }
   .quick-list__item:hover { background: transparent; }
-  .tile:hover { border-color: var(--line); }
 }
 
 /* ==================================================================== */
@@ -5037,9 +4993,9 @@ button.heatmap__cell::after {
    вітрина нагород і є розбір сезонів), але дороги до неї з цього місця
    не було.
 
-   Стани беруться ті самі, що в .tile — інший набір підсвіток на ту саму
-   дію («це натискається») читався б як інший елемент. Стрілку додає CSS,
-   а не розмітка: вона ознака посилання, а не частина слова.
+   Стани беруться ті самі, що в звичайної .kpi — інший набір підсвіток
+   на ту саму дію («це натискається») читався б як інший елемент. Стрілку
+   додає CSS, а не розмітка: вона ознака посилання, а не частина слова.
    --------------------------------------------------------------------- */
 .kpi--link {
   display: block;
@@ -6832,7 +6788,3 @@ h1 > .h1-ico {
   background: var(--card-1);
 }
 
-/* Плитки беруть скло зі спільного правила «ПОВЕРХНЯ СКЛА» вище.
-   Окремого рецепта для них тут немає навмисно — саме так і з'являється
-   четверте скло, схоже на три попередні. */
-.tile:active { background: var(--surface-2); }

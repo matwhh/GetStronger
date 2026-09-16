@@ -8,7 +8,7 @@
 -- Це ДОВІДКА, а не міграція: виконувати цілком по бойовій базі не можна.
 -- Повний опис — у db/README.md.
 --
--- Знято: 2026-09-12. PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit, проєкт postgres.
+-- Знято: 2026-09-16. PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit, проєкт postgres.
 -- =============================================================================
 
 create table if not exists public.account_status (
@@ -189,6 +189,48 @@ $function$
 ;
 grant execute on function public.account_state() to authenticated;
 grant execute on function public.account_state() to service_role;
+
+CREATE OR REPLACE FUNCTION public.admin_cron_health()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me uuid := auth.uid();
+  expected text[] := array['elo_cron_eval_week',
+                           'elo_cron_close_seasons',
+                           'purge_abandoned_signups'];
+  out jsonb;
+begin
+  if me is null then raise exception 'not authenticated'; end if;
+  if not public.is_admin(me) then raise exception 'FORBIDDEN'; end if;
+
+  select coalesce(jsonb_agg(x order by x->>'job'), '[]'::jsonb) into out from (
+    select jsonb_build_object(
+             'job',     j.job,
+             'lastRun', l.run_at,
+             'failed',  coalesce((l.result->>'failed')::int, 0),
+             'result',  l.result,
+             'state',
+               case
+                 when l.run_at is null then 'never'
+                 when coalesce((l.result->>'failed')::int, 0) > 0 then 'failed'
+                 when l.run_at < now() - interval '48 hours' then 'stale'
+                 else 'ok'
+               end) x
+    from unnest(expected) j(job)
+    left join lateral (
+      select run_at, result from public.cron_log c
+      where c.job = j.job order by c.run_at desc limit 1
+    ) l on true
+  ) g;
+
+  return jsonb_build_object('ok', true, 'jobs', out, 'now', now());
+end $function$
+;
+grant execute on function public.admin_cron_health() to authenticated;
+grant execute on function public.admin_cron_health() to service_role;
 
 CREATE OR REPLACE FUNCTION public.admin_decide(p_user uuid, p_action text)
  RETURNS jsonb
@@ -639,6 +681,75 @@ $function$
 ;
 grant execute on function public.elo_catch_up_weeks(uid uuid, szn text, cfg jsonb) to service_role;
 
+CREATE OR REPLACE FUNCTION public.elo_cfg_apply(cfg jsonb, skip text[])
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+declare
+  keys text[];
+  total numeric := 0;
+  w jsonb := '{}'::jsonb;
+  k text;
+begin
+  if cfg is null or cfg->'weights' is null then return cfg; end if;
+  if skip is null or array_length(skip, 1) is null then return cfg; end if;
+
+  select array_agg(x) into keys
+    from jsonb_object_keys(cfg->'weights') x where not (x = any (skip));
+  if keys is null or array_length(keys, 1) is null then return cfg; end if;
+  if array_length(keys, 1) = (select count(*) from jsonb_object_keys(cfg->'weights')) then
+    return cfg;
+  end if;
+
+  foreach k in array keys loop
+    total := total + coalesce((cfg#>>array['weights', k])::numeric, 0);
+  end loop;
+  if total <= 0 then return cfg; end if;
+
+  foreach k in array keys loop
+    w := w || jsonb_build_object(k,
+      round(coalesce((cfg#>>array['weights', k])::numeric, 0) / total, 6));
+  end loop;
+  return jsonb_set(cfg, '{weights}', w);
+end $function$
+;
+grant execute on function public.elo_cfg_apply(cfg jsonb, skip text[]) to service_role;
+
+CREATE OR REPLACE FUNCTION public.elo_cfg_for(uid uuid, cfg jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  raw jsonb;
+  allowed jsonb;
+  skip text[];
+begin
+  if cfg is null or cfg->'weights' is null then return cfg; end if;
+
+  -- jsonb_typeof, а не просто coalesce: jsonb_array_elements_text кидає
+  -- «cannot extract elements from a scalar» на будь-чому, крім масиву.
+  select coalesce((select p.data->'eloSkip' from profiles p where p.user_id = uid), '[]'::jsonb)
+    into raw;
+  if jsonb_typeof(raw) is distinct from 'array' then return cfg; end if;
+
+  -- Білий список із конфігу. Немає ключа — вимикати не можна нічого:
+  -- мовчазний дозвіл тут коштував би дорожче за мовчазну заборону.
+  allowed := coalesce(cfg->'skippable', '[]'::jsonb);
+  if jsonb_typeof(allowed) is distinct from 'array' then allowed := '[]'::jsonb; end if;
+
+  select array_agg(x) into skip
+    from jsonb_array_elements_text(raw) x
+   where allowed ? x;
+
+  return public.elo_cfg_apply(cfg, skip);
+end $function$
+;
+grant execute on function public.elo_cfg_for(uid uuid, cfg jsonb) to service_role;
+
 CREATE OR REPLACE FUNCTION public.elo_close_season(p_season text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -655,6 +766,157 @@ $function$
 ;
 grant execute on function public.elo_close_season(p_season text) to authenticated;
 grant execute on function public.elo_close_season(p_season text) to service_role;
+
+CREATE OR REPLACE FUNCTION public.elo_close_season_for(p_user uuid, p_season text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  uid uuid := p_user;
+  cfg jsonb; st season_state;
+  my_rank int; total int; pctl numeric;
+  lvl int; elite boolean;
+  d_active int; d_total int;
+  stats jsonb; b record;
+begin
+  if uid is null then raise exception 'no user'; end if;
+  select data into cfg from elo_config where id = 1;
+  select * into b from season_bounds(p_season);
+  if b.e is null then
+    return jsonb_build_object('ok', false, 'error', 'invalid_season');
+  end if;
+  if current_date <= b.e + (cfg->>'submitWindowDays')::int then
+    return jsonb_build_object('ok', false, 'error', 'season_running', 'finalAfter', b.e + (cfg->>'submitWindowDays')::int);
+  end if;
+  if exists (select 1 from season_history where user_id = uid and season = p_season) then
+    return jsonb_build_object('ok', true, 'duplicate', true);
+  end if;
+
+  -- ELO-005: останній тиждень сезону оцінюємо ДО підбиття підсумку, поки
+  -- season_history ще порожня — інакше він не оцінюється ніколи.
+  perform public.elo_catch_up_weeks(uid, p_season, cfg);
+
+  select * into st from season_state where user_id = uid and season = p_season;
+  if st is null then return jsonb_build_object('ok', false, 'error', 'no_data'); end if;
+  select count(*) into total from season_state where season = p_season;
+  select r into my_rank from (
+    select user_id, rank() over (order by elo desc) r from season_state where season = p_season
+  ) x where x.user_id = uid;
+  pctl := case when total >= (cfg->>'minUsersForPercentile')::int
+               then round(my_rank::numeric / total * 100, 1) else null end;
+  lvl := least((cfg->>'levelCount')::int, floor(st.elo / (cfg->>'levelSize')::int)::int + 1);
+  elite := st.elo >= (cfg->>'eliteFloor')::int;
+  select count(distinct day) into d_active from elo_events
+    where user_id = uid and season = p_season and delta > 0;
+  d_total := b.e - b.s + 1;
+  select coalesce(jsonb_object_agg(category, s), '{}'::jsonb) into stats from (
+    select category, jsonb_build_object('events', count(*), 'elo', sum(delta),
+                                        'avgQuality', round(avg(quality), 2)) s
+    from elo_events where user_id = uid and season = p_season
+      and category in ('training','nutrition','sleep','recovery','activity')
+    group by category
+  ) g;
+  stats := stats || coalesce((
+    select jsonb_build_object('biggestGain', max(s), 'biggestLoss', least(min(s), 0))
+    from (select day, sum(delta) s from elo_events
+          where user_id = uid and season = p_season group by day) dd
+  ), '{}'::jsonb);
+  stats := stats || coalesce((
+    select jsonb_build_object(
+      'bestCategory', (array_agg(category order by aq desc))[1],
+      'weakestCategory', (array_agg(category order by aq asc))[1])
+    from (select category, avg(quality) aq from elo_events
+          where user_id = uid and season = p_season
+            and category in ('training','nutrition','sleep','recovery','activity')
+          group by category) c
+  ), '{}'::jsonb);
+  insert into season_history (user_id, season, final_elo, level, elite, rank, of_users,
+                              percentile, days_active, days_total, grace_weeks_used, stats)
+  values (uid, p_season, st.elo, lvl, elite, my_rank, total, pctl, d_active, d_total, st.grace_used, stats)
+  on conflict (user_id, season) do nothing;
+
+  -- DB-015: імена колонок замість позицій.
+  if lvl >= 5  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level5',  'Season Badge') on conflict do nothing; end if;
+  if lvl >= 7  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level7',  'Profile Frame') on conflict do nothing; end if;
+  if lvl >= 8  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level8',  'Seasonal Cosmetic') on conflict do nothing; end if;
+  if lvl >= 9  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level9',  'Exclusive Reward') on conflict do nothing; end if;
+  if lvl >= 10 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level10', 'Legendary Season Reward') on conflict do nothing; end if;
+  if elite     then insert into awards (user_id, season, kind, label) values (uid, p_season, 'elite',   'ELITE 2000+') on conflict do nothing; end if;
+  if my_rank = 1 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'first', '#1 сезону') on conflict do nothing; end if;
+  if my_rank <= 3 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top3', 'Top 3') on conflict do nothing; end if;
+  if my_rank <= 10 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top10', 'Top 10') on conflict do nothing; end if;
+  if my_rank <= 100 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top100', 'Top 100') on conflict do nothing; end if;
+  if my_rank <= 1000 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top1000', 'Top 1000') on conflict do nothing; end if;
+  if pctl is not null and pctl <= 10 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top10pct', 'Top 10%') on conflict do nothing; end if;
+  if pctl is not null and pctl <= 5  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top5pct',  'Top 5%') on conflict do nothing; end if;
+  if pctl is not null and pctl <= 1  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top1pct',  'Top 1%') on conflict do nothing; end if;
+
+  return jsonb_build_object('ok', true, 'elo', st.elo, 'level', lvl, 'elite', elite,
+    'rank', my_rank, 'of', total, 'percentile', pctl,
+    'daysActive', d_active, 'daysTotal', d_total, 'graceUsed', st.grace_used, 'stats', stats);
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.elo_cron_close_seasons()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  cfg jsonb; closed int := 0; failed int := 0;
+  seasons text[] := '{}'; reasons text[] := '{}';
+  s record; u record; b record; r jsonb;
+begin
+  select data into cfg from elo_config where id = 1;
+
+  for s in select distinct season from season_state loop
+    select * into b from season_bounds(s.season);
+    continue when b.e is null;
+    -- Сезон ще йде або не минуло вікно дописування.
+    continue when current_date <= b.e + (cfg->>'submitWindowDays')::int;
+    -- Усіх уже закрито — нема чого робити.
+    continue when not exists (
+      select 1 from season_state ss
+      where ss.season = s.season
+        and not exists (select 1 from season_history h
+                        where h.user_id = ss.user_id and h.season = ss.season));
+
+    seasons := seasons || s.season;
+
+    -- ПРОХІД 1: догнати останній тиждень УСІМ.
+    for u in select user_id from season_state where season = s.season loop
+      begin
+        perform public.elo_catch_up_weeks(u.user_id, s.season, cfg);
+      exception when others then
+        failed := failed + 1;
+        reasons := reasons || (u.user_id::text || ' catchup: ' || sqlerrm);
+      end;
+    end loop;
+
+    -- ПРОХІД 2: підсумок. Рангу можна вірити лише тепер.
+    for u in select user_id from season_state where season = s.season loop
+      begin
+        r := public.elo_close_season_for(u.user_id, s.season);
+        if coalesce((r->>'ok')::boolean, false)
+           and not coalesce((r->>'duplicate')::boolean, false) then
+          closed := closed + 1;
+        end if;
+      exception when others then
+        failed := failed + 1;
+        reasons := reasons || (u.user_id::text || ' close: ' || sqlerrm);
+      end;
+    end loop;
+  end loop;
+
+  return jsonb_build_object('closed', closed, 'failed', failed,
+                            'seasons', to_jsonb(seasons), 'reasons', to_jsonb(reasons));
+end;
+$function$
+;
 
 CREATE OR REPLACE FUNCTION public.elo_cron_eval_week(p_weeks_back integer DEFAULT 4)
  RETURNS jsonb
@@ -707,6 +969,23 @@ end $function$
 ;
 grant execute on function public.elo_cron_eval_week(p_weeks_back integer) to service_role;
 
+CREATE OR REPLACE FUNCTION public.elo_cron_log_close_seasons()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare r jsonb;
+begin
+  r := public.elo_cron_close_seasons();
+  insert into public.cron_log (job, result) values ('elo_cron_close_seasons', r);
+  if coalesce((r->>'failed')::int, 0) > 0 then
+    raise warning 'elo_cron_close_seasons: % помилок — %', r->>'failed', r->>'reasons';
+  end if;
+end $function$
+;
+grant execute on function public.elo_cron_log_close_seasons() to service_role;
+
 CREATE OR REPLACE FUNCTION public.elo_cron_log_eval_week(p_weeks_back integer DEFAULT 4)
  RETURNS void
  LANGUAGE plpgsql
@@ -717,8 +996,10 @@ declare r jsonb;
 begin
   r := public.elo_cron_eval_week(p_weeks_back);
   insert into public.cron_log (job, result) values ('elo_cron_eval_week', r);
+  /* warning, а не exception: виняток відкотив би і оцінені тижні, і цей
+     самий рядок журналу. Провал видно в admin_cron_health(). */
   if coalesce((r->>'failed')::int, 0) > 0 then
-    raise exception 'elo_cron_eval_week: % помилок — %', r->>'failed', r->>'reasons';
+    raise warning 'elo_cron_eval_week: % помилок — %', r->>'failed', r->>'reasons';
   end if;
 end $function$
 ;
@@ -835,6 +1116,34 @@ end;
 $function$
 ;
 grant execute on function public.elo_evaluate_week(p_week_start date) to service_role;
+
+CREATE OR REPLACE FUNCTION public.elo_event_delta(cfg jsonb, cat text, q numeric, p_pace numeric, planned integer)
+ RETURNS integer
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+declare
+  base numeric;
+  w numeric := coalesce((cfg#>>array['weights', cat])::numeric, 0);
+  weekly numeric := (cfg->>'weeklyBudget')::numeric * p_pace * (cfg->>'categoryShare')::numeric;
+begin
+  -- Вимкнена категорія — ваги немає, отже нуль. Саме так вона й перестає
+  -- рахуватись у перерахованому сезоні.
+  if w = 0 then return 0; end if;
+  if cat = 'training' then
+    base := weekly * w / greatest(1, planned) * q;
+  elsif cat = 'sleep' then
+    base := weekly * w / 7 * public.elo_ladder(cfg#>'{tolerance,sleep}', q);
+  elsif cat = 'activity' then
+    base := weekly * w / 7 * public.elo_ladder(cfg#>'{tolerance,activity}', q);
+  else
+    base := weekly * w / 7 * q;
+  end if;
+  return round(base)::int;
+end $function$
+;
+grant execute on function public.elo_event_delta(cfg jsonb, cat text, q numeric, p_pace numeric, planned integer) to service_role;
 
 CREATE OR REPLACE FUNCTION public.elo_facts(uid uuid, kind text, p_day date, cfg jsonb)
  RETURNS jsonb
@@ -1075,75 +1384,6 @@ $function$
 grant execute on function public.elo_recent(p_limit integer) to authenticated;
 grant execute on function public.elo_recent(p_limit integer) to service_role;
 
-CREATE OR REPLACE FUNCTION public.elo_set_name(p_name text)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  approved text;
-  want text := trim(coalesce(p_name, ''));
-begin
-  if auth.uid() is null then raise exception 'not authenticated'; end if;
-  if not public.is_approved(auth.uid()) then raise exception 'NOT_APPROVED'; end if;
-
-  select nullif(username, '') into approved
-  from account_status where user_id = auth.uid();
-
-  -- Підтверджений нік із заявки має пріоритет: він уже перевірений і
-  -- унікальний. Довільне імʼя приймається лише за його відсутності.
-  if approved is null then
-    if length(want) < 3 or length(want) > 13
-       or want !~ '^[[:alnum:]А-Яа-яІіЇїЄєҐґʼ''_. -]+$' then
-      raise exception 'USERNAME_INVALID';
-    end if;
-    if exists (select 1 from account_status
-               where lower(username) = lower(want) and user_id <> auth.uid()) then
-      raise exception 'USERNAME_TAKEN';
-    end if;
-    if exists (select 1 from season_state
-               where lower(display_name) = lower(want) and user_id <> auth.uid()) then
-      raise exception 'USERNAME_TAKEN';
-    end if;
-  end if;
-
-  update season_state
-     set display_name = left(coalesce(approved, want), 13)
-   where user_id = auth.uid() and season = season_of(current_date);
-end $function$
-;
-grant execute on function public.elo_set_name(p_name text) to authenticated;
-grant execute on function public.elo_set_name(p_name text) to service_role;
-
-CREATE OR REPLACE FUNCTION public.elo_event_delta(cfg jsonb, cat text, q numeric, p_pace numeric, planned integer)
- RETURNS integer
- LANGUAGE plpgsql
- IMMUTABLE
- SET search_path TO 'public'
-AS $function$
-declare
-  base numeric;
-  w numeric := coalesce((cfg#>>array['weights', cat])::numeric, 0);
-  weekly numeric := (cfg->>'weeklyBudget')::numeric * p_pace * (cfg->>'categoryShare')::numeric;
-begin
-  -- Вимкнена категорія — ваги немає, отже нуль. Саме так вона й перестає
-  -- рахуватись у перерахованому сезоні.
-  if w = 0 then return 0; end if;
-  if cat = 'training' then
-    base := weekly * w / greatest(1, planned) * q;
-  elsif cat = 'sleep' then
-    base := weekly * w / 7 * public.elo_ladder(cfg#>'{tolerance,sleep}', q);
-  elsif cat = 'activity' then
-    base := weekly * w / 7 * public.elo_ladder(cfg#>'{tolerance,activity}', q);
-  else
-    base := weekly * w / 7 * q;
-  end if;
-  return round(base)::int;
-end $function$
-;
-grant execute on function public.elo_event_delta(cfg jsonb, cat text, q numeric, p_pace numeric, planned integer) to service_role;
-
 CREATE OR REPLACE FUNCTION public.elo_recount_categories()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1283,6 +1523,47 @@ end $function$
 ;
 grant execute on function public.elo_recount_categories() to authenticated;
 grant execute on function public.elo_recount_categories() to service_role;
+
+CREATE OR REPLACE FUNCTION public.elo_set_name(p_name text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  approved text;
+  want text := trim(coalesce(p_name, ''));
+begin
+  if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if not public.is_approved(auth.uid()) then raise exception 'NOT_APPROVED'; end if;
+
+  select nullif(username, '') into approved
+  from account_status where user_id = auth.uid();
+
+  -- Підтверджений нік із заявки має пріоритет: він уже перевірений і
+  -- унікальний. Довільне імʼя приймається лише за його відсутності.
+  if approved is null then
+    if length(want) < 3 or length(want) > 13
+       or want !~ '^[[:alnum:]А-Яа-яІіЇїЄєҐґʼ''_. -]+$' then
+      raise exception 'USERNAME_INVALID';
+    end if;
+    if exists (select 1 from account_status
+               where lower(username) = lower(want) and user_id <> auth.uid()) then
+      raise exception 'USERNAME_TAKEN';
+    end if;
+    if exists (select 1 from season_state
+               where lower(display_name) = lower(want) and user_id <> auth.uid()) then
+      raise exception 'USERNAME_TAKEN';
+    end if;
+  end if;
+
+  update season_state
+     set display_name = left(coalesce(approved, want), 13)
+   where user_id = auth.uid() and season = season_of(current_date);
+end $function$
+;
+grant execute on function public.elo_set_name(p_name text) to authenticated;
+grant execute on function public.elo_set_name(p_name text) to service_role;
 
 CREATE OR REPLACE FUNCTION public.elo_state(p_today date DEFAULT NULL::date)
  RETURNS jsonb
@@ -2159,237 +2440,4 @@ grant UPDATE (user_id) on public.profiles to authenticated;
 -- заплановані завдання (для довідки, не виконується цим файлом)
 -- cron: forge-elo-week  «10 0 * * *»  select public.elo_cron_log_eval_week()
 -- cron: forge-purge-abandoned-signups  «20 3 * * *»  select public.cron_purge_abandoned_signups()
-
-CREATE OR REPLACE FUNCTION public.elo_cfg_apply(cfg jsonb, skip text[])
- RETURNS jsonb
- LANGUAGE plpgsql
- IMMUTABLE
- SET search_path TO 'public'
-AS $function$
-declare
-  keys text[];
-  total numeric := 0;
-  w jsonb := '{}'::jsonb;
-  k text;
-begin
-  if cfg is null or cfg->'weights' is null then return cfg; end if;
-  if skip is null or array_length(skip, 1) is null then return cfg; end if;
-
-  select array_agg(x) into keys
-    from jsonb_object_keys(cfg->'weights') x where not (x = any (skip));
-  if keys is null or array_length(keys, 1) is null then return cfg; end if;
-  if array_length(keys, 1) = (select count(*) from jsonb_object_keys(cfg->'weights')) then
-    return cfg;
-  end if;
-
-  foreach k in array keys loop
-    total := total + coalesce((cfg#>>array['weights', k])::numeric, 0);
-  end loop;
-  if total <= 0 then return cfg; end if;
-
-  foreach k in array keys loop
-    w := w || jsonb_build_object(k,
-      round(coalesce((cfg#>>array['weights', k])::numeric, 0) / total, 6));
-  end loop;
-  return jsonb_set(cfg, '{weights}', w);
-end $function$
-;
-grant execute on function public.elo_cfg_apply(cfg jsonb, skip text[]) to service_role;
-
-CREATE OR REPLACE FUNCTION public.elo_cfg_for(uid uuid, cfg jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  raw jsonb;
-  skip text[];
-begin
-  if cfg is null or cfg->'weights' is null then return cfg; end if;
-
-  -- jsonb_typeof, а не просто coalesce: jsonb_array_elements_text кидає
-  -- «cannot extract elements from a scalar» на будь-чому, крім масиву, —
-  -- і один зіпсований профіль («eloSkip»: 123 з відредагованого руками
-  -- експорту) ламав би цій людині elo_submit ЦІЛКОМ. Знайдено тестом.
-  select coalesce((select p.data->'eloSkip' from profiles p where p.user_id = uid), '[]'::jsonb)
-    into raw;
-  if jsonb_typeof(raw) is distinct from 'array' then return cfg; end if;
-
-  select array_agg(x) into skip from jsonb_array_elements_text(raw) x;
-  return public.elo_cfg_apply(cfg, skip);
-end $function$
-;
-grant execute on function public.elo_cfg_for(uid uuid, cfg jsonb) to service_role;
-
-CREATE OR REPLACE FUNCTION public.elo_close_season_for(p_user uuid, p_season text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  uid uuid := p_user;
-  cfg jsonb; st season_state;
-  my_rank int; total int; pctl numeric;
-  lvl int; elite boolean;
-  d_active int; d_total int;
-  stats jsonb; b record;
-begin
-  if uid is null then raise exception 'no user'; end if;
-  select data into cfg from elo_config where id = 1;
-  select * into b from season_bounds(p_season);
-  if b.e is null then
-    return jsonb_build_object('ok', false, 'error', 'invalid_season');
-  end if;
-  if current_date <= b.e + (cfg->>'submitWindowDays')::int then
-    return jsonb_build_object('ok', false, 'error', 'season_running', 'finalAfter', b.e + (cfg->>'submitWindowDays')::int);
-  end if;
-  if exists (select 1 from season_history where user_id = uid and season = p_season) then
-    return jsonb_build_object('ok', true, 'duplicate', true);
-  end if;
-
-  -- ELO-005: останній тиждень сезону оцінюємо ДО підбиття підсумку, поки
-  -- season_history ще порожня — інакше він не оцінюється ніколи.
-  perform public.elo_catch_up_weeks(uid, p_season, cfg);
-
-  select * into st from season_state where user_id = uid and season = p_season;
-  if st is null then return jsonb_build_object('ok', false, 'error', 'no_data'); end if;
-  select count(*) into total from season_state where season = p_season;
-  select r into my_rank from (
-    select user_id, rank() over (order by elo desc) r from season_state where season = p_season
-  ) x where x.user_id = uid;
-  pctl := case when total >= (cfg->>'minUsersForPercentile')::int
-               then round(my_rank::numeric / total * 100, 1) else null end;
-  lvl := least((cfg->>'levelCount')::int, floor(st.elo / (cfg->>'levelSize')::int)::int + 1);
-  elite := st.elo >= (cfg->>'eliteFloor')::int;
-  select count(distinct day) into d_active from elo_events
-    where user_id = uid and season = p_season and delta > 0;
-  d_total := b.e - b.s + 1;
-  select coalesce(jsonb_object_agg(category, s), '{}'::jsonb) into stats from (
-    select category, jsonb_build_object('events', count(*), 'elo', sum(delta),
-                                        'avgQuality', round(avg(quality), 2)) s
-    from elo_events where user_id = uid and season = p_season
-      and category in ('training','nutrition','sleep','recovery','activity')
-    group by category
-  ) g;
-  stats := stats || coalesce((
-    select jsonb_build_object('biggestGain', max(s), 'biggestLoss', least(min(s), 0))
-    from (select day, sum(delta) s from elo_events
-          where user_id = uid and season = p_season group by day) dd
-  ), '{}'::jsonb);
-  stats := stats || coalesce((
-    select jsonb_build_object(
-      'bestCategory', (array_agg(category order by aq desc))[1],
-      'weakestCategory', (array_agg(category order by aq asc))[1])
-    from (select category, avg(quality) aq from elo_events
-          where user_id = uid and season = p_season
-            and category in ('training','nutrition','sleep','recovery','activity')
-          group by category) c
-  ), '{}'::jsonb);
-  insert into season_history (user_id, season, final_elo, level, elite, rank, of_users,
-                              percentile, days_active, days_total, grace_weeks_used, stats)
-  values (uid, p_season, st.elo, lvl, elite, my_rank, total, pctl, d_active, d_total, st.grace_used, stats)
-  on conflict (user_id, season) do nothing;
-
-  -- DB-015: імена колонок замість позицій.
-  if lvl >= 5  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level5',  'Season Badge') on conflict do nothing; end if;
-  if lvl >= 7  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level7',  'Profile Frame') on conflict do nothing; end if;
-  if lvl >= 8  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level8',  'Seasonal Cosmetic') on conflict do nothing; end if;
-  if lvl >= 9  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level9',  'Exclusive Reward') on conflict do nothing; end if;
-  if lvl >= 10 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'level10', 'Legendary Season Reward') on conflict do nothing; end if;
-  if elite     then insert into awards (user_id, season, kind, label) values (uid, p_season, 'elite',   'ELITE 2000+') on conflict do nothing; end if;
-  if my_rank = 1 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'first', '#1 сезону') on conflict do nothing; end if;
-  if my_rank <= 3 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top3', 'Top 3') on conflict do nothing; end if;
-  if my_rank <= 10 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top10', 'Top 10') on conflict do nothing; end if;
-  if my_rank <= 100 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top100', 'Top 100') on conflict do nothing; end if;
-  if my_rank <= 1000 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top1000', 'Top 1000') on conflict do nothing; end if;
-  if pctl is not null and pctl <= 10 then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top10pct', 'Top 10%') on conflict do nothing; end if;
-  if pctl is not null and pctl <= 5  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top5pct',  'Top 5%') on conflict do nothing; end if;
-  if pctl is not null and pctl <= 1  then insert into awards (user_id, season, kind, label) values (uid, p_season, 'top1pct',  'Top 1%') on conflict do nothing; end if;
-
-  return jsonb_build_object('ok', true, 'elo', st.elo, 'level', lvl, 'elite', elite,
-    'rank', my_rank, 'of', total, 'percentile', pctl,
-    'daysActive', d_active, 'daysTotal', d_total, 'graceUsed', st.grace_used, 'stats', stats);
-end;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.elo_cron_close_seasons()
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  cfg jsonb; closed int := 0; failed int := 0;
-  seasons text[] := '{}'; reasons text[] := '{}';
-  s record; u record; b record; r jsonb;
-begin
-  select data into cfg from elo_config where id = 1;
-
-  for s in select distinct season from season_state loop
-    select * into b from season_bounds(s.season);
-    continue when b.e is null;
-    -- Сезон ще йде або не минуло вікно дописування.
-    continue when current_date <= b.e + (cfg->>'submitWindowDays')::int;
-    -- Усіх уже закрито — нема чого робити.
-    continue when not exists (
-      select 1 from season_state ss
-      where ss.season = s.season
-        and not exists (select 1 from season_history h
-                        where h.user_id = ss.user_id and h.season = ss.season));
-
-    seasons := seasons || s.season;
-
-    -- ПРОХІД 1: догнати останній тиждень УСІМ.
-    for u in select user_id from season_state where season = s.season loop
-      begin
-        perform public.elo_catch_up_weeks(u.user_id, s.season, cfg);
-      exception when others then
-        failed := failed + 1;
-        reasons := reasons || (u.user_id::text || ' catchup: ' || sqlerrm);
-      end;
-    end loop;
-
-    -- ПРОХІД 2: підсумок. Рангу можна вірити лише тепер.
-    for u in select user_id from season_state where season = s.season loop
-      begin
-        r := public.elo_close_season_for(u.user_id, s.season);
-        if coalesce((r->>'ok')::boolean, false)
-           and not coalesce((r->>'duplicate')::boolean, false) then
-          closed := closed + 1;
-        end if;
-      exception when others then
-        failed := failed + 1;
-        reasons := reasons || (u.user_id::text || ' close: ' || sqlerrm);
-      end;
-    end loop;
-  end loop;
-
-  return jsonb_build_object('closed', closed, 'failed', failed,
-                            'seasons', to_jsonb(seasons), 'reasons', to_jsonb(reasons));
-end;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.elo_cron_log_close_seasons()
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare r jsonb;
-begin
-  r := public.elo_cron_close_seasons();
-  insert into public.cron_log (job, result) values ('elo_cron_close_seasons', r);
-  if coalesce((r->>'failed')::int, 0) > 0 then
-    raise exception 'elo_cron_close_seasons: % помилок — %', r->>'failed', r->>'reasons';
-  end if;
-end $function$
-;
-
-revoke execute on function public.elo_close_season_for(uuid, text) from public, anon, authenticated;
-revoke execute on function public.elo_cron_close_seasons() from public, anon, authenticated;
-revoke execute on function public.elo_cron_log_close_seasons() from public, anon, authenticated;
-grant execute on function public.elo_close_season(text) to authenticated;
+-- cron: forge-close-season  «40 3 * * *»  select public.elo_cron_log_close_seasons()

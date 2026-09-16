@@ -45,6 +45,7 @@ try {
   ok('знімок схеми розгортається');
   psql('-f '+q(write('skip.sql', fs.readFileSync(path.join(ROOT,'db','elo-skip-category.sql'),'utf8'))));
   psql('-f '+q(write('recount.sql', fs.readFileSync(path.join(ROOT,'db','elo-recount-category.sql'),'utf8'))));
+  psql('-f '+q(write('whitelist.sql', fs.readFileSync(path.join(ROOT,'db','elo-skip-whitelist.sql'),'utf8'))));
   ok('міграції накочуються');
 
   const A = '00000000-0000-4000-8000-0000000000a1';
@@ -103,6 +104,37 @@ try {
     const sum = val(`select round(sum(value::numeric), 4) from jsonb_each_text(
       public.elo_cfg_for('${B}', (select data from elo_config where id=1))->'weights')`);
     if (Number(sum) !== 1) throw new Error('сума ' + sum);
+    run(`update profiles set data = '{"eloSkip":["nutrition"]}'::jsonb where user_id = '${B}'`);
+  });
+
+  /*
+   * Білий список. eloSkip пише КЛІЄНТ (grant update (data) на profiles плюс
+   * profile_patch), тож без цієї перевірки будь-хто зі своїм токеном міг
+   * лишити в грі одну категорію й забрати в неї весь тижневий бюджет.
+   * Дозволене живе в конфізі — elo_config.data->'skippable'.
+   */
+  check('конфіг несе список того, що взагалі можна вимикати', () => {
+    const list = val(`select (select data->>'skippable' from elo_config where id=1)`);
+    if (!list || list === '') throw new Error('ключа skippable немає');
+  });
+
+  check('категорія поза списком не вимикається', () => {
+    run(`update profiles set data = '{"eloSkip":["sleep"]}'::jsonb where user_id = '${B}'`);
+    const w = val(`select public.elo_cfg_for('${B}', (select data from elo_config where id=1))#>>'{weights,sleep}'`);
+    if (Number(w) !== 0.2) throw new Error('сон вимкнувся попри заборону: ' + w);
+    const n = val(`select count(*) from jsonb_object_keys(
+      public.elo_cfg_for('${B}', (select data from elo_config where id=1))->'weights')`);
+    if (n !== '5') throw new Error('категорій лишилось ' + n);
+    run(`update profiles set data = '{"eloSkip":["nutrition"]}'::jsonb where user_id = '${B}'`);
+  });
+
+  check('увесь бюджет в одну самозвітну категорію не переливається', () => {
+    run(`update profiles set data = '{"eloSkip":["training","nutrition","recovery","activity"]}'::jsonb where user_id = '${B}'`);
+    const w = Number(val(`select public.elo_cfg_for('${B}', (select data from elo_config where id=1))#>>'{weights,sleep}'`));
+    /* Дозволене — саме харчування, тож лишається 0,2/0,7. Без білого
+       списку сон отримав би 1,0, тобто ввесь тижневий бюджет за число,
+       набране руками. */
+    if (Math.abs(w - 0.2/0.7) > 1e-5) throw new Error('вага сну ' + w);
     run(`update profiles set data = '{"eloSkip":["nutrition"]}'::jsonb where user_id = '${B}'`);
   });
 

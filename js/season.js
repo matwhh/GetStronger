@@ -302,23 +302,45 @@
    * Рахує це СЕРВЕР (elo_cfg_for): elo_state віддає вже персональний
    * конфіг, тож числа на екрані й у базі не можуть розійтись.
    */
-  const SKIPPABLE = [
-    { id: 'nutrition', name: 'Харчування', note: 'щоденник їжі: калорії й білок' }
-  ];
+  /*
+   * Підписи категорій. А ЩО САМЕ можна вимикати — вирішує сервер: список
+   * лежить у конфізі рейтингу (elo_config.data->'skippable') і приїжджає
+   * сюди в st.config. Доти він був захардкожений тут, і виходило три
+   * різні списки — свій на екрані, свій в імпорті, а на сервері жодного.
+   */
+  const CAT_NAMES = {
+    nutrition: { name: 'Харчування',  note: 'щоденник їжі: калорії й білок' },
+    sleep:     { name: 'Сон',         note: 'години сну проти цілі' },
+    recovery:  { name: 'Відновлення', note: 'самопочуття й відпочинок' },
+    activity:  { name: 'Активність',  note: 'кроки проти цілі' }
+  };
+
+  /** Категорії, які сервер дозволяє вимикати, у порядку конфігу. */
+  function skippable(st) {
+    const list = st && st.config && st.config.skippable;
+    return (Array.isArray(list) ? list : []).filter(function (id) {
+      return Object.prototype.hasOwnProperty.call(CAT_NAMES, id);
+    });
+  }
 
   function renderCats(st) {
     const host = $('#sz-cats');
     if (!host) return;
+    const list = skippable(st);
+    /* Вимикати нічого не можна — картки немає зовсім. Порожня картка з
+       заголовком і без жодного перемикача читалась би як поламка. */
+    if (!list.length) { host.innerHTML = ''; return; }
     const w = (st.config && st.config.weights) || {};
     host.innerHTML = card(
       '<h3 class="card__title" style="margin-bottom:4px">Що рахувати в рейтингу</h3>' +
       '<p class="small muted" style="margin:0 0 10px">Вимкнена категорія віддає свою частку ' +
         'решті: тижнева стеля рейтингу лишається тією самою, і сезон можна пройти ' +
         'на той самий результат без неї.</p>' +
-      SKIPPABLE.map(function (c) {
-        const on = Object.prototype.hasOwnProperty.call(w, c.id);
+      list.map(function (id) {
+        const c = CAT_NAMES[id];
+        const on = Object.prototype.hasOwnProperty.call(w, id);
         return '<label class="check" style="width:100%;box-sizing:border-box">' +
-          '<input type="checkbox" data-cat="' + esc(c.id) + '"' + (on ? ' checked' : '') + '>' +
+          '<input type="checkbox" data-cat="' + esc(id) + '"' + (on ? ' checked' : '') + '>' +
           '<span>' + esc(c.name) + ' <span class="muted">— ' + esc(c.note) + '</span></span>' +
         '</label>';
       }).join('') +
@@ -355,8 +377,11 @@
       try { done = await Api.recountCategories(); } catch (_) {}
       await refresh();
 
-      const base = box.checked ? 'Харчування рахується в рейтингу'
-                               : 'Харчування більше не впливає на рейтинг';
+      /* Назва — з того ж словника, що й перемикач: жорстке «Харчування»
+         тут збрехало б, щойно в skippable зʼявиться друга категорія. */
+      const nm = (CAT_NAMES[id] && CAT_NAMES[id].name) || 'Категорія';
+      const base = box.checked ? nm + ' рахується в рейтингу'
+                               : nm + ' більше не впливає на рейтинг';
       if (done && done.ok && done.changed) {
         window.App.toast(base + ': сезон перераховано, ' +
           (done.diff > 0 ? '+' + done.diff : String(done.diff)) + ' ELO', 'ok');

@@ -548,6 +548,82 @@ for (const dep of CORE_DEPS) {
   }
 }
 
+/* ---- 18. Знімок схеми: жодної функції ПІСЛЯ загального revoke -------- */
+//
+// Привід — аудит 16.09.2026. db/live-schema.sql генерується запитом
+// (db/dump-live-schema.sql) і має жорсткий порядок секцій: усі функції,
+// потім один рядок
+//
+//     revoke execute on all functions in schema public from public;
+//
+// який знімає з них дефолтне право PUBLIC. Але файл двічі дописували
+// руками — нові функції лягали в КІНЕЦЬ, тобто після цього рядка. У
+// бойовій базі права були правильні, а от розгортання знімка на чистій
+// базі (саме так відновлюють із резервної копії і саме так працюють усі
+// SQL-перевірки) залишало elo_cfg_for і elo_cfg_apply — SECURITY DEFINER,
+// що приймають uid ПАРАМЕТРОМ, — доступними для authenticated.
+//
+// Тобто копія схеми виходила дозвільнішою за бойову базу, і перевірка
+// прав цього не бачила, бо перевіряла копію.
+{
+  const f = 'db/live-schema.sql';
+  let src = '';
+  try { src = readFileSync(f, 'utf8'); } catch { src = ''; }
+  if (src) {
+    const cut = src.indexOf('revoke execute on all functions in schema public from public;');
+    if (cut === -1) {
+      fail(`${f} — немає рядка «revoke execute on all functions in schema public `
+         + 'from public;». Без нього копія схеми дозвільніша за бойову базу.');
+    } else {
+      const after = src.slice(cut);
+      const late = [...after.matchAll(/^CREATE OR REPLACE FUNCTION public\.([a-z0-9_]+)/gmi)]
+        .map(m => m[1]);
+      if (late.length) {
+        fail(`${f} — ${late.length} функц. дописано після загального revoke `
+           + `(${late.slice(0, 4).join(', ')}${late.length > 4 ? ', …' : ''}). `
+           + 'Знімок генерується db/dump-live-schema.sql і має порядок секцій: '
+           + 'функції → revoke → RLS. Дописане руками в кінець лишається з '
+           + 'правом PUBLIC на копії схеми.');
+      }
+    }
+  }
+}
+
+/* ---- 19. Що можна вимкнути в рейтингу — один список ------------------ */
+//
+// Привід — аудит 16.09.2026. Списків було три й усі різні: js/season.js
+// пропонував вимкнути саме «Харчування», js/import-core.js приймав при
+// імпорті чотири назви, а сервер (elo_cfg_for) — будь-що.
+//
+// Тепер дозволене живе в db/elo-config.json (ключ "skippable"), звідки
+// його бере і база (elo_config.data), і екран. Для імпорту список
+// потрібен офлайн, тож там лишається копія — і саме її стереже ця
+// перевірка: розійдеться з конфігом — імпорт або прийме заборонене, або
+// відкине дозволене.
+{
+  let cfg = null;
+  try { cfg = JSON.parse(readFileSync('db/elo-config.json', 'utf8')); } catch { cfg = null; }
+  const want = Array.isArray(cfg && cfg.skippable) ? cfg.skippable.slice().sort() : null;
+  if (!want || !want.length) {
+    fail('db/elo-config.json — немає (або порожній) ключ "skippable". Це список '
+       + 'категорій рейтингу, які взагалі можна вимкнути; сервер звіряється '
+       + 'саме з ним, і порожній список означає «вимикати не можна нічого».');
+  } else {
+    let src = '';
+    try { src = readFileSync('js/import-core.js', 'utf8'); } catch { src = ''; }
+    const m = src.match(/const KNOWN = \[([^\]]*)\]/);
+    const got = m ? [...m[1].matchAll(/'([a-z]+)'/g)].map(x => x[1]).sort() : null;
+    if (!got) {
+      fail('js/import-core.js — не знайдено списку KNOWN у гілці eloSkip. '
+         + 'Перевірка 19 звіряє його з db/elo-config.json → skippable.');
+    } else if (got.join(',') !== want.join(',')) {
+      fail(`js/import-core.js — KNOWN = [${got.join(', ')}], а в `
+         + `db/elo-config.json skippable = [${want.join(', ')}]. `
+         + 'Імпорт приймав би не те, що визнає сервер.');
+    }
+  }
+}
+
 /* ---- підсумок -------------------------------------------------------- */
 if (problems.length) {
   console.error('Гігієна репозиторію — знайдено проблеми:\n');

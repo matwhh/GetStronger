@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "seasonMax": 3000,
   "levelSize": 240,
   "levelCount": 10,
@@ -25,6 +25,9 @@
     "recovery": 0.1,
     "activity": 0.1
   },
+  "skippable": [
+    "nutrition"
+  ],
   "categoryShare": 0.857,
   "cleanDayBonus": 3,
   "cleanWeekBonus": 9,

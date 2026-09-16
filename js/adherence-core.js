@@ -29,7 +29,6 @@
 
   const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
   /* Окремо з групами: DATE_KEY — для .test, PARSE — для читання чисел */
-  const DATE_PARSE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
   /** Періоди перемикача — спільні для обох карток */
   const PERIODS = [
@@ -67,13 +66,21 @@
     return window.DateCore.shiftKey(key, n) || key;
   }
 
-  /** Різниця в днях між ISO-ключами (b − a) */
+  /**
+   * Різниця в днях між ISO-ключами (b − a).
+   *
+   * Делегат: єдина реалізація — js/date-core.js (daysBetween), і addDays
+   * вище вже делегував туди ж. Своя копія тут будувала два місцевих Date
+   * і ділила мілісекунди — тобто в добу переходу на літній час рахувала
+   * 23 години, а на 30 лютого (такий ключ проходить регулярку) мовчки
+   * давала 2 березня й цілком правдоподібне число.
+   *
+   * Сміття, як і раніше, дає 0, а не порожнечу: виклики вище передають
+   * результат далі як межу діапазону, і null зробив би її нескінченною.
+   */
   function diffDays(a, b) {
-    const pa = DATE_PARSE.exec(a), pb = DATE_PARSE.exec(b);
-    if (!pa || !pb) return 0;
-    const da = new Date(Number(pa[1]), Number(pa[2]) - 1, Number(pa[3]));
-    const db = new Date(Number(pb[1]), Number(pb[2]) - 1, Number(pb[3]));
-    return Math.round((db - da) / 86400000);
+    const d = window.DateCore.daysBetween(a, b);
+    return d === null ? 0 : d;
   }
 
   /** Найраніший датований ключ журналу, або null */

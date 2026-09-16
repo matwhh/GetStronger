@@ -191,14 +191,26 @@ describe('buildCycle: стеля інтенсивності', () => {
   });
 });
 
-describe('estimateOneRM і midReps', () => {
-  it('середина діапазону повторень', () => {
-    assert.equal(P.midReps('6–8'), 7);
-    assert.equal(P.midReps('8'), 8);
-    assert.equal(P.midReps('10-12'), 11);
-    assert.equal(P.midReps('30 с'), 30, 'число є — беремо його');
-    assert.equal(P.midReps('—'), null);
-    assert.equal(P.midReps(null), null);
+describe('estimateOneRM і planReps', () => {
+  it('нижня межа діапазону, а не середина', () => {
+    /* Правило живе в js/reps-core.js; тут лише делегат. Середина («6–8»
+       → 7) давала число, якого немає в плані, і воно їхало в 1ПМ. */
+    assert.equal(P.planReps('6–8'), 6);
+    assert.equal(P.planReps('8'), 8);
+    assert.equal(P.planReps('10-12'), 10);
+    assert.equal(P.planReps('12–10'), 10, 'неохайний план не завищує обʼєм');
+    assert.equal(P.planReps('30 с'), 30, 'число є — беремо його');
+    assert.equal(P.planReps('—'), null);
+    assert.equal(P.planReps(null), null);
+  });
+
+  it('оцінка 1ПМ бере з плану те саме число, що й екран тренування', () => {
+    /* Друга копія розбору розійшлася б на першій правці — саме тому тут
+       звіряється не конкретне число, а збіг із джерелом правила. */
+    const ex = { name: 'Вправа без рекорду', reps: '6–8', rir: 0 };
+    const low = P.estimateOneRM(ex, 100, {});
+    const eight = P.estimateOneRM({ name: ex.name, reps: '6', rir: 0 }, 100, {});
+    assert.equal(low.value, eight.value, '«6–8» має рахуватись як 6');
   });
 
   it('виміряний рекорд важливіший за оцінку', () => {

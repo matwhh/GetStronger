@@ -210,14 +210,25 @@
     'Армійський жим штанги стоячи': 'ohp'
   };
 
-  /** Середина діапазону повторень із рядка плану: '6–8' → 7, '8' → 8 */
-  function midReps(reps) {
-    const nums = String(reps == null ? '' : reps).match(/\d+/g);
-    if (!nums || !nums.length) return null;
-    const a = Number(nums[0]);
-    const b = nums.length > 1 ? Number(nums[1]) : a;
-    const m = (a + b) / 2;
-    return Number.isFinite(m) && m > 0 ? m : null;
+  /**
+   * Скільки повторень бере план із рядка на кшталт «6–8»: нижню межу.
+   *
+   * Тут була ВЛАСНА копія розбору, і вона брала середину: «6–8» → 7.
+   * Друга копія того самого правила жила в екрані тренування (repMid) і
+   * 16.09 переїхала в js/reps-core.js разом із самим правилом — нижня
+   * межа, бо саме її план і просить, і саме вона в ньому написана.
+   *
+   * Ця копія лишалась третьою й розходилась із рештою на цілу
+   * повторність: 1ПМ за нею виходив вищим, ніж той самий 1ПМ на екрані
+   * тренування. Помилка в цей бік дорожча — прогрес малюється там, де
+   * його не було.
+   *
+   * @returns {?number} повторення, або null якщо в рядку немає числа
+   */
+  function planReps(reps) {
+    const RC = window.RepsCore;
+    const n = RC && typeof RC.repLow === 'function' ? RC.repLow(reps) : 0;
+    return n > 0 ? n : null;
   }
 
   /**
@@ -247,7 +258,7 @@
     const w = Number(weight);
     if (!Number.isFinite(w) || w <= 0) return null;
 
-    const reps = midReps(ex.reps) || 8;
+    const reps = planReps(ex.reps) || 8;
     const rir = Number(ex.rir);
     const toFailure = reps + (Number.isFinite(rir) && rir >= 0 ? Math.min(rir, 5) : 0);
 
@@ -459,7 +470,7 @@
     pctForWeek: pctForWeek,
     /* Експортовані заради тестів (TST-007): обидві — чиста арифметика, і
        перевіряти їх крізь buildCycle означало б перевіряти не те. */
-    midReps: midReps,
+    planReps: planReps,
     estimateOneRM: estimateOneRM,
     CEILING: CEILING,
     buildCycle: buildCycle,

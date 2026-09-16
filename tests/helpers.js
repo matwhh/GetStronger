@@ -38,7 +38,8 @@ export const loadNutrition = () => loadModules(['js/nutrition-core.js']).Nutriti
 export const loadExercises = () => loadModules(['js/exercises.js']);
 export const loadFoods     = () => loadModules(['js/foods.js']);
 export function loadPeriodization() {
-  const w = loadModules(['js/onerm-core.js', 'js/exercises.js', 'js/periodization-core.js']);
+  const w = loadModules(['js/onerm-core.js', 'js/exercises.js', 'js/reps-core.js',
+                         'js/periodization-core.js']);
   return w.Periodization;
 }
 

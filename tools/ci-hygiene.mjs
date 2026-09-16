@@ -407,7 +407,13 @@ if (existsSync(PUB)) {
 // Делегатом вважається функція, у тілі якої є window.DateCore. Тобто
 // лишити імʼя заради сотні місць виклику можна; написати всередині свою
 // арифметику — ні.
-const DATE_FNS = ['keyOf', 'todayKey', 'dateOf', 'mondayOf', 'daysBetween', 'addDaysKey'];
+// Список росте тоді, коли знаходиться чергова копія. 16.09.2026 до нього
+// додано diffDays і shiftKey: js/adherence-core.js рахував різницю днів
+// САМ — будував два місцевих Date і ділив мілісекунди, тобто в добу
+// переходу на літній час мав 23 години замість 24. Ім'я було інше, тому
+// перевірка його не бачила: вона шукала daysBetween.
+const DATE_FNS = ['keyOf', 'todayKey', 'dateOf', 'mondayOf', 'daysBetween',
+                  'addDaysKey', 'diffDays', 'shiftKey'];
 for (const f of tracked) {
   if (!/^js\/.+\.js$/.test(f) || f === 'js/date-core.js') continue;
   let src = '';

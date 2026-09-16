@@ -14,16 +14,20 @@
 --      поодинці вони виходили залежними від того, хто зайшов першим;
 --   3. другий прогін нічого не дублює;
 --   4. сезон, який ще йде, не чіпається;
---   5. серверну функцію не можна викликати з браузера.
+--   5. серверну функцію не можна викликати з браузера;
+--   6. обгортка з журналом НЕ ВІДКОЧУЄ вже закриті сезони, коли на комусь
+--      одному закриття впало (pg_cron виконує завдання однією транзакцією,
+--      тож raise exception у кінці зносив і чужу роботу, і сам журнал).
 -- =============================================================================
 do $$
 declare
   ua uuid := '00000000-0000-4000-8000-00000000c001';
   ub uuid := '00000000-0000-4000-8000-00000000c002';
+  uc uuid := '00000000-0000-4000-8000-00000000c003';
   done text := 'SPRING-2026';     -- завершений: межі в минулому
   live text := 'WINTER-2026';     -- ще не завершений
   r jsonb; out text := E'\n'; okn int := 0; alln int := 0;
-  n int; ra int; rb int; ea int; b record;
+  n int; m int; ra int; rb int; ea int; b record;
   chk boolean;
 begin
   -- Сезон-орієнтир мусить бути справді завершеним, інакше весь файл
@@ -111,6 +115,79 @@ begin
   if chk is not true then okn := okn + 1;
     out := out || E'\nOK   elo_close_season_for недоступна для authenticated';
   else out := out || E'\nFAIL authenticated може закрити сезон за чужий акаунт'; end if;
+
+  -- 10. Провал на одному не відкочує закриття решти — і не зʼїдає журнал.
+  --
+  -- Переграємо закриття з третім користувачем, на якому воно навмисно
+  -- падає (тригер нижче). Із raise exception в обгортці і рядки A та B, і
+  -- рядок cron_log відкочувались разом із винятком — по суті нічна робота
+  -- зникала цілком через одного зламаного користувача.
+  alln := alln + 1;
+  delete from public.season_history where season = done;
+  insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
+  values (uc,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','cs-c@local','x',now(),now());
+  insert into public.account_status (user_id, status) values (uc,'approved');
+  insert into public.profiles (user_id, data) values
+    (uc, jsonb_build_object('activePlan', jsonb_build_object('days', 4)));
+  insert into public.season_state (user_id, season, elo) values (uc, done, 700);
+
+  create or replace function public.tst_close_boom() returns trigger
+    language plpgsql as $f$
+  begin
+    if new.user_id = '00000000-0000-4000-8000-00000000c003'::uuid then
+      raise exception 'навмисна поламка закриття';
+    end if;
+    return new;
+  end $f$;
+  create trigger tst_close_boom before insert on public.season_history
+    for each row execute function public.tst_close_boom();
+
+  begin
+    perform public.elo_cron_log_close_seasons();
+  exception when others then
+    /* Саме сюди все й падало до міграції: виняток обгортки. Ловимо, щоб
+       побачити, ЩО від прогону лишилось. */
+    null;
+  end;
+
+  select count(*) into n from public.season_history where season = done and user_id in (ua, ub);
+  select count(*) into m from public.cron_log where job = 'elo_cron_close_seasons';
+  if n = 2 and m >= 1 then okn := okn + 1;
+    out := out || E'\nOK   провал на одному не відкотив ні закриття решти, ні журнал';
+  else out := out || format(E'\nFAIL після провалу лишилось %s закритих із 2 і %s рядків журналу', n, m); end if;
+
+  drop trigger tst_close_boom on public.season_history;
+  drop function public.tst_close_boom();
+
+  -- 11. Обидві обгортки розкладу більше не кидають виняток.
+  --
+  -- Перевіряється текст функції, а не поведінка: другу обгортку
+  -- (elo_cron_log_eval_week) відтворювати тут дорожче, ніж вона коштує, а
+  -- дефект у них обох був буквально однаковим рядком.
+  alln := alln + 1;
+  select count(*) into n
+    from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+   where ns.nspname = 'public'
+     and p.proname in ('elo_cron_log_eval_week', 'elo_cron_log_close_seasons')
+     and p.prosrc ilike '%raise exception%';
+  if n = 0 then okn := okn + 1;
+    out := out || E'\nOK   жодна обгортка розкладу не кидає винятку';
+  else out := out || format(E'\nFAIL обгорток із raise exception: %s', n); end if;
+
+  -- 12. Замість винятку — будильник: admin_cron_health бачить усі три
+  --     завдання і закрита для всіх, крім залогінених.
+  alln := alln + 1;
+  select count(*) into n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+   where ns.nspname = 'public' and p.proname = 'admin_cron_health';
+  /* Права питаємо лише тоді, коли функція є: has_function_privilege на
+     неіснуючій кидає виняток і завалив би весь файл замість одного рядка. */
+  if n = 1 then
+    select case when has_function_privilege('anon', 'public.admin_cron_health()', 'execute')
+                then 1 else 0 end into m;
+  else m := -1; end if;
+  if n = 1 and m = 0 then okn := okn + 1;
+    out := out || E'\nOK   admin_cron_health на місці й закрита для anon';
+  else out := out || format(E'\nFAIL admin_cron_health: функцій %s, доступ anon %s', n, m); end if;
 
   raise exception 'ЗАКРИТТЯ СЕЗОНУ: % з % пройдено%', okn, alln, out;
 end $$;

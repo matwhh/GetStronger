@@ -165,9 +165,31 @@
     state.busy = false;
   }
 
+  /*
+   * Перемикач вкладок — ОДИН на сторінку, тут.
+   *
+   * Доти видимість крутила js/admin-elo.js: вона знала рівно дві панелі
+   * («заявки» і «ELO») і на кожен клік показувала одну, ховаючи другу.
+   * Третя вкладка в такій схемі показала б заявки разом із собою. Тепер
+   * панель оголошує себе сама — атрибутом data-tab, — а модулі лише
+   * дізнаються, що їх відкрили (подія 'adm:tab' на document).
+   */
+  function initTabs() {
+    const tabs = $('#adm-tabs');
+    if (!tabs) return;
+    const panes = document.querySelectorAll('[data-tab]');
+    tabs.addEventListener('change', function (e) {
+      const t = e.target.closest('input[name="adm-tab"]');
+      if (!t) return;
+      panes.forEach(function (p) { p.hidden = p.dataset.tab !== t.value; });
+      document.dispatchEvent(new CustomEvent('adm:tab', { detail: t.value }));
+    });
+  }
+
   function init() {
     const host = $('#adm');
     if (!host) return;
+    initTabs();
 
     host.addEventListener('click', function (e) {
       const b = e.target.closest('[data-adm]');

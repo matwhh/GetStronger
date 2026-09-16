@@ -203,20 +203,13 @@
 
   function init() {
     const host = $('#adm-elo');
-    const tabs = $('#adm-tabs');
-    if (!host || !tabs) return;
+    if (!host) return;
 
-    /* Вкладки перемикають видимість, а не перемальовують сторінку: список
-       заявок і список ELO обидва вже завантажені, і повторний запит на
-       кожен клік по вкладці був би просто зайвим трафіком. */
-    tabs.addEventListener('change', function (e) {
-      const t = e.target.closest('input[name="adm-tab"]');
-      if (!t) return;
-      const elo = t.value === 'elo';
-      const req = $('#adm');
-      if (req) req.hidden = elo;
-      host.hidden = !elo;
-      if (elo && !state.rows && !state.denied) load();
+    /* Видимість панелей крутить js/admin.js (initTabs) — тут лишається
+       рівно одне: підвантажити список, коли вкладку відкрили вперше.
+       Повторний клік по вкладці нічого не запитує: дані вже є. */
+    document.addEventListener('adm:tab', function (e) {
+      if (e.detail === 'elo' && !state.rows && !state.denied) load();
     });
 
     host.addEventListener('click', function (e) {

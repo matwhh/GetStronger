@@ -201,12 +201,18 @@
    */
   let sessionTimer = null;
 
-  /** Середина діапазону повторень: '6–8' → 7, '10' → 10, сміття → 0. */
-  function repMid(reps) {
-    const m = String(reps || '').match(/(\d+)\s*[–—-]\s*(\d+)/);
-    if (m) return (Number(m[1]) + Number(m[2])) / 2;
-    const one = String(reps || '').match(/\d+/);
-    return one ? Number(one[0]) : 0;
+  /*
+   * Скільки повторень покласти в підхід, якщо людина нічого не вписала.
+   *
+   * Тут була своя копія цього правила — і вона брала СЕРЕДИНУ діапазону:
+   * «8–10» → 9. Число, якого немає в плані й якого людина ніде не
+   * бачила, а воно потім їде в тоннаж, повтори й оцінку 1ПМ. Тепер
+   * правило одне на весь сайт і живе в js/reps-core.js, разом із самими
+   * діапазонами: нижня межа — те, що план і просить.
+   */
+  function repLow(reps) {
+    const RC = window.RepsCore;
+    return RC && typeof RC.repLow === 'function' ? RC.repLow(reps) : 0;
   }
 
   /** Робоча вага вправи з книги ваг — плановий орієнтир, або null */
@@ -219,7 +225,7 @@
   function perfSets(i) {
     const ex = state.plan[state.dayIdx].exercises[i];
     return WC.performedSets(state.done[i], WC.plannedSets(ex),
-      planWeight(ex.name), repMid(ex.reps));
+      planWeight(ex.name), repLow(ex.reps));
   }
 
   /**
@@ -243,7 +249,7 @@
       if (!ps) return;
       const planW = Number(weights && weights[e.name]);
       const fbW = Number.isFinite(planW) && planW > 0 ? planW : null;
-      const r0 = repMid(e.reps);
+      const r0 = repLow(e.reps);
 
       /* Джерело правди — ФАКТИЧНІ підходи, зафіксовані в момент тапу.
          Книга ваг тут лише запасне значення для легасі-днів, де масиву
@@ -609,7 +615,7 @@
   }
 
   function setLogHtml(i, ex, ps) {
-    const list = WC.performedSets(state.done[i], ps, planWeight(ex.name), repMid(ex.reps));
+    const list = WC.performedSets(state.done[i], ps, planWeight(ex.name), repLow(ex.reps));
     return list.map(function (rec, k) { return setRowHtml(i, k, rec, ex); }).join('');
   }
 
@@ -677,7 +683,7 @@
     const ex = state.plan[state.dayIdx].exercises[i];
     const ps = WC.plannedSets(ex);
     const fbW = planWeight(ex.name);
-    const fbR = repMid(ex.reps);
+    const fbR = repLow(ex.reps);
     const raw = String(patch.w != null ? patch.w : patch.r);
 
     /*
@@ -1550,7 +1556,7 @@
         /* Тап ФІКСУЄ вагу й повтори станом на цю мить. Пізніша правка
            робочої ваги вже не переписує цей підхід заднім числом. */
         state.done[i] = WC.setDoneSets(state.done[i], next, ps,
-          planWeight(ex.name), repMid(ex.reps));
+          planWeight(ex.name), repLow(ex.reps));
 
         /* Точкове оновлення рядка — без перемальовки списку під пальцем */
         const row = pip.closest('.tdy-ex');

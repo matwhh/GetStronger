@@ -136,6 +136,25 @@ const snapshot = (p) => p.evaluate(async () => {
   ok('2. рядків рівно за кількістю закритих', await box.locator('.tdy-set').count() === 2,
     String(await box.locator('.tdy-set').count()));
 
+  /*
+   * ЧИСЛО ЗА ЗАМОВЧУВАННЯМ — НИЖНЯ МЕЖА ДІАПАЗОНУ.
+   *
+   * Тап по кружечку фіксує підхід ще до того, як людина щось вписала.
+   * Раніше туди лягала середина («8–10» → 9) — число, якого немає в
+   * плані й якого людина ніде не бачила, а воно їде в тоннаж і 1ПМ.
+   * Перевіряємо на живому плані: у нередагованому підході стоїть саме
+   * менше число зі схеми вправи.
+   */
+  {
+    const scheme = await row.locator('.tdy-ex__scheme').innerText();
+    const nums = (scheme.match(/\d+/g) || []).map(Number);
+    /* Схема «3×8–10 · RIR 2»: перше число — підходи, далі діапазон. */
+    const low = nums.length >= 3 ? Math.min(nums[1], nums[2]) : nums[1];
+    const shown = Number(await box.locator('[data-setr]').first().inputValue());
+    ok('2. у нередагованому підході — нижня межа діапазону',
+       shown === low, 'схема «' + scheme.replace(/\n/g, ' ') + '», у полі ' + shown);
+  }
+
   // правимо ДРУГИЙ підхід
   const w2 = box.locator('[data-setr]').nth(1);
   await w2.fill('5');

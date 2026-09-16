@@ -8,7 +8,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadModules } from './helpers.js';
 
-const ctx = loadModules(['js/date-core.js', 'js/history-core.js', 'js/progress-core.js']);
+const ctx = loadModules(['js/date-core.js', 'js/enough-core.js',
+                         'js/history-core.js', 'js/progress-core.js']);
 const P = ctx.ProgressCore;
 
 const NOW = new Date(2026, 7, 17); // 17 серпня 2026, локально
@@ -39,6 +40,32 @@ describe('вага тіла', () => {
   it('порожній журнал — null, а не NaN', () => {
     assert.equal(P.bodyStats({}, 30, NOW), null);
     assert.equal(P.bodyStats(null, 30, NOW), null);
+  });
+
+  /*
+   * Два зважування дають нахил математично — і не дають тренду по суті:
+   * вода й сіль рухають вагу на ±1,5 кг незалежно від жиру. Поріг у три
+   * записи вже стояв у forecast(); тепер він один на обидві функції й
+   * називається window.Enough.
+   */
+  it('два зважування — це відрізок, а не темп', () => {
+    const s = P.bodyStats({ '2026-08-10': 70.0, '2026-08-17': 69.0 }, 30, NOW);
+    assert.equal(s.count, 2);
+    assert.equal(s.delta, -1, 'сама різниця лишається — вона виміряна');
+    assert.equal(s.perWeek, null, 'а от темп із двох точок — вигадка');
+  });
+
+  it('третє зважування вмикає темп', () => {
+    const s = P.bodyStats(
+      { '2026-08-03': 70.0, '2026-08-10': 69.6, '2026-08-17': 69.2 }, 30, NOW);
+    assert.equal(s.count, 3);
+    assert.equal(s.perWeek, -0.4);
+  });
+
+  it('одне зважування — ні темпу, ні NaN', () => {
+    const s = P.bodyStats({ '2026-08-17': 69.2 }, 30, NOW);
+    assert.equal(s.current, 69.2);
+    assert.equal(s.perWeek, null);
   });
 });
 

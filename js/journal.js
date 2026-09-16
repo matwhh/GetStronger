@@ -492,12 +492,19 @@
     const sign = function (n) { return fmtNum.signed(n, 1); };
     const tiles = [];
 
-    // Вага: середнє за 7 днів + темп за 30 днів
+    /* Вага: поточна + темп за 30 днів.
+       Коли темпу немає, підпис каже, СКІЛЬКИ зважувань бракує, — тими
+       самими словами, що й решта сайту (window.Enough). */
+    const E = window.Enough;
     const b30 = PC.bodyStats(state.bodyLog, 30);
+    const bEnough = E.of(b30 ? b30.count : 0, 0, { min: 3 });
     tiles.push(b30
       ? { val: fmtNum.kg(b30.current) + ' кг', lbl: 'вага',
-          trend: b30.perWeek !== null ? sign(b30.perWeek) + ' кг/тиж' : 'перший запис' }
-      : { val: '—', lbl: 'вага', trend: 'ще без записів' });
+          trend: b30.perWeek !== null
+            ? sign(b30.perWeek) + ' кг/тиж'
+            : E.label(bEnough, ['зважування', 'зважування', 'зважувань']) }
+      : { val: '—', lbl: 'вага',
+          trend: E.label(bEnough, ['зважування', 'зважування', 'зважувань']) });
 
     // Сила: найбільший приріст вправи за 8 тижнів
     const lift = PC.bestLift(state.weightLog, 56);
@@ -531,7 +538,8 @@
       ? { val: f.avgKcal + ' / ' + f.avgTarget, lbl: 'ккал: середнє / ціль',
           trend: f.inTarget + ' із ' + f.withTarget + ' днів у межах ±5%' }
       : fk
-        ? { val: String(f.avgKcal), lbl: 'ккал у середньому', trend: f.kcalDays + ' днів із записом' }
+        ? { val: String(f.avgKcal), lbl: 'ккал у середньому',
+            trend: E.label(E.of(f.kcalDays, 30), ['день', 'дні', 'днів']) || 'усі 30 днів' }
         : { val: '—', lbl: 'харчування',
             trend: f ? 'закриті дні без калорій' : 'ще без закритих днів' });
 

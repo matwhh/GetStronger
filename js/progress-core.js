@@ -93,7 +93,17 @@
       first: first.kg,
       firstDate: first.d,
       delta: r1(delta),
-      perWeek: s.length > 1 ? r1(delta / spanDays * 7) : null,
+      /*
+       * Темп — лише коли за ним стоять хоча б три зважування.
+       *
+       * Двох вистачало «математично»: два числа дають нахил. Але відрізок
+       * між двома випадковостями — це не тренд, і вода з сіллю рухають
+       * вагу на ±1,5 кг незалежно від жиру. Той самий поріг уже стояв у
+       * forecast() нижче; тепер він один на обидві функції й називається
+       * window.Enough — правило «скільки даних стоїть за числом».
+       */
+      perWeek: window.Enough.gate(window.Enough.of(s.length, 0, { min: 3 }),
+                                  r1(delta / spanDays * 7)),
       avg: r1(avg),
       count: s.length,
       spanDays: Math.round(spanDays)

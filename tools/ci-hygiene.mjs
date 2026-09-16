@@ -473,7 +473,9 @@ for (const f of tracked) {
 // нього дописують ядро тоді, коли до нього зʼявився делегат.
 const CORE_DEPS = [
   { global: 'DateCore', file: 'js/date-core.js', what: 'рахує дату' },
-  { global: 'RepsCore', file: 'js/reps-core.js', what: 'ходить до RepsCore' }
+  { global: 'RepsCore', file: 'js/reps-core.js', what: 'ходить до RepsCore' },
+  { global: 'Enough',   file: 'js/enough-core.js',
+    what: 'вирішує, чи досить даних для числа' }
 ];
 for (const dep of CORE_DEPS) {
   const re = new RegExp('window\\.' + dep.global);

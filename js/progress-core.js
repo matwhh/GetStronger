@@ -500,6 +500,112 @@
     };
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Запас до відмови                                                    */
+  /* ------------------------------------------------------------------ */
+  /*
+   * RIR відповідає на питання, на яке вага й повтори не відповідають:
+   * НАСКІЛЬКИ ВАЖКО це було. Дві людини жмуть 60 на вісім — одна на межі,
+   * друга могла зробити дванадцять. У журналі вони виглядають однаково.
+   *
+   * Два висновки, заради яких це рахується, і обидва — про причину, а не
+   * про пораду:
+   *
+   *   light — середній запас великий. Це не плато й не втома: вага
+   *           просто застара, і графік, який «стоїть», стоїть саме тому.
+   *   hard  — більшість підходів доводиться до відмови. Тижнями поспіль
+   *           це не героїзм, а рахунок, який приходить розвантаженням.
+   *
+   * ПОРІГ КІЛЬКОСТІ ВАЖЛИВІШИЙ ЗА ПОРІГ ЗНАЧЕННЯ. Два підходи з великим
+   * запасом — це один поганий день, а не характеристика ваги. Тому
+   * висновок вимагає і підходів, і різних тренувань: на одному
+   * тренуванні буває що завгодно.
+   */
+  const RIR_LIGHT_AVG = 3.5;     // середній запас, вище якого вага застара
+  const RIR_HARD_SHARE = 0.6;    // частка підходів до відмови
+  const RIR_MIN_SETS = 4;        // менше — випадковість, а не висновок
+  const RIR_MIN_SESSIONS = 2;    // один день не характеризує вагу
+
+  /**
+   * Запас до відмови по вправах за період.
+   *
+   * Рахуються ЛИШЕ підходи з явно вписаним числом: підхід без нього не
+   * «нуль», а невідомість (js/workout-core.js, performedSets). Через це
+   * total і sets різні, і саме їхнє співвідношення чесно каже, наскільки
+   * висновкам узагалі можна вірити.
+   *
+   * @param {object} sessionLog журнал сесій
+   * @param {number} periodDays вікно, днів (включно з сьогодні)
+   * @param {Date}   [now]      «сьогодні» — аргументом, щоб тести не
+   *                            залежали від дня запуску
+   * @returns {{days:number, sets:number, total:number, avg:?number,
+   *            zero:number, rows:Array}}
+   */
+  function rirStats(sessionLog, periodDays, now) {
+    const from = cutKey(periodDays, now);
+    const byName = {};
+    let sets = 0, total = 0, sum = 0, zero = 0;
+
+    Object.keys(sessionLog || {}).forEach(function (k) {
+      if (!DATE_KEY.test(k) || k < from) return;
+      const day = sessionLog[k];
+      if (!day || !Array.isArray(day.ex)) return;
+      day.ex.forEach(function (row) {
+        const name = row && typeof row.n === 'string' ? row.n.trim() : '';
+        if (!name || !Array.isArray(row.s)) return;
+        const cap = Math.max(0, Math.round(Number(row.ds) || 0));
+        const list = row.s.slice(0, cap || row.s.length);
+
+        let n = 0, s = 0, z = 0;
+        list.forEach(function (x) {
+          const q = Number(x && x.q);
+          if (!Number.isFinite(q) || q < 0) return;
+          n += 1; s += q;
+          if (q === 0) z += 1;
+        });
+
+        const e = byName[name] || (byName[name] = {
+          name: name, sets: 0, total: 0, sum: 0, zero: 0, days: {}
+        });
+        e.total += list.length;
+        total += list.length;
+        if (!n) return;
+        e.sets += n; e.sum += s; e.zero += z; e.days[k] = 1;
+        sets += n; sum += s; zero += z;
+      });
+    });
+
+    const rows = Object.keys(byName).map(function (name) {
+      const e = byName[name];
+      const sessions = Object.keys(e.days).length;
+      const avg = e.sets ? Math.round((e.sum / e.sets) * 10) / 10 : null;
+      const share = e.sets ? e.zero / e.sets : 0;
+      let flag = null;
+      if (e.sets >= RIR_MIN_SETS && sessions >= RIR_MIN_SESSIONS) {
+        if (avg >= RIR_LIGHT_AVG) flag = 'light';
+        else if (share >= RIR_HARD_SHARE) flag = 'hard';
+      }
+      return {
+        name: name, sets: e.sets, total: e.total, sessions: sessions,
+        avg: avg, zero: e.zero, flag: flag
+      };
+    }).filter(function (r) { return r.sets > 0; })
+      .sort(function (a, b) {
+        if (a.flag !== b.flag) return a.flag ? -1 : 1;   // з висновком — угору
+        if (b.sets !== a.sets) return b.sets - a.sets;
+        return a.name < b.name ? -1 : 1;
+      });
+
+    return {
+      days: Math.max(1, Math.round(Number(periodDays) || 1)),
+      sets: sets,
+      total: total,
+      avg: sets ? Math.round((sum / sets) * 10) / 10 : null,
+      zero: zero,
+      rows: rows
+    };
+  }
+
   window.ProgressCore = {
     bodyStats: bodyStats,
     forecast: forecast,
@@ -512,6 +618,9 @@
     foodStats: foodStats,
     sessionEntries: sessionEntries,
     setsStats: setsStats,
+    rirStats: rirStats,
+    RIR_LIGHT_AVG: RIR_LIGHT_AVG,
+    RIR_HARD_SHARE: RIR_HARD_SHARE,
     sessionMinutes: sessionMinutes,
     timeStats: timeStats,
     prList: prList

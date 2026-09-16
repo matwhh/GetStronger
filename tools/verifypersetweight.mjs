@@ -376,6 +376,59 @@ const snapshot = (p) => p.evaluate(async () => {
   await ctx.close();
 }
 
+/* ---- 9. RIR доїжджає в журнал: картка, стовпець і чесний 1ПМ ---- */
+{
+  const { ctx, p, errs } = await open();
+  const I = await pickRow(p, 3);
+  const row = p.locator('#workout .tdy-ex').nth(I);
+  const name = await row.locator('.tdy-ex__name').innerText();
+  await setWorkWeight(p, 80, I);
+  await tap(row.locator('[data-set-n]').nth(2));      // три підходи
+  await p.waitForTimeout(150);
+  await tap(row.locator('[data-log-tgl]'));
+  const box = row.locator('[data-set-log]');
+  for (let k = 0; k < 3; k++) {
+    const f = box.locator('[data-setq]').nth(k);
+    await f.fill('2');
+    await f.evaluate(e => e.dispatchEvent(new Event('change', { bubbles: true })));
+  }
+  await p.waitForTimeout(2000);                        // дебаунс запису сесії
+
+  await p.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1600);
+
+  const card = p.locator('#jr-rir');
+  ok('9. картка «Запас до відмови» зʼявилась', await card.locator('.card').count() === 1,
+    String(await card.locator('.card').count()));
+  const cardTxt = await card.innerText().catch(() => '');
+  /* Читаємо КОМІРКИ рядка, а не весь текст картки: у підписі під нею
+     теж є числа (поріг 3,5), і пошук по всьому тексту пройшов би навіть
+     тоді, коли таблиця порожня. */
+  const cells = await card.locator('tbody tr').first().locator('td')
+    .evaluateAll(es => es.map(e => e.textContent.trim()));
+  ok('9. у рядку картки — та сама вправа й середній запас 2',
+    cells[0] && cells[0].startsWith(name.trim()) && cells[1] === '2',
+    JSON.stringify(cells));
+  ok('9. картка каже, скільки підходів із числа порахувала', /3 з 3/.test(cardTxt),
+    cardTxt.replace(/\n+/g, ' | ').slice(0, 200));
+
+  await p.selectOption('#ex-pick', name).catch(() => {});
+  await p.waitForTimeout(400);
+  const exTxt = await p.locator('#jr-exercise').innerText();
+  ok('9. у таблиці історії зʼявився стовпець RIR', /RIR/.test(exTxt),
+    exTxt.replace(/\n+/g, ' | ').slice(0, 260));
+
+  /* 1ПМ із запасом мусить бути ВИЩИМ за оцінку без нього: підхід із
+     RIR 2 — це не межа людини. Порівнюємо з формулою напряму. */
+  const cmp = await p.evaluate(() => ({
+    with: window.ExerciseCore.e1rmOf(80, 8, 2),
+    without: window.ExerciseCore.e1rmOf(80, 8)
+  }));
+  ok('9. 1ПМ ураховує запас', cmp.with > cmp.without, JSON.stringify(cmp));
+  ok('9. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter(r => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок ваги підходів пройшло.');

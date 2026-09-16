@@ -39,11 +39,31 @@
     return METRICS.some(function (m) { return m.id === id; });
   }
 
-  /** Оцінка разового максимуму, або null (немає ваги / немає повторень) */
-  function e1rmOf(kg, reps) {
+  /**
+   * Оцінка разового максимуму, або null (немає ваги / немає повторень).
+   *
+   * ТРЕТІЙ АРГУМЕНТ — ЗАПАС ДО ВІДМОВИ цього підходу.
+   *
+   * Формули 1ПМ описують підхід, ДОВЕДЕНИЙ ДО ВІДМОВИ: вісім повторень
+   * означає «більше не міг». Але в залі так майже ніхто не працює — план
+   * сам каже зупинятись за одне-два до межі. Тобто без RIR оцінка
+   * систематично занижена, і тим сильніше, чим обережніше людина
+   * тренується.
+   *
+   * Запас додається до повторень: 8 із запасом 2 — це 10 до відмови. Так
+   * само рахує js/periodization-core.js, коли будує драбину від плану;
+   * два різні числа «до відмови» в одному застосунку означали б, що
+   * графік прогресу й план розходяться на рівному місці.
+   *
+   * Невідомий запас (а він невідомий скрізь, де його не вписали) нічого
+   * не додає: оцінка лишається такою ж, якою була до появи поля.
+   */
+  function e1rmOf(kg, reps, rir) {
     const OR = window.OneRM;
     if (!OR || !OR.oneRepMax) return null;
-    const v = OR.oneRepMax(kg, reps);
+    const q = Number(rir);
+    const extra = (Number.isFinite(q) && q > 0) ? Math.min(q, 5) : 0;
+    const v = OR.oneRepMax(kg, Number(reps) + extra);
     return Number.isFinite(v) ? Math.round(v * 10) / 10 : null;
   }
 
@@ -77,17 +97,21 @@
       if (!list.length) return null;
 
       let n = 0, reps = 0, vol = 0, kg = null, best = null, wr = 0;
+      let qSum = 0, qN = 0;
       list.forEach(function (x) {
         n += 1;
         const w = Number(x && x.w);
         const r = Number(x && x.r);
+        const q = Number(x && x.q);
         const hasW = Number.isFinite(w) && w > 0;
         const hasR = Number.isFinite(r) && r > 0;
+        const hasQ = Number.isFinite(q) && q >= 0;
         if (hasR) { reps += r; wr += 1; }
+        if (hasQ) { qSum += q; qN += 1; }
         if (hasW && (kg === null || w > kg)) kg = w;
         if (hasW && hasR) {
           vol += w * r;
-          const e = e1rmOf(w, r);
+          const e = e1rmOf(w, r, hasQ ? q : null);
           if (e !== null && (best === null || e > best)) best = e;
         }
       });
@@ -98,6 +122,11 @@
         perSet: wr ? Math.round((reps / wr) * 10) / 10 : null,
         reps: Math.round(reps),
         vol: Math.round(vol),
+        /* Середній запас — ТІЛЬКИ по підходах, де його вписали. Підхід
+           без числа не «нуль до відмови», він просто невідомий, і
+           ділити на нього середнє означало б вигадати важку роботу. */
+        rir: qN ? Math.round((qSum / qN) * 10) / 10 : null,
+        rirSets: qN,
         e1rm: best
       };
     }
@@ -121,6 +150,10 @@
       perSet: hasReps ? per : null,
       reps: reps,
       vol: vol,
+      /* У легасі-знімку підходів немає зовсім, отже й запасу до відмови
+         в ньому нізвідки взятись: графік чесно показує розрив. */
+      rir: null,
+      rirSets: 0,
       e1rm: (hasKg && hasReps) ? e1rmOf(kg, per) : null
     };
   }
@@ -338,6 +371,7 @@
   window.ExerciseCore = {
     METRICS: METRICS,
     isMetric: isMetric,
+    e1rmOf: e1rmOf,
     pointOf: pointOf,
     exerciseNames: exerciseNames,
     series: series,

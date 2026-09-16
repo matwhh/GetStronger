@@ -264,7 +264,7 @@ elo-core · elo-api · elo-hooks
 |---|---|---|
 | `weightLog` | account, welcome, journal | `HistoryCore`, `ProgressCore` |
 | `sessions` | workout | `ExerciseCore`, `ProgressCore`, ELO |
-| `sessionLog` | workout | `ProgressCore`, журнал; підходи лежать у `ex[].s[]` як `{w, r, q}` — вага, повтори, RIR |
+| `sessionLog` | workout | `ProgressCore` (зокрема `rirStats`), `ExerciseCore`, журнал; підходи лежать у `ex[].s[]` як `{w, r, q}` — вага, повтори, RIR |
 | `days` | workout, today | `WorkoutCore`, теплокарта, ELO |
 | `measureLog` | measure | `MeasureCore` (зокрема `homeSummary` на «Сьогодні») |
 | `trackers` · `trackerLog` | trackers, today | `TrackerCore` |

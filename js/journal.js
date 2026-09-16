@@ -1407,6 +1407,71 @@
       '</div>';
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Запас до відмови                                                    */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Картка ЗНИКАЄ, поки жодного числа не вписано, — і це не економія
+   * місця. Порожня таблиця з прочерками виглядає як зламана функція, а
+   * не як запрошення; поле RIR у тренуванні необовʼязкове навмисно, і
+   * той, хто його не веде, не має отримувати докір у журналі.
+   */
+  const RIR_DAYS = 30;
+
+  function renderRir() {
+    const host = $('#jr-rir');
+    if (!host || !window.ProgressCore || !window.ProgressCore.rirStats) return;
+
+    const st = window.ProgressCore.rirStats(state.sessionLog, RIR_DAYS);
+    if (!st.rows.length) { host.innerHTML = ''; return; }
+
+    const NOTE = {
+      light: 'вага застара',
+      hard: 'до відмови'
+    };
+
+    const rows = st.rows.map(function (r) {
+      return '<tr>' +
+        '<td>' + esc(r.name) +
+          (r.flag ? ' <span class="chip chip--sm">' + NOTE[r.flag] + '</span>' : '') + '</td>' +
+        '<td class="num mono">' + fmtNum.n(r.avg, 1) + '</td>' +
+        '<td class="num mono">' + r.sets + ' з ' + r.total + '</td>' +
+      '</tr>';
+    }).join('');
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
+          '<h2 style="margin:0">Запас до відмови</h2>' +
+          '<span class="small muted">за ' + RIR_DAYS + ' днів</span>' +
+        '</div>' +
+        '<div class="table-wrap mt-2">' +
+          '<table class="tbl">' +
+            '<thead><tr>' +
+              /* Три колонки, і заголовки короткі. Четверта («на нулі»)
+                 тут була й виїжджала за екран телефона разом із
+                 «СЕРЕДНІЙ RIR»: у капітелі з розрядкою заголовок ширший
+                 за назву вправи. Саме число підходів до відмови нікуди
+                 не поділось — воно в ядрі й у підписі «до відмови»,
+                 а точні числа по днях видно в «Прогресі вправи». */
+              '<th>Вправа</th><th class="num">RIR</th>' +
+              '<th class="num">Підходів</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+        '<p class="small muted mb-0" style="margin-top:10px">' +
+          'RIR — середній за період. ' +
+          'Рахуються лише підходи, де запас вписали: «' + st.sets + ' з ' + st.total +
+          '» — саме про це. «Вага застара» — середній запас від ' +
+          fmtNum.n(window.ProgressCore.RIR_LIGHT_AVG, 1) +
+          ' на кількох тренуваннях: графік, який стоїть, стоїть через це, ' +
+          'а не через плато. «До відмови» — більшість підходів на нулі; ' +
+          'тижнями поспіль це рахунок, який приходить розвантаженням.' +
+        '</p>' +
+      '</div>';
+  }
+
   function renderLifts() {
     const host = $('#jr-lifts');
     if (!host || !window.HistoryCore) return;
@@ -1730,22 +1795,34 @@
             '<span class="muted">(перша третина серії проти останньої).</span></p>'
           : '') +
 
-        '<div class="table-wrap mt-2">' +
-          '<table class="tbl"><thead><tr>' +
-            '<th>Дата</th><th class="num">Вага</th><th class="num">Підходи</th>' +
-            '<th class="num">Повтори</th><th class="num">Обʼєм</th>' +
-          '</tr></thead><tbody>' +
-            st.points.slice(-10).reverse().map(function (p) {
-              return '<tr>' +
-                '<td data-l="Дата">' + esc(dateLabel(dateOf(p.d))) + '</td>' +
-                '<td class="num mono" data-l="Вага">' + (p.kg ? fmtNum.kg(p.kg) + ' кг' : '—') + '</td>' +
-                '<td class="num mono" data-l="Підходи">' + p.sets + '</td>' +
-                '<td class="num mono" data-l="Повтори">' + (p.reps || '—') + '</td>' +
-                '<td class="num mono" data-l="Обʼєм">' + (p.vol ? thou(p.vol) + ' кг' : '—') + '</td>' +
-              '</tr>';
-            }).join('') +
-          '</tbody></table>' +
-        '</div>' +
+        /* Стовпець RIR зʼявляється лише тоді, коли в цьому періоді є
+           хоч одне число. Порожня колонка з прочерками звузила б чотири
+           справжні на телефоні заради нічого. */
+        (function () {
+          const shown = st.points.slice(-10).reverse();
+          const anyRir = shown.some(function (p) { return p.rir !== null && p.rir !== undefined; });
+          return '<div class="table-wrap mt-2">' +
+            '<table class="tbl"><thead><tr>' +
+              '<th>Дата</th><th class="num">Вага</th><th class="num">Підходи</th>' +
+              '<th class="num">Повтори</th>' + (anyRir ? '<th class="num">RIR</th>' : '') +
+              '<th class="num">Обʼєм</th>' +
+            '</tr></thead><tbody>' +
+              shown.map(function (p) {
+                return '<tr>' +
+                  '<td data-l="Дата">' + esc(dateLabel(dateOf(p.d))) + '</td>' +
+                  '<td class="num mono" data-l="Вага">' + (p.kg ? fmtNum.kg(p.kg) + ' кг' : '—') + '</td>' +
+                  '<td class="num mono" data-l="Підходи">' + p.sets + '</td>' +
+                  '<td class="num mono" data-l="Повтори">' + (p.reps || '—') + '</td>' +
+                  (anyRir
+                    ? '<td class="num mono" data-l="RIR">' +
+                        (p.rir === null || p.rir === undefined ? '—' : fmtNum.n(p.rir, 1)) + '</td>'
+                    : '') +
+                  '<td class="num mono" data-l="Обʼєм">' + (p.vol ? thou(p.vol) + ' кг' : '—') + '</td>' +
+                '</tr>';
+              }).join('') +
+            '</tbody></table>' +
+          '</div>';
+        })() +
         '<p class="small muted mt-1 mb-0">' + st.count + ' ' +
           window.App.plural(st.count, 'тренування', 'тренування', 'тренувань') +
           ' за період. ' +
@@ -1753,7 +1830,12 @@
             ? 'Показано лише підхід ' + setNo + '.'
             : 'Вага — найважчий фактичний підхід дня, обʼєм — сума «вага × повтори» ' +
               'по кожному підходу. Тренування до появи ваг по підходах рахуються ' +
-              'за робочою вагою того дня.') + '</p>';
+              'за робочою вагою того дня.') +
+          (metric === 'e1rm'
+            ? ' 1ПМ рахується з урахуванням вписаного запасу: підхід із RIR 2 ' +
+              'оцінюється як на два повторення важчий, бо формула описує підхід ' +
+              'до відмови.'
+            : '') + '</p>';
     }
 
     host.innerHTML =
@@ -2700,7 +2782,8 @@
    * innerHTML: без нього координати були б із попереднього кадру.
    */
   const HASH_BLOCKS = ['jr-overview', 'jr-adherence', 'jr-weight', 'jr-train',
-                       'jr-lifts', 'jr-exercise', 'jr-prs', 'jr-food', 'jr-trackers'];
+                       'jr-lifts', 'jr-rir', 'jr-exercise', 'jr-prs', 'jr-food',
+                       'jr-trackers'];
 
   function focusHash() {
     const id = String(location.hash || '').replace(/^#/, '');
@@ -2825,6 +2908,7 @@
     keepFocus(renderTrain);
     renderLifts();
     renderStale();
+    renderRir();
     renderPrs();
     renderExercise();
     renderFood();

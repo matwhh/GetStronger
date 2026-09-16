@@ -29,6 +29,13 @@ const W = ctx.WorkoutCore;
 const hctx = loadModules(['js/date-core.js', 'js/history-core.js']);
 const H = hctx.HistoryCore;
 
+const ectx = loadModules(['js/date-core.js', 'js/onerm-core.js', 'js/exercise-core.js']);
+const E = ectx.ExerciseCore;
+const OR = ectx.OneRM;
+
+const pctx = loadModules(['js/date-core.js', 'js/history-core.js', 'js/progress-core.js']);
+const P = pctx.ProgressCore;
+
 /** Компактний вигляд списку: '100x8@2,100x8@-' — масиви з vm не рівні */
 function sig(list) {
   return list.map(function (x) {
@@ -143,3 +150,121 @@ describe('history-core: RIR у знімку сесії', () => {
     assert.equal('q' in s[0], false);
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*
+ * ЩО RIR ОЗНАЧАЄ. Записане число має міняти висновки, інакше це поле
+ * заради поля. Воно міняє два: оцінку разового максимуму (підхід із
+ * запасом у два — це не межа людини) і відповідь на питання «чому вага
+ * стоїть» (три тижні на RIR 4 — це не плато, це занадто легко).
+ */
+describe('exercise-core: RIR робить оцінку 1ПМ чесною', () => {
+  it('підхід із запасом оцінюється як важчий, ніж він виглядає', () => {
+    const plain = E.e1rmOf(100, 8);
+    const rested = E.e1rmOf(100, 8, 2);
+    assert.equal(rested > plain, true, plain + ' проти ' + rested);
+    /* Вісім повторень із запасом у два — це десять до відмови, і
+       формула має дати рівно стільки ж, скільки для десяти. */
+    assert.equal(rested, E.e1rmOf(100, 10));
+  });
+
+  it('RIR 0 нічого не міняє — це і є відмова', () => {
+    assert.equal(E.e1rmOf(100, 8, 0), E.e1rmOf(100, 8));
+  });
+
+  it('невідомий RIR не вигадується', () => {
+    [null, undefined, '', 'два', NaN].forEach(function (q) {
+      assert.equal(E.e1rmOf(100, 8, q), E.e1rmOf(100, 8), String(q));
+    });
+  });
+
+  it('точка серії несе середній RIR або null', () => {
+    const withQ = E.pointOf('2026-09-16',
+      { n: 'Жим', ds: 3, ps: 3, s: [{ w: 100, r: 8, q: 2 }, { w: 100, r: 8, q: 1 }, { w: 100, r: 8 }] }, 0);
+    assert.equal(withQ.rir, 1.5, 'середнє з тих підходів, де число є');
+    assert.equal(withQ.rirSets, 2);
+
+    const noQ = E.pointOf('2026-09-16',
+      { n: 'Жим', ds: 2, ps: 2, s: [{ w: 100, r: 8 }, { w: 100, r: 8 }] }, 0);
+    assert.equal(noQ.rir, null);
+    assert.equal(noQ.rirSets, 0);
+  });
+
+  it('1ПМ точки рахується з урахуванням запасу підходу', () => {
+    const p = E.pointOf('2026-09-16',
+      { n: 'Жим', ds: 1, ps: 1, s: [{ w: 100, r: 8, q: 2 }] }, 0);
+    assert.equal(p.e1rm, E.e1rmOf(100, 10));
+  });
+
+  it('легасі-знімок без підходів RIR не має', () => {
+    const p = E.pointOf('2026-09-16', { n: 'Жим', ds: 3, ps: 3, kg: 100, r: 8 }, 0);
+    assert.equal(p.rir, null);
+    assert.equal(p.e1rm, E.e1rmOf(100, 8), 'оцінка та сама, що й була');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+describe('progress-core: статистика запасу до відмови', () => {
+  /* Три тренування жиму з великим запасом і одне присідання на нулі. */
+  const log = {
+    '2026-09-01': { done: 2, total: 2, ex: [
+      { n: 'Жим', ds: 3, ps: 3, s: [{ w: 60, r: 8, q: 4 }, { w: 60, r: 8, q: 4 }, { w: 60, r: 8, q: 5 }] },
+      { n: 'Присідання', ds: 2, ps: 2, s: [{ w: 100, r: 5, q: 0 }, { w: 100, r: 5, q: 0 }] }
+    ] },
+    '2026-09-08': { done: 2, total: 2, ex: [
+      { n: 'Жим', ds: 3, ps: 3, s: [{ w: 60, r: 8, q: 4 }, { w: 60, r: 8, q: 3 }, { w: 60, r: 8, q: 4 }] },
+      { n: 'Присідання', ds: 2, ps: 2, s: [{ w: 100, r: 5, q: 0 }, { w: 100, r: 5, q: 1 }] }
+    ] },
+    '2026-09-15': { done: 1, total: 2, ex: [
+      { n: 'Жим', ds: 3, ps: 3, s: [{ w: 60, r: 8, q: 4 }, { w: 60, r: 8 }, { w: 60, r: 8, q: 4 }] }
+    ] }
+  };
+  const NOW = new Date(2026, 8, 16);   // 16 вересня 2026
+
+  it('рахує лише ті підходи, де число є', () => {
+    const st = P.rirStats(log, 30, NOW);
+    const jim = st.rows.filter(function (r) { return r.name === 'Жим'; })[0];
+    assert.equal(jim.sets, 8, 'дев\'ятий підхід без числа не рахується');
+    assert.equal(jim.total, 9);
+  });
+
+  it('великий середній запас позначається як «вага застара»', () => {
+    const jim = P.rirStats(log, 30, NOW).rows.filter(function (r) { return r.name === 'Жим'; })[0];
+    assert.equal(jim.avg, 4);
+    assert.equal(jim.flag, 'light');
+  });
+
+  it('підходи до відмови позначаються окремо', () => {
+    const sq = P.rirStats(log, 30, NOW).rows.filter(function (r) { return r.name === 'Присідання'; })[0];
+    assert.equal(sq.zero, 3);
+    assert.equal(sq.flag, 'hard');
+  });
+
+  it('мало підходів — не висновок, а випадковість', () => {
+    const thin = { '2026-09-15': { ex: [{ n: 'Тяга', ds: 2, ps: 2, s: [{ w: 80, r: 8, q: 5 }, { w: 80, r: 8, q: 5 }] }] } };
+    const row = P.rirStats(thin, 30, NOW).rows[0];
+    assert.equal(row.avg, 5);
+    assert.equal(row.flag, null, 'двох підходів замало для висновку');
+  });
+
+  it('журнал без жодного RIR не вигадує рядків', () => {
+    const blank = { '2026-09-15': { ex: [{ n: 'Тяга', ds: 2, ps: 2, s: [{ w: 80, r: 8 }] }] } };
+    const st = P.rirStats(blank, 30, NOW);
+    assert.equal(st.rows.length, 0);
+    assert.equal(st.sets, 0);
+  });
+
+  it('період відрізає старе', () => {
+    const st = P.rirStats(log, 7, NOW);
+    const jim = st.rows.filter(function (r) { return r.name === 'Жим'; })[0];
+    assert.equal(jim.sets, 2, 'лише тренування 15 вересня');
+    assert.equal(st.rows.length, 1, 'присідань у вікні немає');
+  });
+
+  it('сміття в журналі не ламає підрахунку', () => {
+    const junk = { 'вчора': { ex: 'ні' }, '2026-09-15': { ex: [{ n: '', ds: 2, ps: 2, s: [{ q: 2 }] }] } };
+    const st = P.rirStats(junk, 30, NOW);
+    assert.equal(st.rows.length, 0);
+  });
+});
+

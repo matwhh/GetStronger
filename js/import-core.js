@@ -816,7 +816,7 @@
 
         case 'ratingLog': {
           // { 'YYYY-MM-DD': {rating,delta,quality,reasons:[{key,label,pts}]} } —
-          // це КЕШ RatingCore.recompute(), не джерело правди (rating-core.js).
+          // це кеш старого довічного рейтингу; самої формули в проєкті вже немає.
           // Форма перевіряється структурно; биту причину просто відкидаємо,
           // а не весь запис дня — recompute() однаково перебудує його заново.
           if (!isPlain(v)) return reject(k);

@@ -1044,7 +1044,6 @@
     }
 
     if (!Object.keys(patch).length) return;
-    window.App.stampRating(Object.assign({}, state.profile, patch), patch);
     saveOwn(patch).catch(function (e) {
       toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');
     });

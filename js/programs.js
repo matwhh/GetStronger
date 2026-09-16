@@ -278,9 +278,8 @@
        вихідне число (100 → −15% → 85 → +15% → 97,75 → 97,5). */
     deload: null,
 
-    // Останній відомий профіль. Потрібен лише для того, щоб позначити
-    // новий запис історії ваг «побаченим» для Get Stronger Rating (App.stampRating):
-    // stamp() дивиться на ratingSeen/ratingLog, а їх тут ніхто інший не тримає.
+    // Останній відомий профіль: стать і стаж для підбору діапазонів
+    // повторень, свої вправи, книга ваг.
     profile: {},
 
     /* Чи вмикати ноги в загальний крок ±2,5 кг.
@@ -444,7 +443,6 @@
       weightLog: state.weightLog,
       warmups: state.warmups
     };
-    window.App.stampRating(Object.assign({}, state.profile || {}, patch), patch);
     try {
       await saveOwn(patch);
     } catch (e) {
@@ -641,10 +639,6 @@
       state.deloadDirty = false;
     }
     const full = Object.assign({ weights: state.weights, weightLog: state.weightLog }, extra);
-    // Новий запис у weightLog — це факт для Rating. Позначаємо його
-    // побаченим тут-таки: інакше він зарахується лише коли людина відкриє
-    // «Сьогодні» чи rating.html, і то якщо встигне за два дні.
-    window.App.stampRating(Object.assign({}, state.profile || {}, full), full);
     try {
       await saveOwn(full);
     } catch (e) {

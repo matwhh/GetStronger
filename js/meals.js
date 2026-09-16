@@ -1210,7 +1210,6 @@
     state.quickP = '';
 
     const patch = { mealLog: log, day: state.day };
-    window.App.stampRating(Object.assign({}, state.profile, patch), patch);
     try {
       await window.Store.saveProfile(patch);
       /* Текст мусить збігатися з тим, що робить сервер. Було «білкова
@@ -1696,7 +1695,6 @@
     state.day = EMPTY_DAY();
 
     const patch = { mealLog: log, day: state.day };
-    window.App.stampRating(Object.assign({}, state.profile, patch), patch);
     try {
       await window.Store.saveProfile(patch);
       toast('День закрито: ' + log[key].kcal + ' ккал в історії', 'ok');

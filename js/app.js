@@ -185,15 +185,6 @@
     };
   }
 
-  /**
-   * Історична заглушка. Старий довічний Get Stronger Rating замінено сезонним
-   * ELO (js/elo-core.js + сервер): факти більше не «штампуються» у
-   * профіль, а події подає js/elo-hooks.js. Сигнатура збережена, бо
-   * виклики лишились у пʼятьох модулях і їхні патчі мають проходити далі
-   * без змін.
-   */
-  function stampRating(profileAfter, patch) { return patch; }
-
   /** Обмежити число діапазоном */
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
@@ -2229,7 +2220,6 @@
     fmt: fmt,
     fmtNum: numFmt,
     sheet: sheet,
-    stampRating: stampRating,
     flashDone: flashDone,
     busy: busy,
     dateLabel: dateLabel,

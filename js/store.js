@@ -302,14 +302,15 @@
       //   форма, що bodyLog/workLog.
       trackers: {},
       trackerLog: {},
-      // Get Stronger RATING (етап 5). Форма — js/rating-core.js.
-      // ratingLog — ЦЕ КЕШ, не джерело правди: {'YYYY-MM-DD': {rating,delta,quality,reasons}},
-      //   будь-коли перебудовується заново RatingCore.recompute() з history + ratingSeen.
-      // ratingSeen — коли Rating ВПЕРШЕ побачив кожен факт ('train:D'/'meal:D'/…),
-      //   не дата самого факту. Захист від заднього заповнення (див. rating-core.js).
-      // ratingAlgorithmVersion — версія формули, якою рахувався ratingLog востаннє;
-      //   0 = ще не рахувався. Зміна RatingCore.RATING_ALGORITHM_VERSION у майбутньому
-      //   означає повний recompute(), а не тиху розбіжність зі старими числами.
+      // СПАДОК СТАРОГО РЕЙТИНГУ. Довічний Get Stronger Rating (етап 5)
+      // замінено сезонним ELO: рахує його сервер, події подає
+      // js/elo-hooks.js, а js/rating-core.js у проєкті більше немає.
+      //
+      // Три ключі лишаються порожніми й нікому не потрібними — але
+      // лишаються: вони є в старих експортах профілю, і round-trip
+      // «експорт → імпорт → експорт» мусить віддавати те саме
+      // (tools/verifydata.mjs, tools/verifyimport.mjs). Прибирати їх
+      // означало б мовчки губити чуже збережене.
       ratingLog: {},
       ratingSeen: {},
       ratingAlgorithmVersion: 0,
@@ -508,10 +509,10 @@
     /*
      * 3 -> 4: зʼявився Get Stronger Rating.
      *
-     * Лише гарантія типу — ratingLog/ratingSeen порожні, ratingAlgorithmVersion 0.
-     * Свідомо НЕ рахуємо тут перший ratingLog: recompute() потребує window.HistoryCore
-     * (сторінка, не store.js) і має відпрацювати один раз при першому відкритті
-     * rating.html/today.html — там і виставиться ratingAlgorithmVersion.
+     * Самого рейтингу давно немає (його замінив сезонний ELO на сервері),
+     * але крок міграції лишається: профіль версії 3 досі може приїхати зі
+     * старого браузера або старого експорту, і структура полів має бути
+     * передбачуваною для всіх, хто їх просто переносить далі.
      */
     if (v < 4) {
       if (!p.ratingLog || typeof p.ratingLog !== 'object') p.ratingLog = {};

@@ -151,12 +151,12 @@ bash tools/ci-browser.sh full               # core + решта, ~50 хв
 | Чого | Скільки |
 |---|---|
 | сторінок `*.html` | 27 |
-| файлів у `js/` | 86 |
-| з них ядра `*-core.js` / `*-data.js` | 39 |
-| файлів `tests/*.test.js` | 59 |
-| скриптів `tools/verify*.mjs` | 66 |
+| файлів у `js/` | 87 |
+| з них ядра `*-core.js` / `*-data.js` | 40 |
+| файлів `tests/*.test.js` | 60 |
+| скриптів `tools/verify*.mjs` | 67 |
 | наборів у `ci-browser.sh core` | 14 |
-| наборів у `ci-browser.sh full` | 55 |
+| наборів у `ci-browser.sh full` | 56 |
 | перевірок гігієни | 21 |
 <!-- ЧИСЛА:КІНЕЦЬ -->
 
@@ -215,7 +215,7 @@ Enough.label(v, ['день', 'дні', 'днів'])   // «поки 4 із 10 д
 | рейтинг, стрічка подій, `seasons.html` | `verifyseasons`, `verifylvlbar`, `verifydaycal`, `verifya11y` |
 | нагороди | `verifyawards`, `verifyaward`, `award-core.test.js` |
 | `db/*.sql` | `verify-sql-suites.mjs`, `verify-schema-perms.mjs`, `verify-elo-week.mjs`, `verify-elo-skip.mjs` |
-| статистика «Прогресу», `enough-core` | `progress-core.test.js`, `enough-core.test.js` |
+| статистика «Прогресу», `enough-core`, `insight-core` | `progress-core.test.js`, `enough-core.test.js`, `insight-core.test.js`, `verifyinsight` |
 
 ### 2.5. Коміти
 

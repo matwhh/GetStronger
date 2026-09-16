@@ -36,7 +36,7 @@ FULL="verifya11y verifyflows verifyimport verifythemes verifyonboard \
       verifyheatmap verifyseg verifytilt verifydaycal verifytabbar verifydonut \
       verifylevelicon verifyaward verifyprogression verifylvlbar \
       verifyownexercise verifyownplan verifyhelpbook verifyloginerrors \
-      verifygym verifytdee verifycoach verifyadmintabs"
+      verifygym verifytdee verifycoach verifyadmintabs verifyinsight"
 
 case "${1:-core}" in
   core) LIST="$CORE" ;;

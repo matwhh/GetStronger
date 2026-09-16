@@ -134,6 +134,11 @@
            Порожньо й не рендериться, якщо жоден трекер не увімкнено. -->
       <div id="jr-trackers" class="mt-3 reveal" data-d="3"></div>
 
+      <!-- Порівняння власних тижнів між собою. Стоїть останнім навмисно:
+           воно читає все, що вище, і зʼявляється пізніше за все інше —
+           потрібно вісім завершених тижнів. -->
+      <div id="jr-insight" class="mt-3 reveal" data-d="3"></div>
+
       <div class="mt-3" data-longform="Як читати графіки й теплокарту">
         <h2 class="reveal">Навіщо це</h2>
         <div class="grid grid-2 mt-2">
@@ -210,6 +215,10 @@
 <script defer src="js/onerm-core.js"></script>
 <script defer src="js/exercise-core.js"></script>
 <script defer src="js/tracker-core.js"></script>
+<!-- Одне правило «скільки даних стоїть за числом» і порівняння власних
+     тижнів, яке на нього спирається. -->
+<script defer src="js/enough-core.js"></script>
+<script defer src="js/insight-core.js"></script>
 <script defer src="js/journal.js"></script>
 </body>
 </html>

@@ -2426,6 +2426,124 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Що працює саме на тобі: порівняння власних тижнів                   */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Рахує js/insight-core.js, тут — тільки слова. Це навмисно: одиниці
+   * («7 год 50 хв», «62 %», «−0,4 кг») — питання показу, а не аналізу, і
+   * ядро про них не знає.
+   *
+   * Картка показує ВСІ чотири питання, зокрема ті, на які даних ще
+   * немає. Ховати їх означало б, що людина не дізнається, ЩО саме варто
+   * почати вести, щоб отримати відповідь.
+   */
+
+  /* Як назвати кожен бік пари й чим виміряти. hi/lo — слова для «більше»
+     і «менше» причини: «більше сну» читається, «вищий сон» — ні. */
+  const INSIGHT_WORDS = {
+    sleep:      { what: 'сну',           hi: 'більше', lo: 'менше',
+                  fmt: function (v) { return durTxt(Math.round(v)); } },
+    steps:      { what: 'кроків',        hi: 'більше', lo: 'менше',
+                  fmt: function (v) { return thou(v) + ' на день'; } },
+    proteinHit: { what: 'білка в цілі',  hi: 'частіше', lo: 'рідше',
+                  fmt: function (v) { return Math.round(v * 100) + '% днів'; } },
+    lifts:      { unit: 'вправ важчає за тиждень',
+                  fmt: function (v) { return fmtNum.n(v, 1); } },
+    setsPct:    { unit: 'підходів закрито',
+                  fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    bodyDelta:  { unit: 'ваги тіла за тиждень',
+                  fmt: function (v) { return fmtNum.signed(v, 2) + ' кг'; } }
+  };
+
+  const INSIGHT_Q = {
+    'sleep-lifts':  'Чи ростуть робочі ваги, коли більше спиш?',
+    'sleep-sets':   'Чи закриваєш більше підходів, коли більше спиш?',
+    'protein-sets': 'Чи закриваєш більше підходів, коли добираєш білок?',
+    'steps-weight': 'Чи йде вага вниз, коли більше ходиш?'
+  };
+
+  function insightCard(r) {
+    const d = INSIGHT_WORDS[r.driver] || {};
+    const o = INSIGHT_WORDS[r.outcome] || {};
+    const q = INSIGHT_Q[r.id] || '';
+    let body;
+
+    if (r.level === 'none' || r.level === 'thin') {
+      /* Скільки саме бракує — не «замало даних». Число називає
+         window.Enough, одне правило на весь сайт. */
+      const E = window.Enough;
+      const need = r.split
+        ? 'усі тижні вийшли з однаковим числом — ділити поки нічого'
+        : E.label(r.enough, ['тиждень', 'тижні', 'тижнів']);
+      body = '<p class="small muted mt-1 mb-0">' + esc(need) + '.</p>';
+    } else if (r.level === 'flat' && r.still) {
+      /* Наслідок не рухався жодного тижня. «Різниці не видно» тут
+         збрехало б: різниці немає не тому, що причина не впливає, а
+         тому, що порівнювати нічого. */
+      body = '<p class="small mt-1 mb-0">Порівнювати поки нічого: ' +
+        esc(o.unit) + ' — <b class="mono">' + esc(o.fmt(r.value)) +
+        '</b> в усі ' + r.weeks + ' ' +
+        window.App.plural(r.weeks, 'тиждень', 'тижні', 'тижнів') + '.</p>';
+    } else if (r.level === 'flat') {
+      body = '<p class="small mt-1 mb-0">Різниці не видно: ' +
+        esc(o.fmt(r.high.avg)) + ' проти ' + esc(o.fmt(r.low.avg)) +
+        ' — менше за звичайний розкид між тижнями. ' +
+        '<span class="muted">Порівняно ' + r.weeks + ' ' +
+        window.App.plural(r.weeks, 'тиждень', 'тижні', 'тижнів') + '.</span></p>';
+    } else {
+      const better = r.delta > 0 ? d.hi : d.lo;
+      body =
+        '<p class="small mt-1 mb-0">Так — коли ' + esc(d.hi) + ' ' + esc(d.what) +
+          ' (' + esc(d.fmt(r.high.driver)) + ' проти ' + esc(d.fmt(r.low.driver)) + '): ' +
+          '<b class="mono">' + esc(o.fmt(r.high.avg)) + '</b> проти <b class="mono">' +
+          esc(o.fmt(r.low.avg)) + '</b> ' + esc(o.unit) + '.</p>' +
+        '<p class="small muted mb-0" style="margin-top:6px">' +
+          r.high.n + ' ' + window.App.plural(r.high.n, 'тиждень', 'тижні', 'тижнів') +
+          ' проти ' + r.low.n + '. Різниця більша за розкид між тижнями — ' +
+          'тому її й видно.' + (better ? '' : '') + '</p>';
+    }
+
+    return '<div class="card">' +
+      '<h3 class="card__title" style="margin:0">' + esc(q) + '</h3>' + body +
+    '</div>';
+  }
+
+  function renderInsight() {
+    const host = $('#jr-insight');
+    const IC = window.InsightCore;
+    if (!host || !IC || !window.Enough) return;
+
+    /* Повні журнали, а не сезонний зріз: питання «що працює на мені» —
+       не про сезон. Вісім тижнів усередині одного сезону зібрати важко,
+       а сама відповідь від межі сезону не залежить. */
+    const rows = IC.findings({
+      sessionLog: state.sessionLog, workLog: state.workLog,
+      mealLog: state.mealLog, bodyLog: state.bodyLog,
+      trackerLog: state.trackerLog,
+      weightLog: state.weightLog
+    }, todayKey());
+
+    const found = rows.filter(function (r) { return r.level === 'ok'; }).length;
+
+    host.innerHTML =
+      '<div class="card">' +
+        '<div class="row" style="justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">' +
+          '<h2 style="margin:0">Що працює саме на тобі</h2>' +
+          '<span class="small muted">' +
+            (found ? 'знайдено: ' + found + ' із ' + rows.length : 'відповідей поки немає') +
+          '</span>' +
+        '</div>' +
+        '<p class="small muted" style="margin:6px 0 0">Твої тижні порівнюються ' +
+          'між собою: ті, де чогось було більше за твою звичайну норму, проти решти. ' +
+          'Потрібно щонайменше ' + IC.MIN_WEEKS + ' завершених тижнів із обома числами.</p>' +
+      '</div>' +
+      '<div class="grid grid-2 mt-2">' + rows.map(insightCard).join('') + '</div>' +
+      '<p class="small muted" style="margin-top:10px">Це збіг у твоїх даних, а не доведена ' +
+        'причина: у тижні з гарним сном могло бути й менше роботи, і менше стресу. ' +
+        'Але якщо збіг тримається — його варто перевірити на собі свідомо.</p>';
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Історія: календар місяця                                            */
   /* ------------------------------------------------------------------ */
   /*
@@ -2985,6 +3103,7 @@
     renderExercise();
     renderFood();
     renderTrackers();
+    renderInsight();
 
     // Вигляд з URL: #history відкриває історію одразу (посилання з меню
     // й акаунта). silent — hash уже правильний, не чіпаємо його.

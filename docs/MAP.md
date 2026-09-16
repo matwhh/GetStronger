@@ -66,7 +66,7 @@ elo-core · elo-api · elo-hooks
 | `programs.html` | Вибір і редагування плану | history-core, exercises, reps-core, programs-data, workout-core, **programs** |
 | `plan.html` | Мій план + прогноз ваг | …, onerm-core, periodization-core, programs, projection, **plan-ui** |
 | `periodization.html` | Цикл на 8–16 тижнів | exercises, reps-core, programs-data, onerm-core, periodization-core, **periodization** |
-| `journal.html` | Прогрес: вага, сила, тренування | daycal-core, history-core, daylog-core, progression-core, statwindow-core, progress-core, adherence-core, onerm-core, exercise-core, tracker-core, **journal** |
+| `journal.html` | Прогрес: вага, сила, тренування, «що працює саме на тобі» | daycal-core, history-core, daylog-core, progression-core, statwindow-core, progress-core, tdee-core, coach-core, adherence-core, onerm-core, exercise-core, tracker-core, enough-core, insight-core, **journal** |
 | `nutrition.html` | План харчування: норма КБЖВ | donut-core, nutrition-core, **nutrition** |
 | `meals.html` | Раціон: продукти, рецепти, день | history-core, foods, recipes-data, donut-core, day-core, nutrition-core, **meals** |
 | `measure.html` | Заміри тіла | history-core, measure-core, **measure** |
@@ -113,7 +113,9 @@ elo-core · elo-api · elo-hooks
 | `nutrition-core.js` | 585 | BMR/TDEE/ціль/макроси/прогноз маси | `NutritionCalc`: `targetFor`, `bmrMifflin`, `bmrKatch`, `macros`, `massForecast`, `LIMITS` | — |
 | `workout-core.js` | 485 | тренувальний день: план, галочки, підходи | `WorkoutCore`: `resolvePlan`, `readDay`/`writeDay`, `plannedSets`, `dayStats`, `weekStartKey` | `PROGRAMS`, `MUSCLES`, `RepsCore`, `DateCore` |
 | `periodization-core.js` | 470 | лінійний цикл, % від 1ПМ, дельоуд | `Periodization`: `buildCycle`, `pctForWeek`, `currentWeek`, `applyDeload`, `applyRaise` | `OneRM` |
-| `progress-core.js` | 428 | зведена аналітика над журналами | `ProgressCore`: `bodyStats`, `forecast`, `liftStats`, `trainingStats`, `prList` | `HistoryCore`, `DateCore` |
+| `progress-core.js` | 445 | зведена аналітика над журналами | `ProgressCore`: `bodyStats`, `forecast`, `liftStats`, `trainingStats`, `prList` | `HistoryCore`, `DateCore`, `Enough` |
+| `enough-core.js` | 135 | **скільки даних стоїть за числом** — одне правило на весь сайт: `none` / `thin` / `ok` замість «є або немає» | `Enough`: `of`, `label`, `gate` | — |
+| `insight-core.js` | 310 | «що працює саме на тобі»: порівняння власних тижнів по медіані причини | `InsightCore`: `weeks`, `compare`, `findings` | `DateCore`, `Enough`, `HistoryCore`, `TrackerCore`, `ProgressCore` |
 | `tracker-tile-core.js` | 383 | кубик трекера на «Сьогодні»: свій ввід під кожен вид | `TrackerTile`: `html`, `grid`, `isWide` | `TrackerCore` |
 | `elo-core.js` | 374 | сезони, рівні, бюджети, дельти дій | `EloCore`: `seasonOf`, `seasonRange`, `levelFor`, `weeklyBudget`, `actionDelta`, `applyDayCaps` | — |
 | `award-core.js` | 361 | двобічна картка нагороди, 8 щаблів рідкості (Common…Legendary), вітрина з силуетами | `Award`: `html`, `grid`, `showcase`, `CODES`, `ORDER`, `TIERS`, `tierOf` | — |

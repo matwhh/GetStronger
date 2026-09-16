@@ -518,6 +518,41 @@ const FAKE = { state: STATE, events: EVENTS, history: HISTORY, awards: AWARDS };
   await ctx.close();
 }
 
+/* ================================================================== */
+/* Картка «Сезон завершено» веде до повного розбору                    */
+/* ================================================================== */
+/*
+ * Її бачать рівно один раз на сезон — у момент, коли подробиць хочеться
+ * найбільше. Доти вона мовчала про те, що вони взагалі десь є, і єдиною
+ * дією в ній було «Сховати звіт»: натиснув — і розбір, який сервер рахував
+ * три місяці, зник зі сторінки без сліду про те, де його шукати.
+ */
+{
+  const ctx = await context(FAKE);
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', (e) => errs.push(e.message));
+  /* Звіт кладеться в localStorage тим самим ключем, що й elo-hooks. */
+  await p.goto('file://' + ROOT + '/rating.html', { waitUntil: 'load' });
+  await p.evaluate(() => {
+    localStorage.setItem('ib.eloReport', JSON.stringify({
+      ok: true, elo: 1840, level: 8, elite: false, rank: 2, of: 11, percentile: 18
+    }));
+  });
+  await p.reload({ waitUntil: 'load' });
+  await p.waitForSelector('#sz-report .card', { timeout: 9000 }).catch(() => {});
+  await p.waitForTimeout(700);
+
+  const txt = await p.locator('#sz-report').innerText().catch(() => '');
+  ok('72. картка підсумку зʼявилась', /Сезон завершено/.test(txt), txt.slice(0, 50));
+  ok('73. і веде на повний розбір',
+    await p.locator('#sz-report a[href="seasons.html"]').count() > 0);
+  ok('74. сказано, що підсумок нікуди не дінеться',
+    /лишається на/.test(txt), txt.replace(/\n/g, ' ').slice(-120));
+  ok('75. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter((r) => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок сезонів і стрічки подій пройшло.');

@@ -801,7 +801,23 @@
         (n(rep.percentile) ? ' · Top ' + ns(rep.percentile) + '%' : '') +
       '</p>' +
       reportStats(rep) +
-      '<button class="btn btn--ghost btn--sm" type="button" id="sz-report-hide">Сховати звіт</button>');
+      /*
+       * ДВЕРІ ДО ПОВНОГО РОЗБОРУ. Тут — короткий підсумок: ELO, рівень,
+       * місце. Усе інше, що сервер порахував за три місяці (категорії з
+       * якістю виконання, активні дні, витрачені Grace Weeks, найкращий і
+       * найгірший день, нагороди сезону), лежить на seasons.html — і доти
+       * ця картка про нього мовчала. Момент, коли людина найбільше хоче
+       * подробиць, буває рівно один раз на сезон.
+       */
+      '<div class="row mt-1" style="gap:10px;align-items:center;flex-wrap:wrap">' +
+        '<a class="btn btn--primary btn--sm" href="seasons.html">Повний розбір сезону</a>' +
+        '<button class="btn btn--ghost btn--sm" type="button" id="sz-report-hide">Сховати</button>' +
+      '</div>' +
+      /* Кнопка прибирає картку назавжди, тож сказати, що підсумок нікуди
+         не дівається, треба ДО натискання, а не після. */
+      '<p class="small muted" style="margin:8px 0 0">Підсумок лишається на ' +
+        '<a href="seasons.html">сторінці сезонів</a> — ця картка просто ' +
+        'більше не показуватиметься.</p>');
     const hide = $('#sz-report-hide');
     if (hide) hide.addEventListener('click', function () {
       try { localStorage.removeItem('ib.eloReport'); } catch (_) {}

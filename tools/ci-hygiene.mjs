@@ -630,6 +630,76 @@ for (const dep of CORE_DEPS) {
   }
 }
 
+/* ---- 20. Числа проєкту живуть в ОДНОМУ місці й не брешуть ------------ */
+//
+// Привід — аудит 16.09.2026. Одні й ті самі числа стояли шістьма копіями
+// в README.md, RELEASE.md, docs/MAP.md, docs/CONTINUE.md,
+// docs/ENGINEERING.md і tools/README-verify.md, і жодні дві копії не
+// збігались: «1107 юніт-тестів» проти «1004» проти «998», «46 браузерних
+// наборів» проти справжніх 55, «33 ядра» проти 38.
+//
+// Копія числа не падає — вона просто старіє. Читач довіряє їй рівно доти,
+// доки не перевірить руками, а перевіряти руками ніхто не буде.
+//
+// Тепер таблиця одна (AGENTS.md, §2.2, між мітками ЧИСЛА:ПОЧАТОК і
+// ЧИСЛА:КІНЕЦЬ), і ось тут вона звіряється з репозиторієм.
+{
+  const want = {
+    'сторінок `*.html`':              tracked.filter(f => /^[^/]+\.html$/.test(f)).length,
+    'файлів у `js/`':                 tracked.filter(f => /^js\/[^/]+\.js$/.test(f)).length,
+    'з них ядра `*-core.js` / `*-data.js`':
+                                      tracked.filter(f => /^js\/.+-(core|data)\.js$/.test(f)).length,
+    'файлів `tests/*.test.js`':       tracked.filter(f => /^tests\/.+\.test\.js$/.test(f)).length,
+    'скриптів `tools/verify*.mjs`':   tracked.filter(f => /^tools\/verify.*\.mjs$/.test(f)).length
+  };
+
+  /* Набори браузерних перевірок читаються з самого ci-browser.sh: це
+     теж «число», і теж мусить збігатися без ручного перерахунку. */
+  let sh = '';
+  try { sh = readFileSync('tools/ci-browser.sh', 'utf8'); } catch { sh = ''; }
+  const listOf = (name) => {
+    const m = new RegExp(name + '="([^"]*)"', 's').exec(sh);
+    return m ? m[1].replace(/\\\n/g, ' ').trim().split(/\s+/).filter(Boolean) : [];
+  };
+  const core = listOf('CORE'), full = listOf('FULL');
+  want['наборів у `ci-browser.sh core`'] = core.length;
+  want['наборів у `ci-browser.sh full`'] = core.length + full.length;
+
+  /* Скільки перевірок у цьому файлі — за заголовками розділів. */
+  let self = '';
+  try { self = readFileSync('tools/ci-hygiene.mjs', 'utf8'); } catch { self = ''; }
+  want['перевірок гігієни'] = (self.match(/^\/\* ---- \d+\. /gm) || []).length;
+
+  let agents = '';
+  try { agents = readFileSync('AGENTS.md', 'utf8'); } catch { agents = ''; }
+  const block = /ЧИСЛА:ПОЧАТОК[\s\S]*?ЧИСЛА:КІНЕЦЬ/.exec(agents);
+  if (!block) {
+    fail('AGENTS.md — немає блоку між «ЧИСЛА:ПОЧАТОК» і «ЧИСЛА:КІНЕЦЬ». '
+       + 'Це єдине місце, де в проєкті стоять числа; решта документів має '
+       + 'посилатись на нього, а не заводити свою копію.');
+  } else {
+    const got = {};
+    for (const line of block[0].split('\n')) {
+      const m = /^\|\s*(.+?)\s*\|\s*(\d+)\s*\|$/.exec(line.trim());
+      if (m) got[m[1]] = Number(m[2]);
+    }
+    for (const [what, n] of Object.entries(want)) {
+      if (!(what in got)) {
+        fail(`AGENTS.md §2.2 — у таблиці чисел немає рядка «${what}» (насправді ${n}).`);
+      } else if (got[what] !== n) {
+        fail(`AGENTS.md §2.2 — «${what}»: написано ${got[what]}, насправді ${n}.`);
+      }
+    }
+    for (const what of Object.keys(got)) {
+      if (!(what in want)) {
+        fail(`AGENTS.md §2.2 — рядок «${what}» ніхто не рахує. Число, яке не `
+           + 'звіряється, застаріє мовчки: або додайте лічильник у перевірку 20, '
+           + 'або приберіть рядок.');
+      }
+    }
+  }
+}
+
 /* ---- підсумок -------------------------------------------------------- */
 if (problems.length) {
   console.error('Гігієна репозиторію — знайдено проблеми:\n');

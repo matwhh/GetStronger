@@ -103,7 +103,7 @@ elo-core · elo-api · elo-hooks
 Без DOM, без `location`, без слухачів. Під юніт-тестами. Саме тому їх
 можна перенести в мобільний застосунок без переписування.
 
-34 файли, ~10 700 рядків.
+38 файлів, ~13 200 рядків.
 
 | Файл | Ряд. | Що робить | Глобал і ключові функції | Залежить від |
 |---|---:|---|---|---|
@@ -268,7 +268,7 @@ elo-core · elo-api · elo-hooks
 | `days` | workout, today | `WorkoutCore`, теплокарта, ELO |
 | `measureLog` | measure | `MeasureCore` (зокрема `homeSummary` на «Сьогодні») |
 | `trackers` · `trackerLog` | trackers, today | `TrackerCore` |
-| `mealsLog` | meals | `DayCore`, `AdherenceCore` |
+| `mealLog` | meals | `DayCore`, `AdherenceCore` |
 | `gym` | «Мій план» (`gym-view.js`) | `GymCore` — крок ваги, розминкові сходинки; `null` = стара поведінка |
 | `tdeeMode` | «Харчування» | `NutritionCalc.targetFor` — `'measured'` рахує ціль від виміряного підтримання (`TdeeCore`); `null` = формула |
 
@@ -296,8 +296,11 @@ elo-core · elo-api · elo-hooks
 — історія змін, тести й точкові виправлення; **виконувати їх по
 продакшену не можна**. Порядок і правила — `db/README.md`.
 
-Rollback-файл поки один: `db/season-week-bounds-rollback.sql`. Так має
-бути в кожної ризикованої міграції.
+Rollback-файлів сім, усі з суфіксом `-rollback.sql`: `award-beta`,
+`elo-partial-cap`, `elo-recount-category`, `elo-skip-category`,
+`elo-skip-whitelist`, `season-week-bounds`, `cron-keep-work`. Так і має
+бути в кожної ризикованої міграції: відкат пишеться разом із нею, а не
+тоді, коли вже треба відкочуватись.
 
 ### `sw.js`
 
@@ -315,13 +318,17 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
 
 | Рівень | Чим | Скільки | Коли |
 |---|---|---|---|
-| Юніт | `node --test`, без залежностей | **52 файли, 1107 тестів** | `npm test`, ~6 с |
-| Гігієна | `tools/ci-hygiene.mjs` | 17 перевірок по ~320 файлах | `node tools/ci-hygiene.mjs`, ~1 с |
-| Браузер | Playwright на справжньому Chromium | **55 файлів `verify*.mjs`** | `bash tools/ci-browser.sh core` |
+| Юніт | `node --test`, без залежностей | скільки саме — друкує `npm test` | `npm test`, ~15 с |
+| Гігієна | `tools/ci-hygiene.mjs` | **20 перевірок**; по скількох файлах — каже сам скрипт | `node tools/ci-hygiene.mjs`, ~1 с |
+| Браузер | Playwright на справжньому Chromium | **14 наборів у `core`, 55 у `full`** | `bash tools/ci-browser.sh core` |
 
-Ще 5 файлів `verify*.mjs` — не браузерні: `verify-sql-suites.mjs`,
+Скільки тут файлів і тестів — у [`../AGENTS.md`](../AGENTS.md) §2.2 і
+ніде більше: копія числа не падає, вона просто старіє, тому перевірка 20
+гігієни звіряє ту таблицю з репозиторієм.
+
+Ще 6 файлів `verify*.mjs` — не браузерні: `verify-sql-suites.mjs`,
 `verify-schema-perms.mjs`, `verify-elo-week.mjs`,
-`verify-backup-roundtrip.mjs`, `verifyauthz.mjs`.
+`verify-backup-roundtrip.mjs`, `verify-elo-skip.mjs`, `verifyauthz.mjs`.
 
 Набори задає `tools/ci-browser.sh`:
 
@@ -329,7 +336,7 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
   `verifyworkout`, `verifydata`, `verifyroundtrip`, `verifyloop`,
   `verify7`, `verifyaccountmix`, `verifylink`, `verifysw`, `verifyhelp`,
   `verifymeasurewidget`, `verifyawards`, `verifyseasons`, `verifydaylogs`.
-- **full** (раз на добу): core + 33, зокрема `verifylvlbar`, `verifya11y`,
+- **full** (раз на добу): core + 41, зокрема `verifylvlbar`, `verifya11y`,
   `verifythemes`, `verifyresponsive`, `verifyperf`, `verifychaos`,
   `verifychaos2`, `verifyhardening`, `verifytabbar`, `verifydonut`,
   `verifydaycal`, `verifylevelicon`, `verifyprogression`.
@@ -337,10 +344,13 @@ stale-while-revalidate. Свіжий HTML звіряється з кешован
   `verifyregister`, `verifyregfail`, `verifyregresume`, `verifyrecover`,
   `verifyproduction`, `verifyauthz`.
 
-`.github/workflows/ci.yml`: `test` (юніт + гігієна + SQL-набори +
-`simelo`) і `browser` (core) на кожен пуш; `browser-full` — за
-розкладом; `pulse` — щоденний `curl` у Supabase, щоб free-план не
-заснув.
+`.github/workflows/ci.yml`: `test` — юніт, гігієна, відновлення з
+резервної копії (`verify-backup-roundtrip`), оцінка тижня
+(`verify-elo-week`), права й політики (`verify-schema-perms`),
+SQL-набори (`verify-sql-suites`), вимкнена категорія рейтингу
+(`verify-elo-skip`) і баланс (`simelo`); `browser` (core) на кожен пуш;
+`browser-full` — за розкладом; `pulse` — щоденний `curl` у Supabase,
+щоб free-план не заснув.
 
 ### Що стереже гігієна
 

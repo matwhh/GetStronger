@@ -740,10 +740,21 @@
    * пошукати, не працює: її не шукають. Тому вона стоїть одразу під
    * карткою дня — у другому місці, куди падає око.
    *
-   * ПРО ЗАПИТАННЯ. Фактичний RIR ніде не записується, і вигадати його з
-   * повторень не можна: десять повторень на RIR 3 і десять у відмову
-   * виглядають у даних однаково. Тому питає віджет, а відповідь — це
-   * саме натискання кнопки. «Так» означає «запас був», а не «згоден».
+   * ПРО ЗАПИТАННЯ. Фактичний RIR тепер можна вписати в кожен підхід
+   * (js/workout-core.js), але поле необовʼязкове й у більшості підходів
+   * порожнє. Вигадати запас із повторень не можна: десять повторень на
+   * RIR 3 і десять у відмову виглядають у даних однаково. Тому питає
+   * віджет, а відповідь — це саме натискання кнопки. «Так» означає
+   * «запас був», а не «згоден».
+   *
+   * ДЕФІЦИТ МІНЯЄ САМЕ ПИТАННЯ.
+   *
+   * Якщо людина третій тиждень худне, «додай 2,5 кг» — це вимога
+   * провалити підхід: у дефіциті сила лінійно не росте. Тоді картка не
+   * зникає (мовчання виглядало б як поламана функція), а МІНЯЄ ЗМІСТ:
+   * успіхом стає утримати ті самі повторення на тій самій вазі, і
+   * сказано, звідки це взялось — вага тіла за останній місяць. Додати
+   * вагу все одно можна: рішення за людиною, а не за застосунком.
    */
   function progressionHtml() {
     const PC = window.ProgressionCore;
@@ -751,9 +762,14 @@
 
     const rows = PC.due({
       profile: state.profile, plan: state.plan,
-      today: state.todayKey, isLeg: isLegExercise
+      today: state.todayKey, isLeg: isLegExercise,
+      nextWeight: gymNext
     });
     if (!rows.length) return '';
+
+    const CC = window.CoachCore;
+    const em = CC ? CC.energyMode(state.profile) : null;
+    const hold = !!(em && em.mode === 'hold');
 
     const one = rows.map(function (r) {
       const stood = r.sessions + ' ' +
@@ -767,8 +783,16 @@
             '<span class="small muted mono">' + fmtNum.kg(r.kg) + ' кг · ' + esc(stood) + '</span>' +
           '</div>' +
           '<p class="small muted prg__why">Верхня межа ' + r.top +
-            ' закрита в усіх підходах. Якщо в останньому лишалось ще 2 повтори — час на +' +
-            fmtNum.kg(r.step) + ' кг.' +
+            ' закрита в усіх підходах. ' +
+            (hold
+              ? 'Але за ' + em.days + ' днів вага тіла впала на ' +
+                fmtNum.kg(Math.abs(em.deltaKg)) + ' кг' +
+                (em.balance !== null ? ' (їли на ' + Math.abs(em.balance) +
+                  ' ккал менше за підтримання)' : '') +
+                ' — у дефіциті сила так не росте. Утримати ці повторення на ' +
+                fmtNum.kg(r.kg) + ' кг зараз і є успіхом.'
+              : 'Якщо в останньому лишалось ще 2 повтори — час на +' +
+                fmtNum.kg(r.step) + ' кг.') +
             /* E6. Пропущений день більше не глушить вправу, яку зробили
                як належить, — але змовчати про неповний тиждень означало б
                видати за повну картину те, що нею не є. */
@@ -778,10 +802,19 @@
               : '') +
           '</p>' +
           '<div class="prg__acts">' +
-            '<button class="btn btn--primary btn--sm" type="button" data-prg-up="' + esc(r.name) + '">' +
-              'Так — ' + fmtNum.kg(r.next) + ' кг</button>' +
-            '<button class="btn btn--ghost btn--sm" type="button" data-prg-keep="' + esc(r.name) + '">' +
-              'Ні — лишити</button>' +
+            /* У режимі утримання головна кнопка — «лишити»: саме вона
+               тепер правильна відповідь, і саме вона має бути під
+               великим пальцем. Додати вагу не заборонено, лише не
+               запропоновано першим. */
+            (hold
+              ? '<button class="btn btn--primary btn--sm" type="button" data-prg-keep="' + esc(r.name) + '">' +
+                  'Лишити ' + fmtNum.kg(r.kg) + ' кг</button>' +
+                '<button class="btn btn--ghost btn--sm" type="button" data-prg-up="' + esc(r.name) + '">' +
+                  'Все одно додати — ' + fmtNum.kg(r.next) + ' кг</button>'
+              : '<button class="btn btn--primary btn--sm" type="button" data-prg-up="' + esc(r.name) + '">' +
+                  'Так — ' + fmtNum.kg(r.next) + ' кг</button>' +
+                '<button class="btn btn--ghost btn--sm" type="button" data-prg-keep="' + esc(r.name) + '">' +
+                  'Ні — лишити</button>') +
             '<button class="btn btn--ghost btn--sm" type="button" data-prg-snooze="' + esc(r.name) + '">' +
               'Відкласти</button>' +
           '</div>' +
@@ -790,9 +823,22 @@
 
     return '' +
       '<section class="card prg mt-2" aria-labelledby="prg-t">' +
-        '<h2 class="prg__title" id="prg-t">Час додати вагу</h2>' +
+        '<h2 class="prg__title" id="prg-t">' +
+          (hold ? 'Вага: тримати' : 'Час додати вагу') + '</h2>' +
         one +
       '</section>';
+  }
+
+  /* Наступна вага з профілю залу: у залі без дрібних млинців «+2,5» не
+     існує. Порожній профіль повертає null, і прогресія лишається на
+     старому правилі 5/2,5. */
+  function gymNext(name, kg) {
+    const G = window.GymCore;
+    if (!G) return null;
+    const gym = G.normGym(state.profile && state.profile.gym);
+    const kind = G.kindOf(name);
+    if (!G.knows(kind, gym)) return null;
+    return G.nextUp(kg, kind, gym);
   }
 
   /* Ноги беруть крок 5 кг, решта 2,5 — те саме правило, що в «Планах

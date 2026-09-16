@@ -1364,6 +1364,60 @@
    */
   const STALE_SHOWN = 8;
 
+  /* ------------------------------------------------------------------ */
+  /*
+   * ЧОМУ ВАГА СТОЇТЬ — відповідь із СУСІДНІХ журналів.
+   *
+   * Таблиця вище каже «60 кг · 44 дні · 2 тренування» і на цьому
+   * замовкає. А причина рівної лінії здебільшого лежить не в залі:
+   * дефіцит, білок, пропуски, втома або навпаки — вага давно легка.
+   * js/coach-core.js читає всі журнали й повертає ФАКТИ.
+   *
+   * Назва причини зʼявляється ЛИШЕ тоді, коли доказ однозначний. Дві
+   * причини разом — і жодна не названа головною: впевнено названа
+   * неправильна причина гірша за мовчання, бо людина піде виправляти
+   * не те.
+   */
+  const CAUSE_LABEL = {
+    deficit: 'дефіцит',
+    protein: 'мало білка',
+    missed: 'пропуски',
+    fatigue: 'втома',
+    light: 'вага застара'
+  };
+
+  function causesOf(name) {
+    const CC = window.CoachCore;
+    if (!CC || typeof CC.causesFor !== 'function') return null;
+    return CC.causesFor({
+      bodyLog: state.bodyLog, mealLog: state.mealLog, sessionLog: state.sessionLog
+    }, name, CC.WINDOW_DAYS);
+  }
+
+  function causeChip(name) {
+    const r = causesOf(name);
+    if (!r || !r.one) return '';
+    return ' <span class="chip chip--sm">' + esc(CAUSE_LABEL[r.one] || '') + '</span>';
+  }
+
+  /* Пояснення — під таблицею, а не в комірці: у рядку на телефоні для
+     речення місця немає, а без факту ярлик нічого не вартий. */
+  function causeNotes(rows) {
+    const out = [];
+    rows.forEach(function (r) {
+      const c = causesOf(r.name);
+      if (!c || !c.causes.length) return;
+      out.push('<p class="small muted" style="margin:8px 0 0">' +
+        '<b>' + esc(r.name) + '</b> — ' +
+        (c.one
+          ? esc(c.causes[0].fact) + '.'
+          : 'причин може бути кілька: ' +
+            c.causes.map(function (x) { return esc(x.fact); }).join('; ') + '.') +
+        '</p>');
+    });
+    return out.join('');
+  }
+
   function renderStale() {
     const host = $('#jr-stale');
     if (!host || !window.ProgressionCore) return;
@@ -1391,7 +1445,7 @@
             '</tr></thead>' +
             '<tbody>' + shown.map(function (r) {
               return '<tr>' +
-                '<td>' + esc(r.name) + '</td>' +
+                '<td>' + esc(r.name) + causeChip(r.name) + '</td>' +
                 '<td class="num mono">' + fmtNum.kg(r.kg) + '</td>' +
                 '<td class="num mono">' + (r.days == null ? '—' : r.days) + '</td>' +
                 '<td class="num mono">' + r.sessions + '</td>' +
@@ -1399,6 +1453,7 @@
             }).join('') + '</tbody>' +
           '</table>' +
         '</div>' +
+        causeNotes(shown) +
         (hidden > 0
           ? '<button class="btn btn--ghost btn--sm mt-2" type="button" id="stale-more">' +
               'Ще ' + hidden + ' ' + window.App.plural(hidden, 'вправа', 'вправи', 'вправ') +

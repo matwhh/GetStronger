@@ -232,6 +232,10 @@
     var plan = Array.isArray(o.plan) ? o.plan : [];
     var today = o.today;
     var isLeg = typeof o.isLeg === 'function' ? o.isLeg : function () { return false; };
+    /* Наступна вага з ПРОФІЛЮ ЗАЛУ, якщо сторінка його дала. Без нього
+       лишається старе правило: 5 кг на ноги, 2,5 на решту. Ядро про
+       GymCore не знає навмисно — воно бере функцію, а не залежність. */
+    var nextWeight = typeof o.nextWeight === 'function' ? o.nextWeight : null;
     if (!today) return [];
 
     /* Останній ПОВНИЙ тиждень — попередній відносно поточного. Поточний
@@ -298,8 +302,16 @@
 
         seen[name] = true;
         var step = isLeg(name) ? STEP_LEGS : STEP_OTHER;
+        var next = kg + step;
+        if (nextWeight) {
+          var real = Number(nextWeight(name, kg));
+          /* Профіль залу може сказати «важчого немає» (null) — тоді
+             лишаємо старе число: заборонити вагу, якої в залі нема, ми
+             можемо, а вигадати причину не додавати — ні. */
+          if (Number.isFinite(real) && real > kg) { next = real; step = real - kg; }
+        }
         out.push({
-          name: name, kg: kg, step: step, next: kg + step,
+          name: name, kg: kg, step: step, next: next,
           top: top, reps: String(ex.reps || ''),
           days: age.days, sessions: age.sessions, week: prevMon,
           weekClosed: weekClosed

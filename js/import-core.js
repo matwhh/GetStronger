@@ -38,6 +38,12 @@
     'bodyLog','workLog','theme','periodization','deload',
     'weightLog','sessionLog','mealLog','trackers','trackerLog',
     'measureLog','bmiAck','hideHelp',
+    /* Додано після аудиту 17.09.2026: цих трьох тут не було, і вони
+       зникали при відновленні з власної резервної копії МОВЧКИ — навіть
+       не потрапляючи у звіт про відкинуте, бо цикл іде по самому списку.
+       Профіль залу забирав із собою справжній крок ваги, tdeeMode тихо
+       відкочував ціль на формулу, progression — усі «відкласти». */
+    'gym','tdeeMode','progression',
     'ratingLog','ratingSeen','ratingAlgorithmVersion',
     /* Латки разових міграцій. Без них імпорт на чистий браузер знімав
        позначку weightsHarvested, і programs.js на завантаженні знову
@@ -77,7 +83,12 @@
     sex: 1, age: 1, height: 1, weight: 1, goalWeight: 1, bodyfat: 1, daysPerWeek: 1,
     programId: 1, goal: 1, activity: 1, meals: 1, trainingAge: 1,
     hrRest: 1, hrMax: 1, theme: 1, scheme: 1,
-    activePlan: 1, day: 1, periodization: 1, deload: 1
+    activePlan: 1, day: 1, periodization: 1, deload: 1,
+    /* У blankProfile обидва null: «профілю залу немає» і «ціль рахується
+       за формулою». Без цього рядка явний null у файлі відкидався б як
+       зіпсоване значення, і резервна копія людини без профілю залу
+       щоразу звітувала б про відкинуте поле. */
+    gym: 1, tdeeMode: 1
   };
 
   /*
@@ -453,6 +464,79 @@
           return accept(k, { level: lvl === null ? 1 : lvl, skin: str(v.skin, 40) ? v.skin : null });
         }
 
+        /* ---- профіль залу, режим витрат, стан прогресії ---- */
+
+        case 'gym': {
+          /* Форму задає js/gym-core.js; тут — та сама перевірка, але без
+             залежності на нього: import-core вантажиться і там, де
+             gym-core немає. Порожній результат — це не профіль залу, а
+             його відсутність, тож віддаємо null. */
+          if (v === null) return accept(k, null);
+          if (!isPlain(v)) return reject(k);
+          const bar = finite(v.bar, 1, 500);
+          const plates = [];
+          (Array.isArray(v.plates) ? v.plates : []).slice(0, 12).forEach(function (x) {
+            if (!isPlain(x)) return;
+            const kg = finite(x.kg, 0.25, 100);
+            const pairs = finite(x.pairs, 1, 20);
+            if (kg === null || pairs === null) return;
+            plates.push({ kg: Math.round(kg * 4) / 4, pairs: Math.round(pairs) });
+          });
+          let db = null;
+          if (isPlain(v.dumbbells)) {
+            const from = finite(v.dumbbells.from, 0.5, 500);
+            const to = finite(v.dumbbells.to, 0.5, 500);
+            const step = finite(v.dumbbells.step, 0.25, 100);
+            if (from !== null && to !== null && step !== null && to >= from) {
+              db = { from: from, to: to, step: step };
+            }
+          }
+          const ms = finite(v.machineStep, 0.5, 100);
+          /*
+           * З обʼєкта не вийшло НІЧОГО придатного — це відмова, а не
+           * «порожній зал». Прийняти тут null означало б СТЕРТИ робочий
+           * профіль залу, що вже є в застосунку, зіпсованим полем із
+           * файла. Явний null у файлі (нижче, на вході) — інша річ: це
+           * свідоме «залу немає».
+           */
+          if (bar === null && !plates.length && !db && ms === null) return reject(k);
+          return accept(k, {
+            bar: bar, plates: plates, dumbbells: db,
+            machineStep: ms === null ? null : ms
+          });
+        }
+
+        case 'tdeeMode': {
+          /* Два значення й null. Рядок поза переліком — це не «інший
+             режим», це зіпсований файл: приймати його означало б лишити
+             профіль у стані, якого код не знає. */
+          if (v === null || v === 'formula') return accept(k, null);
+          if (v === 'measured') return accept(k, 'measured');
+          return reject(k);
+        }
+
+        case 'progression': {
+          // { 'Вправа': { snoozeUntil:'YYYY-MM-DD', decidedAt:'…', kept:1 } }
+          if (!isPlain(v)) return reject(k);
+          const names = Object.keys(v);
+          if (names.length > 300) return reject(k);
+          const out = {};
+          names.forEach(function (name) {
+            const n = str(name, 60);
+            const rec = v[name];
+            if (!n || !isPlain(rec)) return;
+            const o = {};
+            ['snoozeUntil', 'decidedAt', 'week'].forEach(function (f) {
+              const d = str(rec[f], 10);
+              if (d && DATE_KEY.test(d)) o[f] = d;
+            });
+            const kept = finite(rec.kept, 0, 999);
+            if (kept !== null) o.kept = Math.round(kept);
+            if (Object.keys(o).length) out[n] = o;
+          });
+          return accept(k, out);
+        }
+
         case 'activePlan': {
           if (!isPlain(v)) return reject(k);
           /*
@@ -474,7 +558,44 @@
         /* Розминка — ціле 0…5 на вправу; стеля та сама, що в
            js/workout-core.js, і перевіряється тут ще раз, бо файл могли
            правити руками. */
-        case 'warmups':  { const m = cleanNumMap(v, 0, 5);    return m ? accept(k, m) : reject(k); }
+        /*
+         * Розминкові підходи. Форм ДВІ, і обидві чинні: старий запис —
+         * просто число сходинок, новий — { n, reps } зі своїми
+         * повтореннями кожної сходинки (js/workout-core.js, normWarmup).
+         *
+         * Тут довго стояв cleanNumMap: він приймав лише число, тож
+         * резервна копія, зроблена після появи повторів, втрачала ВСЮ
+         * книгу розминок — мовчки, бо ключ у білому списку є, а вміст не
+         * підходив. Знайдено, коли перевірку round-trip нарешті навчили
+         * звіряти це поле.
+         */
+        case 'warmups': {
+          if (!isPlain(v)) return reject(k);
+          const names = Object.keys(v);
+          if (names.length > 300) return reject(k);
+          const out = {};
+          names.forEach(function (name) {
+            const n = str(name, 60);
+            if (!n) return;
+            const val = v[name];
+            if (typeof val === 'number' || typeof val === 'string') {
+              const plain = finite(val, 0, 5);
+              if (plain !== null) out[n] = Math.round(plain);
+              return;
+            }
+            if (!isPlain(val)) return;
+            const cnt = finite(val.n, 0, 5);
+            if (cnt === null) return;
+            const src = Array.isArray(val.reps) ? val.reps : [];
+            const reps = [];
+            for (let i = 0; i < Math.round(cnt); i++) {
+              const r = finite(src[i], 1, 30);
+              reps.push(r === null ? null : Math.round(r));
+            }
+            out[n] = { n: Math.round(cnt), reps: reps };
+          });
+          return accept(k, out);
+        }
 
         /* Вимкнені категорії рейтингу. Список короткий і закритий: чуже
            слово тут не просто зайве — сервер нормує ваги за ним, і
@@ -630,6 +751,13 @@
                     if (w !== null) o.w = Math.round(w * 2) / 2;
                     const rr = finite(x.r, 1, 200);
                     if (rr !== null) o.r = Math.round(rr);
+                    /* Запас до відмови. Без нього відновлення з власної
+                       копії опускало ВСІ оцінки 1ПМ: підхід 100×5 із
+                       запасом 2 рахується як сім повторень, а без нього —
+                       як пʼять, і графік сили ламався на даті відновлення.
+                       Межі ті самі, що в js/history-core.js. */
+                    const qq = finite(x.q, 0, 5);
+                    if (qq !== null) o.q = Math.round(qq);
                     sets.push(o);
                   }
                   if (sets.length) row.s = sets;

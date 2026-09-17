@@ -42,7 +42,12 @@ await p.evaluate(async () => {
     const k = key(i);
     if (i % 2 === 0) workLog[k] = 1;
     if (i % 2 === 1) mealLog[k] = { kcal: 2400, p: 160, f: 70, c: 250, fiber: 30, target: 2500 };
-    if (i % 3 === 0) sessionLog[k] = { programId: 'ppl', days: 3, dayIdx: i % 3, title: 'Push', done: 5, total: 6 };
+    if (i % 3 === 0) sessionLog[k] = { programId: 'ppl', days: 3, dayIdx: i % 3, title: 'Push',
+      done: 5, total: 6, end: 1,
+      /* Підходи з ЗАПАСОМ ДО ВІДМОВИ: саме його імпорт мовчки зрізав,
+         і всі оцінки 1ПМ після відновлення падали. */
+      ex: [{ n: 'Жим лежачи', ds: 3, ps: 3, kg: 73, r: 6,
+             s: [{ w: 73, r: 6, q: 2 }, { w: 73, r: 6, q: 1 }, { w: 73, r: 5 }] }] };
     if (i % 7 === 0) bodyLog[k] = 82.4 - i * 0.02;
     if (i % 5 === 0) {
       weightLog['Присідання'].unshift({ d: k, kg: 100 + (60 - i) / 10 });
@@ -83,7 +88,25 @@ await p.evaluate(async () => {
                      cadence: 1, stepPct: 2.5, mode: 'linear',
                      oneRM: { 'Присідання': 140, 'Жим лежачи': 95 } },
     deload: { percent: 10, at: '2026-08-01T10:00:00.000Z',
-              before: { 'Присідання': 118, 'Жим лежачи': 81 } }
+              before: { 'Присідання': 118, 'Жим лежачи': 81 } },
+    /*
+     * Поля, яких у цій перевірці не було — і саме тому три діри в
+     * імпорті дожили до аудиту 17.09.2026. Профіль залу й режим витрат
+     * зникали МОВЧКИ (їх не було в білому списку), а запас до відмови
+     * кожного підходу — при санітизації. Перевірка, яка мовчить про
+     * нове поле, гірша за її відсутність: вона створює враження, що
+     * резервну копію звіряють.
+     */
+    gym: { bar: 20, plates: [{ kg: 20, pairs: 2 }, { kg: 5, pairs: 2 }],
+           dumbbells: { from: 2, to: 30, step: 2 }, machineStep: 5 },
+    tdeeMode: 'measured',
+    progression: { 'Жим лежачи': { snoozeUntil: '2026-09-30' } },
+    warmups: { 'Присідання': { n: 3, reps: [10, 6, 3] } },
+    /* Саме в тій формі, у якій їх пише застосунок: user:true ставить
+       UserExercises.normOne, і без нього тест порівнював би профіль,
+       якого в житті не буває. */
+    customExercises: [{ name: 'Своя тяга', muscles: ['back'], lift: 'compound', user: true }],
+    eloSkip: ['nutrition']
   });
 });
 await p.reload({ waitUntil: 'load' });
@@ -176,6 +199,24 @@ ok('план: власні правки днів', same(B.customPlans, after.cus
 ok('рекорди 1ПМ', same(B.records, after.records), JSON.stringify(after.records));
 ok('власні рецепти', same(B.recipes, after.recipes));
 ok('робочі ваги збережено', same(B.weights, after.weights));
+ok('профіль залу', same(B.gym, after.gym), JSON.stringify(after.gym));
+num('режим витрат', B.tdeeMode, after.tdeeMode);
+ok('стан прогресії', same(B.progression, after.progression), JSON.stringify(after.progression));
+ok('розминкові підходи', same(B.warmups, after.warmups), JSON.stringify(after.warmups));
+ok('свої вправи', same(B.customExercises, after.customExercises), JSON.stringify(after.customExercises));
+ok('категорії поза рейтингом', same(B.eloSkip, after.eloSkip), JSON.stringify(after.eloSkip));
+
+/* Запас до відмови кожного підходу — поіменно, а не «журнал не
+   порожній»: він живе на два рівні вглиб і зрізався саме там. */
+{
+  const q = (prof) => {
+    const day = Object.keys(prof.sessionLog || {}).sort().pop();
+    const s0 = day && prof.sessionLog[day].ex && prof.sessionLog[day].ex[0];
+    return s0 && s0.s ? s0.s.map((x) => ('q' in x ? x.q : '-')).join(',') : '(немає)';
+  };
+  ok('запас до відмови підходів пережив round-trip', q(B) === q(after), q(B) + ' → ' + q(after));
+}
+
 const cnt = (o) => Object.keys(o || {}).length;
 num('тренування: днів у workLog', cnt(B.workLog), cnt(after.workLog));
 num('тренування: сесій у sessionLog', cnt(B.sessionLog), cnt(after.sessionLog));

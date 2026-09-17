@@ -112,8 +112,36 @@ describe('Власник локальних даних', () => {
     const res = await b.Store.signIn('b@test', 'password');
     assert.equal(res.merge, 'foreign');
     assert.equal(ls.getItem('ib.profile'), null, 'чужий профіль прибрано з робочого ключа');
-    assert.ok(ls.getItem('ib.profile.backup.login'), 'і збережено в окремому слоті');
     assert.equal(fb.state.row, null, 'у хмару B нічого не пішло');
+    /*
+     * А ОСЬ КОПІЇ БІЛЬШЕ НЕМАЄ — і це свідома зміна (аудит 17.09.2026).
+     *
+     * Профіль A встиг доїхати в хмару, тож копія в ЦЬОМУ браузері не дає
+     * йому нічого: він побачить свої дані, увійшовши з будь-якого
+     * пристрою. Зате B бачив би в DevTools чужу анкету — вагу, відсоток
+     * жиру, заміри тіла, журнали. Копія лишається лише тоді, коли вона
+     * ЄДИНА (наступний тест).
+     */
+    assert.equal(ls.getItem('ib.profile.backup.login'), null,
+      'дані A вже в хмарі — чужа копія в браузері не лишається');
+  });
+
+  test('…але якщо в попереднього власника лишалась незіслана робота — копія є', async () => {
+    const ls = makeStorage();
+    const fa = net(null, { uid: UID_A, writeNetworkError: true });
+    const a = loadStore({ fetch: fa, storage: ls });
+    await a.Store.signIn('a@test', 'password');
+    /* Мережі немає: патч лягає в чергу, у хмару не доїхав. */
+    await a.Store.saveProfile({ weight: 70 }).catch(() => {});
+    assert.ok(JSON.parse(ls.getItem('ib.pending') || '[]').length, 'патч у черзі');
+    ls.removeItem('ib.session');
+
+    const fb = net(null, { uid: UID_B });
+    const b = loadStore({ fetch: fb, storage: ls });
+    await b.Store.signIn('b@test', 'password');
+    const slot = JSON.parse(ls.getItem('ib.profile.backup.login') || 'null');
+    assert.ok(slot, 'копія збережена: іншої копії цих даних немає ніде');
+    assert.equal(slot.owner, UID_A);
   });
 
   test('вихід прибирає весь стан ELO', async () => {
@@ -337,6 +365,36 @@ describe('clearLocal', () => {
     ['ib.eloState', 'ib.eloPending', 'ib.profile.backup', 'ib.profile.backup.login',
      'ib.profile.owner', 'ib.account'].forEach((k) =>
       assert.equal(ls.getItem(k), null, k + ' мусить зникнути'));
+  });
+
+  /*
+   * ПЕРЕЛІК ПРОТИ ПОВЕДІНКИ.
+   *
+   * Попередня перевірка називає ключі поіменно — і саме тому нічого не
+   * ловить: новий ключ у неї теж треба дописати руками, а забувають
+   * рівно це. За історію файла так дожили три витоки: ib.regdraft
+   * (WEB-003), ib.cloud/ib.remember (LOC-011) і ib.auth.await із поштою,
+   * знайдений аудитом 17.09.2026 — вона переживала і вихід, і кнопку
+   * «стерти дані», при тому що обидві обіцяють прибрати все.
+   *
+   * Тому тут перевіряється ПОВЕДІНКА: після кнопки в сховищі не
+   * лишається НІ ОДНОГО ключа сайту. Новий ключ ламає цей тест сам, без
+   * жодних правок у ньому.
+   */
+  test('після кнопки не лишається жодного ключа сайту', async () => {
+    const ls = makeStorage({
+      'ib.eloState': '{}', 'ib.profile.backup.login': '{}', 'ib.profile.owner': UID_A,
+      'ib.auth.await': JSON.stringify({ email: 'a@test', at: Date.now() }),
+      'ib.regdraft': '{}', 'ib.cloud': '1', 'ib.remember': '1',
+      'ib.profile.backup.stale': '{}',
+      'forge.today': '{}', 'forge.theme': 'dark'
+    });
+    const s = loadStore({ fetch: net(null), storage: ls });
+    await s.Store.saveProfile({ weight: 80 }).catch(() => {});
+    s.Store.clearLocal();
+    const left = Object.keys(ls.dump ? ls.dump() : {})
+      .filter((k) => /^(ib\.|forge\.)/.test(k));
+    assert.equal(left.join(','), '', 'лишилось: ' + left.join(','));
   });
 });
 

@@ -307,3 +307,109 @@ describe('Імпорт: цільова вага', () => {
     }
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*
+ * РЕЗЕРВНА КОПІЯ, ЯКА НЕ ВІДНОВЛЮЄ ВСЕ, — НЕ РЕЗЕРВНА КОПІЯ.
+ *
+ * Аудит 17.09.2026 знайшов три діри в одному місці. Профіль залу й режим
+ * витрат не були в білому списку — і зникали при імпорті МОВЧКИ, навіть
+ * не потрапляючи у звіт про відкинуте, бо цикл іде по самому списку.
+ * Санітайзер підходу копіював вагу й повтори, але не запас до відмови —
+ * тож відновлення з власної копії опускало всі оцінки 1ПМ і ламало
+ * графік сили на даті відновлення.
+ *
+ * Дожили вони тому, що verifyroundtrip звіряв сорок дві позиції, серед
+ * яких не було жодної з нових.
+ */
+describe('імпорт відновлює те, що експорт віддає', () => {
+  test('профіль залу, режим витрат і стан прогресії', () => {
+    const r = V({
+      gym: { bar: 20, plates: [{ kg: 20, pairs: 2 }], dumbbells: { from: 2, to: 30, step: 2 }, machineStep: 5 },
+      tdeeMode: 'measured',
+      progression: { 'Жим': { snoozeUntil: '2026-09-20' } }
+    });
+    assert.equal(r.patch.gym.bar, 20, JSON.stringify(r.patch.gym));
+    assert.equal(r.patch.gym.plates[0].kg, 20);
+    assert.equal(r.patch.gym.dumbbells.step, 2);
+    assert.equal(r.patch.gym.machineStep, 5);
+    assert.equal(r.patch.tdeeMode, 'measured');
+    assert.equal(r.patch.progression['Жим'].snoozeUntil, '2026-09-20');
+  });
+
+  test('сміття в профілі залу відкидається, а не стирає наявний', () => {
+    /* Прийняти тут null означало б стерти робочий профіль залу
+       зіпсованим полем із файла. Тому — відмова, і поіменно. */
+    const r = V({ gym: { bar: 'важкий', plates: 'багато', machineStep: -5 } });
+    assert.equal('gym' in r.patch, false, JSON.stringify(r.patch.gym));
+    assert.equal(r.rejected.includes('gym'), true, r.rejected.join(','));
+  });
+
+  test('а явний null у файлі — це свідоме «залу немає»', () => {
+    const r = V({ gym: null });
+    assert.equal(r.patch.gym, null);
+  });
+
+  test('невідомий режим витрат відкидається, а не їде як є', () => {
+    const r = V({ tdeeMode: 'вгадай' });
+    assert.equal('tdeeMode' in r.patch, false);
+  });
+
+  test('запас до відмови кожного підходу переживає імпорт', () => {
+    const r = V({
+      sessionLog: { '2026-09-16': { done: 1, total: 1, ex: [
+        { n: 'Жим', ds: 3, ps: 3, s: [{ w: 100, r: 5, q: 2 }, { w: 100, r: 5, q: 0 }, { w: 100, r: 4 }] }
+      ] } }
+    });
+    const s = r.patch.sessionLog['2026-09-16'].ex[0].s;
+    assert.equal(s[0].q, 2, JSON.stringify(s));
+    assert.equal(s[1].q, 0, 'нуль — це відповідь, а не порожнеча');
+    assert.equal('q' in s[2], false, 'чого не було, того не вигадуємо');
+  });
+
+  test('сміття в запасі до відмови не проїжджає', () => {
+    const r = V({
+      sessionLog: { '2026-09-16': { done: 1, total: 1, ex: [
+        { n: 'Жим', ds: 3, ps: 3, s: [{ w: 100, r: 5, q: 9 }, { w: 100, r: 5, q: -1 }, { w: 100, r: 5, q: 'два' }] }
+      ] } }
+    });
+    const s = r.patch.sessionLog['2026-09-16'].ex[0].s;
+    assert.equal(s.filter(function (x) { return 'q' in x; }).length, 0, JSON.stringify(s));
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*
+ * ІМПОРТ МУСИТЬ ДОГАНЯТИ ПЕРЕЙМЕНУВАННЯ ВПРАВ.
+ *
+ * Патч лягає на вже версійований профіль, тож migrate() по ньому не
+ * проходить жодним кроком. А саме там живуть перейменування: копія,
+ * зроблена до них, приносила історію під мертвим ключем — на екрані
+ * нова назва з порожньою вагою, а вся сила під старою.
+ */
+describe('імпорт доганяє перейменування вправ', () => {
+  test('назва, вага й історія переїжджають разом', async () => {
+    const { loadStore: LS } = await import('./helpers.js');
+    const Store = LS({ local: true }).Store;
+
+    const patch = {
+      weights: { 'Ягодичний міст зі штангою': 80 },
+      weightLog: { 'Ягодичний міст зі штангою': [{ d: '2026-09-01', kg: 80 }] },
+      customPlans: { 'fullbody:3': [{ exercises: [{ name: 'Згинання ніг', note: 'Підводні: 1–2 × 6' }] }] }
+    };
+    Store.normalizeImported(patch);
+
+    assert.equal(patch.weights['Сідничний міст зі штангою'], 80, JSON.stringify(patch.weights));
+    assert.equal('Ягодичний міст зі штангою' in patch.weights, false, 'стара назва не лишається');
+    assert.equal(patch.weightLog['Сідничний міст зі штангою'].length, 1, 'історія переїхала');
+    assert.equal(patch.customPlans['fullbody:3'][0].exercises[0].name, 'Згинання ніг сидячи');
+    assert.equal('note' in patch.customPlans['fullbody:3'][0].exercises[0], false,
+      'примітка «Підводні» теж прибирається — як у міграції 11 → 12');
+  });
+
+  test('сучасні назви не чіпаються', () => {
+    const patch = { weights: { 'Жим штанги лежачи': 100 } };
+    const { weights } = patch;
+    assert.equal(weights['Жим штанги лежачи'], 100);
+  });
+});

@@ -159,13 +159,15 @@ elo-core · elo-api · elo-hooks
 
 ### Один журнал — три входи
 
-`profile.workLog` і `profile.bodyLog` пише тепер троє: «Сьогодні»
-(плитки), окремі сторінки «Дні тренувань» і «Зважування», і «Прогрес».
+`profile.workLog` і `profile.bodyLog` пишуть двоє: «Сьогодні» (плитки) і
+окремі сторінки «Дні тренувань» та «Зважування». «Прогрес» їх ЛИШЕ читає —
+17.09.2026 ввід звідти прибраний цілком: дублювати ті самі поля на
+найважчій сторінці сайту означало тримати дві реалізації одного запису.
 Правила запису в усіх одні — `js/daylog-core.js`. Це не формальність:
 до вересня 2026 питання «чи був цього дня тренувальний день» відповідали
 `journal.js` і `today.js` кожен своїм кодом, і код збігався «майже».
 Журнал умів явний нуль як «знято руками», і достатньо було правки в
-одному з двох, щоб теплокарта й квадратик на головній почали розповідати
+одному з двох, щоб календар і квадратик на головній почали розповідати
 про той самий день різне — мовчки.
 
 ---
@@ -264,10 +266,12 @@ elo-core · elo-api · elo-hooks
 
 | Ключ у профілі | Хто пише | Хто читає |
 |---|---|---|
-| `weightLog` | account, welcome, journal | `HistoryCore`, `ProgressCore` |
+| `weightLog` | programs («Мій план»), workout | `HistoryCore`, `ProgressCore`, `InsightCore` |
+| `bodyLog` | today, weight-log | `ProgressCore`, `InsightCore`, журнал (лише показ) |
+| `workLog` | today, train-log | `DayLogCore`, `ProgressCore`, ELO |
 | `sessions` | workout | `ExerciseCore`, `ProgressCore`, ELO |
 | `sessionLog` | workout | `ProgressCore` (зокрема `rirStats`), `ExerciseCore`, журнал; підходи лежать у `ex[].s[]` як `{w, r, q}` — вага, повтори, RIR |
-| `days` | workout, today | `WorkoutCore`, теплокарта, ELO |
+| `days` | workout, today | `WorkoutCore`, календарі днів, ELO |
 | `measureLog` | measure | `MeasureCore` (зокрема `homeSummary` на «Сьогодні») |
 | `trackers` · `trackerLog` | trackers, today | `TrackerCore` |
 | `mealLog` | meals | `DayCore`, `AdherenceCore` |

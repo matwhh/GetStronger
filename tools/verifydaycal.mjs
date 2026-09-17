@@ -3,10 +3,10 @@
  *
  * Ця сітка була написана двічі майже однаково (історія тренувань і
  * календар зважувань), і копії вже встигли розійтись у сенсі заливки:
- * теплокарта показувала, СКІЛЬКИ підходів закрито, а місяць — лише
- * «було/не було», і найяскравіший колір означав у них різні речі. Тепер
- * сітку малює один модуль (js/daycal-core.js), і цей інструмент стереже
- * саме єдність: усі три календарі сайту мають однакову СТРУКТУРУ.
+ * одна показувала, СКІЛЬКИ підходів закрито, а друга — лише «було/не
+ * було», і найяскравіший колір означав у них різні речі. Тепер сітку
+ * малює один модуль (js/daycal-core.js), і цей інструмент стереже саме
+ * єдність: усі календарі сайту мають однакову СТРУКТУРУ.
  *
  * Окремо перевіряється календар сезону в рейтингу: заради нього все й
  * зводилось у модуль, і в нього своя, третя семантика клітинки —
@@ -99,28 +99,41 @@ const SHAPE = (sel) => {
      shapeSeason && shapeSeason.root === 'mcal' && shapeSeason.col7 && shapeSeason.hasMonths &&
      shapeSeason.days === 'ПнВтСрЧтПтСбНд', JSON.stringify(shapeSeason));
 
-  /* ---- 2. Обидва календарі журналу — та сама структура --------------- */
+  /* ---- 2. Календарі журналів — та сама структура ---------------------- */
+  /* Історія тренувань лишилась у «Прогресі», а календар зважувань живе на
+     власній сторінці: блок ваги в «Прогресі» — це тепер сам графік. */
   await p.goto('file://' + ROOT + '/journal.html#history', { waitUntil: 'load' });
   await p.waitForTimeout(1800);
 
-  ok('2. обидва календарі журналу намальовані',
-     await p.locator('#jr-hcal .mcal').count() === 1 &&
-     await p.locator('#jr-weight .mcal').count() === 1);
-
+  ok('2. календар історії намальований',
+     await p.locator('#jr-hcal .mcal').count() === 1);
   const shapeHist = await p.evaluate(SHAPE, '#jr-hcal .mcal');
-  const shapeWeight = await p.evaluate(SHAPE, '#jr-weight .mcal');
   ok('2. історія тренувань = структура сезону',
      shapeHist && shapeHist.kids === shapeSeason.kids && shapeHist.days === shapeSeason.days &&
      shapeHist.col7, JSON.stringify(shapeHist));
+  ok('2. у журналі дні клікабельні',
+     await p.locator('#jr-hcal button.mcal__cell').count() > 0);
+
+  await p.goto('file://' + ROOT + '/weight-log.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1500);
+  ok('2. календар зважувань намальований',
+     await p.locator('#wl-main .mcal').count() === 1);
+  const shapeWeight = await p.evaluate(SHAPE, '#wl-main .mcal');
   ok('2. зважування = структура сезону',
      shapeWeight && shapeWeight.kids === shapeSeason.kids && shapeWeight.days === shapeSeason.days &&
      shapeWeight.col7, JSON.stringify(shapeWeight));
+  ok('2. дні зважувань клікабельні',
+     await p.locator('#wl-main button.mcal__cell').count() > 0);
 
-  /* Дні в журналі — клікабельні: там за кліком стоїть дія (підсумок дня,
-     вибір дня для запису ваги). Це і є різниця між ними й сезоном. */
-  ok('2. у журналі дні клікабельні',
-     await p.locator('#jr-hcal button.mcal__cell').count() > 0 &&
-     await p.locator('#jr-weight button.mcal__cell').count() > 0);
+  await p.goto('file://' + ROOT + '/train-log.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1500);
+  ok('2. календар тренувань намальований',
+     await p.locator('#tl-main .mcal').count() === 1);
+  const shapeTrain = await p.evaluate(SHAPE, '#tl-main .mcal');
+  ok('2. дні тренувань = структура сезону',
+     shapeTrain && shapeTrain.kids === shapeSeason.kids && shapeTrain.days === shapeSeason.days &&
+     shapeTrain.col7, JSON.stringify(shapeTrain));
+
   ok('2. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

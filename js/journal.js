@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const { $, esc, round, toast, dateLabel, fmt, fmtNum } = window.App;
+  const { $, esc, round, dateLabel, fmt, fmtNum } = window.App;
   const Store = window.Store;
 
   const state = {
@@ -33,11 +33,9 @@
     exPeriod: 90,    // період графіка вправи, днів; 0 = весь час
     exSet: 0,        // підхід у графіку вправи: 0 = усі разом, 1..N — один
     view: 'overview',// 'overview' | 'history'
-    wDay: '',        // день, у який пишеться вага (за замовчуванням сьогодні)
     hcalY: 0,        // рік/місяць календаря історії
     hcalM: 0,
-    selDay: '',      // обраний день історії 'YYYY-MM-DD'
-    wired: false
+    selDay: ''       // обраний день історії 'YYYY-MM-DD'
   };
 
   /* Періоди графіка ваги. 0 — весь час. */
@@ -81,7 +79,6 @@
   /* Ті самі фізіологічні межі, що в ядрі харчування. Джерело —
      js/daylog-core.js: їх перевіряє і ввід тут, і ввід на окремій
      сторінці «Зважування». */
-  const W_MIN = window.DayLogCore.W_MIN, W_MAX = window.DayLogCore.W_MAX;
 
   /** Відсортовані записи ваги: [{key, kg}] від старих до нових */
   /* Делегат: єдина реалізація — js/daylog-core.js. */
@@ -650,70 +647,11 @@
     '</p>';
   }
 
-  /**
-   * КАЛЕНДАР ЗВАЖУВАНЬ — та сама сітка, що в теплокарті тренувань.
-   *
-   * Розмітка й класи спільні (.mcal), тож вигляд однаковий без жодного
-   * дубля стилів: підписи днів колонкою зліва, тижні колонками вправо,
-   * підписи місяців над ними, роздільник у проміжку.
-   *
-   * ШКАЛА ТУТ ДВІЙКОВА, і це не спрощення. У теплокарті глибина заливки
-   * означає частку закритих підходів — у ваги такої величини не існує:
-   * зважування або було, або ні. Фарбувати клітинку за самим числом
-   * (важчий день — темніший) означало б показати шкалу, у якої немає
-   * нуля й немає межі; графік вище відповідає на це питання чесно.
-   *
-   * Клік по дню не пише нічого сам — він ОБИРАЄ день, у який піде
-   * наступний запис. Мовчазна правка ваги за минулий четвер одним тапом
-   * була б надто легкою для даних, які потім рахують тренд.
-   */
-  function weightCalHtml() {
-    const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth() - (HM_MONTHS - 1), 1);
-    const today = todayKey();
-    return window.DayCal.html({
-      from: keyOf(first),
-      to: today,
-      label: 'Календар зважувань за ' + HM_MONTHS + ' місяців',
-      cls: 'mt-2',
-      cell: function (k, d, isFuture) {
-        if (isFuture) return null;
-        const kg = Number(state.bodyLog[k]);
-        const has = Number.isFinite(kg) && kg > 0;
-        const sel = k === weightDay();
-        /* Шкала тут БІНАРНА (0 або 4), і це свідома відмінність від
-           календаря тренувань. Там рівень означає частку закритих
-           підходів; у зважуванні часток немає — вага або записана, або
-           ні. Малювати «наполовину зважений день» не було б чим. */
-        return {
-          lvl: has ? 4 : 0,
-          sel: sel,
-          attrs: 'data-wday="' + k + '"',
-          label: dateLabel(dateOf(k)) +
-            (has ? ': ' + fmtNum.kg(kg) + ' кг' : ': запису немає') +
-            '. Натисніть, щоб вписати вагу за цей день'
-        };
-      }
-    });
-  }
-
-  /** День, у який пишеться вага. Порожній або майбутній → сьогодні. */
-  /* Делегат: єдина реалізація — js/daylog-core.js. */
-  function weightDay() {
-    return window.DayLogCore.pickDay(state.wDay, todayKey());
-  }
-
   function renderWeight() {
     const host = $('#jr-weight');
     if (!host) return;
 
     const entries = weightEntries();
-    const today = todayKey();
-    /* Пишемо не обовʼязково в сьогодні: календар нижче обирає день. */
-    const day = weightDay();
-    const isToday = day === today;
-    const todayVal = state.bodyLog[day];
-    const last = entries.slice(-10).reverse();
     const withAvg = rollingCached(entries);
     const avgNow = withAvg.length ? withAvg[withAvg.length - 1].avg : null;
 
@@ -740,30 +678,6 @@
                 ? ' · ' + (weekDelta >= 0 ? '+' : '') + fmt(round(weekDelta, 2)) + ' / тижд.'
                 : '') + '</span>'
             : '') +
-        '</div>' +
-
-        '<div class="row mt-2" style="gap:10px;align-items:flex-end;flex-wrap:wrap">' +
-          '<div class="field" style="margin:0">' +
-            '<label class="field__label" for="w-kg">' +
-              (isToday ? 'Сьогодні, кг' : esc(dateLabel(dateOf(day))) + ', кг') +
-            '</label>' +
-            '<input class="input mono" type="text" inputmode="decimal" id="w-kg" style="width:130px" ' +
-              'min="' + W_MIN + '" max="' + W_MAX + '" step="0.1" ' +
-              'value="' + (todayVal != null ? esc(todayVal) : '') + '" placeholder="82.4">' +
-          '</div>' +
-          '<button class="btn btn--primary btn--sm" type="button" id="w-add">' +
-            (todayVal != null ? 'Оновити' : 'Записати') +
-          '</button>' +
-          /* Повернутись у «сьогодні» має бути видно одразу: інакше людина,
-             що глянула минулий тиждень, потім мовчки перезапише не той
-             день. Кнопка є лише тоді, коли обрано НЕ сьогодні. */
-          (isToday ? '' :
-            '<button class="btn btn--ghost btn--sm" type="button" id="w-today">Сьогодні</button>') +
-          '<span class="small muted">' +
-            (isToday
-              ? 'Найкраще — щоранку після туалету, до їжі. Однакові умови важливіші за точність ваг.'
-              : 'Запис піде в цей день. Календар нижче — щоб дописати пропущене.') +
-          '</span>' +
         '</div>' +
 
         (entries.length >= 2
@@ -797,49 +711,29 @@
                  ? ' Пунктир — коридор обраної цілі: модель, не обіцянка.' : '') + '</p>'
              : '<p class="small muted mt-2">Два записи' + (state.period ? ' у цьому періоді' : '') + ' — і зʼявиться графік.</p>') +
 
-        weightCalHtml() +
-        '<p class="small muted mt-1 mb-0">Зафарбований день — є запис ваги. ' +
-          'Клік по дню — вписати або виправити вагу за нього.</p>' +
-
-        (last.length
-          ? '<div class="mt-2">' +
-              last.map(function (e) {
-                return '<div class="wlog-row">' +
-                         '<span class="muted small">' + esc(dateLabel(dateOf(e.key))) + '</span>' +
-                         '<span class="mono">' + fmtNum.kg(e.kg) + ' кг</span>' +
-                         '<button class="icon-btn icon-btn--danger" type="button" data-w-del="' + e.key + '" ' +
-                                 'aria-label="Видалити запис за ' + esc(dateLabel(dateOf(e.key))) + '">' +
-                           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
-                         '</button>' +
-                       '</div>';
-              }).join('') +
-            '</div>'
-          : '') +
+        /* Ввід, календар і список записів живуть на «Днях зважувань».
+           Тут лишається питання «рухаюсь я чи ні» — на нього відповідає
+           графік, а не клавіатура.
+           Посилання — кнопкою, а не рядком тексту: текстовий рядок дає
+           ціль 16px заввишки при нормі дотику 44 (verifyresponsive). */
+        '<div class="row mt-2">' +
+          '<a class="btn btn--ghost btn--sm" href="weight-log.html">Записати вагу →</a>' +
+        '</div>' +
       '</div>';
 
     wireChartTip('#w-chart', '#w-tip');
   }
 
   /* ------------------------------------------------------------------ */
-  /* Тренування: теплокарта                                              */
+  /* Спільне для календаря історії                                       */
   /* ------------------------------------------------------------------ */
-
 
   /**
    * НАСИЧЕНІСТЬ ДНЯ: 0…4.
    *
-   * Раніше клітинка була бінарною, і на те була причина: рівні «1–3
-   * тренування за день» заохочували б яскравішим кольором звичку, якої
-   * сайт заохочувати не має, а клік-перемикач такими рівнями керувати не
-   * може.
-   *
-   * Ця причина стосувалась КІЛЬКОСТІ ТРЕНУВАНЬ. Тут рівень означає інше —
-   * ЯКА ЧАСТКА ЗАПЛАНОВАНИХ ПІДХОДІВ закрита, тобто рівно те, за що
-   * нараховує ELO (js/elo-core.js рахує доданок workout як
-   * doneSets/totalSets). Двічі за день на цю шкалу не впливає ніяк, а
-   * перемикач лишається бінарним: клік вмикає й вимикає ДЕНЬ, рівень
-   * усередині нього — похідне від записаних підходів, і клацанням не
-   * задається.
+   * Рівень означає ЯКУ ЧАСТКУ ЗАПЛАНОВАНИХ ПІДХОДІВ закрито — рівно те,
+   * за що нараховує ELO (js/elo-core.js рахує доданок workout як
+   * doneSets/totalSets). Двічі за день на цю шкалу не впливає ніяк.
    *
    *   0  тренування немає
    *   1  відмічено вручну — підходів не записано, частки ми НЕ ЗНАЄМО
@@ -848,8 +742,7 @@
    *   4  закрито все
    *
    * Рівень 1 стоїть окремо навмисно: поставити його поруч із «менше
-   * половини» означало б сказати про день те, чого в даних немає. У
-   * підказці так і написано, а в легенді він має власну позначку.
+   * половини» означало б сказати про день те, чого в даних немає.
    */
   /* Делегат: єдина реалізація — js/daylog-core.js. Та сама шкала
      потрібна окремій сторінці «Дні тренувань», а шкала, написана двічі,
@@ -858,429 +751,21 @@
     return window.DayLogCore.dayLevel(state.workLog, state.sessionLog, key);
   }
 
-  /** Підпис рівня — той самий текст у підказці й у легенді. */
+  /** Підпис рівня — той самий текст, що на «Днях тренувань». */
   const HM_LEVEL_TEXT = window.DayLogCore.LEVEL_TEXT;
-
-  /**
-   * День або тренувальний, або ні — саме це вмикає й вимикає клік.
-   *
-   * Делегат: єдина реалізація — js/daylog-core.js. Копія цього правила
-   * жила ще й у today.js, і розходження між ними означало б, що
-   * теплокарта тут і квадратик на головній розповідають про один день
-   * різне. Там же пояснено, чому явний 0 перекриває сесію.
-   */
-  function trained(key) {
-    return window.DayLogCore.trained(state.workLog, state.sessionLog, key);
-  }
 
   /** Чи є в записі сесії робота. Делегат: js/daylog-core.js. */
   function sessionCounts(s) {
     return window.DayLogCore.sessionCounts(s);
   }
 
-  /** Чи є під днем сесія з «Тренування» (тоді зняття треба записати явним 0) */
-  function hasSession(key) {
-    return window.DayLogCore.hasSession(state.sessionLog, key);
-  }
-
-  const DOW = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
   const MON = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
-
-  /** Понеділок того тижня, якому належить дата */
-  /* Делегат: єдина реалізація — js/date-core.js. Тут лишається лише
-     імʼя, щоб не переписувати 4 місць виклику. Чому одна: копії
-     цієї функції встигли розійтись у сімох файлах (див.
-     docs/audit/2026-09-12/AUDIT.md). */
-  function mondayOf(d) { return window.DateCore.mondayOf(d); }
-
   /**
-   * Вікно календаря — РІВНО сім календарних місяців: поточний і шість
-   * попередніх, з першого числа. Не «N тижнів назад»: людина думає
+   * Вікно календаря історії — РІВНО сім календарних місяців: поточний і
+   * шість попередніх, з першого числа. Не «N тижнів назад»: людина думає
    * місяцями, і кожен місяць має стояти в сітці цілим.
    */
   const HM_MONTHS = 7;
-
-  function hmFirstDay() {
-    const n = new Date();
-    return new Date(n.getFullYear(), n.getMonth() - (HM_MONTHS - 1), 1);
-  }
-
-  /** Кількість тижневих колонок вікна: від понеділка тижня з 1-м числом
-      стартового місяця до поточного тижня включно */
-  function hmWeeks() {
-    const from = mondayOf(hmFirstDay());
-    const to = mondayOf(new Date());
-    return Math.round((to - from) / (7 * 86400000)) + 1;
-  }
-
-  /**
-   * Сітка: колонки — тижні вікна, рядки — Пн…Нд з підписами.
-   * Кожна клітинка вікна — кнопка: клік ставить або знімає позначку.
-   * Дні ПОЗА вікном — хвіст попереднього місяця в першому тижні й
-   * майбутнє поточного — порожні заглушки, їх клацати нема чого.
-   *
-   * ПРО ПІДКАЗКУ. Атрибута title тут немає навмисно: браузер показує його
-   * через півтори секунди, системним шрифтом, поза межами вікна прокрутки
-   * і взагалі не показує на дотику. Замість нього — власна підказка (див.
-   * wireHeatmap), а для читалок екрана лишається aria-label, який був і
-   * раніше.
-   *
-   * ПРО ЗАТРИМКУ ПОЯВИ. Кожна клітинка несе --i: свій номер по порядку.
-   * З нього CSS рахує затримку анімації, тож сітка проявляється хвилею
-   * зліва направо. Це не прикраса: 31 колонка × 7 днів = 217 клітинок,
-   * і поява їх усіх одночасно читається як стрибок розмітки. Хвиля
-   * показує, що сітка має напрямок — час іде вліво-вправо.
-   */
-  function heatmapHtml() {
-    const weeks = hmWeeks();
-    const start = mondayOf(hmFirstDay());
-    const firstK = keyOf(hmFirstDay());
-    const todayK = todayKey();
-
-    /*
-     * МІСЯЦЬ КОЖНОЇ КОЛОНКИ РАХУЄМО ОДИН РАЗ.
-     *
-     * Раніше це були два незалежні цикли з однаковою арифметикою: один
-     * будував підписи місяців, другий нічого про них не знав. Роздільник
-     * доводилось малювати від ПІДПИСУ, а підпис стоїть у власному ряду
-     * над сіткою — звідси й бралась розсинхронізація: лінію треба було
-     * тягнути вниз наосліп, вгадуючи висоту, і вона лягала на клітинки
-     * замість проміжку.
-     *
-     * Тепер прапорець «тут починається місяць» дістається самій КОЛОНЦІ,
-     * і лінія малюється в її власному проміжку — тобто рівно там, де
-     * проміжок і є, за будь-якого розміру клітинки.
-     *
-     * Місяць колонки визначає її ЧЕТВЕР, ЗАТИСНУТИЙ у вікно: перший
-     * тиждень може починатись хвостом попереднього місяця (підпис за
-     * понеділком дав би «тра» над червнем), а четвер останнього —
-     * вилазити в наступний місяць, якого в сітці ще немає.
-     */
-    const colMonth = [];
-    const colFirst = [];
-    {
-      let prev = -1;
-      for (let w = 0; w < weeks; w++) {
-        const thu = new Date(start);
-        thu.setDate(start.getDate() + w * 7 + 3);
-        let k = keyOf(thu);
-        if (k > todayK) k = todayK;
-        if (k < firstK) k = firstK;
-        const m = Number(k.slice(5, 7)) - 1;
-        colMonth[w] = m;
-        colFirst[w] = (w === 0 || m !== prev);
-        prev = m;
-      }
-    }
-
-    let cols = '';
-    let idx = 0;
-    for (let w = 0; w < weeks; w++) {
-      let cells = '';
-      for (let d = 0; d < 7; d++) {
-        const day = new Date(start);
-        day.setDate(start.getDate() + w * 7 + d);
-        const k = keyOf(day);
-        const num = day.getDate();
-        if (k > todayK || k < firstK) {
-          cells += '<i class="heatmap__cell heatmap__cell--future" aria-hidden="true"></i>';
-          continue;
-        }
-        const lvl = hmLevel(k);
-        const on = lvl > 0;
-        const label = dateLabel(dateOf(k));
-        const s = state.sessionLog[k];
-        const total = Number(s && s.totalSets);
-        const hasSets = total > 0;
-        const frac = hasSets ? (Number(s.doneSets) || 0) + '/' + total + ' підходів' : '';
-        /*
-         * У ПІДКАЗЦІ — дріб, у aria-label — слова.
-         *
-         * «закрито всі підходи · 20/20 підходів» — це одне й те саме
-         * двічі, причому другий раз точніше. Тому оком людина бачить
-         * дріб, а читалка екрана читає формулювання: «20/20» вголос
-         * звучить гірше за «закрито всі підходи».
-         */
-        const tip = label + ' · ' + (hasSets ? frac : HM_LEVEL_TEXT[lvl]);
-        const aria = label + ': ' + HM_LEVEL_TEXT[lvl] + (hasSets ? ' (' + frac + ')' : '');
-        cells += '<button type="button" class="heatmap__cell' + (on ? ' heatmap__cell--on' : '') + '" ' +
-                 'data-hm="' + k + '" data-lvl="' + lvl + '" ' +
-                 'style="--i:' + (idx++) + '" ' +
-                 'data-tip="' + esc(tip) + '" ' +
-                 'aria-pressed="' + on + '" ' +
-                 'aria-label="' + esc(aria) +
-                 '. Натисніть, щоб змінити"><span>' + num + '</span></button>';
-      }
-      /* is-month — на першій колонці місяця, крім найпершої в сітці:
-         зліва від неї роздільник відділяв би сітку від підписів днів. */
-      cols += '<div class="heatmap__col' + (colFirst[w] && w > 0 ? ' is-month' : '') + '">' +
-              cells + '</div>';
-    }
-
-    /* Ряд місяців над колонками — з тих самих порахованих вище даних. */
-    let months = '<span class="heatmap__months-pad" aria-hidden="true"></span>';
-    for (let w = 0; w < weeks; w++) {
-      months += '<span class="heatmap__month">' +
-                (colFirst[w] ? MON[colMonth[w]] : '') + '</span>';
-    }
-
-    const days = DOW.map(function (n) { return '<span>' + n + '</span>'; }).join('');
-    /* Підказка лежить ПОЗА .heatmap. У сітки overflow-x: auto, а це
-       обрізає вміст і по вертикалі теж — підказка над верхнім рядом
-       зрізалась навпіл. Обгортка дає їй систему координат, з якої нічого
-       не обрізається. */
-    return '<div class="heatmap-wrap">' +
-             '<div class="heatmap" role="group" aria-label="Календар тренувань за ' + HM_MONTHS + ' місяців">' +
-               '<div class="heatmap__months" aria-hidden="true">' + months + '</div>' +
-               '<div class="heatmap__grid">' +
-                 '<div class="heatmap__days" aria-hidden="true">' + days + '</div>' + cols +
-               '</div>' +
-             '</div>' +
-             '<div class="heatmap__tip" hidden></div>' +
-           '</div>' +
-           hmLegendHtml();
-  }
-
-  /**
-   * Легенда: «менше → більше» плюс окрема позначка ручного дня.
-   *
-   * Наведення на крок легенди підсвічує в сітці саме ті дні — інакше
-   * шкала з чотирьох майже однакових сірих квадратиків нічого не пояснює:
-   * побачити, ЯКІ це дні, можна лише показавши їх.
-   */
-  function hmLegendHtml() {
-    const steps = [2, 3, 4].map(function (l) {
-      return '<button type="button" class="heatmap__key" data-key-lvl="' + l + '" ' +
-               'aria-label="Підсвітити дні: ' + esc(HM_LEVEL_TEXT[l]) + '">' +
-               '<i class="heatmap__cell heatmap__cell--on" data-lvl="' + l + '"></i>' +
-             '</button>';
-    }).join('');
-    return '<div class="heatmap__legend">' +
-             '<button type="button" class="heatmap__key heatmap__key--manual" data-key-lvl="1" ' +
-               'aria-label="Підсвітити дні: ' + esc(HM_LEVEL_TEXT[1]) + '">' +
-               '<i class="heatmap__cell heatmap__cell--on" data-lvl="1"></i>' +
-               '<span>вручну</span>' +
-             '</button>' +
-             '<span class="heatmap__legend-sp"></span>' +
-             '<span class="heatmap__legend-lbl">менше</span>' +
-             steps +
-             '<span class="heatmap__legend-lbl">більше</span>' +
-           '</div>';
-  }
-
-  /**
-   * Підказка й підсвічування — ОДИН слухач на всю сітку.
-   *
-   * Слухач на кожній із 217 клітинок коштував би 217 підписок, які треба
-   * знімати при кожній перемальовці; делегування на контейнері живе
-   * стільки ж, скільки сторінка. Контейнер постійний (renderTrain міняє
-   * лише innerHTML нащадків), тому навішуємо один раз — той самий guard,
-   * що й скрізь у проєкті.
-   */
-  let hmWired = false;
-  function wireHeatmap() {
-    const host = $('#jr-train');
-    if (!host || hmWired) return;
-    hmWired = true;
-
-    const show = function (btn) {
-      const wrap = host.querySelector('.heatmap-wrap');
-      const tip = wrap && wrap.querySelector('.heatmap__tip');
-      if (!wrap || !tip) return;
-      tip.textContent = btn.dataset.tip || '';
-      tip.hidden = false;
-      /*
-       * Координати рахуються від ОБГОРТКИ, а не від вікна: сітка всередині
-       * прокручується по горизонталі, і позиція, порахована від вікна,
-       * лишилась би правильною рівно до першого руху пальцем.
-       *
-       * getBoundingClientRect кнопки вже враховує прокрутку сітки, тому
-       * додавати scrollLeft тут не треба — це саме та помилка на подвійне
-       * врахування, через яку підказка від'їжджає в кінці ряду.
-       */
-      const b = btn.getBoundingClientRect();
-      const w = wrap.getBoundingClientRect();
-      const x = b.left - w.left + b.width / 2;
-      tip.style.left = x + 'px';
-      tip.style.top = (b.top - w.top) + 'px';
-      /* Підказка не має вилазити за край картки. Зсув рахується ПІСЛЯ
-         показу: до нього в неї ще немає ширини. */
-      const t = tip.getBoundingClientRect();
-      let shift = 0;
-      if (t.left < w.left + 2) shift = w.left + 2 - t.left;
-      else if (t.right > w.right - 2) shift = w.right - 2 - t.right;
-      if (shift) tip.style.left = (x + shift) + 'px';
-    };
-    const hide = function () {
-      const tip = host.querySelector('.heatmap__tip');
-      if (tip) tip.hidden = true;
-    };
-
-    host.addEventListener('pointerover', function (e) {
-      const btn = e.target.closest('[data-hm]');
-      if (btn) show(btn);
-    });
-    host.addEventListener('pointerout', function (e) {
-      if (e.target.closest('[data-hm]')) hide();
-    });
-    /* Клавіатура: підказка мусить зʼявлятись і без миші. */
-    host.addEventListener('focusin', function (e) {
-      const btn = e.target.closest('[data-hm]');
-      if (btn) show(btn);
-    });
-    host.addEventListener('focusout', hide);
-    /* Прокрутка сітки зсуває клітинку з-під підказки — ховаємо. */
-    host.addEventListener('scroll', hide, true);
-
-    /* Легенда: підсвітити дні одного рівня. Працює і наведенням, і
-       фокусом з клавіатури, і тапом — на телефоні наведення немає. */
-    /*
-     * ДВА РІЗНІ ПІДСВІЧУВАННЯ, І ЦЕ ВАЖЛИВО.
-     *
-     * Наведення — тимчасове: відвів мишу, підсвітка зникла. Клік — стійке:
-     * лишається, поки не клікнеш удруге. Без цього поділу підсвітка не
-     * працювала на дотику взагалі: Chrome на тапі шле pointerover ПЕРЕД
-     * click, тому обробник кліку бачив уже виставлений атрибут, вважав це
-     * «другим тапом» і одразу гасив те, що щойно ввімкнулось. На миші
-     * помилки не було видно — там pointerover приходить задовго до кліку.
-     */
-    let stickyLvl = null;
-    const mark = function (lvl) {
-      const box = host.querySelector('.heatmap');
-      if (!box) return;
-      if (lvl == null) box.removeAttribute('data-only');
-      else box.setAttribute('data-only', String(lvl));
-    };
-    const hover = function (lvl) {
-      if (stickyLvl != null) return;   /* стійкий вибір сильніший */
-      mark(lvl);
-    };
-    host.addEventListener('pointerover', function (e) {
-      const k = e.target.closest('[data-key-lvl]');
-      if (k) hover(k.dataset.keyLvl);
-    });
-    host.addEventListener('pointerout', function (e) {
-      if (e.target.closest('[data-key-lvl]')) hover(null);
-    });
-    host.addEventListener('focusin', function (e) {
-      const k = e.target.closest('[data-key-lvl]');
-      if (k) hover(k.dataset.keyLvl);
-    });
-    host.addEventListener('click', function (e) {
-      const k = e.target.closest('[data-key-lvl]');
-      if (!k) return;
-      stickyLvl = (stickyLvl === k.dataset.keyLvl) ? null : k.dataset.keyLvl;
-      mark(stickyLvl);
-      /* Кнопка каже вголос, увімкнена вона чи ні: без цього для читалки
-         екрана стійкий вибір нічим не відрізняється від його відсутності. */
-      host.querySelectorAll('[data-key-lvl]').forEach(function (el) {
-        el.setAttribute('aria-pressed', String(el.dataset.keyLvl === stickyLvl));
-      });
-    });
-  }
-
-  function renderTrain() {
-    const host = $('#jr-train');
-    if (!host) return;
-
-    /*
-     * Позначки за видиме вікно — та сама рамка, що й сітка.
-     *
-     * Ключі беруться з ОБОХ журналів. Раніше тут стояв самий workLog, і
-     * чіп рахував лише дні, позначені руками: тренування, закриті на
-     * «Тренуванні», лежать у sessionLog — клітинки в сітці світились, а
-     * чіп над ними писав «0». Саме та підсвічена клітинка, яку видно
-     * поруч, не потрапляла в підсумок.
-     */
-    const startK = keyOf(hmFirstDay());
-    const seen = Object.create(null);
-    let total = 0;
-    [state.workLog, state.sessionLog].forEach(function (log) {
-      Object.keys(log || {}).forEach(function (k) {
-        if (seen[k] || k < startK || k > todayKey()) return;
-        seen[k] = 1;
-        if (trained(k)) total++;
-      });
-    });
-
-    /* «Цього тижня» тут і в плитці огляду — одне число з одного джерела.
-       Доти цей блок рахував його власним циклом по ПОВНИХ журналах, а
-       плитка брала з ProgressCore по сезонному зрізі: сезон, що починався
-       посеред тижня, розводив дві цифри на одному екрані. */
-    const thisWeek = window.ProgressCore
-      ? window.ProgressCore.trainingStats(sn.workLog, sn.sessionLog, state.daysTarget).thisWeek
-      : 0;
-
-    // Ціль — кількість днів обраного плану. Хвалимось акцентом, лише
-    // коли тиждень закритий повністю.
-    const target = state.daysTarget;
-    const weekText = target ? thisWeek + ' з ' + target + ' цього тижня' : thisWeek + ' цього тижня';
-    const done = target && thisWeek >= target;
-    const today = todayKey();
-
-    host.innerHTML =
-      '<div class="card">' +
-        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">' +
-          '<h2 style="margin:0">Тренування</h2>' +
-          '<span class="chip mono' + (done ? ' chip--acc' : '') + '">' +
-            weekText + ' · ' + total + ' за ' + HM_MONTHS + ' місяців</span>' +
-        '</div>' +
-
-        '<div class="mt-2">' + heatmapHtml() + '</div>' +
-        '<p class="small muted mt-1">Клікніть по дню, щоб поставити чи зняти позначку.' +
-          (target ? '' : ' Оберіть план тренувань — і тут зʼявиться ціль на тиждень.') + '</p>' +
-
-        '<div class="row mt-2" style="gap:10px;align-items:center;flex-wrap:wrap">' +
-          // Підпис міняється разом зі станом: сіра кнопка з тим самим
-          // текстом читається як поламана, а не як «уже зроблено».
-          '<button class="btn btn--primary btn--sm" type="button" id="t-mark"' +
-            (trained(today) ? ' disabled' : '') + '>' +
-            (trained(today) ? 'Сьогодні позначено' : 'Відмітити тренування') +
-          '</button>' +
-        '</div>' +
-      '</div>';
-
-    /*
-     * Теплокарта ширша за екран (455px проти 230–340 на телефоні) і
-     * малювалась зі scrollLeft = 0, тобто показувала найстаріші тижні, а
-     * ПОТОЧНИЙ день лишався за межами видимої частини на всіх мобільних
-     * ширинах. Прокручуємо до кінця — актуальний тиждень має бути видно
-     * без пошуку пальцем усередині сторінки, що й сама скролиться.
-     */
-    /*
-     * Прокрутка в кінець — ПІСЛЯ розкладки, а не одразу.
-     *
-     * Тут стояло присвоєння відразу після innerHTML. На телефоні воно
-     * мовчки не спрацьовувало: у момент виконання картка ще не мала
-     * ширини, scrollWidth дорівнював clientWidth, умова не виконувалась —
-     * і сітка лишалась на найстаріших тижнях, тобто рівно там, звідки її
-     * і хотіли зрушити. На робочому столі сітка вміщалась цілком, і
-     * помилки не було видно взагалі.
-     */
-    const hm = host.querySelector('.heatmap');
-    if (hm) {
-      requestAnimationFrame(function () {
-        if (hm.scrollWidth > hm.clientWidth) hm.scrollLeft = hm.scrollWidth;
-      });
-    }
-
-    wireHeatmap();
-
-    /*
-     * Хвиля появи — ТІЛЬКИ при першому малюванні.
-     *
-     * renderTrain викликається на кожен клік по дню (і на кожну зміну
-     * профілю ззовні). Якби анімація йшла щоразу, один тап по клітинці
-     * перезапускав би появу всієї сітки з двохсот квадратиків — тобто
-     * саме те миготіння, від якого анімація мала б рятувати.
-     */
-    if (hm && !hmAnimated) {
-      hmAnimated = true;
-      hm.classList.add('is-in');
-    }
-  }
-  let hmAnimated = false;
-
 
   /* ------------------------------------------------------------------ */
   /* Робочі ваги: історія по вправах                                     */
@@ -2550,7 +2035,7 @@
    * Основна навігація по минулих днях: місяць, Пн→Нд, плоскі клітинки з
    * числом дня, активний день — акцентом теми (токени, не hardcode:
    * зміна теми перефарбовує і його). Клік — підсумок дня нижче.
-   * Тут НІЧОГО не редагується: позначки ставляться в теплокарті огляду.
+   * Тут НІЧОГО не редагується: позначки ставляться на «Днях тренувань».
    */
 
   function renderHcal() {
@@ -2563,15 +2048,16 @@
      * Місяць за раз відповідав на питання «що було у вересні», а питання
      * до історії інше: «як я тренувався останнім часом». Щоб побачити
      * провал у липні, доводилось клацати назад чотири рази й тримати
-     * побачене в голові. Вікно те саме, що в теплокарті огляду
-     * (HM_MONTHS), тож обидві сітки показують один відрізок часу.
+     * побачене в голові. Вікно — сім місяців (HM_MONTHS), те саме, що на
+     * сторінці «Дні тренувань».
      *
      * Стрілки лишились, але тепер зсувають ВІКНО на місяць, а не гортають
      * місяці: історія глибша за сім місяців нікуди не поділась.
      *
-     * Саму сітку малює спільний DayCal — той самий, що в календарі
-     * зважувань і в календарі сезону. Тут лишається лише те, чого немає
-     * більше ніде: вікно з навігацією й рівень клітинки.
+     * Саму сітку малює спільний DayCal — той самий, що на «Днях
+     * тренувань», «Днях зважувань» і в календарі сезону. Тут лишається
+     * лише те, чого немає більше ніде: вікно з навігацією й рівень
+     * клітинки.
      */
     const now = new Date();
     const endY = state.hcalY, endM = state.hcalM;
@@ -2624,7 +2110,7 @@
         '</div>' +
         cal +
         '<p class="small muted mt-1 mb-0">' + HM_MONTHS + ' місяців. Глибина заливки — ' +
-          'частка закритих підходів, як у теплокарті вище: контур — відмічено вручну, ' +
+          'частка закритих підходів: контур — відмічено вручну, ' +
           'суцільна заливка — закрито всі. Клік по дню — його підсумок нижче.</p>' +
       '</div>';
   }
@@ -2697,14 +2183,14 @@
      * різні твердження про один день і не мала способу зрозуміти, чому
      * план не дає повторити тренування.
      *
-     * Статистику це не міняє: у trainedDates і в теплокарті день і далі
+     * Статистику це не міняє: у trainedDates і в календарі день і далі
      * не тренувальний — роботи справді не було.
      */
     if (s && Number(s.end) > 0) {
       return '<h3 style="margin:0">Тренування</h3>' +
         '<p class="small mt-1 mb-0">Сесію закрито з нульовим виконанням: жодного підходу не відмічено.</p>' +
         '<p class="small muted mt-1 mb-0">День плану вважається використаним, ' +
-        'але в статистику й у теплокарту таке тренування не входить.</p>';
+        'але в статистику й у календар таке тренування не входить.</p>';
     }
     return '<h3 style="margin:0">Тренування</h3>' +
       '<p class="small muted mt-1 mb-0">Цього дня тренування не записано.</p>';
@@ -2824,138 +2310,27 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Збереження й обробники                                              */
+  /* Показ                                                               */
   /* ------------------------------------------------------------------ */
-
-  async function persist(patch) {
-    try { await Store.saveProfile(patch); }
-    catch (e) {
-      // .queued означає «мережі немає, лежить у черзі» — це не втрата даних,
-      // і лякати людину червоним тостом тут неправильно.
-      toast(e.queued ? e.message : 'Не збереглося: ' + e.message, e.queued ? 'ok' : 'err');
-    }
-  }
 
   /**
    * Перемалювати блок, не втрачаючи клавіатурний фокус.
    *
-   * renderWeight і renderTrain перебудовують innerHTML цілком. Через це
-   * після Enter на клітинці теплокарти фокус летів на <body>, і людина,
-   * яка працює з клавіатури, мусила табати від початку сторінки — після
-   * КОЖНОЇ позначки. Запамʼятовуємо елемент за стабільним data-атрибутом
-   * і повертаємо фокус на його новий екземпляр.
+   * renderWeight перебудовує innerHTML цілком, і фокус при цьому летить
+   * на <body>: людина, яка працює з клавіатури, мусила б табати від
+   * початку сторінки після кожного оновлення ззовні. Запамʼятовуємо
+   * елемент за id і повертаємо фокус на його новий екземпляр.
    */
   function keepFocus(render) {
     const before = document.activeElement;
     let selector = null;
-    if (before && before !== document.body && before.dataset) {
-      if (before.dataset.hm) selector = '[data-hm="' + before.dataset.hm + '"]';
-      else if (before.dataset.wDel) selector = '[data-w-del="' + before.dataset.wDel + '"]';
-      else if (before.id) selector = '#' + before.id;
-    }
+    if (before && before !== document.body && before.id) selector = '#' + before.id;
 
     render();
 
     if (!selector) return;
     const after = document.querySelector(selector);
     if (after && after.focus) after.focus();
-  }
-
-  function wire() {
-    if (state.wired) return;
-    state.wired = true;
-
-    $('#jr-weight').addEventListener('click', function (e) {
-      if (e.target.closest('#w-add')) {
-        const input = $('#w-kg');
-        /* Розбір рядка, кома, межі й крок 0,1 кг — усе в ядрі: те саме
-           поле є на сторінці «Зважування», і два розбори одного вводу
-           розійшлись би на першій же правці меж. */
-        const kg = window.DayLogCore.parseKg(input && input.value);
-        if (kg === null) {
-          toast('Вага має бути числом від ' + W_MIN + ' до ' + W_MAX + ' кг', 'err');
-          return;
-        }
-        /* День беремо з календаря, а не з годинника: людина могла обрати
-           пропущений четвер. weightDay() сам відкочується на сьогодні,
-           якщо обране зіпсоване або в майбутньому. */
-        const day = weightDay();
-        state.bodyLog = window.DayLogCore.setWeight(state.bodyLog, day, kg);
-        /* Патч — функція (SYN-011): дописуємо один день на актуальному
-           профілі, а не надсилаємо весь журнал, зчитаний колись. Інакше
-           сусідня вкладка втрачала б свої записи цілком. */
-        persist(function (p) {
-          const base = (p && p.bodyLog && typeof p.bodyLog === 'object') ? p.bodyLog : {};
-          const out = Object.assign({}, base); out[day] = kg;
-          return { bodyLog: out };
-        });
-        keepFocus(renderWeight);
-        toast(day === todayKey() ? 'Записано' : 'Записано за ' + dateLabel(dateOf(day)), 'ok');
-        return;
-      }
-
-      /* Вибір дня в календарі ваги. Клік нічого не пише — він лише
-         переводить поле вводу на цей день; запис робить «Записати». */
-      const wcell = e.target.closest('[data-wday]');
-      if (wcell) {
-        state.wDay = wcell.dataset.wday;
-        keepFocus(renderWeight);
-        /* Фокус у поле: людина натиснула день саме щоб вписати число, і
-           зайвий тап по полю після цього — зайвий. */
-        const f = $('#w-kg');
-        if (f) { try { f.focus(); f.select(); } catch (_) {} }
-        return;
-      }
-      if (e.target.closest('#w-today')) {
-        state.wDay = todayKey();
-        keepFocus(renderWeight);
-        return;
-      }
-      const del = e.target.closest('[data-w-del]');
-      if (del) {
-        const key = del.dataset.wDel;
-        // Журнал ваги append-only: видалене нізвідки не відновити, а ✕
-        // стоїть у щільному рядку впритул до інших елементів.
-        if (!window.confirm('Видалити запис ваги за ' + key + '? Відновити його буде нічим.')) return;
-        state.bodyLog = window.DayLogCore.removeWeight(state.bodyLog, key);
-        /* Видалення теж адресне: прибираємо один день, решту журналу
-           беремо з актуального профілю. */
-        persist(function (p) {
-          const base = (p && p.bodyLog && typeof p.bodyLog === 'object') ? p.bodyLog : {};
-          const out = Object.assign({}, base); delete out[key];
-          return { bodyLog: out };
-        });
-        keepFocus(renderWeight);
-        toast('Запис за ' + key + ' видалено', 'ok');
-      }
-    });
-
-    $('#jr-train').addEventListener('click', function (e) {
-      const cell = e.target.closest('[data-hm]');
-      if (cell) {
-        const k = cell.dataset.hm;
-        /* Три стани перемикача (немає ключа / 1 / явний 0) живуть в ядрі:
-           той самий перемикач стоїть на сторінці «Дні тренувань». */
-        state.workLog = window.DayLogCore.toggleTrained(state.workLog, state.sessionLog, k);
-        /* Функцією (SYN-011): позначка одного дня не має відкочувати
-           весь журнал до стану на момент відкриття сторінки. */
-        persist(function (pr) {
-          return { workLog: window.DayLogCore.toggleTrained(
-            (pr && pr.workLog) || {}, (pr && pr.sessionLog) || {}, k) };
-        });
-        keepFocus(renderTrain);
-        return;
-      }
-      if (e.target.closest('#t-mark')) {
-        const today = todayKey();
-        state.workLog = window.DayLogCore.markTrained(state.workLog, today);
-        persist(function (pr) {
-          return { workLog: window.DayLogCore.markTrained((pr && pr.workLog) || {}, today) };
-        });
-        keepFocus(renderTrain);
-        toast('Позначено', 'ok');
-      }
-    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -2979,7 +2354,7 @@
    * requestAnimationFrame — щоб розкладка встигла злягтись після
    * innerHTML: без нього координати були б із попереднього кадру.
    */
-  const HASH_BLOCKS = ['jr-overview', 'jr-adherence', 'jr-weight', 'jr-train',
+  const HASH_BLOCKS = ['jr-overview', 'jr-adherence', 'jr-weight',
                        'jr-lifts', 'jr-rir', 'jr-exercise', 'jr-prs', 'jr-food',
                        'jr-trackers'];
 
@@ -3099,11 +2474,9 @@
     state.selDay = todayKey();
 
     seasonize();
-    wire();
     renderOverview();
     renderAdherence();
     keepFocus(renderWeight);
-    keepFocus(renderTrain);
     renderLifts();
     renderStale();
     renderRir();
@@ -3201,13 +2574,13 @@
       if (profile.workLog && profile.workLog !== state.workLog) {
         state.workLog = profile.workLog;
         seasonize();
-        keepFocus(renderTrain); renderAdherence();
+        renderAdherence();
         if (state.view === 'history') { renderHcal(); renderDay(); }
       }
       if (profile.sessionLog && profile.sessionLog !== state.sessionLog) {
         state.sessionLog = profile.sessionLog;
         seasonize();
-        keepFocus(renderTrain); renderOverview(); renderAdherence();
+        renderOverview(); renderAdherence();
         if (state.view === 'history') { renderHcal(); renderDay(); }
       }
       if (profile.bodyLog && profile.bodyLog !== state.bodyLog) {

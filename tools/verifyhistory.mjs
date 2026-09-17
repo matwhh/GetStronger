@@ -91,12 +91,12 @@ ok('2. календар намальовано', (await p.locator('#jr-hcal .mca
    String(await p.locator('#jr-hcal .mcal__cell').count()) + ' клітинок');
 
 /* Клас --on прибрано: клітинка тепер несе data-lvl, той самий, що й у
-   теплокарті (0 — без тренування, 1–4 — частка закритих підходів). */
+   на «Днях тренувань» (0 — без тренування, 1–4 — частка закритих підходів). */
 const onCells = await p.locator('#jr-hcal .mcal__cell[data-lvl]:not([data-lvl="0"])').count();
 ok('3. дні з тренуванням зафарбовані', onCells === 3, onCells + ' з 3');
 const lvls = await p.locator('#jr-hcal .mcal__cell[data-lvl]:not([data-lvl="0"])')
   .evaluateAll(els => els.map(e => e.dataset.lvl).join(','));
-ok('3. рівень заливки той самий, що в теплокарті', /^[1-4](,[1-4])*$/.test(lvls), lvls);
+ok('3. рівень заливки той самий, що на «Днях тренувань»', /^[1-4](,[1-4])*$/.test(lvls), lvls);
 
 for (const [k, name] of [[K_GOOD, 'нормальна сесія'], [K_LEG, 'стара з t0=t1'], [K_OLD, 'без часу']]) {
   ok('4. день ' + k + ' клікабельний (' + name + ')',
@@ -182,9 +182,11 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
    * тепер ПРИХІД за якорем, а не клік по плитці: ламається тут не
    * посилання, а прокрутка — блоки журналу порожні на завантаженні, і
    * браузер стрибає по якорю ще до того, як вони отримають висоту.
+   *
+   * Якір лишився один: блок тренувань із «Прогресу» прибраний, його
+   * сторінка — train-log.html, і назад вона веде на #jr-overview.
    */
   for (const [href, id, name] of [
-    ['journal.html#jr-train',  'jr-train',  'Тренування'],
     ['journal.html#jr-weight', 'jr-weight', 'Зважування']
   ]) {
     /* Порожня сторінка між ітераціями НЕ для чистоти — вона обовʼязкова.
@@ -240,57 +242,7 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx2.close();
 }
 
-/* ---- 23. Календар зважувань: вибір дня й запис у нього --------------
-   Той самий компонент, що в історії, але з іншою роллю: клік не пише
-   нічого сам, він переводить поле вводу на обраний день. Стережемо саме
-   це — щоб «Записати» не почало мовчки писати в сьогодні. */
-{
-  const ctx3 = await adultContext(b, { viewport: { width: 1300, height: 1000 } });
-  const q = await ctx3.newPage();
-  const e5 = []; q.on('pageerror', (e) => e5.push(e.message));
-  await q.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' });
-  await q.waitForTimeout(1500);
-
-  ok('23. у блоці ваги є календар', await q.locator('#jr-weight .mcal').count() === 1);
-  ok('23. поле пише в сьогодні за замовчуванням',
-     /Сьогодні/.test(await q.locator('#jr-weight label[for="w-kg"]').innerText()));
-
-  /* Беремо позавчора: він точно в минулому й точно в вікні календаря. */
-  const back = await q.evaluate(() => {
-    const d = new Date(); d.setDate(d.getDate() - 2);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
-           '-' + String(d.getDate()).padStart(2, '0');
-  });
-  await q.locator('#jr-weight [data-wday="' + back + '"]').click();
-  await q.waitForTimeout(600);
-  ok('23. клік по дню переводить поле на цей день',
-     !/Сьогодні/.test(await q.locator('#jr-weight label[for="w-kg"]').innerText()),
-     await q.locator('#jr-weight label[for="w-kg"]').innerText());
-  ok('23. зʼявилась кнопка повернення в сьогодні', await q.locator('#w-today').count() === 1);
-
-  await q.fill('#w-kg', '77,7');
-  await q.click('#w-add');
-  await q.waitForTimeout(900);
-  const saved = await q.evaluate(async (k) => {
-    const pr = await window.Store.getProfile();
-    return { at: (pr.bodyLog || {})[k], today: (pr.bodyLog || {})[
-      new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') +
-      '-' + String(new Date().getDate()).padStart(2, '0')] };
-  }, back);
-  ok('23. запис пішов у ОБРАНИЙ день, а не в сьогодні',
-     saved.at === 77.7 && saved.today === undefined, JSON.stringify(saved));
-  ok('23. клітинка того дня стала заповненою',
-     (await q.locator('#jr-weight [data-wday="' + back + '"]').getAttribute('data-lvl')) === '4');
-
-  await q.locator('#w-today').click();
-  await q.waitForTimeout(600);
-  ok('23. «Сьогодні» повертає поле назад',
-     /Сьогодні/.test(await q.locator('#jr-weight label[for="w-kg"]').innerText()));
-  ok('23. без JS-помилок', e5.length === 0, e5.join(' | '));
-  await ctx3.close();
-}
-
-/* ---- 24. Графік ваги: той самий складений графік, що й у вправі -----
+/* ---- 23. Графік ваги: той самий складений графік, що й у вправі -----
    Раніше це була гола лінія з трьома позначками, без сітки, підказки й
    стовпчиків — інший компонент для тієї самої задачі. Тепер обидва
    графіки сторінки — один візуальний словник, і головне його правило
@@ -320,7 +272,7 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
   await q.goto('file://' + ROOT + '/journal.html', { waitUntil: 'load' });
   await q.waitForTimeout(1500);
 
-  ok('24. графік ваги намальовано', await q.locator('#jr-weight svg.exc').count() === 1);
+  ok('23. графік ваги намальовано', await q.locator('#jr-weight svg.exc').count() === 1);
   const g = await q.$eval('#jr-weight svg.exc', (svg) => {
     /* Рядки шкали мають іти РІВНИМ кроком: нерівна шкала (76·80·84·86)
        бреше про відстані сильніше, ніж зайва лінія сітки. */
@@ -345,13 +297,13 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
              grid: svg.querySelectorAll('.exc__grid').length,
              ys: ys, even: even, outside: outside };
   });
-  ok('24. стовпчиків немає жодного (стандарт: графік — це лінія)',
+  ok('23. стовпчиків немає жодного (стандарт: графік — це лінія)',
      g.bars === 0 && g.rects === 0, JSON.stringify(g));
-  ok('24. лінія, заливка й крапка на кожне зважування',
+  ok('23. лінія, заливка й крапка на кожне зважування',
      g.line === 1 && g.area === 1 && g.dots === seeded, JSON.stringify(g));
-  ok('24. жодна крапка не зрізана рамкою', g.outside === 0, String(g.outside));
-  ok('24. є сітка й підписи шкали', g.grid >= 3 && g.ys.length >= 3, JSON.stringify(g.ys));
-  ok('24. крок шкали рівний', g.even, JSON.stringify(g.ys));
+  ok('23. жодна крапка не зрізана рамкою', g.outside === 0, String(g.outside));
+  ok('23. є сітка й підписи шкали', g.grid >= 3 && g.ys.length >= 3, JSON.stringify(g.ys));
+  ok('23. крок шкали рівний', g.even, JSON.stringify(g.ys));
 
   /*
    * КРАПКИ МУСЯТЬ ЛЕЖАТИ НА ЛІНІЇ.
@@ -385,9 +337,9 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
     });
     return { worst: worst, pts: pts.length, dots: dots.length, hasFact: Boolean(fact) };
   });
-  ok('24. лінія проходить рівно через крапки',
+  ok('23. лінія проходить рівно через крапки',
      fit.worst <= 0.11 && fit.pts === fit.dots, JSON.stringify(fit));
-  ok('24. на довгій історії середня — окрема лінія', fit.hasFact === true, JSON.stringify(fit));
+  ok('23. на довгій історії середня — окрема лінія', fit.hasFact === true, JSON.stringify(fit));
 
   /*
    * МАЛО ЗАПИСІВ — СЕРЕДНЬОЇ НЕМАЄ ВЗАГАЛІ.
@@ -423,8 +375,8 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
     });
     return { fact: svg.querySelectorAll('.wc__fact').length, worst: worst, dots: dots.length };
   });
-  ok('24. на двох записах середньої немає', few.fact === 0 && few.dots === 2, JSON.stringify(few));
-  ok('24. і єдина лінія йде рівно по крапках', few.worst <= 0.11, JSON.stringify(few));
+  ok('23. на двох записах середньої немає', few.fact === 0 && few.dots === 2, JSON.stringify(few));
+  ok('23. і єдина лінія йде рівно по крапках', few.worst <= 0.11, JSON.stringify(few));
 
   /* Повертаємо довгу історію: наступні перевірки блоку писались під неї. */
   await q.evaluate((n) => {
@@ -447,18 +399,18 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
     const r = el.getBoundingClientRect();
     return { hidden: el.hasAttribute('hidden'), w: Math.round(r.width), h: Math.round(r.height) };
   });
-  ok('24. схована підказка справді схована', tip0.hidden && tip0.w === 0 && tip0.h === 0, JSON.stringify(tip0));
+  ok('23. схована підказка справді схована', tip0.hidden && tip0.w === 0 && tip0.h === 0, JSON.stringify(tip0));
 
   await q.locator('#jr-weight .exc__hit').first().hover();
   await q.waitForTimeout(200);
   const tip1 = await q.$eval('#w-tip', (el) => ({ hidden: el.hasAttribute('hidden'), t: el.innerText }));
-  ok('24. наведення дає день, вагу й середню',
+  ok('23. наведення дає день, вагу й середню',
      !tip1.hidden && /кг/.test(tip1.t) && /середня/.test(tip1.t), JSON.stringify(tip1));
-  ok('24. без JS-помилок', e6.length === 0, e6.join(' | '));
+  ok('23. без JS-помилок', e6.length === 0, e6.join(' | '));
   await ctx4.close();
 }
 
-/* ---- 25. Якір не губиться, коли сторінка домальовується ------------
+/* ---- 24. Якір не губиться, коли сторінка домальовується ------------
  * Прокрутка до блоку рахується від висоти того, що ВЖЕ намальовано. Але
  * сторінка домальовується й далі: шрифт замінює запасний і переносить
  * рядки, картинки отримують розмір, графік перемальовується під ширину.
@@ -498,8 +450,8 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
       late: !!document.getElementById('late-content')
     };
   });
-  ok('25. пізній контент справді вставився', m2.late);
-  ok('25. якір доводиться після зсуву сторінки',
+  ok('24. пізній контент справді вставився', m2.late);
+  ok('24. якір доводиться після зсуву сторінки',
      m2.top >= m2.navH && m2.top < m2.navH + 60,
      'top=' + m2.top + ' шапка=' + m2.navH);
 
@@ -512,8 +464,8 @@ ok('21. без JS-помилок', errs.length === 0, errs.join(' | '));
   });
   await q.waitForTimeout(900);
   const back = await q.evaluate(() => Math.round(window.scrollY));
-  ok('25. після дотику до прокрутки доводка мовчить', back < 30, 'scrollY=' + back);
-  ok('25. без JS-помилок', e7.length === 0, e7.join(' | '));
+  ok('24. після дотику до прокрутки доводка мовчить', back < 30, 'scrollY=' + back);
+  ok('24. без JS-помилок', e7.length === 0, e7.join(' | '));
   await ctx5.close();
 }
 

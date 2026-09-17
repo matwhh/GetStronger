@@ -33,7 +33,7 @@ FULL="verifya11y verifyflows verifyimport verifythemes verifyonboard \
       verifypersetweight verifyplanfields verifysexplans verifysleepremember \
       verifytrackerspage verifywomen3 verifycreatine verifyexercise \
       verifychaos verifychaos2 verifyfix90 verifyhardening verifyerrors \
-      verifyheatmap verifyseg verifytilt verifydaycal verifytabbar verifydonut \
+      verifyseg verifytilt verifydaycal verifytabbar verifydonut \
       verifylevelicon verifyaward verifyprogression verifylvlbar \
       verifyownexercise verifyownplan verifyhelpbook verifyloginerrors \
       verifygym verifytdee verifycoach verifyadmintabs verifyinsight"

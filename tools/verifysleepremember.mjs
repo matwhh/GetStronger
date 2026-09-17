@@ -161,15 +161,19 @@ const fill = async (el, v) => {
   await ctx.close();
 }
 
-/* ---- 4. Прогрес: рівно 7 місяців ---- */
+/* ---- 4. Календар тренувань: рівно 7 місяців ---- */
+/* Вікно календаря — сім календарних місяців. Перевіряємо його на
+   «Днях тренувань»: із «Прогресу» цей календар переїхав туди, а у
+   вкладці «Історія» те саме вікно з навігацією по місяцях. */
 {
-  const { ctx, p, errs } = await open('journal.html');
+  const { ctx, p, errs } = await open('train-log.html');
   await p.waitForTimeout(900);
-  const lab = await p.locator('.heatmap').first().getAttribute('aria-label');
+  const lab = await p.locator('.mcal').first().getAttribute('aria-label');
   ok('4. календар підписаний 7 місяцями', /7 місяц/.test(String(lab)), String(lab));
-  const months = await p.locator('.heatmap').first()
-    .evaluate(e => new Set([...e.querySelectorAll('[data-hm-mon], .heatmap__mon')].map(x => x.textContent.trim()).filter(Boolean)).size);
-  ok('4. у сітці 7 підписів місяців', months === 7 || months === 0, String(months));
+  const months = await p.locator('.mcal').first()
+    .evaluate(e => new Set([...e.querySelectorAll('.mcal__month')]
+      .map(x => x.textContent.trim()).filter(Boolean)).size);
+  ok('4. у сітці 7 підписів місяців', months === 7, String(months));
   ok('4. без JS-помилок', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

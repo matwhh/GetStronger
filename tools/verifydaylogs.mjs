@@ -71,7 +71,13 @@ async function open(page, profile) {
 {
   const p = await open('train-log.html', Object.assign({}, BASE, {
     workLog: { [key(3)]: 1 },
-    sessionLog: { [key(5)]: { doneSets: 8, totalSets: 8 } }
+    sessionLog: {
+      [key(5)]: { doneSets: 8, totalSets: 8 },
+      /* Дві середні сходинки: без них шкала вироджується в «було / не
+         було», а саме заради часток вона й чотириступенева. */
+      [key(6)]: { doneSets: 3, totalSets: 10 },
+      [key(7)]: { doneSets: 8, totalSets: 10 }
+    }
   }));
 
   ok('4. сторінка намалювалась', (await p.locator('#tl-main .card').count()) >= 1);
@@ -83,6 +89,10 @@ async function open(page, profile) {
   ok('7. ручна позначка дає рівень 1', (await lvl(key(3))) === '1');
   ok('8. повністю закрита сесія дає рівень 4', (await lvl(key(5))) === '4');
   ok('9. порожній день — рівень 0', (await lvl(key(4))) === '0');
+  /* Середні сходинки: 3 з 10 — менше половини, 8 з 10 — більша частина.
+     Доти їх ганяла лише теплокарта на «Прогресі», якої більше немає. */
+  ok('9a. менше половини підходів — рівень 2', (await lvl(key(6))) === '2');
+  ok('9b. більша частина підходів — рівень 3', (await lvl(key(7))) === '3');
 
   const week = await p.locator('#tl-main .chip').first().innerText();
   ok('10. тиждень показаний із ціллю плану', /\/3 цього тижня/.test(week), week);
@@ -189,11 +199,23 @@ async function open(page, profile) {
 {
   const p = await open('journal.html', null);
   await p.waitForTimeout(1200);
-  const txt = await p.locator('#jr-weight').innerText();
   /* Той самий журнал: число, вписане на окремій сторінці, мусить бути
-     видним у «Прогресі» без жодного перенесення. */
-  ok('30. вага з окремої сторінки видна в «Прогресі»', /81,4|80,2/.test(txt),
-     txt.replace(/\n/g, ' ').slice(0, 120));
+     видним у «Прогресі» без жодного перенесення. Дивимось у ТОЧКИ
+     графіка, а не в текст: ввід і список записів звідти прибрані, на
+     «Прогресі» лишився сам графік. */
+  const pts = await p.locator('#jr-weight svg.exc [data-v]').evaluateAll(
+    (els) => els.map((e) => e.getAttribute('data-v')).join(' '));
+  ok('30. вага з окремої сторінки видна в «Прогресі»', /81,4|80,2/.test(pts),
+     String(pts).slice(0, 120));
+  /* І навпаки: писати її звідти більше нічим — поле переїхало на
+     «Дні зважувань» цілком. */
+  /* Радіокнопки періоду графіка лишились — а от поля, у яке пишуть вагу,
+     більше немає: воно цілком переїхало на «Дні зважувань». */
+  ok('30a. на «Прогресі» немає поля вводу ваги',
+     (await p.locator('#jr-weight input:not([type="radio"])').count()) === 0 &&
+     (await p.locator('#jr-weight #w-add').count()) === 0);
+  ok('30b. і немає блоку тренувань — у нього окрема сторінка',
+     (await p.locator('#jr-train').count()) === 0);
   await p.close();
 }
 

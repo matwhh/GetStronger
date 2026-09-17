@@ -49,7 +49,6 @@ node tools/verifyloop.mjs        # щоденний цикл: дія → ста�
 node tools/verifyworkout.mjs     # тренування як окремий екран + опційний настрій сесії
 node tools/verifyagegate.mjs     # 17+: гейт, обхід URL/історією/localStorage/імпортом, токен у хеші
 node tools/verifyreps.mjs        # діапазони повторень: 4 стажі × 4 програми × великі/малі групи
-node tools/verifyheatmap.mjs     # теплокарта: рівні з журналу, підказка, легенда, перемикач дня
 node tools/verifyseg.mjs         # сегментований перемикач: доріжка по вмісту, виділення їздить і не бреше
 node tools/verifytilt.mjs        # скляні картки вибору: нахил, блик за курсором, фокус, контраст скла
 node tools/verifyperf.mjs        # вага сторінок, час завантаження, вузли — зі стелями

@@ -169,11 +169,24 @@ await tap(p.locator('#m-add')); await p.waitForTimeout(800);
 const day=await p.evaluate(async()=>(await window.Store.getProfile()).day);
 ok('7. продукт додано в день', day.meals.reduce((s,m)=>s+m.items.length,0)===1);
 
-// 8. Прогрес
-await p.goto(U('journal.html')); await p.waitForTimeout(900);
-await p.locator('#w-kg').fill('82,4'); await tap(p.locator('#w-add')); await p.waitForTimeout(800);
+// 8. Вага тіла
+/* ВАГУ ПИШУТЬ НА «ДНЯХ ЗВАЖУВАНЬ», а не в «Прогресі»: поле #w-kg звідти
+   прибрано разом із календарем і списком записів — два входи в один
+   журнал означали дві реалізації одного запису. Той самий клас помилки,
+   що й із [data-wt] вище: перевірка їхала на старому селекторі й падала
+   за тайм-аутом, тобто кроки 9–10 не ганялись би взагалі. */
+await p.goto(U('weight-log.html')); await p.waitForTimeout(900);
+await p.locator('#wl-kg').fill('82,4'); await tap(p.locator('#wl-add')); await p.waitForTimeout(800);
 const bl=await p.evaluate(async()=>(await window.Store.getProfile()).bodyLog);
 ok('8. вага тіла з комою записалась', Object.values(bl||{}).includes(82.4), JSON.stringify(bl));
+
+/* І те саме число мусить бути видно в «Прогресі» — журнал один.
+   Графіка тут ще немає (він з'являється від двох записів), тож дивимось
+   у чип ковзної середньої: на одному записі вона дорівнює самому запису. */
+await p.goto(U('journal.html')); await p.waitForTimeout(1200);
+const wtxt=await p.locator('#jr-weight').innerText();
+ok('8. і «Прогрес» показує її без жодного перенесення',
+   /82,4/.test(wtxt), wtxt.replace(/\n/g,' ').slice(0,110));
 
 // 9. Повернення наступного дня
 await p.goto(U('index.html')); await p.waitForTimeout(1200);

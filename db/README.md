@@ -19,7 +19,7 @@
 
 ## Перекриті файли: що не можна запускати
 
-Дванадцять файлів у цій теці містять тіла функцій, СТАРІШІ за базу. Кожен
+Тринадцять файлів у цій теці містять тіла функцій, СТАРІШІ за базу. Кожен
 виглядає як «схема» — і саме такий прогін колись зняв із продакшену барʼєр
 `NOT_APPROVED` (INV-002). Тепер у кожного в шапці стоїть рядок
 `-- ПЕРЕКРИТО: <чим>`, і його звіряє `tools/ci-hygiene.mjs`:
@@ -35,7 +35,8 @@
 | `elo-engine.sql` | багатьма пізнішими | 8 тіл з 11 старіші; знімає `NOT_APPROVED` |
 | `elo-integrity.sql` | `elo-week-eval-fix`, `elo-skip-category`, `elo-pace` | відкотить `season_bounds` до квартальної межі |
 | `elo-authoritative.sql` | `elo-partial-cap`, `elo-week-eval-fix`, `elo-skip-category` | 6 тіл з 9 старіші |
-| `admin-elo.sql` | `elo-partial-cap`, `elo-skip-category` | 3 тіла з 4 старіші |
+| `admin-elo.sql` | `elo-partial-cap`, `elo-skip-category`, `account-hole` | усі 4 тіла старіші; поверне дірку з рейтингом без заявки |
+| `purge-abandoned-signups.sql` | `account-hole` | зніме правило «заявки не було жодної» |
 | `elo-proportional.sql` | `elo-partial-cap` | обидва тіла старіші |
 | `elo-catchup.sql` | `elo-week-eval-fix` | `elo_catch_up` старіша |
 | `elo-partial-first-week.sql` | `elo-skip-category` | `elo_eval_week_for` старіша |
@@ -134,6 +135,7 @@
 20260915151208  elo_recount_categories                 → elo-recount-category.sql
 20260916181525  cron_wrappers_keep_work                → cron-keep-work.sql       ← крон
 20260916181540  elo_skip_whitelist                     → elo-skip-whitelist.sql   ← білий список
+20260916222229  admin_elo_approved_only_and_purge_never_applied → account-hole.sql ← дірка з акаунтами
 ```
 
 **Про `elo-pace.sql`.** Це не точкова правка, а зміна БАЛАНСУ: вартість дії

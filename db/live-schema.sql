@@ -358,8 +358,11 @@ begin
              'elo',      coalesce(ss.elo, 0),
              'me',       (u.id = me)) as x
     from auth.users u
+    /* JOIN, а не LEFT JOIN, і тільки approved: рейтинг існує лише в
+       підтверджених акаунтів, тож показувати решту означає пропонувати
+       адміну дію, якої робити не можна. */
+    join account_status ar on ar.user_id = u.id and ar.status = 'approved'
     left join season_state ss on ss.user_id = u.id and ss.season = szn
-    left join account_status ar on ar.user_id = u.id
     order by coalesce(ss.elo, 0) desc, u.created_at
     limit greatest(1, least(coalesce(p_limit, 200), 500))
   ) t;
@@ -388,6 +391,13 @@ begin
   if not public.is_admin(me) then raise exception 'FORBIDDEN'; end if;
   if p_user is null then raise exception 'BAD_USER'; end if;
   if not exists (select 1 from auth.users where id = p_user) then raise exception 'NO_USER'; end if;
+  /* Той самий барʼєр, що на клієнтських RPC. Без нього адмінська кнопка
+     заводила season_state акаунту без заявки — і він ставав видимим у
+     таблиці лідерів. */
+  if not exists (select 1 from account_status a
+                  where a.user_id = p_user and a.status = 'approved') then
+    raise exception 'NOT_APPROVED';
+  end if;
   select data into cfg from elo_config where id = 1;
   target := greatest(0, least(coalesce(p_elo, 0), (cfg->>'seasonMax')::int));
   insert into season_state (user_id, season) values (p_user, szn) on conflict do nothing;
@@ -1994,9 +2004,16 @@ begin
   select coalesce(array_agg(u.id), '{}')
     into v_ids
     from auth.users u
-   where u.email_confirmed_at is null
-     and u.last_sign_in_at is null
-     and u.created_at < v_cut;
+   where u.created_at < v_cut
+     and (
+       /* Реєстрація не дійшла навіть до пошти. */
+       (u.email_confirmed_at is null and u.last_sign_in_at is null)
+       /* Або дійшла, але заявки не було ЖОДНОЇ: рядка account_status
+          немає, тобто в «Заявках» цієї людини не існує. Рішення адміна
+          (pending / approved / rejected / blocked) завжди лишає рядок,
+          тож сюди не потрапляє ніхто, про кого вже думали. */
+       or not exists (select 1 from public.account_status a where a.user_id = u.id)
+     );
 
   v_count := coalesce(array_length(v_ids, 1), 0);
   if v_count = 0 then

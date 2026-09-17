@@ -17,6 +17,7 @@ declare
   ub uuid := '00000000-0000-4000-8000-00000000e202';  -- Борис, approved
   uc uuid := '00000000-0000-4000-8000-00000000e203';  -- Віра, pending
   ud uuid := '00000000-0000-4000-8000-00000000e204';  -- новачок без заявки
+  ue uuid := '00000000-0000-4000-8000-00000000e205';  -- адмін
   y date := current_date - 1;
   r jsonb; out text := E'\n'; okn int := 0; alln int := 0; n int; c boolean; txt text;
 begin
@@ -24,10 +25,13 @@ begin
   values (ua,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','mu-a@local','x',now(),now()),
          (ub,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','mu-b@local','x',now(),now()),
          (uc,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','mu-c@local','x',now(),now()),
-         (ud,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','mu-d@local','x',now(),now());
+         (ud,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','mu-d@local','x',now(),now()),
+         (ue,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','mu-e@local','x',now(),now());
 
   insert into public.account_status (user_id, status, username) values
-    (ua,'approved','Аня'), (ub,'approved','Борис'), (uc,'pending','Віра');
+    (ua,'approved','Аня'), (ub,'approved','Борис'), (uc,'pending','Віра'),
+    (ue,'approved','Адмін');
+  insert into public.admins (user_id) values (ue);
 
   -- Однакові факти в обох: якщо бюджети переплутані, це вилізе одразу.
   insert into public.profiles (user_id, data)
@@ -217,6 +221,84 @@ begin
   alln:=alln+1; okn:=okn+c::int;
   out := out || case when c then 'OK   ' else 'FAIL ' end || 'звичайний користувач не блокує інших :: ' || txt || E'\n';
   reset role;
+
+  -- ---- 7. Акаунт без заявки не потрапляє в рейтинг ---------------------
+  --
+  -- Дірка, знайдена 17.09.2026: в адмінці, на вкладці ELO, стояли люди,
+  -- яких у «Заявках» не було жодного разу — і їм можна було НАТИСНУТИ
+  -- «Поставити». Перевіряємо всі три частини разом, бо кожна окремо
+  -- виглядала нешкідливо.
+  perform set_config('request.jwt.claims', json_build_object('sub', ue)::text, true);
+  set local role authenticated;
+
+  r := public.admin_elo_list(500);
+
+  select count(*) into n from jsonb_array_elements(r->'rows') e
+   where (e->>'userId')::uuid in (ud, uc);
+  c := n = 0; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+              || 'у списку ELO немає ні новачка без заявки, ні pending :: зайвих рядків ' || n || E'\n';
+
+  select count(*) into n from jsonb_array_elements(r->'rows') e
+   where (e->>'userId')::uuid in (ua, ub);
+  c := n = 2; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+              || 'підтверджені в списку ELO лишились :: рядків ' || n || E'\n';
+
+  -- Кнопка «Поставити» на акаунті без заявки.
+  begin
+    r := public.admin_elo_set(ud, 500, 'тест');
+    c := false; txt := 'рейтинг нараховано';
+  exception when others then
+    c := sqlerrm = 'NOT_APPROVED'; txt := sqlerrm;
+  end;
+  alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+              || 'адмін не нарахує ELO акаунту без заявки :: ' || txt || E'\n';
+
+  begin
+    r := public.admin_elo_set(uc, 500, 'тест');
+    c := false; txt := 'рейтинг нараховано';
+  exception when others then
+    c := sqlerrm = 'NOT_APPROVED'; txt := sqlerrm;
+  end;
+  alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+              || 'адмін не нарахує ELO тому, хто ще чекає рішення :: ' || txt || E'\n';
+
+  -- Барʼєр не має перекрити роботу: підтвердженому виставити можна.
+  r := public.admin_elo_set(ua, 700, 'тест');
+  c := (r->>'elo')::int = 700; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+              || 'підтвердженому рейтинг виставляється :: ' || coalesce(r->>'elo','—') || E'\n';
+
+  -- Слід від акаунта без заявки в season_state не завівся.
+  select count(*) into n from public.season_state where user_id in (ud, uc);
+  c := n = 0; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+              || 'спроба не завела season_state непідтвердженим :: рядків ' || n || E'\n';
+  reset role;
+
+  -- Прибирання: пошту підтверджено, вхід був, заявки НЕ подавав — таких
+  -- у «Заявках» не видно, тож старе правило (email не підтверджено Й
+  -- жодного входу) їх не чіпало, і вони лишались у базі назавжди.
+  update auth.users
+     set created_at = now() - interval '30 days',
+         email_confirmed_at = now() - interval '29 days',
+         last_sign_in_at = now() - interval '29 days'
+   where id = ud;
+
+  r := public.purge_abandoned_signups(7);
+
+  select count(*) into n from auth.users where id = ud;
+  c := n = 0; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+              || 'акаунт без заявки прибрано :: лишилось рядків ' || n || E'\n';
+
+  select count(*) into n from auth.users where id in (ua, ub, uc, ue);
+  c := n = 4; alln:=alln+1; okn:=okn+c::int;
+  out := out || case when c then 'OK   ' else 'FAIL ' end
+              || 'той, про кого рішення вже приймали, лишився :: рядків ' || n || E'\n';
 
   raise exception 'MULTIUSER: % з % пройдено%', okn, alln, out;
 end $$;

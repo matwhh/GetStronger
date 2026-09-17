@@ -203,6 +203,76 @@ async function open(page, extra) {
   await ctx.close();
 }
 
+/* ---- 5. Попередження чіпляються до ЧИСЛА, а не живуть банером ---- */
+/*
+ * Банер під числом читають один раз, а потім перестають бачити — і
+ * число живе далі саме, без застереження. Тепер застереження висить на
+ * самому числі: пунктир, знак поруч, пояснення по дотику.
+ *
+ * Профіль підібрано так, щоб мета дала менше за підлогу калорійності:
+ * жінка 50 кг, 160 см, сидяча робота, агресивне схуднення. Саме цей
+ * випадок колись давав ~1025 ккал без жодного попередження.
+ */
+{
+  const ctx = await adultContext(b, { viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
+  await ctx.route('**://fonts.googleapis.com/**', r => r.abort());
+  await ctx.route('**://fonts.gstatic.com/**', r => r.abort());
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', e => errs.push(e.message));
+  await p.goto('file://' + ROOT + '/index.html', { waitUntil: 'load' });
+  await p.evaluate(async () => {
+    await window.Store.saveProfile({
+      birthDate: '1990-06-15', sex: 'female', age: 40, height: 160, weight: 50,
+      activity: 1.2, goal: 'cutfast', meals: 4
+    });
+  });
+  await p.goto('file://' + ROOT + '/nutrition.html', { waitUntil: 'load' });
+  await p.waitForTimeout(1500);
+
+  const out = p.locator('#nutri-out');
+  const mark = out.locator('[data-flag]').first();
+  ok('5. на числі є знак попередження', await mark.count() === 1,
+    String(await out.locator('[data-flag]').count()));
+  ok('5. пояснення сховане, поки його не питали',
+    await out.locator('.flagnum__note').first().isHidden());
+  /* Банер саме ПРО ЦЕ ЧИСЛО має зникнути. Інші лишаються й мусять
+     лишатись: попередження про агресивний режим стосується МЕТОДУ, а не
+     числа, і чіпляти його до цифри було б брехнею про те, що не так. */
+  const banners = await out.locator('.notice').allInnerTexts();
+  ok('5. банера про підлогу калорійності більше немає',
+    !banners.some(function (t) { return /Показано саме поріг/.test(t); }),
+    banners.join(' | ').slice(0, 200));
+
+  await mark.click();
+  await p.waitForTimeout(250);
+  const note = out.locator('.flagnum__note').first();
+  ok('5. дотик розкриває пояснення', await note.isVisible());
+  const noteTxt = await note.innerText();
+  ok('5. і в ньому те саме, що було в банері',
+    /підлог|поріг|базовий обмін/i.test(noteTxt), noteTxt.slice(0, 160));
+  ok('5. знак каже читалці екрана, що він розкритий',
+    (await mark.getAttribute('aria-expanded')) === 'true');
+
+  /* Пояснення стоїть усередині великого числа з .gradient-text.mono —
+     і без власної типографіки успадкувало б моноширинний шрифт,
+     розрядку й ПРОЗОРИЙ колір градієнта, тобто стало б нечитним. */
+  const look = await note.evaluate(function (el) {
+    const c = getComputedStyle(el);
+    return { size: parseFloat(c.fontSize), mono: /mono/i.test(c.fontFamily),
+             fill: c.webkitTextFillColor || c.color };
+  });
+  ok('5. пояснення читається як речення, а не як уламок числа',
+    look.size < 20 && !look.mono && !/transparent|rgba\(0, 0, 0, 0\)/.test(look.fill),
+    JSON.stringify(look));
+
+  await mark.click();
+  await p.waitForTimeout(250);
+  ok('5. повторний дотик згортає', await note.isHidden());
+  ok('5. без JS-помилок', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 await b.close();
 const bad = R.filter(r => !r[1]).length;
 console.log('\n' + (R.length - bad) + '/' + R.length + ' перевірок адаптивних витрат пройшло.');

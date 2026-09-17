@@ -354,8 +354,17 @@
     out.innerHTML = '' +
       '<div class="card">' +
         '<span class="eyebrow"><span class="eyebrow__dot"></span>' + esc(goal.label) + '</span>' +
+        /* Застереження — НА ЧИСЛІ, а не банером під ним (App.flagNum).
+           Банер під ціллю читали один раз, після чого ціль, що вперлась
+           у підлогу, стояла тим самим великим шрифтом, що й звичайна. */
         '<div style="font-size:clamp(2.6rem,7vw,4rem);font-weight:800;letter-spacing:-0.04em;line-height:1.05;margin-top:12px" class="gradient-text mono">' +
-          round(target, 0) + ' ккал' +
+          window.App.flagNum(round(target, 0) + ' ккал', t.floored
+            ? 'Обрана мета дала б ' + round(t.rawKcal, 0) + ' ккал — нижче за ' +
+              (t.floorKcal === t.bmr ? 'ваш базовий обмін' : 'загальноприйнятий поріг') +
+              ' (' + round(t.floorKcal, 0) + ' ккал). Показано саме поріг: глибший дефіцит ' +
+              'створюють рухом, а не подальшим зрізанням їжі — інакше страждає мʼязова маса ' +
+              'й закриття раціону за вітамінами та мінералами.'
+            : '', 'ціль калорійності') +
         '</div>' +
         '<p class="small muted" style="margin:6px 0 0">' +
           'На добу. Це ' + (delta >= 0 ? '+' : '') + round(delta, 0) + ' ккал відносно витрат (' + round(tdee, 0) + ' ккал).' +
@@ -363,22 +372,6 @@
             ? ' Очікувана динаміка: ' + (weeklyKg > 0 ? '+' : '') + round(weeklyKg, 2) + ' кг/тиждень.'
             : ' Вага має триматись стабільною.') +
         '</p>' +
-
-        (t.floored
-          ? '<div class="notice mt-2">Обрана мета дала б ' + round(t.rawKcal, 0) + ' ккал — ' +
-            'нижче за ' + (t.floorKcal === t.bmr ? 'ваш базовий обмін' : 'загальноприйнятий поріг') +
-            ' (' + round(t.floorKcal, 0) + ' ккал). Показано саме поріг: глибший дефіцит створюють ' +
-            'рухом, а не подальшим зрізанням їжі — інакше страждає мʼязова маса й закриття ' +
-            'раціону за вітамінами та мінералами.</div>'
-          : '') +
-
-        (t.proteinCapped
-          ? '<div class="notice mt-2">Білок обмежено часткою калорійності (' +
-            round(window.NutritionCalc.PROTEIN_MAX_SHARE * 100, 0) + '%), а не масою тіла: ' +
-            'за верхом діапазону (' + dec(PROTEIN_MAX_PER_KG) + ' г на кг) вийшло б ' +
-            round(weight * PROTEIN_MAX_PER_KG, 0) + ' г, ' +
-            'і це була б більша частина всієї добової енергії.</div>'
-          : '') +
 
         '<div class="kpis mt-3">' +
           '<div class="kpi"><div class="kpi__val mono">' + round(bmr, 0) + '</div><p class="kpi__lbl">BMR, ккал</p></div>' +
@@ -426,7 +419,16 @@
           // оцінка плато (Morton 2018), 2,2 — верхня межа її 95% ДІ.
           'Білок: <b>' + round(t.proteinRange[0], 0) + '–' + round(t.proteinRange[1], 0) + ' г</b> ' +
           '(' + dec(PROTEIN_MIN_PER_KG) + '–' + dec(PROTEIN_MAX_PER_KG) + ' г на кг маси тіла), ' +
-          'у розрахунку взято <b>' + round(m.protein, 0) + ' г</b> — це ' +
+          /* Стеля білка теж чіпляється до числа, а не до банера вгорі
+             сторінки: вона стосується саме цього числа й ніякого іншого. */
+          'у розрахунку взято <b>' +
+          window.App.flagNum(round(m.protein, 0) + ' г', t.proteinCapped
+            ? 'Білок обмежено часткою калорійності (' +
+              round(window.NutritionCalc.PROTEIN_MAX_SHARE * 100, 0) + '%), а не масою тіла: ' +
+              'за верхом діапазону (' + dec(PROTEIN_MAX_PER_KG) + ' г на кг) вийшло б ' +
+              round(weight * PROTEIN_MAX_PER_KG, 0) + ' г, і це була б більша частина ' +
+              'усієї добової енергії.'
+            : '', 'норма білка') + '</b> — це ' +
           dec(round(m.protein / weight, 2)) + ' г/кг. ' +
           'Вуглеводи вказані БЕЗ клітковини, як і в довіднику продуктів. ' +
           'Вода: <b>' + dec(round(water, 1)) + ' л</b> плюс те, що випʼєте на тренуванні.' +

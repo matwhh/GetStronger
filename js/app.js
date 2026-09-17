@@ -2204,6 +2204,60 @@
 
   initServiceWorker();
 
+  /* ------------------------------------------------------------------ */
+  /* Попередження, що чіпляється до ЧИСЛА                                */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Банер під числом читають рівно один раз. Далі його перестають
+   * бачити — а число живе собі далі, вже без застереження, і виглядає
+   * так само впевнено, як будь-яке інше. Найдорожчий приклад: ціль
+   * калорійності, що вперлась у підлогу, стояла тим самим великим
+   * шрифтом, що й звичайна, а пояснення лежало окремим прямокутником
+   * нижче.
+   *
+   * Тепер застереження НА САМОМУ ЧИСЛІ: пунктир під ним, знак поруч,
+   * пояснення по дотику. Кольору немає — закон оформлення діє й тут, і
+   * саме тому пунктир, а не червоне.
+   *
+   * Чому не модальне вікно: пояснення тут — це один абзац, а не
+   * рішення. Вікно забирає екран і вимагає його закрити; абзац під
+   * числом читається на місці й згортається тим самим дотиком.
+   */
+  let flagSeq = 0;
+
+  /**
+   * Число із застереженням.
+   *
+   * @param {string} inner готова розмітка самого числа (вже екранована)
+   * @param {string} note   пояснення, звичайним текстом
+   * @param {string} [label] що саме пояснюємо — для читалки екрана
+   * @returns {string} розмітка: число зі знаком і згорнутий абзац під ним
+   */
+  function flagNum(inner, note, label) {
+    if (!note) return inner;
+    const id = 'flag-' + (++flagSeq);
+    return '' +
+      '<span class="flagnum">' + inner +
+        '<button class="flagnum__mark" type="button" data-flag="' + id + '" ' +
+          'aria-expanded="false" aria-controls="' + id + '" ' +
+          'aria-label="Чому саме це число' + (label ? ': ' + esc(label) : '') + '">!</button>' +
+      '</span>' +
+      '<p class="small muted flagnum__note" id="' + id + '" hidden>' + esc(note) + '</p>';
+  }
+
+  /* Один слухач на весь сайт: картки перемальовуються часто, і вішати
+     обробник на кожен знак означало б губити його при кожній
+     перемальовці. */
+  document.addEventListener('click', function (e) {
+    const b = e.target.closest && e.target.closest('[data-flag]');
+    if (!b) return;
+    const note = document.getElementById(b.dataset.flag);
+    if (!note) return;
+    const open = note.hidden;
+    note.hidden = !open;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
   window.App = {
     $: $, $$: $$,
     esc: esc, round: round, clamp: clamp, num: num,
@@ -2219,6 +2273,7 @@
     plural: plural,
     fmt: fmt,
     fmtNum: numFmt,
+    flagNum: flagNum,
     sheet: sheet,
     flashDone: flashDone,
     busy: busy,

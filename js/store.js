@@ -69,6 +69,13 @@
    */
   const LS_BACKUP_LOGIN = 'ib.profile.backup.login';
   /*
+   * Патчі з черги, які не вдалося накласти цілком на новіший профіль
+   * (див. mergeStalePatch). Слот існує рівно для того, щоб офлайнова
+   * робота не зникала МОВЧКИ: журнали з такого патча дописуються самі, а
+   * все інше лягає сюди, звідки його видно в експорті резервної копії.
+   */
+  const LS_BACKUP_STALE = 'ib.profile.backup.stale';
+  /*
    * Чий це локальний профіль. Без цього поля дані попереднього
    * користувача на спільному пристрої вважалися «своїми» для наступного:
    * resolveFirstLogin бачив непорожній локальний профіль і заливав його
@@ -117,6 +124,7 @@
    * до цього переліку не входять навмисно: enforceOwner саме їх і пише.
    */
   const PERSONAL_KEYS = [LS_PROFILE, LS_BACKUP, LS_PENDING, DIRTY_KEY,
+    LS_BACKUP_STALE,
     'forge.today', 'ib.meals.fold',
     /* Чернетка реєстрації: пошта, дата народження, стать, вага, зріст і
        згоди. Її не було ні у виході, ні в «стерти дані в цьому браузері»,
@@ -1252,9 +1260,121 @@
       });
     }
 
-    q.push({ at: Date.now(), uid: me, patch: patch });
+    /* id, а не лише час: зняття з черги після відправки шукає РІВНО ці
+       записи, і два патчі в одну мілісекунду не мають зливатись в один. */
+    q.push({ id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+             at: Date.now(), uid: me, patch: patch });
     // Черга не має рости нескінченно: 200 патчів — це вже кількасот КБ.
     return lsSet(LS_PENDING, q.slice(-200));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Накладання СТАРОГО патча на новіший профіль                         */
+  /* ------------------------------------------------------------------ */
+  /*
+   * Патч, зроблений офлайн у вівторок, і профіль, збережений з іншого
+   * пристрою в середу, — обидва справжні, і жоден не є продовженням
+   * іншого. Раніше такий патч просто викидали (і знімали з черги), тобто
+   * тренування зникало з усіх пристроїв без жодного сліду.
+   *
+   * Накласти його цілком теж не можна: патч — це ПОВНЕ значення ключа, і
+   * вівторковий sessionLog поверне журнал до вівторкового стану, стерши
+   * все, що додали в середу. Саме це й описує PRF-001.
+   *
+   * Тому старий патч уміє РІВНО ОДНЕ: дописати в журнали дні, яких у
+   * новішому профілі немає. Правило звужене ще раз — тільки дні, НЕ
+   * СТАРІШІ за сам патч: запис, який у середу свідомо прибрали, не має
+   * відроджуватись вівторковою чергою. Ширшої свободи цій операції
+   * давати не можна, бо вона виконується без людини й без питань.
+   *
+   * Усе, що не журнал (вага, мета, плани), лишається за новішим
+   * профілем — і повертається в dropped, щоб той, хто кличе, міг про це
+   * сказати вголос, а не проковтнути.
+   */
+
+  /** Журнали, ключовані ДНЕМ: 'YYYY-MM-DD' → факт того дня. */
+  const DAY_JOURNALS = ['bodyLog', 'workLog', 'sessionLog', 'mealLog',
+                        'measureLog', 'trackerLog', 'days', 'sessions'];
+
+  /** Журнали, ключовані НАЗВОЮ: назва → масив записів із полем d. */
+  const NAME_JOURNALS = ['weightLog'];
+
+  const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+  /* Ключ МІСЦЕВОГО дня. Свій, а не з DateCore: store.js вантажиться на
+     кожній сторінці й свідомо не має залежностей — навіть на ядро дати.
+     Формула та сама, що там: getFullYear/getMonth/getDate, бо о 23:40 у
+     поясі схід від UTC toISOString дає вже завтрашній день. */
+  function dayKeyOf(d) {
+    const x = (d instanceof Date && !isNaN(d)) ? d : new Date();
+    return x.getFullYear() + '-' +
+      String(x.getMonth() + 1).padStart(2, '0') + '-' +
+      String(x.getDate()).padStart(2, '0');
+  }
+
+  function isMap(v) {
+    return !!v && typeof v === 'object' && !Array.isArray(v);
+  }
+
+  /**
+   * @param {object} base   новіший профіль (виграє в усьому спірному)
+   * @param {object} patch  старий патч із черги
+   * @param {string} fromKey день, у який патч зроблено ('YYYY-MM-DD')
+   * @returns {{merged:object, added:string[], dropped:string[]}}
+   */
+  function mergeStalePatch(base, patch, fromKey) {
+    const out = Object.assign({}, base || {});
+    const added = [], dropped = [];
+    const p = isMap(patch) ? patch : {};
+    /* Без дати патча вирішити, що старе, а що ні, неможливо — тоді не
+       чіпаємо нічого взагалі. */
+    const from = DAY_KEY.test(String(fromKey)) ? String(fromKey) : null;
+
+    Object.keys(p).forEach(function (field) {
+      const src = p[field];
+
+      if (from && DAY_JOURNALS.indexOf(field) !== -1) {
+        if (!isMap(src)) { dropped.push(field); return; }
+        const dst = isMap(out[field]) ? Object.assign({}, out[field]) : {};
+        let any = false;
+        Object.keys(src).forEach(function (k) {
+          if (!DAY_KEY.test(k) || k < from) return;
+          if (Object.prototype.hasOwnProperty.call(dst, k)) return;
+          dst[k] = src[k];
+          any = true;
+        });
+        if (any) { out[field] = dst; added.push(field); }
+        return;
+      }
+
+      if (from && NAME_JOURNALS.indexOf(field) !== -1) {
+        if (!isMap(src)) { dropped.push(field); return; }
+        const dst = isMap(out[field]) ? Object.assign({}, out[field]) : {};
+        let any = false;
+        Object.keys(src).forEach(function (name) {
+          const list = Array.isArray(src[name]) ? src[name] : null;
+          if (!list) return;
+          const have = Array.isArray(dst[name]) ? dst[name].slice() : [];
+          const seen = Object.create(null);
+          have.forEach(function (e) { if (e && e.d) seen[e.d] = 1; });
+          let touched = false;
+          list.forEach(function (e) {
+            if (!e || !DAY_KEY.test(String(e.d)) || e.d < from || seen[e.d]) return;
+            have.push(e); seen[e.d] = 1; touched = true;
+          });
+          if (!touched) return;
+          have.sort(function (a, b) { return String(a.d) < String(b.d) ? -1 : 1; });
+          dst[name] = have;
+          any = true;
+        });
+        if (any) { out[field] = dst; added.push(field); }
+        return;
+      }
+
+      dropped.push(field);
+    });
+
+    return { merged: out, added: added, dropped: dropped };
   }
 
   /*
@@ -1312,12 +1432,35 @@
      */
     let merged = await api.getProfile();
     const baseTs = Date.parse((merged && merged.updatedAt) || '') || 0;
+    /* Патчі, з яких вдалося взяти не все: їх кладемо в резервний слот,
+       щоб нічого не зникало мовчки (див. mergeStalePatch). */
+    const partial = [];
     mine.forEach(function (item) {
       if (!item || !item.patch) return;
-      if (baseTs && Number(item.at) < baseTs) return;
+      if (baseTs && Number(item.at) < baseTs) {
+        /*
+         * СТАРИЙ ПАТЧ НЕ ВИКИДАЄМО. Раніше тут стояв просто return, і
+         * офлайнове тренування зникало з усіх пристроїв, щойно з іншого
+         * пристрою зберігся новіший профіль. Тепер патч дописує в
+         * журнали те, чого в новішому профілі немає, а решту чесно
+         * віддає в dropped.
+         */
+        const r = mergeStalePatch(merged, item.patch, dayKeyOf(new Date(Number(item.at))));
+        merged = r.merged;
+        if (r.dropped.length) partial.push({ at: item.at, dropped: r.dropped, patch: item.patch });
+        return;
+      }
       merged = Object.assign({}, merged, item.patch);
     });
     merged.updatedAt = new Date().toISOString();
+
+    if (partial.length) {
+      /* Слот перезаписується, а не накопичується: він потрібен, щоб
+         дістати дані руками, а не як другий журнал. */
+      lsSet(LS_BACKUP_STALE, { savedAt: new Date().toISOString(), items: partial.slice(-20) });
+      console.warn('[store] частину старих патчів не вдалося накласти цілком — ' +
+        'збережено в ' + LS_BACKUP_STALE + ' (' + partial.length + ')');
+    }
 
     await pushToCloud(merged);
 
@@ -1331,13 +1474,23 @@
      * pushToCloud). Якщо за цей час звʼязок знову впав і doSave устиг
      * покласти новий патч, removeItem видаляв би його разом із рештою —
      * після того, як інтерфейс уже пообіцяв, що патч у черзі.
+     *
+     * Шукаємо ЗА ОЗНАКОЮ ЗАПИСУ, а не за довжиною. Було
+     * `after.slice(mine.length)` — припущення, що черга могла тільки
+     * вирости. Але pendingPush не лише додає: він ЗГОРТАЄ чергу,
+     * викидаючи записи, чиї ключі перекриває новий патч. Тож довжина
+     * могла лишитись тією самою при зовсім іншому вмісті, і зі щойно
+     * покладеного патча знімався хтось інший — тобто дані, які ніколи не
+     * відправляли. Старі записи без id порівнюємо за часом: гірше, ніж
+     * id, але краще, ніж індекс.
      */
-    const after = pendingGet();
-    if (after.length > mine.length) {
-      lsSet(LS_PENDING, after.slice(mine.length));
-    } else {
-      try { localStorage.removeItem(LS_PENDING); } catch (_) {}
-    }
+    const sentKeys = Object.create(null);
+    mine.forEach(function (it) { if (it) sentKeys[it.id || ('at:' + it.at)] = 1; });
+    const left = pendingGet().filter(function (it) {
+      return it && !sentKeys[it.id || ('at:' + it.at)];
+    });
+    if (left.length) lsSet(LS_PENDING, left);
+    else { try { localStorage.removeItem(LS_PENDING); } catch (_) {} }
     emit();
     return q.length;
   }
@@ -1525,6 +1678,11 @@
 
     pendingCount: function () { return pendingGet().length; },
     flushPending: flushPending,
+
+    /* Назовні — лише заради тестів: перевірити злиття старого патча
+       через справжній вхід-вихід із мережею означало б перевіряти
+       мережу, а не правило. Сторінки цього не кличуть. */
+    mergeStalePatch: mergeStalePatch,
 
     /**
      * Виклик серверної функції (PostgREST RPC) від імені сесії.

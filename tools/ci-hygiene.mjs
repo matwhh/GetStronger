@@ -755,6 +755,55 @@ for (const dep of CORE_DEPS) {
   }
 }
 
+/* ---- 22. Журнал не надсилають ОБʼЄКТОМ ------------------------------- */
+//
+// Правило описане в js/store.js (SYN-011): патч — це ПОВНЕ значення поля,
+// тож `saveProfile({ trackerLog: x })` з журналом, зчитаним при відкритті
+// сторінки, стирає все, що записали тим часом з іншого пристрою. Не за
+// день — увесь журнал відкочується до знімка.
+//
+// Правило вже двічі лагодили точково (js/weight-log.js, js/train-log.js,
+// js/today.js, js/workout.js) і двічі ж забували про сусідні місця: аудит
+// 17.09.2026 знайшов ще девʼять. Правило, яке тримається на памʼяті,
+// зношується — тому тепер його стереже збірка.
+//
+// Ловимо виклик, перший аргумент якого — літерал обʼєкта з ключем-журналом.
+// Функція (`saveProfile(function (p) {…})`) проходить, бо вона й виконується
+// вже на свіжому профілі.
+{
+  const JOURNALS = ['bodyLog', 'workLog', 'sessionLog', 'mealLog',
+                    'measureLog', 'trackerLog', 'weightLog'];
+  // Обгортки навколо saveProfile, які є в сторінкових файлах.
+  const SAVERS = ['saveProfile', 'saveOwn', 'persist'];
+  const reCall = new RegExp('\\b(' + SAVERS.join('|') + ')\\(\\{', 'g');
+
+  for (const f of tracked) {
+    if (!/^js\/.+\.js$/.test(f) || f === 'js/store.js') continue;
+    let src = '';
+    try { src = readFileSync(f, 'utf8'); } catch { continue; }
+
+    let m;
+    while ((m = reCall.exec(src))) {
+      // Від «{» читаємо до парної «}», щоб побачити саме цей аргумент.
+      let depth = 0, i = m.index + m[0].length - 1, end = -1;
+      for (; i < src.length && i < m.index + 4000; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') { depth--; if (!depth) { end = i; break; } }
+      }
+      if (end < 0) continue;
+      const arg = src.slice(m.index, end + 1);
+      const hit = JOURNALS.filter((k) => new RegExp('[{,]\\s*' + k + '\\s*:').test(arg));
+      if (!hit.length) continue;
+      const line = src.slice(0, m.index).split('\n').length;
+      fail(`${f}:${line} — ${m[1]}({ ${hit[0]}: … }) надсилає журнал ОБʼЄКТОМ. `
+         + 'Патч — це повне значення поля, тож запис з іншого пристрою зникне '
+         + 'разом з усім журналом. Передайте функцію: '
+         + `${m[1]}(function (p) { return { ${hit[0]}: … p.${hit[0]} … }; }) `
+         + '— див. SYN-011 у js/store.js.');
+    }
+  }
+}
+
 /* ---- підсумок -------------------------------------------------------- */
 if (problems.length) {
   console.error('Гігієна репозиторію — знайдено проблеми:\n');

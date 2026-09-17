@@ -1834,15 +1834,28 @@
   async function rtMarkToday() {
     try {
       const p = await window.Store.getProfile() || {};
-      const log = (p.workLog && typeof p.workLog === 'object' && !Array.isArray(p.workLog))
-        ? p.workLog : {};
       const d = new Date();
       const key = d.getFullYear() + '-' +
         String(d.getMonth() + 1).padStart(2, '0') + '-' +
         String(d.getDate()).padStart(2, '0');
-      if (log[key]) return;
-      log[key] = 1;
-      await window.Store.saveProfile({ workLog: log });
+      if (p.workLog && p.workLog[key]) return;
+      /*
+       * ФУНКЦІЄЮ, І БЕЗ МУТАЦІЇ НА МІСЦІ (SYN-011).
+       *
+       * Було два проміахи одразу: журнал мутувався просто в профілі
+       * (`log[key] = 1` писало в обʼєкт, який Store віддав як кеш), а
+       * потім надсилався ЦІЛИМ значенням — тобто позначка з таймера
+       * відкочувала весь workLog до знімка, зчитаного на початку цієї ж
+       * функції. Тепер зміна виконується на свіжому профілі й торкається
+       * рівно одного дня.
+       */
+      await window.Store.saveProfile(function (pr) {
+        const log = (pr && pr.workLog && typeof pr.workLog === 'object' &&
+                     !Array.isArray(pr.workLog)) ? pr.workLog : {};
+        const next = Object.assign({}, log);
+        next[key] = 1;
+        return { workLog: next };
+      });
       toast('День позначено в журналі', 'ok');
     } catch (_) { /* журнал — не критичний шлях таймера */ }
   }

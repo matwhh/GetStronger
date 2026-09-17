@@ -2585,13 +2585,23 @@
        */
       if (!profile.weightsHarvested) {
         const moved = harvestWeights(state.custom);
-        Object.keys(state.weights).forEach(function (n) {
-          logWeight(n, Number(state.weights[n]));
-        });
-        saveOwn({
-          weights: state.weights,
-          weightLog: state.weightLog,
-          weightsHarvested: true
+        const names = Object.keys(state.weights);
+        names.forEach(function (n) { logWeight(n, Number(state.weights[n])); });
+        /*
+         * Книга ваг — ФУНКЦІЄЮ (SYN-011). Міграція разова, але вона
+         * однаково надсилала weightLog ЦІЛИМ значенням, зчитаним на
+         * завантаженні сторінки: запис, зроблений тим часом з іншого
+         * пристрою, зникав разом з усією історією сили. Тепер ті самі
+         * appendWeight виконуються вже на свіжому профілі.
+         */
+        saveOwn(function (pr) {
+          let log = (pr && pr.weightLog) || {};
+          if (window.HistoryCore) {
+            names.forEach(function (n) {
+              log = window.HistoryCore.appendWeight(log, n, Number(state.weights[n]));
+            });
+          }
+          return { weights: state.weights, weightLog: log, weightsHarvested: true };
         }).catch(function (e) {
           if (!(e && e.queued)) console.warn('[programs] міграція ваг не збереглась:', e.message);
         });

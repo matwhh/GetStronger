@@ -503,9 +503,21 @@
     persist({ trackers: next });
   }
 
-  function saveLog(next) {
-    state.log = next;
-    persist({ trackerLog: next });
+  /**
+   * Записати зміну журналу трекерів.
+   *
+   * Приймає ФУНКЦІЮ перетворення, а не готовий журнал (SYN-011). Патч —
+   * це повне значення поля, тож `trackerLog`, зчитаний при відкритті
+   * сторінки, стирав усе, що записали тим часом з телефона: вода, сон і
+   * звички за день відкочувались до знімка на момент відкриття. Те саме
+   * перетворення застосовується двічі — до стану екрана й до свіжого
+   * профілю всередині збереження.
+   */
+  function saveLog(mk) {
+    state.log = mk(state.log || {});
+    persist(function (pr) {
+      return { trackerLog: mk((pr && pr.trackerLog) || {}) };
+    });
   }
 
   function renderAll() {
@@ -568,9 +580,12 @@
             renderBuiltins();
             return;
           }
-          saveLog(mins === null
-            ? T.removeEntry(state.log, id, todayKey())
-            : T.logValue(state.trackers, state.log, id, mins, todayKey()));
+          const kToday = todayKey();
+          saveLog(function (log) {
+            return mins === null
+              ? T.removeEntry(log, id, kToday)
+              : T.logValue(state.trackers, log, id, mins, kToday);
+          });
           renderBuiltins();
         }, 0);
         return;
@@ -621,14 +636,16 @@
 
       const add = e.target.closest('[data-add]');
       if (add) {
-        saveLog(T.addDelta(state.trackers, state.log, add.dataset.add, Number(add.dataset.amount), todayKey()));
+        const addId = add.dataset.add, addN = Number(add.dataset.amount), addK = todayKey();
+        saveLog(function (log) { return T.addDelta(state.trackers, log, addId, addN, addK); });
         renderBuiltins();
         return;
       }
 
       const sc = e.target.closest('[data-scale]');
       if (sc) {
-        saveLog(T.logValue(state.trackers, state.log, sc.dataset.scale, Number(sc.dataset.val), todayKey()));
+        const scId = sc.dataset.scale, scV = Number(sc.dataset.val), scK = todayKey();
+        saveLog(function (log) { return T.logValue(state.trackers, log, scId, scV, scK); });
         renderBuiltins();
         return;
       }
@@ -636,7 +653,8 @@
       const pr = e.target.closest('[data-pair]');
       if (pr) {
         const patch = {}; patch[pr.dataset.field] = Number(pr.dataset.val);
-        saveLog(T.logValue(state.trackers, state.log, pr.dataset.pair, patch, todayKey()));
+        const prId = pr.dataset.pair, prK = todayKey();
+        saveLog(function (log) { return T.logValue(state.trackers, log, prId, patch, prK); });
         renderBuiltins();
         return;
       }
@@ -655,14 +673,16 @@
          * головній, і прибрати його можна було лише через ✕ в історії.
          */
         if (!raw) {
-          saveLog(T.removeEntry(state.log, id, todayKey()));
+          const rmK = todayKey();
+          saveLog(function (log) { return T.removeEntry(log, id, rmK); });
           renderBuiltins();
           toast('Запис за сьогодні прибрано', 'ok');
           return;
         }
         const v = Number(raw.replace(',', '.'));
         if (!Number.isFinite(v)) { toast('Введіть число', 'err'); return; }
-        saveLog(T.logValue(state.trackers, state.log, id, v, todayKey()));
+        const lvK = todayKey();
+        saveLog(function (log) { return T.logValue(state.trackers, log, id, v, lvK); });
         renderBuiltins();
         toast('Записано', 'ok');
         return;
@@ -688,7 +708,7 @@
         // Журнал append-only: видалений запис нізвідки не відновити, а ✕
         // стоїть у щільному рядку поруч з іншими елементами.
         if (!window.confirm('Видалити запис за ' + d + '? Відновити його буде нічим.')) return;
-        saveLog(T.removeEntry(state.log, id, d));
+        saveLog(function (log) { return T.removeEntry(log, id, d); });
         renderBuiltins();
         toast('Запис видалено', 'ok');
         return;
@@ -719,7 +739,13 @@
         state.trackers = T.removeCustom(state.trackers, id);
         state.log = Object.assign({}, state.log);
         delete state.log[id];
-        persist({ trackers: state.trackers, trackerLog: state.log });
+        /* Реєстр трекерів — точкове поле, а журнал — функцією (SYN-011):
+           видалення однієї звички не має відкочувати весь журнал. */
+        persist(function (pr) {
+          const log = Object.assign({}, (pr && pr.trackerLog) || {});
+          delete log[id];
+          return { trackers: state.trackers, trackerLog: log };
+        });
         renderSupplements();
         renderHabits();
         return;

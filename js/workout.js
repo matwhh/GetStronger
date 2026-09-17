@@ -513,11 +513,22 @@
     askFinish(st, doFinish);
   }
 
-  /** Записати зміну трекера дня й одразу оновити екран */
-  function saveTrackerLog(next) {
-    state.trackerLog = next;
+  /**
+   * Записати зміну трекера дня й одразу оновити екран.
+   *
+   * Приймає ФУНКЦІЮ перетворення журналу, а не готовий журнал (SYN-011).
+   * Патч — це повне значення поля, тож надісланий `trackerLog`, зчитаний
+   * при відкритті сторінки, стирав усе, що записали тим часом з іншого
+   * пристрою: вода, сон і настрій за день відкочувались до ранкового
+   * знімка. Те саме перетворення застосовується двічі — до стану екрана
+   * (щоб намалювати одразу) і до свіжого профілю всередині збереження.
+   */
+  function saveTrackerLog(mk) {
+    state.trackerLog = mk(state.trackerLog || {});
     render();
-    saveOwn({ trackerLog: next }).catch(function (e) {
+    saveOwn(function (pr) {
+      return { trackerLog: mk((pr && pr.trackerLog) || {}) };
+    }).catch(function (e) {
       if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err');
     });
   }
@@ -1678,7 +1689,10 @@
       const pr = TC && e.target.closest('[data-trk-pair]');
       if (pr) {
         const patch = {}; patch[pr.dataset.field] = Number(pr.dataset.val);
-        saveTrackerLog(TC.logValue(state.trackers, state.trackerLog, pr.dataset.trkPair, patch, state.todayKey));
+        const pair = pr.dataset.trkPair;
+        saveTrackerLog(function (log) {
+          return TC.logValue(state.trackers, log, pair, patch, state.todayKey);
+        });
       }
     });
   }

@@ -2937,13 +2937,21 @@
         /* Три стани перемикача (немає ключа / 1 / явний 0) живуть в ядрі:
            той самий перемикач стоїть на сторінці «Дні тренувань». */
         state.workLog = window.DayLogCore.toggleTrained(state.workLog, state.sessionLog, k);
-        persist({ workLog: state.workLog });
+        /* Функцією (SYN-011): позначка одного дня не має відкочувати
+           весь журнал до стану на момент відкриття сторінки. */
+        persist(function (pr) {
+          return { workLog: window.DayLogCore.toggleTrained(
+            (pr && pr.workLog) || {}, (pr && pr.sessionLog) || {}, k) };
+        });
         keepFocus(renderTrain);
         return;
       }
       if (e.target.closest('#t-mark')) {
-        state.workLog = window.DayLogCore.markTrained(state.workLog, todayKey());
-        persist({ workLog: state.workLog });
+        const today = todayKey();
+        state.workLog = window.DayLogCore.markTrained(state.workLog, today);
+        persist(function (pr) {
+          return { workLog: window.DayLogCore.markTrained((pr && pr.workLog) || {}, today) };
+        });
         keepFocus(renderTrain);
         toast('Позначено', 'ok');
       }

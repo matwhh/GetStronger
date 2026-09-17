@@ -888,12 +888,28 @@
 
     render();
 
-    const snapshot = {
-      progression: state.profile.progression,
-      weights: state.profile.weights,
-      weightLog: state.profile.weightLog
-    };
-    window.Store.saveProfile(weightDelta ? snapshot : { progression: snapshot.progression })
+    /*
+     * ІСТОРІЯ ВАГ — ФУНКЦІЄЮ (SYN-011).
+     *
+     * weightLog, зчитаний при відкритті «Сьогодні», надісланий цілим
+     * значенням стирав записи, зроблені тим часом у «Моєму плані» чи з
+     * іншого пристрою. progression і weights — це точкові поля самої
+     * вправи, їх можна слати як є, але журнал перераховуємо вже на
+     * свіжому профілі тим самим appendWeight.
+     */
+    const prgNow = state.profile.progression;
+    const wts = state.profile.weights;
+    const newKg = weightDelta ? Number((wts || {})[name]) : null;
+    window.Store.saveProfile(weightDelta
+      ? function (pr) {
+          const out = { progression: prgNow, weights: wts };
+          if (window.HistoryCore && Number.isFinite(newKg) && newKg > 0) {
+            out.weightLog = window.HistoryCore.appendWeight(
+              (pr && pr.weightLog) || {}, name, newKg);
+          }
+          return out;
+        }
+      : { progression: prgNow })
       .catch(function (e) {
         if (e && e.queued) return;
         if (window.App && window.App.toast) window.App.toast('Не збереглося: ' + e.message, 'err');

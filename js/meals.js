@@ -1209,9 +1209,17 @@
     state.quickKcal = '';
     state.quickP = '';
 
-    const patch = { mealLog: log, day: state.day };
+    /* Журнал — ФУНКЦІЄЮ (SYN-011): день, записаний тим часом з іншого
+       пристрою, не має зникати разом з усім mealLog. Те саме
+       перетворення, що вище, але вже на свіжому профілі. */
     try {
-      await window.Store.saveProfile(patch);
+      await window.Store.saveProfile(function (pr) {
+        return {
+          mealLog: window.HistoryCore.quickDay(
+            (pr && pr.mealLog) || {}, key, kcal, prot, t ? t.kcal : null, t ? t.protein : null),
+          day: EMPTY_DAY()
+        };
+      });
       /* Текст мусить збігатися з тим, що робить сервер. Було «білкова
          частина не рахується» — а вона рахувалась, і то як провалена. */
       toast('День записано приблизно: ' + log[key].kcal + ' ккал' +
@@ -1694,9 +1702,16 @@
     state.profile.mealLog = log;
     state.day = EMPTY_DAY();
 
-    const patch = { mealLog: log, day: state.day };
+    /* Журнал — ФУНКЦІЄЮ (SYN-011), див. коментар у швидкому записі дня. */
     try {
-      await window.Store.saveProfile(patch);
+      await window.Store.saveProfile(function (pr) {
+        return {
+          mealLog: window.HistoryCore.closeDay(
+            (pr && pr.mealLog) || {}, key, got, t ? t.kcal : null, t ? t.protein : null,
+            window.DayCore.hasFrozenItems(frozen) ? frozen : null),
+          day: EMPTY_DAY()
+        };
+      });
       toast('День закрито: ' + log[key].kcal + ' ккал в історії', 'ok');
     } catch (e) {
       toast(e.queued ? e.message : 'Не збереглося: ' + e.message, e.queued ? 'ok' : 'err');

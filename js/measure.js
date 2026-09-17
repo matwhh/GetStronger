@@ -214,15 +214,39 @@
       nextLog[d] = Object.assign({}, nextLog[d] || {}, entry);
     }
 
-    const patch = { measureLog: nextLog };
     if (weight !== null) {
       state.bodyLog = Object.assign({}, state.bodyLog);
       state.bodyLog[d] = weight;
-      patch.bodyLog = state.bodyLog;
     }
 
+    /*
+     * ЖУРНАЛ ПЕРЕДАЄТЬСЯ ФУНКЦІЄЮ (SYN-011).
+     *
+     * Патч — це ПОВНЕ значення поля. Якщо надіслати measureLog, зчитаний
+     * при відкритті сторінки, то замір, зроблений тим часом з іншого
+     * пристрою, зникне разом із усім журналом — не за день, а цілком.
+     * Функція виконується вже на свіжому профілі, тож правка лягає
+     * ТОЧКОВО: міняється лише той день, який людина щойно редагувала.
+     */
+    const editing = state.editing;
+    const mode = state.editMode;
     try {
-      await Store.saveProfile(patch);
+      await Store.saveProfile(function (pr) {
+        const log = Object.assign({}, (pr && pr.measureLog) || {});
+        if (mode === 'edit') {
+          if (editing !== d && log[editing]) delete log[editing];
+          if (entry) log[d] = entry;
+          else if (log[d]) delete log[d];
+        } else if (entry) {
+          log[d] = Object.assign({}, log[d] || {}, entry);
+        }
+        const out = { measureLog: log };
+        if (weight !== null) {
+          out.bodyLog = Object.assign({}, (pr && pr.bodyLog) || {});
+          out.bodyLog[d] = weight;
+        }
+        return out;
+      });
       toast('Замір збережено', 'ok');
     } catch (e) {
       toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');
@@ -240,7 +264,13 @@
     const nextLog = Object.assign({}, state.log);
     delete nextLog[k];
     try {
-      await Store.saveProfile({ measureLog: nextLog });
+      /* Функцією, а не обʼєктом: видалення одного дня не має відкочувати
+         весь журнал до стану на момент відкриття сторінки (SYN-011). */
+      await Store.saveProfile(function (pr) {
+        const log = Object.assign({}, (pr && pr.measureLog) || {});
+        delete log[k];
+        return { measureLog: log };
+      });
       toast('Замір видалено', 'ok');
     } catch (e) {
       toast(e && e.queued ? e.message : 'Не збереглося: ' + (e && e.message), e && e.queued ? 'ok' : 'err');

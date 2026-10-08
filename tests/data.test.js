@@ -33,8 +33,8 @@ describe('групи мʼязів', () => {
      * чисел, у тому числі за розсинхронізованих. Тепер числа названі явно —
      * зміна VOLUME_CAP має бути свідомою і видимою в diff.
      */
-    assert.equal(VOLUME_CAP.large, 14, 'стеля великої групи');
-    assert.equal(VOLUME_CAP.small, 12, 'стеля малої групи');
+    assert.equal(VOLUME_CAP.large, 30, 'стеля великої групи');
+    assert.equal(VOLUME_CAP.small, 30, 'стеля малої групи');
     for (const m of MUSCLES) {
       assert.equal(typeof m.cap, 'number', `група ${m.id}: cap не число`);
       assert.ok(m.cap <= VOLUME_CAP[m.size],

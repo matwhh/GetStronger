@@ -1,0 +1,39 @@
+--- VOLUME_CAP ---
+js/programs-data.js:704:     правило, що для решти схем; стелі з VOLUME_CAP у js/exercises.js):
+js/exercises.js:63:const VOLUME_CAP = { large: 14, small: 12 };
+js/exercises.js:107:  // розсинхронізувати з VOLUME_CAP при правці списку. Явно заданий cap
+js/exercises.js:109:  return Object.assign({ cap: VOLUME_CAP[m.size] }, m);
+js/exercises.js:267:window.VOLUME_CAP = VOLUME_CAP;
+js/programs.js:232:        'велика група — ' + window.VOLUME_CAP.large + ' робочих підходів, мала — ' + window.VOLUME_CAP.small + '. ' +
+tests/programs-sex.test.js:285:      return m ? (m.cap ?? w.VOLUME_CAP[m.size]) : Infinity;
+tests/data.test.js:14:const { MUSCLES, EXERCISES, VOLUME_CAP, musclesOfExercise, primaryMuscle, liftKind } = W;
+tests/data.test.js:31:     * TST-013: тут стояло assert.equal(m.cap ?? VOLUME_CAP[m.size], expected),
+tests/data.test.js:34:     * зміна VOLUME_CAP має бути свідомою і видимою в diff.
+tests/data.test.js:36:    assert.equal(VOLUME_CAP.large, 14, 'стеля великої групи');
+tests/data.test.js:37:    assert.equal(VOLUME_CAP.small, 12, 'стеля малої групи');
+tests/data.test.js:40:      assert.ok(m.cap <= VOLUME_CAP[m.size],
+tests/data.test.js:41:        `група ${m.id}: cap ${m.cap} більший за стелю розміру ${VOLUME_CAP[m.size]}`);
+tests/data.test.js:49:    const custom = MUSCLES.filter((m) => m.cap !== VOLUME_CAP[m.size]).map((m) => m.id);
+tests/data.test.js:115:      return m ? (m.cap ?? w.VOLUME_CAP[m.size]) : Infinity;
+--- де задано large/small ---
+js/reps-core.js:68:  const MAX = { large: 12, small: 15 };
+js/exercises.js:63:const VOLUME_CAP = { large: 14, small: 12 };
+--- числа 14 і 12 у текстах про підходи ---
+js/programs-data.js:292:   12 вправ · 28 робочих підходів за сесію · 84 за тиждень. Кожна група
+js/programs-data.js:326:       4–5 днів → 120 підходів
+js/programs-data.js:328:     Це свідомо: на трьох днях 120 підходів давали б 40 за сесію,
+js/programs-data.js:334:       Біцепс 8 · Трицепс 8 · Прес 12 · Ікри 8          = 120 підходів
+js/programs-data.js:367:      'Тижневий обʼєм: 102 підходи на трьох днях, 120 на чотирьох і пʼяти.',
+js/programs-data.js:715:     плану, і саме він тягне біцепс стегна до 12 підходів.
+js/programs-data.js:735:      'Акцент на сідниці й біцепс стегна: 14 і 12 підходів за тиждень.',
+js/programs-data.js:763:      'Усі три тренування повністю ідентичні: 12 вправ, 28 робочих підходів.',
+js/journal.js:1836:   * картка нижче — по фактичних підходах за 14. «Новий PR» означало на
+js/journal.js:2156:          /* Підходи точніші за вправи: 4 з 20 підходів і «0 з 14 вправ» —
+js/nutrition-core.js:53:    cutfast: { label: 'Агресивне схуднення', pct: -0.25, maxMonths: 3, rate: '≈−0,8% маси тіла на тиждень, макс. 8–12 тижнів' }
+js/exercises.js:47:          велика група — 14 робочих підходів на тиждень, мала — 12.
+nutrition.html:231:              4 силові тренування на тиждень і працювали на набір 8–12 тижнів. Різниця була
+programs.html:132:              єдиний орієнтир: <b>14</b> робочих підходів на тиждень для великих груп,
+research.html:271:          3 підходи по 8–12 ПМ у 7 вправах. Група з 3-хвилинним відпочинком показала більший приріст
+tests/programs-sex.test.js:346:  it('три ідентичні дні по 12 вправ і 28 підходів; 84 за тиждень', () => {
+tests/tracker-core.test.js:734:      '2026-08-10', '2026-08-12',     // тиждень 10–16
+tests/workout-core.test.js:97:    // −10 хв розминки −(40+180) c підходу ≈ −14 хв

@@ -1,0 +1,320 @@
+--- 1. Схожі назви ---
+js/progression-core.js:247:    var days = Number(profile.daysPerWeek) ||
+js/elo-api.js:264:        Number(p.activePlan && p.activePlan.days) || Number(p.daysPerWeek) || 3)));
+js/progress-core.js:75:   * delta — між першим і останнім записом ПЕРІОДУ; perWeek — той самий
+js/progress-core.js:105:      perWeek: window.Enough.gate(window.Enough.of(s.length, 0, { min: 3 }),
+js/progress-core.js:155:    const kgAt = function (pctPerWeek, t) {
+js/progress-core.js:157:      return anchor.kg * Math.pow(1 + pctPerWeek / 100, t / 7);
+js/progress-core.js:463:   * weeklySets у планах, «Підходів на тиждень по групах мʼязів», стеля на
+js/adherence-core.js:51:    weeklyBudget: 200, categoryShare: 0.857,
+js/adherence-core.js:115:    const n = Number(a.days) || Number(profile && profile.daysPerWeek) || 0;
+js/store.js:243:      daysPerWeek: null, programId: null, goal: null,
+js/journal.js:500:          trend: b30.perWeek !== null
+js/journal.js:501:            ? sign(b30.perWeek) + ' кг/тиж'
+js/journal.js:625:      (st.perWeek !== null ? '<span class="small">Темп: <b class="mono">' + sign(st.perWeek) + ' кг/тиж</b></span>' : '') +
+js/journal.js:2464:    const days = Number(p.activePlan && p.activePlan.days) || Number(p.daysPerWeek) || 0;
+js/elo-core.js:257:   * Тижнева стеля в грі спільна — weeklyBudget × темп, незалежно від
+js/elo-core.js:296:  function weeklyBudget(cat, cfg, elo) {
+js/elo-core.js:297:    return cfg.weeklyBudget * pace(elo, cfg) * cfg.categoryShare * cfg.weights[cat];
+js/elo-core.js:300:  function dailyBudget(cat, cfg, elo) { return weeklyBudget(cat, cfg, elo) / 7; }
+js/elo-core.js:331:    const per = weeklyBudget('training', cfg, ctx && ctx.elo) /
+js/elo-core.js:486:   * (weeklyBudget), план тренувань тижневий, штраф за пропуск теж
+js/elo-core.js:521:    weeklyBudget: weeklyBudget,
+js/help.js:67:      const raw = Number(p.activePlan && p.activePlan.days) || Number(p.daysPerWeek) || 3;
+js/help.js:176:            ['Тижневий бюджет', 'не більше ' + cfg.weeklyBudget + ' × темп рівня',
+js/import-core.js:33:  const ALLOWED_KEYS = ['birthDate','sex','age','height','weight','goalWeight','bodyfat','daysPerWeek',
+js/import-core.js:75:    daysPerWeek: [1, 7], meals: [1, 8],
+js/import-core.js:83:    sex: 1, age: 1, height: 1, weight: 1, goalWeight: 1, bodyfat: 1, daysPerWeek: 1,
+js/import-core.js:435:        if (n !== null && (k === 'daysPerWeek' || k === 'meals')) n = Math.round(n);
+js/account.js:408:          field('Днів у залі на тиждень', segInput('daysPerWeek', p.daysPerWeek,
+js/account.js:496:    daysPerWeek: [1, 7], hrRest: [30, 110], hrMax: [120, 230], meals: [2, 6]
+js/programs.js:66:  function weeklySets(plan) {
+js/programs.js:1065:            '<span><b class="mono">' + weeklySets(plan) + '</b> підх./тиждень</span>' +
+js/programs.js:1296:          '<input class="input input--sm num mono" type="number" min="1" max="' + maxSetsFor(dayIdx, i) + '" step="1" ' +
+js/programs.js:1297:            'value="' + esc(ex.sets) + '" title="Максимум за тижневою межею: ' + maxSetsFor(dayIdx, i) + '" ' +
+js/programs.js:1826:          '<div class="kpi"><div class="kpi__val">' + weeklySets(plan) + '</div><p class="kpi__lbl">підходів / тиждень</p></div>' +
+js/programs.js:1960:  function maxSetsFor(dayIdx, i) {
+js/programs.js:2080:      const max = maxSetsFor(dayIdx, i);
+js/programs.js:2157:      const max = maxSetsFor(dayIdx, i);
+js/programs.js:2676:    if (profile.daysPerWeek) {
+js/programs.js:2677:      const el = $$('input[name="days"]').find(function (x) { return Number(x.value) === profile.daysPerWeek; });
+js/programs.js:2730:      saveOwn({ programId: state.programId, daysPerWeek: state.days }).catch(function (e) { if (!(e && e.queued)) toast('Не збереглося: ' + e.message, 'err'); });
+js/programs.js:2815:          daysPerWeek: state.days
+db/admin-elo-anomalies.sql:14:--   capWeeks       тижнів, коли позитивна сума впирається у weeklyBudget
+db/admin-elo-anomalies.sql:28:  budget int := (select (data->>'weeklyBudget')::int from elo_config where id = 1);
+db/admin-elo.sql:157:      coalesce((data#>>'{activePlan,days}')::int, (data->>'daysPerWeek')::int, 3)))
+db/admin-elo.sql:181:  -- daysPerWeek більше не дає нічого: бюджет однаковий.
+db/admin-elo.sql:189:      (cfg->>'weeklyBudget')::numeric * (cfg->>'categoryShare')::numeric
+db/elo-authoritative.sql:181:  weekly numeric := (cfg->>'weeklyBudget')::numeric * (cfg->>'categoryShare')::numeric;
+db/elo-authoritative.sql:322:      coalesce((data#>>'{activePlan,days}')::int, (data->>'daysPerWeek')::int, 3)))
+db/elo-authoritative.sql:466:      coalesce((data#>>'{activePlan,days}')::int, (data->>'daysPerWeek')::int, 3)))
+db/elo-authoritative.sql:490:  -- daysPerWeek більше не дає нічого: бюджет однаковий.
+db/elo-authoritative.sql:498:      (cfg->>'weeklyBudget')::numeric * (cfg->>'categoryShare')::numeric
+db/elo-engine.sql:37:insert into public.elo_config (id, data) values (1, '{"version":4,"seasonMax":3000,"levelSize":240,"levelCount":10,"levelPace":[2.1,1.9,1.75,1.6,1.45,1.3,1.2,1.1,1.0,0.9],"elitePace":0.8,"eliteFloor":2400,"weeklyBudget":200,"weights":{"training":0.3,"nutrition":0.3,"sleep":0.2,"recovery":0.1,"activity":0.1},"skippable":["nutrition"],"categoryShare":0.857,"cleanDayBonus":3,"cleanWeekBonus":9,"cleanThreshold":0.9,"partialNutritionCap":0.85,"nutritionSplit":{"kcal":0.55,"protein":0.45},"tolerance":{"training":[[0.99,1.0],[0.97,0.82],[0.9,0.45],[0.8,0.45],[0.65,0.3],[0.5,0.12],[0,0.05]],"kcalBand":[[0.02,1.0],[0.05,0.82],[0.1,0.5],[0.2,0.45],[0.35,0.15],[1,0.05]],"protein":[[0.99,1.0],[0.95,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]],"sleep":[[0.99,1.0],[0.97,0.82],[0.9,0.55],[0.8,0.5],[0.65,0.22],[0,0.05]],"activity":[[0.99,1.0],[0.97,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]]},"recoveryFillShare":0.6,"recoveryGoodValue":7,"missedWorkoutPenalty":-8,"openMealPenalty":-3,"dayLossFloor":-15,"dayGainCap":45,"graceWeeksPerSeason":2,"graceDays":7,"submitWindowDays":2,"minUsersForPercentile":8,"leaderboardTops":[0.1,0.05,0.01],"leaderboardRanks":[1000,100,10,3,1],"floors":{"sleepGoalMin":240,"sleepMax":960,"stepsGoalMin":3000,"stepsMax":100000,"workoutTotalMin":3}}'::jsonb)
+db/elo-engine.sql:70:  weekly numeric := (cfg->>'weeklyBudget')::numeric * (cfg->>'categoryShare')::numeric;
+db/elo-engine.sql:175:      coalesce((data#>>'{activePlan,days}')::int, (data->>'daysPerWeek')::int, 3)))
+db/elo-engine.sql:301:      coalesce((data#>>'{activePlan,days}')::int, (data->>'daysPerWeek')::int, 3)))
+db/elo-integrity-tests.sql:8:-- Числа — з db/elo-config.json (weeklyBudget 200, dayGainCap 45, план 3 → 17).
+db/elo-integrity-tests.sql:22:  wfull int := round((cfgj->>'weeklyBudget')::numeric * public.elo_pace(0, cfgj)
+db/elo-integrity-tests.sql:25:  whalf int := round((cfgj->>'weeklyBudget')::numeric * public.elo_pace(0, cfgj)
+db/elo-integrity-tests.sql:35:  d_sleep int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-integrity-tests.sql:38:  d_rec int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-integrity-tests.sql:41:  d_act int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-integrity-tests.sql:44:  d_meal int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-integrity-tests.sql:47:  d_work6 int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-integrity-tests.sql:174:  budget := floor((cfgj->>'weeklyBudget')::numeric * public.elo_pace(0, cfgj))::int;
+db/elo-integrity.sql:46:--   P5        Один тижневий бюджет позитивного ELO = weeklyBudget (200) на
+db/elo-integrity.sql:126:         coalesce((data #>> '{activePlan,days}')::int, (data ->> 'daysPerWeek')::int, 3)))
+db/elo-integrity.sql:139:  select greatest(0, (cfg ->> 'weeklyBudget')::int - coalesce((
+db/elo-integrity.sql:371:      (cfg->>'weeklyBudget')::numeric * (cfg->>'categoryShare')::numeric
+db/elo-pace-recount.sql:102:          base := (cfg->>'weeklyBudget')::numeric * pace * (cfg->>'categoryShare')::numeric
+db/elo-pace-recount.sql:105:          base := (cfg->>'weeklyBudget')::numeric * pace * (cfg->>'categoryShare')::numeric
+db/elo-pace-recount.sql:108:          base := (cfg->>'weeklyBudget')::numeric * pace * (cfg->>'categoryShare')::numeric
+db/elo-pace-recount.sql:115:          base := (cfg->>'weeklyBudget')::numeric * pace * (cfg->>'categoryShare')::numeric
+db/elo-pace-recount.sql:119:          base := (cfg->>'weeklyBudget')::numeric * pace * (cfg->>'categoryShare')::numeric
+db/elo-pace-recount.sql:144:      week_cap  := floor((cfg->>'weeklyBudget')::numeric * pace)::int;
+db/elo-pace-recount.sql:145:      train_cap := round((cfg->>'weeklyBudget')::numeric * pace
+db/elo-pace.sql:35:-- ДЗЕРКАЛО КЛІЄНТА. Те саме рахує js/elo-core.js (pace, weeklyBudget,
+db/elo-pace.sql:75:  weekly numeric := (cfg->>'weeklyBudget')::numeric * public.elo_pace(p_elo, cfg)
+db/elo-pace.sql:162:  return greatest(0, floor((cfg ->> 'weeklyBudget')::numeric
+db/elo-pace.sql:241:      (cfg->>'weeklyBudget')::numeric * public.elo_pace(st.elo, cfg)
+db/elo-pace.sql:400:update public.elo_config set data = '{"version":3,"seasonMax":3000,"levelSize":240,"levelCount":10,"levelPace":[2.1,1.9,1.75,1.6,1.45,1.3,1.2,1.1,1.0,0.9],"elitePace":0.8,"eliteFloor":2400,"weeklyBudget":200,"weights":{"training":0.3,"nutrition":0.3,"sleep":0.2,"recovery":0.1,"activity":0.1},"categoryShare":0.857,"cleanDayBonus":3,"cleanWeekBonus":9,"cleanThreshold":0.9,"nutritionSplit":{"kcal":0.55,"protein":0.45},"tolerance":{"training":[[0.99,1.0],[0.97,0.82],[0.9,0.45],[0.8,0.45],[0.65,0.3],[0.5,0.12],[0,0.05]],"kcalBand":[[0.02,1.0],[0.05,0.82],[0.1,0.5],[0.2,0.45],[0.35,0.15],[1,0.05]],"protein":[[0.99,1.0],[0.95,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]],"sleep":[[0.99,1.0],[0.97,0.82],[0.9,0.55],[0.8,0.5],[0.65,0.22],[0,0.05]],"activity":[[0.99,1.0],[0.97,0.82],[0.85,0.5],[0.7,0.45],[0.5,0.15],[0,0.05]]},"recoveryFillShare":0.6,"recoveryGoodValue":7,"missedWorkoutPenalty":-8,"openMealPenalty":-3,"dayLossFloor":-15,"dayGainCap":45,"graceWeeksPerSeason":2,"graceDays":7,"submitWindowDays":2,"minUsersForPercentile":8,"leaderboardTops":[0.1,0.05,0.01],"leaderboardRanks":[1000,100,10,3,1],"floors":{"sleepGoalMin":240,"sleepMax":960,"stepsGoalMin":3000,"stepsMax":100000,"workoutTotalMin":3}}'::jsonb where id = 1;
+db/elo-partial-cap-rollback.sql:96:  weekly numeric := (cfg->>'weeklyBudget')::numeric * public.elo_pace(p_elo, cfg)
+db/elo-partial-cap.sql:132:  weekly numeric := (cfg->>'weeklyBudget')::numeric * public.elo_pace(p_elo, cfg)
+db/elo-planned-and-retry.sql:8:--   coalesce((data #>> '{activePlan,days}')::int, (data ->> 'daysPerWeek')::int, 3)
+db/elo-planned-and-retry.sql:18:-- daysPerWeek округлюються до цілого — і при імпорті, і при виборі плану.
+db/elo-planned-and-retry.sql:54:      nullif(public.elo_num(data -> 'daysPerWeek', 0), 0),
+db/elo-proportional.sql:24:--      weeklyBudget × categoryShare × weights.training / planned_days.
+db/elo-proportional.sql:127:  weekly numeric := (cfg->>'weeklyBudget')::numeric * (cfg->>'categoryShare')::numeric;
+db/elo-recount-category.sql:138:  weekly numeric := (cfg->>'weeklyBudget')::numeric * p_pace * (cfg->>'categoryShare')::numeric;
+db/elo-recount-category.sql:259:    week_cap  := floor((cfg->>'weeklyBudget')::numeric * p_pace)::int;
+db/elo-recount-category.sql:260:    train_cap := round((cfg->>'weeklyBudget')::numeric * p_pace
+db/elo-skip-category-rollback.sql:187:        nullif(public.elo_num(data -> 'daysPerWeek', 0), 0),
+db/elo-skip-category-rollback.sql:281:      (cfg->>'weeklyBudget')::numeric * public.elo_pace(st.elo, cfg)
+db/elo-skip-category.sql:17:--  ЩО ЛАГОДИМО. Тижнева стеля в грі спільна: weeklyBudget × темп, і її
+db/elo-skip-category.sql:286:        nullif(public.elo_num(data -> 'daysPerWeek', 0), 0),
+db/elo-skip-category.sql:384:      (cfg->>'weeklyBudget')::numeric * public.elo_pace(st.elo, cfg)
+db/elo-tests.sql:12:-- відповідають db/elo-config.json: weeklyBudget 200, categoryShare 0.857,
+db/elo-tests.sql:28:  d_sleep int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-tests.sql:31:  d_rec int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-tests.sql:34:  d_act int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-tests.sql:37:  d_meal int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-tests.sql:40:  d_work6 int := round((cfgd->>'weeklyBudget')::numeric * public.elo_pace(0, cfgd)
+db/elo-tests.sql:168:  tb  := round((cfg->>'weeklyBudget')::numeric * public.elo_pace(0, cfg)
+db/elo-tests.sql:171:  per := round((cfg->>'weeklyBudget')::numeric * public.elo_pace(0, cfg)
+db/live-schema.sql:276:  budget int := (select (data->>'weeklyBudget')::int from elo_config where id = 1);
+db/live-schema.sql:517:  weekly numeric := (cfg->>'weeklyBudget')::numeric * public.elo_pace(p_elo, cfg)
+db/live-schema.sql:1139:  weekly numeric := (cfg->>'weeklyBudget')::numeric * p_pace * (cfg->>'categoryShare')::numeric;
+db/live-schema.sql:1359:      nullif(public.elo_num(data -> 'daysPerWeek', 0), 0),
+db/live-schema.sql:1498:    week_cap  := floor((cfg->>'weeklyBudget')::numeric * p_pace)::int;
+db/live-schema.sql:1499:    train_cap := round((cfg->>'weeklyBudget')::numeric * p_pace
+db/live-schema.sql:1611:        nullif(public.elo_num(data -> 'daysPerWeek', 0), 0),
+db/live-schema.sql:1712:      (cfg->>'weeklyBudget')::numeric * public.elo_pace(st.elo, cfg)
+db/live-schema.sql:1924:  return greatest(0, floor((cfg ->> 'weeklyBudget')::numeric
+db/sim-week.sql:39:  trainbudget int := round((cfg->>'weeklyBudget')::int * (cfg->>'categoryShare')::numeric
+db/sim-week.sql:69:      'daysPerWeek', plan_days[i],
+db/sim-week.sql:191:    select sum(delta) - floor((cfg->>'weeklyBudget')::numeric
+db/sim-week.sql:205:    select sum(delta) - round((cfg->>'weeklyBudget')::numeric
+--- 2. Тексти для користувача ---
+programs.html:132:              єдиний орієнтир: <b>14</b> робочих підходів на тиждень для великих груп,
+js/help-content.js:361:          ['Підходи', 'Скільки робочих підходів у вправі. Розминкові не рахуються й у план не пишуться.'],
+js/help-content.js:1046:        'Під назвою кожної схеми стоять три числа: скільки разів на тиждень тренується група мʼязів, скільки робочих підходів виходить за тиждень і скільки приблизно триває одне тренування. За ними схеми й порівнюють.',
+js/help-content.js:1176:        'Тому в «Огляді прогресу» є плитка «підходів за тиждень»: це єдине ' +
+js/help-content.js:1181:        'саме «підходів на тиждень», що стоїть під кожною схемою тренувань, ' +
+js/programs-data.js:15: *     sets:    3,                    // кількість робочих підходів
+js/programs-data.js:24: * саме з цього поля рахується таблиця «Підходів на тиждень».
+js/programs-data.js:292:   12 вправ · 28 робочих підходів за сесію · 84 за тиждень. Кожна група
+js/programs-data.js:713:     Разом 96 підходів за тиждень: 23 у кожному Push і 25 у кожному Pull.
+js/programs-data.js:735:      'Акцент на сідниці й біцепс стегна: 14 і 12 підходів за тиждень.',
+js/programs-data.js:763:      'Усі три тренування повністю ідентичні: 12 вправ, 28 робочих підходів.',
+js/progress-core.js:463:   * weeklySets у планах, «Підходів на тиждень по групах мʼязів», стеля на
+js/journal.js:572:        lbl: 'підходів за тиждень',
+js/exercises.js:11: * З цього працює все інше: таблиця «Підходів на тиждень» рахує обʼєм,
+js/exercises.js:47:          велика група — 14 робочих підходів на тиждень, мала — 12.
+js/programs.js:226:      '<h3 style="margin-bottom:4px">Підходів на тиждень по групах мʼязів</h3>' +
+js/programs.js:232:        'велика група — ' + window.VOLUME_CAP.large + ' робочих підходів, мала — ' + window.VOLUME_CAP.small + '. ' +
+js/programs.js:964:        '<p>' + list.length + ' вправ · ' + sets + ' робочих підходів</p>' +
+js/programs.js:2197:              (muscle ? muscle.cap : '') + ' підходів на тиждень', 'err');
+js/programs.js:2214:              (muscle ? muscle.cap : '') + ' підходів на тиждень', 'err');
+--- 3. Підходи + тиждень/ліміт ---
+./programs.html:7:<meta name="description" content="Full Body, UL, PPL і UL/PPL під 3–6 днів на тиждень. Підходи, повторення, RIR, відпочинок і прогресія.">
+./programs.html:129:            <h3 class="card__title">Підходи на тиждень</h3>
+./programs.html:132:              єдиний орієнтир: <b>14</b> робочих підходів на тиждень для великих груп,
+./programs.html:162:              <li><b>Видалити</b> вправу — і її підходи одразу зникнуть із тижневого обʼєму</li>
+./js/progression-core.js:24: *   2. ВПРАВА НА ВЕРХНІЙ МЕЖІ в УСІХ своїх робочих підходах того тижня.
+./js/help-content.js:322:          'підходів. Скільки днів на тиждень — стільки й тренувань: схема на 3 дні ' +
+./js/help-content.js:329:          'Обсяг на кожну мʼязову групу тримається в межах тижневої стелі: більше підходів редактор просто не дасть поставити.',
+./js/help-content.js:383:          'має свою робочу вагу й історію, а її підходи йдуть у тижневий обʼєм ' +
+./js/help-content.js:1031:        ['«Пошта або пароль не підходять»', 'Найчастіше це Caps Lock або незакрита розкладка — пароль набирається латиницею. Якщо не згадали з третього разу, простіше відновити, ніж угадувати.'],
+./js/help-content.js:1046:        'Під назвою кожної схеми стоять три числа: скільки разів на тиждень тренується група мʼязів, скільки робочих підходів виходить за тиждень і скільки приблизно триває одне тренування. За ними схеми й порівнюють.',
+./js/help-content.js:1053:        ['Редагування', 'Кнопка «Редагувати» над розкладом тижня. У ній: замінити вправу на іншу з тієї самої групи, посунути вище або нижче, змінити кількість підходів і повторень, видалити вправу, додати нову на потрібну групу, перейменувати день, видалити день цілком, додати день.'],
+./js/help-content.js:1054:        ['Тижневий обʼєм', 'Таблиця під планом. Вона рахує підходи за групами мʼязів і має стелю на кожну групу — більше вона просто не дасть поставити й скаже, чому.'],
+./js/help-content.js:1105:        'Розминка — це сходинки до робочої ваги (у програмах їх називали «підводними»). У рядку вправи вона стоїть цілком: «1×45×6–10 · 2×65×4–6» — номер підходу, вага і скільки разів. Відкривати нічого не треба; розминкові підходи кружечків не займають і в тижневий обʼєм не входять.',
+./js/help-content.js:1156:        ['Закриті підходи', 'роблять день тренувальним; тренувальні дні складаються в тиждень; тиждень дає оцінку рейтингу; оцінки за сезон дають рівень і нагороди.'],
+./js/help-content.js:1176:        'Тому в «Огляді прогресу» є плитка «підходів за тиждень»: це єдине ' +
+./js/help-content.js:1181:        'саме «підходів на тиждень», що стоїть під кожною схемою тренувань, ' +
+./js/help-content.js:1240:        ['«Час додати вагу» не зʼявляється', 'Перевірте дві речі: чи зроблено вправу стільки разів, скільки її планує тиждень, і чи в КОЖНОМУ підході закрито верхню межу діапазону. Одного вдалого підходу мало.']
+./js/programs-data.js:24: * саме з цього поля рахується таблиця «Підходів на тиждень».
+./js/programs-data.js:50:  'Розминкові підходи (сходинки до робочої ваги, раніше «підводні») не рахуються як робочі й не входять у тижневий обʼєм. Скільки їх — ставите самі на екрані тренування.',
+./js/programs-data.js:292:   12 вправ · 28 робочих підходів за сесію · 84 за тиждень. Кожна група
+./js/programs-data.js:367:      'Тижневий обʼєм: 102 підходи на трьох днях, 120 на чотирьох і пʼяти.',
+./js/programs-data.js:369:      'Якщо вправа в якийсь день відсутня — її підходи цього тижня вже стоять в інших днях.',
+./js/programs-data.js:703:     Тижневий обʼєм (підходи йдуть у ПЕРШУ групу в muscles — те саме
+./js/programs-data.js:713:     Разом 96 підходів за тиждень: 23 у кожному Push і 25 у кожному Pull.
+./js/programs-data.js:735:      'Акцент на сідниці й біцепс стегна: 14 і 12 підходів за тиждень.',
+./js/programs-data.js:764:      'Тижневий обʼєм — 28 × 3 = 84 робочі підходи; акцент на ноги, сідниці й спину.',
+./js/progress-core.js:454:   * СКІЛЬКИ ПІДХОДІВ ЗА ОСТАННІЙ ПОВНИЙ ТИЖДЕНЬ.
+./js/progress-core.js:463:   * weeklySets у планах, «Підходів на тиждень по групах мʼязів», стеля на
+./js/progress-core.js:480:  function setsStats(sessionLog, baseWeeks, now) {
+./js/progress-core.js:488:    /** Підходи й сесії за тиждень, що починається в monKey. */
+./js/progress-core.js:538:   *   hard  — більшість підходів доводиться до відмови. Тижнями поспіль
+./js/auth-msg-core.js:128:               text: 'Пошта або пароль не підходять. Найчастіше це Caps Lock або ' +
+./js/journal.js:554:     * Підходи за останній повний тиждень — ЄДИНЕ ВИМІРЯНЕ число про обʼєм
+./js/journal.js:572:        lbl: 'підходів за тиждень',
+./js/elo-core.js:328:    const total = Math.max(1, Number(bySets ? payload.totalSets : payload.total) || 0);
+./js/help.js:137:             'Усі підходи дня відмічені. Ваш план — ' + plan + ' тренувань на тиждень, ' +
+./js/tracker-core.js:88:      min: 0, max: 15, presets: [0.25, 0.5, 1], defaultGoal: 2.5
+./js/tracker-core.js:99:      min: 0, max: 100000, defaultGoal: 8000, presets: [1000, 5000], hasSource: true
+./js/tracker-core.js:103:      min: 0, max: 2000, presets: [30, 80, 150]
+./js/workout-core.js:252:    const cur = performedSets(entry, cap, fbW, fbR);
+./js/exercises.js:11: * З цього працює все інше: таблиця «Підходів на тиждень» рахує обʼєм,
+./js/exercises.js:47:          велика група — 14 робочих підходів на тиждень, мала — 12.
+./js/exercises.js:74: * потрібне рівно для кольору смуги в «Підходах на тиждень» — і лежить
+./js/exercises.js:92:     Разом вони давали 24 підходи на тиждень і виглядали як грубе перевищення,
+./js/exercises.js:284: * Саме сюди і тільки сюди йдуть підходи при підрахунку тижневого обʼєму.
+./js/exercise-core.js:76:    const sets = Math.max(0, Math.round(Number(row.ds) || 0));
+./js/programs.js:66:  function weeklySets(plan) {
+./js/programs.js:183:        if (sets > m.cap)       { state = 'over'; label = 'вище межі'; }
+./js/programs.js:184:        else if (sets === m.cap) { state = 'full'; label = 'на межі'; }
+./js/programs.js:188:          sets: sets, cap: m.cap,
+./js/programs.js:205:      const scale = Math.max(r.cap, r.sets);
+./js/programs.js:226:      '<h3 style="margin-bottom:4px">Підходів на тиждень по групах мʼязів</h3>' +
+./js/programs.js:232:        'велика група — ' + window.VOLUME_CAP.large + ' робочих підходів, мала — ' + window.VOLUME_CAP.small + '. ' +
+./js/programs.js:241:            over.map(function (r) { return '<b>' + esc(r.name) + '</b> ' + r.sets + ' при межі ' + r.cap; }).join(', ') +
+./js/programs.js:1065:            '<span><b class="mono">' + weeklySets(plan) + '</b> підх./тиждень</span>' +
+./js/programs.js:1296:          '<input class="input input--sm num mono" type="number" min="1" max="' + maxSetsFor(dayIdx, i) + '" step="1" ' +
+./js/programs.js:1297:            'value="' + esc(ex.sets) + '" title="Максимум за тижневою межею: ' + maxSetsFor(dayIdx, i) + '" ' +
+./js/programs.js:1463:   * а не з плану. У тижневий обʼєм не входять — це не робочі підходи.
+./js/programs.js:1702:           'а її підходи йдуть у тижневий обʼєм головній групі.',
+./js/programs.js:1826:          '<div class="kpi"><div class="kpi__val">' + weeklySets(plan) + '</div><p class="kpi__lbl">підходів / тиждень</p></div>' +
+--- 4. elo-core.js weeklyBudget ---
+254-  /*
+255-   * КОНФІГ ПІД ЛЮДИНУ: ВИМКНЕНІ КАТЕГОРІЇ.
+256-   *
+257:   * Тижнева стеля в грі спільна — weeklyBudget × темп, незалежно від
+258-   * категорій (elo_week_room на сервері). Ваги лише ділять цю стелю. Тому
+259-   * людина, яка не веде щоденник їжі, не «заробляла менше за ті самі
+260-   * дії» — вона мала НЕДОСЯЖНИЙ кусок власної стелі: 30 %, закріплені за
+261-   * категорією, якої в неї немає.
+262-   *
+263-   * Вимкнення категорії — не знижка й не штраф, а перерозподіл: вага
+264-   * зникає, решта нормується назад до одиниці, спільна стеля лишається
+265-   * тією самою. Через це ж і немає вигоди вмикати-вимикати категорію
+266-   * посеред сезону: більше за тижневу стелю все одно не взяти.
+267-   *
+268-   * Повертає НОВИЙ обʼєкт: cfg приходить із сервера один на весь екран, і
+269-   * правка на місці зачепила б усе, що його вже прочитало.
+270-   */
+271-  function cfgFor(cfg, skip) {
+272-    const src = (cfg && cfg.weights) || null;
+273-    if (!src) return cfg;
+274-    const drop = Array.isArray(skip) ? skip : [];
+275-    const keys = Object.keys(src).filter(function (k) { return drop.indexOf(k) === -1; });
+276-    /* Вимкнути все — це ділення на нуль і бюджет NaN. Такого вибору немає
+277-       в інтерфейсі, але конфіг приходить і з профілю, який могли правити
+278-       руками в експорті. */
+279-    if (!keys.length || keys.length === Object.keys(src).length) return cfg;
+280-
+281-    let sum = 0;
+282-    keys.forEach(function (k) { sum += Number(src[k]) || 0; });
+--
+293-  }
+294-
+295-  /** Тижневий бюджет категорії в ELO (без бонусної частки). */
+296:  function weeklyBudget(cat, cfg, elo) {
+297:    return cfg.weeklyBudget * pace(elo, cfg) * cfg.categoryShare * cfg.weights[cat];
+298-  }
+299-
+300:  function dailyBudget(cat, cfg, elo) { return weeklyBudget(cat, cfg, elo) / 7; }
+301-
+302-  /** Драбина якості: [[поріг, множник], …] згори вниз. */
+303-  function ladder(steps, x) {
+304-    for (let i = 0; i < steps.length; i++) {
+305-      if (x >= steps[i][0]) return steps[i][1];
+306-    }
+307-    return steps[steps.length - 1][1];
+308-  }
+309-
+310-  /* ---------------- Дії → якість і дельта ---------------- */
+311-  /*
+312-   * Кожна дія повертає { quality: 0..1 (до драбини), mult: множник,
+313-   * delta: ELO (округлене) }. ctx = { plannedDays, grace } — персональний
+314-   * план і активний grace week.
+315-   */
+316-
+317-  /*
+318-   * Тренування — ЛІНІЙНА пропорція, а не драбина: earned = base × done/total
+319-   * (етап «завершення тренування»). Закрив половину підходів — отримав
+320-   * половину вартості дня; драбини лишаються іншим категоріям. Якщо запис
+321-   * має підходи (doneSets/totalSets) — частка рахується по них, це точніше;
+322-   * старі записи без підходів рахуються по вправах, як раніше.
+323-   * Дзеркало серверної elo_action_delta (db/elo-proportional.sql).
+324-   */
+325-  function workoutDelta(payload, cfg, ctx) {
+--
+328-    const total = Math.max(1, Number(bySets ? payload.totalSets : payload.total) || 0);
+329-    const done = Number(bySets ? payload.doneSets : payload.done) || 0;
+330-    const q = clamp(done / total, 0, 1);
+331:    const per = weeklyBudget('training', cfg, ctx && ctx.elo) /
+332-                Math.max(1, Number(ctx && ctx.plannedDays) || 3);
+333-    return { quality: q, mult: q, delta: Math.round(per * q) };
+334-  }
+335-
+336-  function mealDelta(payload, cfg, ctx) {
+337-    const target = Number(payload.target) || 0;
+338-    const pTarget = Number(payload.proteinTarget) || 0;
+339-    const day = dailyBudget('nutrition', cfg, ctx && ctx.elo);
+340-    /*
+341-     * Без цільового білка (старі записи до етапу authoritative) калорії
+342-     * беруть УСЮ вагу категорії — як на сервері (db/elo-authoritative.sql,
+343-     * M5): інакше той самий день коштував би тут 55% від серверної оцінки,
+344-     * і оптимістична дельта з adherence розходилися б із рейтингом.
+345-     */
+346-    let kSh = cfg.nutritionSplit.kcal, pSh = cfg.nutritionSplit.protein;
+347-    if (pTarget <= 0) { kSh = 1; pSh = 0; }
+348-    let qK = 0, qP = 0;
+349-    if (target > 0) {
+350-      const dev = Math.abs((Number(payload.kcal) || 0) - target) / target;
+351-      /* Смуга відхилення: менше — краще. Драбина за |відхиленням|. */
+352-      const band = cfg.tolerance.kcalBand;
+353-      let mult = band[band.length - 1][1];
+354-      for (let i = 0; i < band.length; i++) {
+355-        if (dev <= band[i][0]) { mult = band[i][1]; break; }
+356-      }
+--
+483-   * день відпочинку — жодної. Людина дивилась на «+0 ELO» і робила з
+484-   * цього висновок про застій, хоч за тиждень набігало двадцять.
+485-   * Тиждень — природний крок цієї системи: бюджет ELO тижневий
+486:   * (weeklyBudget), план тренувань тижневий, штраф за пропуск теж
+487-   * рахується по тижню. Тому й підсумок має бути тижневий.
+488-   *
+489-   * events — те, що віддає elo_recent: [{day, delta, …}]. Порядок і
+490-   * зайві поля не важать; сміття ігнорується мовчки, бо єдина
+491-   * альтернатива — показати «—» замість числа через один зіпсований
+492-   * рядок історії.
+493-   *
+494-   * Порівняння рядків, а не дат: ключі 'YYYY-MM-DD' лексикографічно
+495-   * упорядковані так само, як хронологічно, і жодного розбору дати тут
+496-   * не потрібно.
+497-   */
+498-  function sumFrom(events, fromKey) {
+499-    if (!Array.isArray(events) || !/^\d{4}-\d{2}-\d{2}$/.test(String(fromKey))) return 0;
+500-    var from = String(fromKey);
+501-    var sum = 0;
+502-    for (var i = 0; i < events.length; i++) {
+503-      var e = events[i];
+504-      if (!e || typeof e !== 'object') continue;
+505-      var d = String(e.day || '');
+506-      var v = Number(e.delta);
+507-      if (d >= from && Number.isFinite(v)) sum += v;
+508-    }

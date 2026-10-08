@@ -1,0 +1,168 @@
+--- programs.js 160-250 ---
+    const totals = Object.create(null);
+    let untagged = 0;
+
+    plan.forEach(function (day) {
+      day.exercises.forEach(function (ex) {
+        const sets = Number(ex.sets) || 0;
+        // Тільки ГОЛОВНА група. Раніше тут стояв ms.forEach по всіх групах,
+        // і кожна складена вправа зараховувалась двічі — числа були завищені,
+        // а редактор на них ще й забороняв те, що в межу вкладалось.
+        const main = primaryMuscle(ex);
+        if (!main) { untagged += sets; return; }
+        totals[main] = (totals[main] || 0) + sets;
+      });
+    });
+
+    const rows = MUSCLES
+      .filter(function (m) { return totals[m.id]; })
+      .map(function (m) {
+        const sets = totals[m.id];
+        // Стан визначається однією величиною — стелею. «Оптимуму» тут немає
+        // навмисно: він читався як норма, якої треба досягти, хоча насправді
+        // існує лише межа, вище якої не варто.
+        let state, label;
+        if (sets > m.cap)       { state = 'over'; label = 'вище межі'; }
+        else if (sets === m.cap) { state = 'full'; label = 'на межі'; }
+        else                     { state = 'ok';   label = 'у межах'; }
+        return {
+          id: m.id, name: m.name, size: m.size, region: m.region || '',
+          sets: sets, cap: m.cap,
+          state: state, label: label
+        };
+      });
+
+    return { rows: rows, untagged: untagged };
+  }
+
+  function volumeBlock(plan) {
+    const v = weeklyVolume(plan);
+    if (!v.rows.length) return '';
+
+    const over = v.rows.filter(function (r) { return r.state === 'over'; });
+
+    const bars = v.rows.map(function (r, i) {
+      // Шкала завжди до межі: повна смуга = стеля. Так видно саме те,
+      // що потрібно, — скільки ще лишилось запасу.
+      const scale = Math.max(r.cap, r.sets);
+      const fill = r.sets / scale * 100;
+      return '' +
+        /* Регіон іде класом, а не стилем: відтінок належить темі, а не
+           цьому рядку розмітки. Стани (на межі, вище межі) фарбують смугу
+           поверх регіону — перебір важливіший за те, який це мʼяз. */
+        /* --i — номер рядка. З нього CSS рахує затримку появи, тож
+           список проявляється хвилею зверху вниз, а не стрибком. */
+        '<div class="vol vol--' + r.state +
+          (r.region ? ' vol--r-' + r.region : '') +
+          '" style="--i:' + i + '" title="' + esc(r.label) + '">' +
+          '<span class="vol__name">' + esc(r.name) + '</span>' +
+          '<span class="vol__bar"><i style="width:' + fill + '%"></i></span>' +
+          '<span class="vol__num mono">' + r.sets +
+            '<span class="vol__target">/' + r.cap + '</span>' +
+          '</span>' +
+        '</div>';
+    }).join('');
+
+    return '' +
+      '<hr class="divider">' +
+      '<h3 style="margin-bottom:4px">Підходів на тиждень по групах мʼязів</h3>' +
+      '<p class="small muted" style="margin-bottom:6px">' +
+        'Рахується з поточного плану. Видалите вправу — група зникне або впаде в цьому підсумку.' +
+      '</p>' +
+      '<p class="small muted" style="margin-bottom:18px">' +
+        'Числа праворуч: <b>факт / межа</b>. Повна смуга = стеля тижневого обʼєму: ' +
+        'велика група — ' + window.VOLUME_CAP.large + ' робочих підходів, мала — ' + window.VOLUME_CAP.small + '. ' +
+        'Більше редактор поставити не дасть.' +
+      '</p>' +
+      '<div class="vol-list">' + bars + '</div>' +
+
+      (over.length
+        ? '<div class="notice mt-2">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
+            '<div>Вище верхньої межі: ' +
+            over.map(function (r) { return '<b>' + esc(r.name) + '</b> ' + r.sets + ' при межі ' + r.cap; }).join(', ') +
+            '. Приберіть зайві підходи або перенесіть їх на групу, що недобирає.</div>' +
+          '</div>'
+        : '') +
+
+
+
+      (v.untagged
+        ? '<p class="small muted mt-1">' + v.untagged + ' підходів не віднесено до жодної групи — ' +
+          'у цих вправ не задано <code>muscles</code> і не розпізнано рухову модель.</p>'
+--- programs.js maxSetsFor ---
+   *
+   * @param {number} dayIdx день у плані
+   * @param {number} i      індекс вправи в дні
+   * @returns {number} від 1 до 10
+   */
+  function maxSetsFor(dayIdx, i) {
+    const target = state.plan[dayIdx].exercises[i];
+    const main = primaryMuscle(target);
+    if (!main) return 10;
+
+    const muscle = MUSCLES.find(function (m) { return m.id === main; });
+    if (!muscle) return 10;
+
+    let others = 0;
+    state.plan.forEach(function (day, di) {
+      day.exercises.forEach(function (ex, ei) {
+        if (di === dayIdx && ei === i) return;   // саму вправу не рахуємо
+        if (primaryMuscle(ex) !== main) return;
+        others += Number(ex.sets) || 0;
+      });
+    });
+
+    return clamp(muscle.cap - others, 1, 10);
+  }
+
+  /** Чи лишився запас у групі, щоб додати туди ще одну вправу */
+  function roomInMuscle(id) {
+    const muscle = MUSCLES.find(function (m) { return m.id === id; });
+    if (!muscle) return 0;
+    const v = weeklyVolume(state.plan);
+    const row = v.rows.find(function (r) { return r.id === id; });
+--- programs.js 2190-2218 ---
+      }
+
+      const main = primaryMuscle(found);
+      const room = main ? roomInMuscle(main) : 3;
+      if (room < 1) {
+        const muscle = MUSCLES.find(function (m) { return m.id === main; });
+        toast((muscle ? muscle.name : 'Група') + ' уже на межі ' +
+              (muscle ? muscle.cap : '') + ' підходів на тиждень', 'err');
+        return false;
+      }
+
+      list.push({
+        pattern: '', name: found.name, muscles: (found.muscles || []).slice(),
+        lift: found.lift,
+        sets: Math.min(3, room), reps: '8–12', rir: '2', rest: '90 с', note: ''
+      });
+      return true;
+    }
+    if (act === 'add-muscle' && value) {
+      // Група вже на стелі — нову вправу туди класти нікуди
+      const room = roomInMuscle(value);
+      if (room < 1) {
+        const muscle = MUSCLES.find(function (m) { return m.id === value; });
+        toast((muscle ? muscle.name : 'Група') + ' уже на межі ' +
+              (muscle ? muscle.cap : '') + ' підходів на тиждень', 'err');
+        return false;
+      }
+
+      /*
+--- exercises.js 100-112 ---
+  { id: 'adductors',  name: 'Привідні мʼязи стегна', size: 'small', region: 'legs' },
+  { id: 'abductors',  name: 'Відвідні мʼязи стегна', size: 'small', region: 'legs' },
+  { id: 'calves',     name: 'Ікри',                  size: 'small', region: 'legs' },
+  { id: 'neck',       name: 'Шия',                   size: 'small', region: 'core' },
+  { id: 'abs',        name: 'Прес',                  size: 'small', region: 'core' }
+].map(function (m) {
+  // Межа виводиться з розміру групи, щоб її не можна було випадково
+  // розсинхронізувати з VOLUME_CAP при правці списку. Явно заданий cap
+  // має пріоритет — це виняток для окремої групи, а не нове правило.
+  return Object.assign({ cap: VOLUME_CAP[m.size] }, m);
+});
+
+/* ============================================================================

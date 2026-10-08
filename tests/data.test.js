@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { loadExercises, loadFoods, loadModules } from './helpers.js';
 
 const W = loadExercises();
-const { MUSCLES, EXERCISES, VOLUME_CAP, musclesOfExercise, primaryMuscle, liftKind } = W;
+const { MUSCLES, EXERCISES, VOLUME_CAP, VOLUME_SOFT, musclesOfExercise, primaryMuscle, liftKind } = W;
 
 describe('групи мʼязів', () => {
   it('усі id унікальні', () => {
@@ -35,6 +35,11 @@ describe('групи мʼязів', () => {
      */
     assert.equal(VOLUME_CAP.large, 30, 'стеля великої групи');
     assert.equal(VOLUME_CAP.small, 30, 'стеля малої групи');
+    assert.equal(VOLUME_SOFT.large, 14, 'орієнтир великої групи');
+    assert.equal(VOLUME_SOFT.small, 12, 'орієнтир малої групи');
+    for (const m of MUSCLES) {
+      assert.ok(m.soft > 0 && m.soft <= m.cap, `група ${m.id}: soft ${m.soft} поза межами cap ${m.cap}`);
+    }
     for (const m of MUSCLES) {
       assert.equal(typeof m.cap, 'number', `група ${m.id}: cap не число`);
       assert.ok(m.cap <= VOLUME_CAP[m.size],

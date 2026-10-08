@@ -182,10 +182,11 @@
         let state, label;
         if (sets > m.cap)       { state = 'over'; label = 'вище межі'; }
         else if (sets === m.cap) { state = 'full'; label = 'на межі'; }
+        else if (sets > m.soft)  { state = 'full'; label = 'понад орієнтир'; }
         else                     { state = 'ok';   label = 'у межах'; }
         return {
           id: m.id, name: m.name, size: m.size, region: m.region || '',
-          sets: sets, cap: m.cap,
+          sets: sets, cap: m.cap, soft: m.soft,
           state: state, label: label
         };
       });
@@ -202,7 +203,8 @@
     const bars = v.rows.map(function (r, i) {
       // Шкала завжди до межі: повна смуга = стеля. Так видно саме те,
       // що потрібно, — скільки ще лишилось запасу.
-      const scale = Math.max(r.cap, r.sets);
+      const shown = r.sets > r.soft ? r.cap : r.soft;
+      const scale = Math.max(shown, r.sets);
       const fill = r.sets / scale * 100;
       return '' +
         /* Регіон іде класом, а не стилем: відтінок належить темі, а не
@@ -216,7 +218,7 @@
           '<span class="vol__name">' + esc(r.name) + '</span>' +
           '<span class="vol__bar"><i style="width:' + fill + '%"></i></span>' +
           '<span class="vol__num mono">' + r.sets +
-            '<span class="vol__target">/' + r.cap + '</span>' +
+            '<span class="vol__target">/' + shown + '</span>' +
           '</span>' +
         '</div>';
     }).join('');
@@ -228,9 +230,9 @@
         'Рахується з поточного плану. Видалите вправу — група зникне або впаде в цьому підсумку.' +
       '</p>' +
       '<p class="small muted" style="margin-bottom:18px">' +
-        'Числа праворуч: <b>факт / межа</b>. Повна смуга = стеля тижневого обʼєму: ' +
-        'велика група — ' + window.VOLUME_CAP.large + ' робочих підходів, мала — ' + window.VOLUME_CAP.small + '. ' +
-        'Більше редактор поставити не дасть.' +
+        'Числа праворуч: <b>факт / орієнтир</b>. Орієнтир: ' +
+        window.VOLUME_SOFT.large + ' підходів для великих груп, ' + window.VOLUME_SOFT.small + ' для малих. ' +
+        'Якщо поставити більше, шкала переходить на стелю в ' + window.VOLUME_CAP.large + ' підходів — вище редактор не дасть. ' +
       '</p>' +
       '<div class="vol-list">' + bars + '</div>' +
 
